@@ -335,7 +335,7 @@ def train(args):
     lm_cost = []
     acc = []
     time_begin = time.time()
-    while True:
+    while steps < args.num_train_steps:
         try:
             steps += nccl2_num_trainers
             skip_steps = args.skip_steps * nccl2_num_trainers
