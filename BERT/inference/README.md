@@ -28,25 +28,24 @@ src_id, pos_id, segment_id, self_attention_bias, next_segment_index
 
 ## 编译和运行
 
-为了编译 inference demo，`c++` 编译器需要支持 `C++11` 标准。
+为了编译 inference demo，`C++` 编译器需要支持 `C++11` 标准。
 
-首先下载对应的 [Fluid_inference库](http://paddlepaddle.org/documentation/docs/zh/1.2/advanced_usage/deploy/inference/build_and_install_lib_cn.html) , 根据使用的 paddle 的版本和配置状况 (是否使用 avx, mkl, 以及 cuda, cudnn 版本) 选择下载对应的版本，并解压至 `inference` 目录，会得到 `fluid_inference` 文件夹。
+首先下载对应的 [PaddlePaddle预测库](http://paddlepaddle.org/documentation/docs/zh/1.3/advanced_usage/deploy/inference/build_and_install_lib_cn.html) , 根据使用的 paddle 的版本和配置状况 (是否使用 avx, mkl, 以及 cuda, cudnn 版本) 选择下载对应的版本，并解压至 `inference` 目录，会得到 `fluid_inference` 子目录。
 
-设置运行相关的环境变量(以 `cpu_avx_mkl` 版本为例)
+假设`paddle_infer_lib_path`是刚才解压得到的`fluid_inference`子目录的绝对路径，设置运行相关的环境变量(以 `cpu_avx_mkl` 版本为例)
 
 ``` bash
-LD_LIBRARY_PATH=fluid_inference/paddle/lib/:$LD_LIBRARY_PATH
-LD_LIBRARY_PATH=fluid_inference/third_party/install/mklml/lib:$LD_LIBRARY_PATH
-LD_LIBRARY_PATH=fluid_inference/third_party/install/mkldnn/lib:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=${paddle_infer_lib_path}/paddle/lib/:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=${paddle_infer_lib_path}/third_party/install/mklml/lib:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=${paddle_infer_lib_path}/third_party/install/mkldnn/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH
 ```
 
 编译 demo
 
 ``` bash
-mkdir build
-cd build
-cmake
+mkdir build && cd build
+cmake .. -DFLUID_INFER_LIB=${paddle_infer_lib_path}
 make
 ```
 
@@ -60,12 +59,3 @@ make
     --data $DATA_PATH \
     --repeat $REPEAT_NUM
 ```
-
-## 性能测试
-
-E5-2680 CPU，单线程下196样本性能如下
-
-| repeat | 单样本耗时(ms) |
-| -----  | -----          |
-| 10     | 264.696        |
-| 50     | 264.84         |
