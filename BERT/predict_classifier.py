@@ -41,7 +41,7 @@ model_g.add_arg("use_fp16",                     bool, False, "Whether to resume 
 data_g = ArgumentGroup(parser, "data", "Data paths, vocab paths and data processing options.")
 data_g.add_arg("data_dir",      str,  None,  "Directory to test data.")
 data_g.add_arg("vocab_path",    str,  None,  "Vocabulary path.")
-data_g.add_arg("max_seq_len",   int,  512,   "Number of words of the longest seqence.")
+data_g.add_arg("max_seq_len",   int,  128,   "Number of words of the longest seqence.")
 data_g.add_arg("batch_size",    int,  32,    "Total examples' number in batch for training. see also --in_tokens.")
 data_g.add_arg("in_tokens",     bool, False,
               "If set, the batch size will be the maximum number of tokens in one batch. "
@@ -51,7 +51,6 @@ data_g.add_arg("do_lower_case", bool, True,
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",          bool,   True,  "If set, use GPU for training.")
-run_type_g.add_arg("use_fast_executor", bool,   False, "If set, use fast parallel executor (in experiment).")
 run_type_g.add_arg("task_name",         str,    None,
                    "The name of task to perform fine-tuning, should be in {'xnli', 'mnli', 'cola', 'mrpc'}.")
 run_type_g.add_arg("do_prediction",     bool,   True,  "Whether to do prediction on test set.")
