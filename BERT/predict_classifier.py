@@ -109,13 +109,13 @@ def main(args):
 
     # Due to the design that ParallelExecutor would drop small batches (mostly the last batch)
     # So using ParallelExecutor may left some data unpredicted
-    # if prediction of each and every example is needed, use Executor instead
+    # if prediction of each and every example is needed, please use Executor instead
     predict_exe = fluid.ParallelExecutor(
         use_cuda=args.use_cuda, main_program=predict_prog)
 
     predict_pyreader.decorate_tensor_provider(
         processor.data_generator(
-            batch_size=args.batch_size, phase='test', epoch=1))
+            batch_size=args.batch_size, phase='test', epoch=1, shuffle=False))
 
     predict_pyreader.start()
     all_results = []
