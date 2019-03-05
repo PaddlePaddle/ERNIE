@@ -44,7 +44,7 @@ model_g.add_arg("init_pretraining_params",  str,  None,
 model_g.add_arg("checkpoints",              str,  "checkpoints",  "Path to save checkpoints.")
 
 train_g = ArgumentGroup(parser, "training", "training options.")
-train_g.add_arg("epoch",             int,    100,     "Number of epoches for training.")
+train_g.add_arg("epoch",             int,    3,       "Number of epoches for fine-tuning.")
 train_g.add_arg("learning_rate",     float,  5e-5,    "Learning rate used to train with warmup.")
 train_g.add_arg("lr_scheduler",      str,    "linear_warmup_decay",
                 "scheduler of learning rate.", choices=['linear_warmup_decay', 'noam_decay'])
@@ -65,13 +65,13 @@ data_g = ArgumentGroup(parser, "data", "Data paths, vocab paths and data process
 data_g.add_arg("data_dir",      str,  None,  "Path to training data.")
 data_g.add_arg("vocab_path",    str,  None,  "Vocabulary path.")
 data_g.add_arg("max_seq_len",   int,  512,   "Number of words of the longest seqence.")
-data_g.add_arg("batch_size",    int,  32,  "Total examples' number in batch for training. see also --in_tokens.")
+data_g.add_arg("batch_size",    int,  32,    "Total examples' number in batch for training. see also --in_tokens.")
 data_g.add_arg("in_tokens",     bool, False,
               "If set, the batch size will be the maximum number of tokens in one batch. "
               "Otherwise, it will be the maximum number of examples in one batch.")
 data_g.add_arg("do_lower_case", bool, True,
                "Whether to lower case the input text. Should be True for uncased models and False for cased models.")
-data_g.add_arg("random_seed",   int,  0,  "Random seed.")
+data_g.add_arg("random_seed",   int,  0,     "Random seed.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")

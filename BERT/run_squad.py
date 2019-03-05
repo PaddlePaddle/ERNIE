@@ -43,16 +43,15 @@ model_g.add_arg("init_pretraining_params",  str,  None,
 model_g.add_arg("checkpoints",              str,  "checkpoints",  "Path to save checkpoints.")
 
 train_g = ArgumentGroup(parser, "training", "training options.")
-train_g.add_arg("epoch",             int,    100,     "Number of epoches for training.")
-train_g.add_arg("learning_rate",     float,  5e-5,    "Learning rate used to train with warmup.")
+train_g.add_arg("epoch",             int,    3,      "Number of epoches for fine-tuning.")
+train_g.add_arg("learning_rate",     float,  5e-5,   "Learning rate used to train with warmup.")
 train_g.add_arg("lr_scheduler",      str,    "linear_warmup_decay",
                 "scheduler of learning rate.", choices=['linear_warmup_decay', 'noam_decay'])
-train_g.add_arg("weight_decay",      float,  0.01,    "Weight decay rate for L2 regularizer.")
+train_g.add_arg("weight_decay",      float,  0.01,   "Weight decay rate for L2 regularizer.")
 train_g.add_arg("warmup_proportion", float,  0.1,
                 "Proportion of training steps to perform linear learning rate warmup for.")
-train_g.add_arg("save_steps",        int,    10000,   "The steps interval to save checkpoints.")
-train_g.add_arg("validation_steps",  int,    1000,    "The steps interval to evaluate model performance.")
-train_g.add_arg("use_fp16",          bool,   False,   "Whether to use fp16 mixed precision training.")
+train_g.add_arg("save_steps",        int,    1000,   "The steps interval to save checkpoints.")
+train_g.add_arg("use_fp16",          bool,   False,  "Whether to use fp16 mixed precision training.")
 train_g.add_arg("loss_scaling",      float,  1.0,
                 "Loss scaling factor for mixed precision training, only valid when use_fp16 is enabled.")
 
@@ -67,9 +66,9 @@ data_g.add_arg("vocab_path",                str,   None,  "Vocabulary path.")
 data_g.add_arg("version_2_with_negative",   bool,  False,
                "If true, the SQuAD examples contain some that do not have an answer. If using squad v2.0, it should be set true.")
 data_g.add_arg("max_seq_len",               int,   512,   "Number of words of the longest seqence.")
-data_g.add_arg("max_query_length",          int,   64,   "Max query length.")
-data_g.add_arg("max_answer_length",         int,   64,   "Max answer length.")
-data_g.add_arg("batch_size",                int,   12,  "Total samples' number in batch for training. see also --in_tokens.")
+data_g.add_arg("max_query_length",          int,   64,    "Max query length.")
+data_g.add_arg("max_answer_length",         int,   30,    "Max answer length.")
+data_g.add_arg("batch_size",                int,   12,    "Total examples' number in batch for training. see also --in_tokens.")
 data_g.add_arg("in_tokens",                 bool,  False,
                "If set, the batch size will be the maximum number of tokens in one batch. "
                "Otherwise, it will be the maximum number of examples in one batch.")
@@ -81,7 +80,7 @@ data_g.add_arg("n_best_size",               int,   20,
                "The total number of n-best predictions to generate in the nbest_predictions.json output file.")
 data_g.add_arg("null_score_diff_threshold", float, 0.0,
                "If null_score - best_non_null is greater than the threshold predict null.")
-data_g.add_arg("random_seed",               int,   0,  "Random seed.")
+data_g.add_arg("random_seed",               int,   0,      "Random seed.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",              bool,   True,  "If set, use GPU for training.")

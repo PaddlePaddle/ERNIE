@@ -20,7 +20,7 @@ from __future__ import print_function
 import numpy as np
 import argparse
 import collections
-from args import print_arguments
+from utils.args import print_arguments
 import tensorflow as tf
 import paddle.fluid as fluid
 from tensorflow.python import pywrap_tensorflow
