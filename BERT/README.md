@@ -12,7 +12,7 @@
 - 支持 BERT GPU 多卡 Fine-tuning
 - 提供 BERT 预测接口 demo, 方便多硬件设备生产环境的部署
 
-2）支持FP16/FP32混合精度训练和 Fine-tuning，节省显存开销、加速训练过程；
+2）支持 FP16/FP32 混合精度训练和 Fine-tuning，节省显存开销、加速训练过程；
 
 3）提供转换成 Paddle Fluid 参数格式的 [BERT 开源预训练模型](https://github.com/google-research/bert) 供下载，以进行下游任务的 Fine-tuning, 包括如下模型:
 
@@ -155,7 +155,7 @@ python -u run_classifier.py --task_name ${TASK_NAME} \
                    --num_iteration_per_drop_scope 1
 ```
 
-这里的 `chinese_L-12_H-768_A-12` 即是转换后的中文预训练模型。需要注意的是，BERT 支持按两种方式构建一个 batch 的数据，`in_tokens` 参数影响 `batch_size` 参数的意义，如果 `in_tokens` 为 `true` 则按照 token 个数构建 batch, 如不设定则按照 example 个数来构建 batch. 训练过程中会输出训练误差、训练速度等信息，训练结束后会输出如下所示的在验证集上的测试结果：
+这里的 `chinese_L-12_H-768_A-12` 即是转换后的中文预训练模型。需要注意的是，BERT on PaddlePaddle 支持按两种方式构建一个 batch 的数据，`in_tokens` 参数影响 `batch_size` 参数的意义，如果 `in_tokens` 为 `true` 则按照 token 个数构建 batch, 如不设定则按照 example 个数来构建 batch. 训练过程中会输出训练误差、训练速度等信息，训练结束后会输出如下所示的在验证集上的测试结果：
 
 ```
 [dev evaluation] ave loss: 0.622958, ave acc: 0.770281, elapsed time: 8.946956 s
