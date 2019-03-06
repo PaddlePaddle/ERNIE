@@ -120,7 +120,7 @@ export current_endpoint=192.168.0.17:9185
 
 ### 语句和句对分类任务
 
-对于 [GLUE 数据](https://gluebenchmark.com/tasks)，请运行这个[脚本](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e)予以下载; 对于 XNLI 任务，则需分别下载 [XNLI dev/test set](https://s3.amazonaws.com/xnli/XNLI-1.0.zip) 和 [XNLI machine-translated training set ](https://s3.amazonaws.com/xnli/XNLI-MT-1.0.zip)，然后解压到同一个目录。以 XNLI 任务为例，启动 Fine-tuning 的方式如下：
+对于 [GLUE 数据](https://gluebenchmark.com/tasks)，请运行这个[脚本](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e)予以下载; 对于 XNLI 任务，则需分别下载 [XNLI dev/test set](https://bert-data.bj.bcebos.com/XNLI-1.0.zip) 和 [XNLI machine-translated training set](https://bert-data.bj.bcebos.com/XNLI-MT-1.0.zip)，然后解压到同一个目录。以 XNLI 任务为例，启动 Fine-tuning 的方式如下：
 
 ```shell
 export FLAGS_enable_parallel_graph=1
