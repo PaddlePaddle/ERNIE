@@ -36,6 +36,7 @@ class DataReader(object):
                  data_dir,
                  vocab_path,
                  batch_size=4096,
+                 in_tokens=True,
                  max_seq_len=512,
                  shuffle_files=True,
                  epoch=100,
@@ -46,6 +47,7 @@ class DataReader(object):
         self.vocab = self.load_vocab(vocab_path)
         self.data_dir = data_dir
         self.batch_size = batch_size
+        self.in_tokens = in_tokens
         self.shuffle_files = shuffle_files
         self.epoch = epoch
         self.current_epoch = 0
@@ -60,8 +62,6 @@ class DataReader(object):
         self.mask_id = self.vocab["[MASK]"]
         self.is_test = is_test
         self.generate_neg_sample = generate_neg_sample
-        assert self.batch_size > 100, "Current batch size means total token's number, \
-                                       it should not be set to too small number."
 
         if self.is_test:
             self.epoch = 1
@@ -245,12 +245,16 @@ class DataReader(object):
                                 continue
                             yield sample
 
-            def batch_reader(reader, batch_size):
+            def batch_reader(reader, batch_size, in_tokens):
                 batch, total_token_num, max_len = [], 0, 0
                 for parsed_line in reader():
                     token_ids, sent_ids, pos_ids, label = parsed_line
                     max_len = max(max_len, len(token_ids))
-                    if (len(batch) + 1) * max_len <= batch_size:
+                    if in_tokens:
+                        to_append = (len(batch) + 1) * max_len <= batch_size
+                    else:
+                        to_append = len(batch) < batch_size
+                    if to_append:
                         batch.append(parsed_line)
                         total_token_num += len(token_ids)
                     else:
@@ -261,8 +265,8 @@ class DataReader(object):
                 if len(batch) > 0:
                     yield batch, total_token_num
 
-            for batch_data, total_token_num in batch_reader(reader,
-                                                            self.batch_size):
+            for batch_data, total_token_num in batch_reader(
+                    reader, self.batch_size, self.in_tokens):
                 yield prepare_batch_data(
                     batch_data,
                     total_token_num,

@@ -61,14 +61,15 @@ log_g.add_arg("verbose",             bool,   False, "Whether to output verbose l
 
 data_g = ArgumentGroup(parser, "data", "Data paths, vocab paths and data processing options")
 data_g.add_arg("data_dir",            str,  "./data/train/",       "Path to training data.")
-data_g.add_arg("validation_set_dir",  str,  "./data/validation/",  "Path to training data.")
-data_g.add_arg("test_set_dir",        str,  None,                  "Path to training data.")
+data_g.add_arg("validation_set_dir",  str,  "./data/validation/",  "Path to validation data.")
+data_g.add_arg("test_set_dir",        str,  None,                  "Path to test data.")
 data_g.add_arg("vocab_path",          str,  "./config/vocab.txt",  "Vocabulary path.")
-data_g.add_arg("max_seq_len",         int,  512,                   "Number of words of the longest seqence.")
-data_g.add_arg("batch_size",          int,  16,                    "Total examples' number in batch for training. see also --in_tokens.")
-data_g.add_arg("in_tokens",           bool, False,
-              "If set, the batch size will be the maximum number of tokens in one batch. "
-              "Otherwise, it will be the maximum number of examples in one batch.")
+data_g.add_arg("max_seq_len",         int,  512,                   "Tokens' number of the longest seqence allowed.")
+data_g.add_arg("batch_size",          int,  8192,
+               "The total number of examples in one batch for training, see also --in_tokens.")
+data_g.add_arg("in_tokens",           bool, True,
+               "If set, the batch size will be the maximum number of tokens in one batch. "
+               "Otherwise, it will be the maximum number of examples in one batch.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("is_distributed",    bool,   False,  "If set, then start distributed training.")
@@ -128,6 +129,7 @@ def predict_wrapper(args,
         data_path,
         vocab_path=args.vocab_path,
         batch_size=args.batch_size,
+        in_tokens=args.in_tokens,
         voc_size=bert_config['vocab_size'],
         shuffle_files=False,
         epoch=1,
@@ -250,9 +252,16 @@ def train(args):
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
 
     print("Device count %d" % dev_count)
-    print("theoretical memory usage: ")
-    print(fluid.contrib.memory_usage(
-        program=train_program, batch_size=args.batch_size // args.max_seq_len))
+    if args.verbose:
+        if args.in_tokens:
+            lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
+         program=train_program,
+         batch_size=args.batch_size // args.max_seq_len)
+        else:
+            lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
+         program=train_program, batch_size=args.batch_size)
+        print("Theoretical memory usage in training: %.3f - %.3f %s" %
+              (lower_mem, upper_mem, unit))
 
     nccl2_num_trainers = 1
     nccl2_trainer_id = 0
@@ -293,6 +302,7 @@ def train(args):
     data_reader = DataReader(
         data_dir=args.data_dir,
         batch_size=args.batch_size,
+        in_tokens=args.in_tokens,
         vocab_path=args.vocab_path,
         voc_size=bert_config['vocab_size'],
         epoch=args.epoch,
