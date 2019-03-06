@@ -62,6 +62,9 @@ class DataReader(object):
         self.mask_id = self.vocab["[MASK]"]
         self.is_test = is_test
         self.generate_neg_sample = generate_neg_sample
+        if self.in_tokens:
+            assert self.batch_size >= self.max_seq_len, "The number of " \
+                   "tokens in batch should not be smaller than max seq length."
 
         if self.is_test:
             self.epoch = 1
