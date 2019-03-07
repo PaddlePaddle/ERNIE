@@ -138,7 +138,7 @@ python -u run_classifier.py --task_name ${TASK_NAME} \
                    --do_val true \
                    --do_test true \
                    --batch_size 8192 \
-                   --in_tokens \
+                   --in_tokens true \
                    --init_pretraining_params ${BERT_BASE_PATH}/params \
                    --data_dir ${DATA_PATH} \
                    --vocab_path ${BERT_BASE_PATH}/vocab.txt \
@@ -338,12 +338,12 @@ DATA_PATH=/path/to/xnli/data/
 INIT_CKPT_PATH=/path/to/a/finetuned/checkpoint/
 
 python -u predict_classifier.py --task_name ${TASK_NAME} \
-       --use_cuda \
+       --use_cuda true \
        --batch_size 64 \
        --data_dir ${DATA_PATH} \
        --vocab_path ${BERT_BASE_PATH}/vocab.txt \
        --init_checkpoint ${INIT_CKPT_PATH} \
-       --do_lower_case \
+       --do_lower_case true \
        --max_seq_len 128 \
        --bert_config_path ${BERT_BASE_PATH}/bert_config.json \
        --do_predict true \
