@@ -206,10 +206,10 @@ python -u run_squad.py --use_cuda true\
                     --epoch 2 \
                     --max_seq_len 384 \
                     --bert_config_path ${BERT_BASE_PATH}/bert_config.json \
-                    --predict_file S{SQUAD_PATH}/dev-v1.1.json \
+                    --predict_file ${SQUAD_PATH}/dev-v1.1.json \
                     --do_lower_case true \
                     --doc_stride 128 \
-                    --train_file S{SQUAD_PATH}/train-v1.1.json \
+                    --train_file ${SQUAD_PATH}/train-v1.1.json \
                     --learning_rate 3e-5 \
                     --lr_scheduler linear_warmup_decay \
                     --skip_steps 10 \
@@ -250,10 +250,10 @@ python -u run_squad.py --use_cuda true \
                     --epoch 2 \
                     --max_seq_len 384 \
                     --bert_config_path ${BERT_BASE_PATH}/bert_config.json \
-                    --predict_file S{SQUAD_PATH}/dev-v2.0.json \
+                    --predict_file ${SQUAD_PATH}/dev-v2.0.json \
                     --do_lower_case true \
                     --doc_stride 128 \
-                    --train_file S{SQUAD_PATH}/train-v2.0.json \
+                    --train_file ${SQUAD_PATH}/train-v2.0.json \
                     --learning_rate 3e-5 \
                     --skip_steps 10 \
                     --lr_scheduler linear_warmup_decay \
