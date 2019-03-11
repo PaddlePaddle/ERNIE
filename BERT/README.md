@@ -151,8 +151,7 @@ python -u run_classifier.py --task_name ${TASK_NAME} \
                    --max_seq_len 512 \
                    --bert_config_path ${BERT_BASE_PATH}/bert_config.json \
                    --learning_rate 1e-4 \
-                   --skip_steps 10 \
-                   --num_iteration_per_drop_scope 1
+                   --skip_steps 10
 ```
 
 这里的 `chinese_L-12_H-768_A-12` 即是转换后的中文预训练模型。需要注意的是，BERT on PaddlePaddle 支持按两种方式构建一个 batch 的数据，`in_tokens` 参数影响 `batch_size` 参数的意义，如果 `in_tokens` 为 `true` 则按照 token 个数构建 batch, 如不设定则按照 example 个数来构建 batch. 训练过程中会输出训练误差、训练速度等信息，训练结束后会输出如下所示的在验证集上的测试结果：
