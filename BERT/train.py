@@ -313,7 +313,6 @@ def train(args):
     if args.use_fast_executor:
         exec_strategy.use_experimental_executor = True
     exec_strategy.num_threads = dev_count
-    exec_strategy.num_iteration_per_drop_scope = min(10, args.skip_steps)
 
     build_strategy = fluid.BuildStrategy()
     build_strategy.remove_unnecessary_lock = False
