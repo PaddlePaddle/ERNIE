@@ -19,7 +19,15 @@ from __future__ import print_function
 
 import numpy as np
 
-def mask(batch_tokens, seg_labels, mask_word_tags, total_token_num, vocab_size, CLS=1, SEP=2, MASK=3):
+
+def mask(batch_tokens,
+         seg_labels,
+         mask_word_tags,
+         total_token_num,
+         vocab_size,
+         CLS=1,
+         SEP=2,
+         MASK=3):
     """
     Add mask for batch_tokens, return out, mask_label, mask_pos;
     Note: mask_pos responding the batch_tokens after padded;
@@ -90,7 +98,8 @@ def mask(batch_tokens, seg_labels, mask_word_tags, total_token_num, vocab_size, 
                     # random replace
                     if token != SEP and token != CLS:
                         mask_label.append(sent[token_index])
-                        sent[token_index] = replace_ids[prob_index + token_index]
+                        sent[token_index] = replace_ids[prob_index +
+                                                        token_index]
                         mask_flag = True
                         mask_pos.append(sent_index * max_len + token_index)
                 else:
@@ -143,7 +152,10 @@ def prepare_batch_data(insts,
     pos_id = pad_batch_data(batch_pos_ids, pad_idx=pad_id)
     sent_id = pad_batch_data(batch_sent_ids, pad_idx=pad_id)
 
-    return_list = [src_id, pos_id, sent_id, self_attn_bias, mask_label, mask_pos, labels, next_sent_index]
+    return_list = [
+        src_id, pos_id, sent_id, self_attn_bias, mask_label, mask_pos, labels,
+        next_sent_index
+    ]
 
     return return_list
 
@@ -207,4 +219,5 @@ def pad_batch_data(insts,
 
 
 if __name__ == "__main__":
+
     pass

@@ -30,6 +30,7 @@ import paddle.fluid as fluid
 
 from batching import prepare_batch_data
 
+
 class ErnieDataReader(object):
     def __init__(self,
                  filelist,
@@ -81,8 +82,8 @@ class ErnieDataReader(object):
         sent_ids = [int(token) for token in sent_ids.split(" ")]
         pos_ids = [int(token) for token in pos_ids.split(" ")]
         seg_labels = [int(seg_label) for seg_label in seg_labels.split(" ")]
-        assert len(token_ids) == len(sent_ids) == len(
-            pos_ids) == len(seg_labels
+        assert len(token_ids) == len(sent_ids) == len(pos_ids) == len(
+            seg_labels
         ), "[Must be true]len(token_ids) == len(sent_ids) == len(pos_ids) == len(seg_labels)"
         label = int(label)
         if len(token_ids) > max_seq_len:
@@ -153,14 +154,17 @@ class ErnieDataReader(object):
             if left_len <= max_len:
                 return (token_seq[1:sep_index], seg_labels[1:sep_index])
             else:
-                return [token_seq[sep_index + 1: -1], seg_labels[sep_index + 1 : -1]]
+                return [
+                    token_seq[sep_index + 1:-1], seg_labels[sep_index + 1:-1]
+                ]
 
         for i in range(num_sample):
             pair_index = (i + 1) % num_sample
-            left_tokens, left_seg_labels = split_sent(pos_samples[i],
-                    (self.max_seq_len - 3) // 2, self.sep_id)
-            right_tokens, right_seg_labels = split_sent(pos_samples[pair_index],
-                    self.max_seq_len - 3 - len(left_tokens), self.sep_id)
+            left_tokens, left_seg_labels = split_sent(
+                pos_samples[i], (self.max_seq_len - 3) // 2, self.sep_id)
+            right_tokens, right_seg_labels = split_sent(
+                pos_samples[pair_index],
+                self.max_seq_len - 3 - len(left_tokens), self.sep_id)
 
             token_seq = [self.cls_id] + left_tokens + [self.sep_id] + \
                     right_tokens + [self.sep_id]
