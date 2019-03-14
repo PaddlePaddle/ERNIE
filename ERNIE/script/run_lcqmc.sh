@@ -10,7 +10,7 @@ python -u run_classifier.py \
                    --do_val true \
                    --do_test true \
                    --batch_size 32 \
-                   --init_pretraining_params ${MODEL_PATH} \
+                   --init_pretraining_params ${MODEL_PATH}/params \
                    --train_set ${TASK_DATA_PATH}/lcqmc/train.tsv \
                    --dev_set ${TASK_DATA_PATH}/lcqmc/dev.tsv \
                    --test_set ${TASK_DATA_PATH}/lcqmc/test.tsv \

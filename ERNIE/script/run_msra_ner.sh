@@ -9,9 +9,9 @@ python -u run_sequence_labeling.py \
                    --do_val true \
                    --do_test true \
                    --batch_size 16 \
-                   --init_pretraining_params ${MODEL_PATH} \
+                   --init_pretraining_params ${MODEL_PATH}/params \
                    --num_labels 7 \
-                   --label_map_config ${TASK_DATA_PATH}/label_map.json \
+                   --label_map_config ${TASK_DATA_PATH}/msra_ner/label_map.json \
                    --train_set ${TASK_DATA_PATH}/msra_ner/train.tsv \
                    --dev_set ${TASK_DATA_PATH}/msra_ner/dev.tsv \
                    --test_set ${TASK_DATA_PATH}/msra_ner/test.tsv \

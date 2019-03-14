@@ -11,7 +11,7 @@ python -u run_classifier.py \
                    --verbose true \
                    --batch_size 8192 \
                    --in_tokens true \
-                   --init_pretraining_params ${MODEL_PATH} \
+                   --init_pretraining_params ${MODEL_PATH}/params \
                    --train_set ${TASK_DATA_PATH}/xnli/train.tsv \
                    --dev_set ${TASK_DATA_PATH}/xnli/dev.tsv \
                    --test_set ${TASK_DATA_PATH}/xnli/test.tsv \
