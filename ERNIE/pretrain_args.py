@@ -38,7 +38,7 @@ train_g.add_arg("lr_scheduler",      str,    "linear_warmup_decay",
                 "scheduler of learning rate.", choices=['linear_warmup_decay', 'noam_decay'])
 train_g.add_arg("weight_decay",      float,  0.01,    "Weight decay rate for L2 regularizer.")
 train_g.add_arg("num_train_steps",   int,    1000000, "Total steps to perform pretraining.")
-train_g.add_arg("warmup_steps",      int,    4000,    "Total steps to perform warmup when pretraining.")
+train_g.add_arg("warmup_steps",      int,    5000,    "Total steps to perform warmup when pretraining.")
 train_g.add_arg("save_steps",        int,    10000,   "The steps interval to save checkpoints.")
 train_g.add_arg("validation_steps",  int,    1000,    "The steps interval to evaluate model performance.")
 train_g.add_arg("use_fp16",          bool,   False,   "Whether to use fp16 mixed precision training.")
