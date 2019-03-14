@@ -62,7 +62,7 @@ class BaseReader(object):
             reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
             headers = next(reader)
             Example = namedtuple('Example', headers)
-                
+
             examples = []
             for line in reader:
                 example = Example(*line)
@@ -85,7 +85,7 @@ class BaseReader(object):
             else:
                 tokens_b.pop()
 
-    def _convert_example_to_record(self, example,  max_seq_length, tokenizer):
+    def _convert_example_to_record(self, example, max_seq_length, tokenizer):
         """Converts a single `Example` into a single `Record`."""
 
         text_a = tokenization.convert_to_unicode(example.text_a)
@@ -148,7 +148,9 @@ class BaseReader(object):
         else:
             label_id = example.label
 
-        Record = namedtuple('Record', ['token_ids', 'text_type_ids', 'position_ids', 'label_id', 'qid'])
+        Record = namedtuple(
+            'Record',
+            ['token_ids', 'text_type_ids', 'position_ids', 'label_id', 'qid'])
 
         qid = None
         if "qid" in example._fields:
@@ -164,11 +166,12 @@ class BaseReader(object):
 
     def _prepare_batch_data(self, examples, batch_size, phase=None):
         """generate batch records"""
-        batch_records,  max_len = [], 0
+        batch_records, max_len = [], 0
         for index, example in enumerate(examples):
             if phase == "train":
                 self.current_example = index
-            record = self._convert_example_to_record(example, self.max_seq_len, self.tokenizer)
+            record = self._convert_example_to_record(example, self.max_seq_len,
+                                                     self.tokenizer)
             max_len = max(max_len, len(record.token_ids))
             if self.in_tokens:
                 to_append = (len(batch_records) + 1) * max_len <= batch_size
@@ -187,7 +190,12 @@ class BaseReader(object):
         examples = self._read_tsv(input_file)
         return len(examples)
 
-    def data_generator(self, input_file, batch_size, epoch, shuffle=True, phase=None):
+    def data_generator(self,
+                       input_file,
+                       batch_size,
+                       epoch,
+                       shuffle=True,
+                       phase=None):
         examples = self._read_tsv(input_file)
 
         def wrapper():
@@ -198,8 +206,10 @@ class BaseReader(object):
                 if shuffle:
                     np.random.shuffle(examples)
 
-                for batch_data in self._prepare_batch_data(examples, batch_size, phase=phase):
+                for batch_data in self._prepare_batch_data(
+                        examples, batch_size, phase=phase):
                     yield batch_data
+
         return wrapper
 
 
@@ -209,9 +219,11 @@ class ClassifyReader(BaseReader):
         with open(input_file, "r") as f:
             reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
             headers = next(reader)
-            text_indices = [index for index, h in enumerate(headers) if h != "label"]
+            text_indices = [
+                index for index, h in enumerate(headers) if h != "label"
+            ]
             Example = namedtuple('Example', headers)
-            
+
             examples = []
             for line in reader:
                 for index, text in enumerate(line):
@@ -219,8 +231,8 @@ class ClassifyReader(BaseReader):
                         line[index] = text.replace(' ', '')
                 example = Example(*line)
                 examples.append(example)
-            return examples 
-    
+            return examples
+
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
         batch_text_type_ids = [record.text_type_ids for record in batch_records]
@@ -236,33 +248,50 @@ class ClassifyReader(BaseReader):
 
         # padding
         padded_token_ids, next_sent_index, self_attn_bias = pad_batch_data(
-            batch_token_ids, pad_idx=self.pad_id, return_next_sent_pos=True, return_attn_bias=True)
-        padded_text_type_ids = pad_batch_data(batch_text_type_ids, pad_idx=self.pad_id)
-        padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=self.pad_id)
+            batch_token_ids,
+            pad_idx=self.pad_id,
+            return_next_sent_pos=True,
+            return_attn_bias=True)
+        padded_text_type_ids = pad_batch_data(
+            batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(
+            batch_position_ids, pad_idx=self.pad_id)
 
-        return_list = [padded_token_ids, padded_text_type_ids, padded_position_ids, self_attn_bias, batch_labels, next_sent_index, batch_qids]
+        return_list = [
+            padded_token_ids, padded_text_type_ids, padded_position_ids,
+            self_attn_bias, batch_labels, next_sent_index, batch_qids
+        ]
 
         return return_list
 
 
 class SequenceLabelReader(BaseReader):
-
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
         batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
         batch_label_ids = [record.label_ids for record in batch_records]
-        batch_seq_lens =  [len(record.token_ids) for record in batch_records]
+        batch_seq_lens = [len(record.token_ids) for record in batch_records]
 
         # padding
         padded_token_ids, self_attn_bias = pad_batch_data(
-            batch_token_ids, pad_idx=self.pad_id, return_next_sent_pos=False, return_attn_bias=True)
-        padded_text_type_ids = pad_batch_data(batch_text_type_ids, pad_idx=self.pad_id)
-        padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=self.pad_id)
-        padded_label_ids = pad_batch_data(batch_label_ids, pad_idx=len(self.label_map)-1)
-        batch_seq_lens = np.array(batch_seq_lens).astype("int64").reshape([-1, 1])
+            batch_token_ids,
+            pad_idx=self.pad_id,
+            return_next_sent_pos=False,
+            return_attn_bias=True)
+        padded_text_type_ids = pad_batch_data(
+            batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(
+            batch_position_ids, pad_idx=self.pad_id)
+        padded_label_ids = pad_batch_data(
+            batch_label_ids, pad_idx=len(self.label_map) - 1)
+        batch_seq_lens = np.array(batch_seq_lens).astype("int64").reshape(
+            [-1, 1])
 
-        return_list = [padded_token_ids, padded_text_type_ids, padded_position_ids, self_attn_bias, padded_label_ids, batch_seq_lens]
+        return_list = [
+            padded_token_ids, padded_text_type_ids, padded_position_ids,
+            self_attn_bias, padded_label_ids, batch_seq_lens
+        ]
         return return_list
 
     def _reseg_token_label(self, tokens, labels, tokenizer):
@@ -285,7 +314,7 @@ class SequenceLabelReader(BaseReader):
         assert len(ret_tokens) == len(ret_labels)
         return ret_tokens, ret_labels
 
-    def _convert_example_to_record(self, example,  max_seq_length, tokenizer):
+    def _convert_example_to_record(self, example, max_seq_length, tokenizer):
         tokens = tokenization.convert_to_unicode(example.text_a).split(u"")
         labels = tokenization.convert_to_unicode(example.label).split(u"")
         tokens, labels = self._reseg_token_label(tokens, labels, tokenizer)
@@ -297,17 +326,22 @@ class SequenceLabelReader(BaseReader):
         tokens = ["[CLS]"] + tokens + ["[SEP]"]
         token_ids = tokenizer.convert_tokens_to_ids(tokens)
         position_ids = list(range(len(token_ids)))
-        text_type_ids = [0] * len(token_ids) 
+        text_type_ids = [0] * len(token_ids)
         no_entity_id = len(self.label_map) - 1
-        label_ids = [no_entity_id] + [self.label_map[label] for label in labels] + [no_entity_id]
+        label_ids = [no_entity_id] + [
+            self.label_map[label] for label in labels
+        ] + [no_entity_id]
 
-        Record = namedtuple('Record', ['token_ids', 'text_type_ids', 'position_ids', 'label_ids'])
+        Record = namedtuple(
+            'Record',
+            ['token_ids', 'text_type_ids', 'position_ids', 'label_ids'])
         record = Record(
             token_ids=token_ids,
             text_type_ids=text_type_ids,
             position_ids=position_ids,
             label_ids=label_ids)
         return record
+
 
 if __name__ == '__main__':
     pass

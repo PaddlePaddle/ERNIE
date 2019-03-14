@@ -25,22 +25,20 @@ import paddle.fluid as fluid
 from model.ernie import ErnieModel
 
 
-def create_model(args,
-                 pyreader_name,
-                 ernie_config,
-                 is_prediction=False):
+def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     pyreader = fluid.layers.py_reader(
         capacity=50,
         shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
                 [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, args.max_seq_len], [-1, 1], [-1, 1], [-1, 1]],
+                [-1, args.max_seq_len, args.max_seq_len], [-1, 1], [-1, 1],
+                [-1, 1]],
         dtypes=['int64', 'int64', 'int64', 'float', 'int64', 'int64', 'int64'],
         lod_levels=[0, 0, 0, 0, 0, 0, 0],
         name=pyreader_name,
         use_double_buffer=True)
 
-    (src_ids, sent_ids, pos_ids, self_attn_mask, labels,
-     next_sent_index, qids) = fluid.layers.read_file(pyreader)
+    (src_ids, sent_ids, pos_ids, self_attn_mask, labels, next_sent_index,
+     qids) = fluid.layers.read_file(pyreader)
 
     ernie = ErnieModel(
         src_ids=src_ids,
@@ -57,7 +55,7 @@ def create_model(args,
         dropout_implementation="upscale_in_train")
     logits = fluid.layers.fc(
         input=cls_feats,
-        size=ernie_config["num_labels"],
+        size=args.num_labels,
         param_attr=fluid.ParamAttr(
             name="cls_out_w",
             initializer=fluid.initializer.TruncatedNormal(scale=0.02)),
@@ -82,17 +80,20 @@ def create_model(args,
     num_seqs = fluid.layers.create_tensor(dtype='int64')
     accuracy = fluid.layers.accuracy(input=probs, label=labels, total=num_seqs)
 
-    graph_vars = {"loss": loss,
-                  "probs": probs,
-                  "accuracy": accuracy,
-                  "labels": labels,
-                  "num_seqs": num_seqs,
-                  "qids": qids}
+    graph_vars = {
+        "loss": loss,
+        "probs": probs,
+        "accuracy": accuracy,
+        "labels": labels,
+        "num_seqs": num_seqs,
+        "qids": qids
+    }
 
     for k, v in graph_vars.items():
-        v.persistable=True
+        v.persistable = True
 
     return pyreader, graph_vars
+
 
 def evaluate_mrr(preds):
     last_qid = None
@@ -113,6 +114,7 @@ def evaluate_mrr(preds):
             correct = True
 
     return total_mrr / qnum
+
 
 def evaluate_map(preds):
     def singe_map(st, en):
@@ -142,17 +144,18 @@ def evaluate_map(preds):
     total_map += singe_map(st, len(preds))
     return total_map / qnum
 
+
 def evaluate(exe, test_program, test_pyreader, graph_vars, eval_phase):
-    train_fetch_list = [graph_vars["loss"].name,
-                        graph_vars["accuracy"].name,
-                        graph_vars["num_seqs"].name
-                       ] 
+    train_fetch_list = [
+        graph_vars["loss"].name, graph_vars["accuracy"].name,
+        graph_vars["num_seqs"].name
+    ]
 
     if eval_phase == "train":
         if "learning_rate" in graph_vars:
             train_fetch_list.append(graph_vars["learning_rate"].name)
         outputs = exe.run(fetch_list=train_fetch_list)
-        ret = {"loss":np.mean(outputs[0]), "accuracy":np.mean(outputs[1])}
+        ret = {"loss": np.mean(outputs[0]), "accuracy": np.mean(outputs[1])}
         if "learning_rate" in graph_vars:
             ret["learning_rate"] = float(outputs[4][0])
         return ret
@@ -162,22 +165,21 @@ def evaluate(exe, test_program, test_pyreader, graph_vars, eval_phase):
     qids, labels, scores = [], [], []
     time_begin = time.time()
 
-    fetch_list = [graph_vars["loss"].name,
-                  graph_vars["accuracy"].name,
-                  graph_vars["probs"].name,
-                  graph_vars["labels"].name,
-                  graph_vars["num_seqs"].name,
-                  graph_vars["qids"].name]
+    fetch_list = [
+        graph_vars["loss"].name, graph_vars["accuracy"].name,
+        graph_vars["probs"].name, graph_vars["labels"].name,
+        graph_vars["num_seqs"].name, graph_vars["qids"].name
+    ]
     while True:
         try:
-            np_loss, np_acc, np_probs, np_labels, np_num_seqs, np_qids = exe.run(program=test_program,
-                                                                                 fetch_list=fetch_list)
+            np_loss, np_acc, np_probs, np_labels, np_num_seqs, np_qids = exe.run(
+                program=test_program, fetch_list=fetch_list)
             total_cost += np.sum(np_loss * np_num_seqs)
             total_acc += np.sum(np_acc * np_num_seqs)
             total_num_seqs += np.sum(np_num_seqs)
             labels.extend(np_labels.reshape((-1)).tolist())
             qids.extend(np_qids.reshape(-1).tolist())
-            scores.extend(np_probs[:,1].reshape(-1).tolist())
+            scores.extend(np_probs[:, 1].reshape(-1).tolist())
             np_preds = np.argmax(np_probs, axis=1).astype(np.float32)
             total_label_pos_num += np.sum(np_labels)
             total_pred_pos_num += np.sum(np_preds)
@@ -188,20 +190,23 @@ def evaluate(exe, test_program, test_pyreader, graph_vars, eval_phase):
     time_end = time.time()
 
     if len(qids) == 0:
-        print("[%s evaluation] ave loss: %f, ave acc: %f, data_num: %d, elapsed time: %f s" %
-            (eval_phase, total_cost / total_num_seqs,
-            total_acc / total_num_seqs, total_num_seqs, time_end - time_begin))
+        print(
+            "[%s evaluation] ave loss: %f, ave acc: %f, data_num: %d, elapsed time: %f s"
+            % (eval_phase, total_cost / total_num_seqs, total_acc /
+               total_num_seqs, total_num_seqs, time_end - time_begin))
     else:
         r = total_correct_num / total_label_pos_num
         p = total_correct_num / total_pred_pos_num
         f = 2 * p * r / (p + r)
 
         assert len(qids) == len(labels) == len(scores)
-        preds = sorted(zip(qids, scores, labels), key=lambda elem:(elem[0], -elem[1]))
+        preds = sorted(
+            zip(qids, scores, labels), key=lambda elem: (elem[0], -elem[1]))
         mrr = evaluate_mrr(preds)
         map = evaluate_map(preds)
 
-        print("[%s evaluation] ave loss: %f, ave_acc: %f, mrr: %f, map: %f, p: %f, r: %f, f1: %f, data_num: %d, elapsed time: %f s" %
-              (eval_phase, total_cost / total_num_seqs,
-              total_acc / total_num_seqs,
-              mrr, map, p, r, f, total_num_seqs, time_end - time_begin))
+        print(
+            "[%s evaluation] ave loss: %f, ave_acc: %f, mrr: %f, map: %f, p: %f, r: %f, f1: %f, data_num: %d, elapsed time: %f s"
+            % (eval_phase, total_cost / total_num_seqs,
+               total_acc / total_num_seqs, mrr, map, p, r, f, total_num_seqs,
+               time_end - time_begin))

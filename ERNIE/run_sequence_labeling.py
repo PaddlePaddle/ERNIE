@@ -30,11 +30,11 @@ from model.ernie import ErnieConfig
 from optimization import optimization
 from utils.init import init_pretraining_params, init_checkpoint
 from utils.args import print_arguments
-from finetune.sequence_label import create_model, evaluate 
-from finetune_args import parser 
-
+from finetune.sequence_label import create_model, evaluate
+from finetune_args import parser
 
 args = parser.parse_args()
+
 
 def main(args):
     ernie_config = ErnieConfig(args.ernie_config_path)
@@ -48,12 +48,13 @@ def main(args):
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
     exe = fluid.Executor(place)
 
-    reader = task_reader.SequenceLabelReader(vocab_path=args.vocab_path,
-                                label_map_config=args.label_map_config,
-                                max_seq_len=args.max_seq_len,
-                                do_lower_case=args.do_lower_case,
-                                in_tokens=args.in_tokens,
-                                random_seed=args.random_seed)
+    reader = task_reader.SequenceLabelReader(
+        vocab_path=args.vocab_path,
+        label_map_config=args.label_map_config,
+        max_seq_len=args.max_seq_len,
+        do_lower_case=args.do_lower_case,
+        in_tokens=args.in_tokens,
+        random_seed=args.random_seed)
 
     if not (args.do_train or args.do_val or args.do_test):
         raise ValueError("For args `do_train`, `do_val` and `do_test`, at "
@@ -107,10 +108,9 @@ def main(args):
 
                 fluid.memory_optimize(
                     input_program=train_program,
-                    skip_opt_set=[graph_vars["loss"].name,
-                                  graph_vars["labels"].name,
-                                  graph_vars["infers"].name,
-                                  graph_vars["seq_lens"].name
+                    skip_opt_set=[
+                        graph_vars["loss"].name, graph_vars["labels"].name,
+                        graph_vars["infers"].name, graph_vars["seq_lens"].name
                     ])
 
         if args.verbose:
@@ -200,24 +200,26 @@ def main(args):
                 if steps % args.skip_steps != 0:
                     train_exe.run(fetch_list=[])
                 else:
-                    outputs = evaluate(train_exe, train_program, train_pyreader, graph_vars, args.num_labels, "train", dev_count)
+                    outputs = evaluate(train_exe, train_program, train_pyreader,
+                                       graph_vars, args.num_labels, "train",
+                                       dev_count)
                     if args.verbose:
                         verbose = "train pyreader queue size: %d, " % train_pyreader.queue.size(
                         )
                         verbose += "learning rate: %f" % (
-                            outputs["lr"] if warmup_steps > 0 else args.learning_rate)
+                            outputs["lr"]
+                            if warmup_steps > 0 else args.learning_rate)
                         print(verbose)
 
-                    current_example, current_epoch = reader.get_train_progress(
-                    )
+                    current_example, current_epoch = reader.get_train_progress()
                     time_end = time.time()
                     used_time = time_end - time_begin
                     print("epoch: %d, progress: %d/%d, step: %d, loss: %f, "
-                          "f1: %f, precision: %f, recall: %f, speed: %f steps/s" %
-                          (current_epoch, current_example, num_train_examples,
-                           steps, outputs["loss"], outputs["f1"],
-                           outputs["precision"], outputs["recall"],
-                           args.skip_steps / used_time))
+                          "f1: %f, precision: %f, recall: %f, speed: %f steps/s"
+                          % (current_epoch, current_example, num_train_examples,
+                             steps, outputs["loss"], outputs["f1"],
+                             outputs["precision"], outputs["recall"],
+                             args.skip_steps / used_time))
                     time_begin = time.time()
 
                 if steps % args.save_steps == 0:
@@ -234,7 +236,8 @@ def main(args):
                                 batch_size=args.batch_size,
                                 epoch=1,
                                 shuffle=False))
-                        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels, "dev")
+                        evaluate(exe, test_prog, test_pyreader, graph_vars,
+                                 args.num_labels, "dev")
                     # evaluate test set
                     if args.do_test:
                         test_pyreader.decorate_tensor_provider(
@@ -243,7 +246,8 @@ def main(args):
                                 batch_size=args.batch_size,
                                 epoch=1,
                                 shuffle=False))
-                        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels, "test")
+                        evaluate(exe, test_prog, test_pyreader, graph_vars,
+                                 args.num_labels, "test")
 
             except fluid.core.EOFException:
                 save_path = os.path.join(args.checkpoints, "step_" + str(steps))
@@ -255,7 +259,9 @@ def main(args):
     if args.do_val:
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(
-                args.dev_set, batch_size=args.batch_size, epoch=1,
+                args.dev_set,
+                batch_size=args.batch_size,
+                epoch=1,
                 shuffle=False))
         print("Final validation result:")
         evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels, "dev")

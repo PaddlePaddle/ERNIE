@@ -32,10 +32,10 @@ from finetune.classifier import create_model, evaluate
 from optimization import optimization
 from utils.args import ArgumentGroup, print_arguments
 from utils.init import init_pretraining_params, init_checkpoint
-from finetune_args import parser 
-
+from finetune_args import parser
 
 args = parser.parse_args()
+
 
 def main(args):
     ernie_config = ErnieConfig(args.ernie_config_path)
@@ -49,12 +49,13 @@ def main(args):
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
     exe = fluid.Executor(place)
 
-    reader = task_reader.ClassifyReader(vocab_path=args.vocab_path,
-                                label_map_config=args.label_map_config,
-                                max_seq_len=args.max_seq_len,
-                                do_lower_case=args.do_lower_case,
-                                in_tokens=args.in_tokens,
-                                random_seed=args.random_seed)
+    reader = task_reader.ClassifyReader(
+        vocab_path=args.vocab_path,
+        label_map_config=args.label_map_config,
+        max_seq_len=args.max_seq_len,
+        do_lower_case=args.do_lower_case,
+        in_tokens=args.in_tokens,
+        random_seed=args.random_seed)
 
     if not (args.do_train or args.do_val or args.do_test):
         raise ValueError("For args `do_train`, `do_val` and `do_test`, at "
@@ -108,10 +109,11 @@ def main(args):
 
                 fluid.memory_optimize(
                     input_program=train_program,
-                    skip_opt_set=[graph_vars["loss"].name,
-                                  graph_vars["probs"].name,
-                                  graph_vars["accuracy"].name,
-                                  graph_vars["num_seqs"].name,
+                    skip_opt_set=[
+                        graph_vars["loss"].name,
+                        graph_vars["probs"].name,
+                        graph_vars["accuracy"].name,
+                        graph_vars["num_seqs"].name,
                     ])
 
         if args.verbose:
@@ -201,7 +203,8 @@ def main(args):
                 if steps % args.skip_steps != 0:
                     train_exe.run(fetch_list=[])
                 else:
-                    outputs = evaluate(train_exe, train_program, train_pyreader, graph_vars, "train") 
+                    outputs = evaluate(train_exe, train_program, train_pyreader,
+                                       graph_vars, "train")
 
                     if args.verbose:
                         verbose = "train pyreader queue size: %d, " % train_pyreader.queue.size(
@@ -217,7 +220,8 @@ def main(args):
                     print("epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
                           "ave acc: %f, speed: %f steps/s" %
                           (current_epoch, current_example, num_train_examples,
-                           steps, outputs["loss"], outputs["accuracy"], args.skip_steps / used_time))
+                           steps, outputs["loss"], outputs["accuracy"],
+                           args.skip_steps / used_time))
                     time_begin = time.time()
 
                 if steps % args.save_steps == 0:
@@ -254,7 +258,9 @@ def main(args):
     if args.do_val:
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(
-                args.dev_set, batch_size=args.batch_size, epoch=1,
+                args.dev_set,
+                batch_size=args.batch_size,
+                epoch=1,
                 shuffle=False))
         print("Final validation result:")
         evaluate(exe, test_prog, test_pyreader, graph_vars, "dev")
@@ -273,4 +279,5 @@ def main(args):
 
 if __name__ == '__main__':
     print_arguments(args)
+
     main(args)

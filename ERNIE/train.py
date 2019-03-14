@@ -35,7 +35,9 @@ from utils.init import init_checkpoint, init_pretraining_params
 from pretrain_args import parser
 
 args = parser.parse_args()
+
 # yapf: enable.
+
 
 def create_model(pyreader_name, ernie_config):
     pyreader = fluid.layers.py_reader(
@@ -224,8 +226,7 @@ def train(args):
             print("train_id == 0, sleep 60s")
             time.sleep(60)
         print("worker_endpoints:{} trainers_num:{} current_endpoint:{} \
-              trainer_id:{}"
-                            .format(worker_endpoints, trainers_num,
+              trainer_id:{}".format(worker_endpoints, trainers_num,
                                     current_endpoint, trainer_id))
 
         # prepare nccl2 env.
@@ -319,13 +320,14 @@ def train(args):
                 epoch, current_file_index, total_file, current_file, mask_type = data_reader.get_progress(
                 )
                 print("current learning_rate:%f" % np_lr[0])
-                print("epoch: %d, progress: %d/%d, step: %d, loss: %f, "
-                      "ppl: %f, next_sent_acc: %f, speed: %f steps/s, file: %s, mask_type: %s"
-                      % (epoch, current_file_index, total_file, steps,
-                         np.mean(np.array(cost)),
-                         np.mean(np.exp(np.array(lm_cost))),
-                         np.mean(np.array(acc)), skip_steps / used_time,
-                         current_file, mask_type))
+                print(
+                    "epoch: %d, progress: %d/%d, step: %d, loss: %f, "
+                    "ppl: %f, next_sent_acc: %f, speed: %f steps/s, file: %s, mask_type: %s"
+                    % (epoch, current_file_index, total_file, steps,
+                       np.mean(np.array(cost)),
+                       np.mean(np.exp(np.array(lm_cost))),
+                       np.mean(np.array(acc)), skip_steps / used_time,
+                       current_file, mask_type))
                 cost = []
                 lm_cost = []
                 acc = []
@@ -341,8 +343,7 @@ def train(args):
                 print("[validation_set] epoch: %d, step: %d, "
                       "loss: %f, global ppl: %f, batch-averged ppl: %f, "
                       "next_sent_acc: %f, speed: %f steps/s" %
-                      (epoch, steps,
-                       np.mean(np.array(vali_cost) / vali_steps),
+                      (epoch, steps, np.mean(np.array(vali_cost) / vali_steps),
                        np.exp(np.mean(np.array(vali_lm_cost) / vali_steps)),
                        np.mean(np.exp(np.array(vali_lm_cost) / vali_steps)),
                        np.mean(np.array(vali_acc) / vali_steps), vali_speed))

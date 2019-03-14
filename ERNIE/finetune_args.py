@@ -64,7 +64,7 @@ data_g.add_arg("do_lower_case",       bool, True,
                "Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 data_g.add_arg("random_seed",         int,  0,     "Random seed.")
 data_g.add_arg("label_map_config",    str,  None,  "label_map_path.")
-data_g.add_arg("num_labels",    int,  2,  "label number")
+data_g.add_arg("num_labels",          int,  2,     "label number")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")
@@ -74,3 +74,4 @@ run_type_g.add_arg("do_train",                     bool,   True,  "Whether to pe
 run_type_g.add_arg("do_val",                       bool,   True,  "Whether to perform evaluation on dev data set.")
 run_type_g.add_arg("do_test",                      bool,   True,  "Whether to perform evaluation on test data set.")
 run_type_g.add_arg("metrics",                      bool,   True,  "Whether to perform evaluation on test data set.")
+# yapf: enable
