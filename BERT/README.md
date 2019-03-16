@@ -6,11 +6,11 @@
 
 ### 发布要点
 
-1）完整支持 BERT 模型训练到部署, 包括:
+1）完整支持 BERT 模型训练, 包括:
 
 - 支持 BERT GPU 单机、分布式预训练
 - 支持 BERT GPU 多卡 Fine-tuning
-- 提供 BERT 预测接口 demo, 方便多硬件设备生产环境的部署
+
 
 2）支持 FP16/FP32 混合精度训练和 Fine-tuning，节省显存开销、加速训练过程；
 
@@ -42,9 +42,7 @@
   - [阅读理解 SQuAD](#阅读理解-squad)
 - [**混合精度训练**: 利用混合精度加速训练](#混合精度训练)
 - [**模型转换**: 如何将 BERT TensorFlow 模型转换为 Paddle Fluid 模型](#模型转换)
-- [**模型部署**: 多硬件环境模型部署支持](#模型部署)
-  - [产出用于部署的 inference model](#保存-inference-model)
-  - [inference 接口调用示例](#inference-接口调用示例)
+
 
 ## 安装
 本项目依赖于 Paddle Fluid 1.3，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
@@ -320,79 +318,6 @@ python convert_params.py \
 
 **注意**：要成功运行转换脚本，需同时安装 TensorFlow 和 Paddle Fluid 1.3。
 
-## 模型部署
-
-深度学习模型需要应用于实际情景，则需要进行模型的部署，把训练好的模型部署到不同的机器上去，这需要考虑不同的硬件环境，包括 GPU/CPU 的环境，单机/分布式集群，或者嵌入式设备；同时还要考虑软件环境，比如部署的机器上是否都安装了对应的深度学习框架；还要考虑运行性能等。但是要求部署环境都安装整个框架会给部署带来不便，为了解决深度学习模型的部署，一种可行的方案是使得模型可以脱离框架运行，Paddle Fluid 采用这种方法进行部署，编译 [Paddle Fluid inference](http://paddlepaddle.org/documentation/docs/zh/1.2/advanced_usage/deploy/inference/build_and_install_lib_cn.html) 库，并且编写加载模型的 `C++` inference 接口。预测的时候则只要加载保存的预测网络结构和模型参数，就可以对输入数据进行预测，不再需要整个框架而只需要 Paddle Fluid inference 库，这带来了模型部署的灵活性。
-
-以语句和语句对分类任务为例子，下面讲述如何进行模型部署。首先需要进行模型的训练，其次是要保存用于部署的模型。最后编写 `C++` inference 程序加载模型和参数进行预测。
-
-前面 [语句和句对分类任务](#语句和句对分类任务) 一节中讲到了如何训练 XNLI 任务的模型，并且保存了 checkpoints。但是值得注意的是这些 checkpoint 中只是包含了模型参数以及对于训练过程中必要的状态信息（参见 [params](http://paddlepaddle.org/documentation/docs/zh/1.3/api_cn/io_cn.html#save-params) 和 [persistables](http://paddlepaddle.org/documentation/docs/zh/1.3/api_cn/io_cn.html#save-persistables) ), 现在要生成预测用的 [inference model](http://paddlepaddle.org/documentation/docs/zh/1.2/api_cn/io_cn.html#permalink-5-save_inference_model)，可以按照下面的步骤进行。
-
-### 保存 inference model
-
-```shell
-BERT_BASE_PATH="chinese_L-12_H-768_A-12"
-TASK_NAME="XNLI"
-DATA_PATH=/path/to/xnli/data/
-INIT_CKPT_PATH=/path/to/a/finetuned/checkpoint/
-
-python -u predict_classifier.py --task_name ${TASK_NAME} \
-       --use_cuda true \
-       --batch_size 64 \
-       --data_dir ${DATA_PATH} \
-       --vocab_path ${BERT_BASE_PATH}/vocab.txt \
-       --init_checkpoint ${INIT_CKPT_PATH} \
-       --do_lower_case true \
-       --max_seq_len 128 \
-       --bert_config_path ${BERT_BASE_PATH}/bert_config.json \
-       --do_predict true \
-       --save_inference_model_path ${INIT_CKPT_PATH}
-```
-
-以上的脚本完成可以两部分工作：
-
-1. 从某一个 `init_checkpoint` 加载模型参数，此时如果设定参数 `--do_predict` 为 `true` 则在 `test` 数据集上进行测试，输出预测结果。
-2. 生成对应于 `init_checkpoint` 的 inference model，这会被保存在 `${INIT_CKPT_PATH}/{CKPT_NAME}_inference_model` 目录。
-
-### inference 接口调用示例
-
-使用 `C++` 进行预测的过程需要使用 Paddle Fluid inference 库，具体的使用例子参考 [`inference`](./inference) 目录下的 `README.md`.
-
-下面的代码演示了如何使用 `C++` 进行预测，更多细节请见 [`inference`](./inference) 目录下的例子，可以参考例子写 inference。
-
-``` cpp
-#include <paddle_inference_api.h>
-
-// create and set configuration
-paddle::NativeConfig config;
-config.model_dir = "xxx";
-config.use_gpu = false;
-
-// create predictor
-auto predictor = CreatePaddlePredictor(config);
-
-// create input tensors
-paddle::PaddleTensor src_id;
-src.dtype = paddle::PaddleDType::INT64;
-src.shape = ...;
-src.data.Reset(...);
-
-paddle::PaddleTensor pos_id;
-paddle::PaddleTensor segmeng_id;
-paddle::PaddleTensor self_attention_bias;
-paddle::PaddleTensor next_segment_index;
-
-// create iutput tensors and run prediction
-std::vector<paddle::PaddleTensor> output;
-predictor->Run({src_id, pos_id, segmeng_id, self_attention_bias, next_segment_index}, &output);
-
-std::cout << "example_id\tcontradiction\tentailment\tneutral";
-for (size_t i = 0; i < output.front().data.length() / sizeof(float); i += 3) {
-  std::cout << static_cast<float *>(output.front().data.data())[i] << "\t"
-            << static_cast<float *>(output.front().data.data())[i + 1] << "\t"
-            << static_cast<float *>(output.front().data.data())[i + 2] << std::endl;
-}
-```
 
 ## Contributors
 
