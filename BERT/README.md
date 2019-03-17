@@ -199,7 +199,6 @@ python -u run_squad.py --use_cuda true\
                     --do_predict true \
                     --save_steps 100 \
                     --warmup_proportion 0.1 \
-                    --validation_steps 100 \
                     --weight_decay  0.01 \
                     --epoch 2 \
                     --max_seq_len 384 \
@@ -207,6 +206,7 @@ python -u run_squad.py --use_cuda true\
                     --predict_file ${SQUAD_PATH}/dev-v1.1.json \
                     --do_lower_case true \
                     --doc_stride 128 \
+                    --n_best_size 20 \
                     --train_file ${SQUAD_PATH}/train-v1.1.json \
                     --learning_rate 3e-5 \
                     --lr_scheduler linear_warmup_decay \
@@ -243,7 +243,6 @@ python -u run_squad.py --use_cuda true \
                     --do_predict true \
                     --save_steps 100 \
                     --warmup_proportion 0.1 \
-                    --validation_steps 100 \
                     --weight_decay  0.01 \
                     --epoch 2 \
                     --max_seq_len 384 \
