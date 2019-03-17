@@ -163,6 +163,11 @@ nlpcc-dbqa是由国际自然语言处理和中文计算会议NLPCC于2016年举�
 
 2) [任务数据下载](https://ernie.bj.bcebos.com/task_data.tgz)
 
+### 安装
+本项目依赖于 Paddle Fluid 1.3，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+
+**Note**: 预训练任务和finetune任务测试机器为P40, 显存22G；如果显存低于22G, 某些任务可能会因显存不足报错；
+
 ### 预训练
 
 #### 数据预处理
