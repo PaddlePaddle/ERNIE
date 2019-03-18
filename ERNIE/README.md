@@ -1,10 +1,8 @@
-## ERNIE: **E**nhanced **R**epresentation from k**N**owledge **I**nt**E**gration
+## ERNIE: **E**nhanced **R**epresentation through k**N**owledge **I**nt**E**gration
 
 **** **2019-03-18 更新**: update ERNIE_stabel.tgz ****
 
-
-
-**ERNIE** 通过建模海量数据中的词、实体及实体关系，学习真实世界的语义知识。相较于 **BERT** 学习局部语言共现的语义表示，**ERNIE** 直接对语义知识进行建模，增强了模型语义表示能力。
+**ERNIE** 通过建模海量数据中的词、实体及实体关系，学习真实世界的语义知识。相较于 **BERT** 学习原始语言信号，**ERNIE** 直接对先验语义知识单元进行建模，增强了模型语义表示能力。
 
 这里我们举个例子：
 
