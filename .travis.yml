@@ -26,10 +26,11 @@ matrix:
             - deadsnakes
           packages:
             - git
-            - python3.7-dev
+            - python3.7-venv
         ssh_known_hosts: 13.229.163.131
 
 before_install:
+  - python --version
   - sudo pip install -U virtualenv pre-commit pip
 
 script:
