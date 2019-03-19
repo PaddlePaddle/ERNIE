@@ -137,7 +137,7 @@ def parse(init_checkpoint):
         else:
             print("ignored param: %s" % var_name)
 
-        if fluid_param_name is not '':
+        if fluid_param_name != '':
             tf_fluid_param_name_map[var_name] = fluid_param_name
             tf_param_name_shape_map[var_name] = var_shape
             fluid_param_name = ''

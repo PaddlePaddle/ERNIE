@@ -25,6 +25,8 @@ import multiprocessing
 import paddle
 import paddle.fluid as fluid
 
+from six.moves import xrange
+
 from model.ernie import ErnieModel
 
 def create_model(args,
