@@ -27,7 +27,7 @@
 |[BERT-Base, Multilingual Cased](https://bert-models.bj.bcebos.com/multi_cased_L-12_H-768_A-12.tar.gz)|12|768|12|110M|
 |[BERT-Base, Chinese](https://bert-models.bj.bcebos.com/chinese_L-12_H-768_A-12.tar.gz)|12|768|12|110M|
 
-每个压缩包都包含了模型配置文件 `bert_config.json`、参数文件夹 `params/` 和词汇表 `vocab.txt`；
+每个压缩包都包含了模型配置文件 `bert_config.json`、参数文件夹 `params` 和词汇表 `vocab.txt`；
 
 4）支持 BERT TensorFlow 模型到 Paddle Fluid 参数的转换。
 
@@ -45,7 +45,7 @@
 
 
 ## 安装
-本项目依赖于 Paddle Fluid 1.3，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+本项目依赖于 Paddle Fluid 1.3.0，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
 
 ## 预训练
 
