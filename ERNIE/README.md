@@ -1,6 +1,6 @@
 ## ERNIE: **E**nhanced **R**epresentation through k**N**owledge **I**nt**E**gration
 
-**** **2019-03-18 更新**: update ERNIE_stabel.tgz ****
+**** **2019-03-18 更新**: update ERNIE_stable.tgz ****
 
 **ERNIE** 通过建模海量数据中的词、实体及实体关系，学习真实世界的语义知识。相较于 **BERT** 学习原始语言信号，**ERNIE** 直接对先验语义知识单元进行建模，增强了模型语义表示能力。
 
@@ -153,7 +153,7 @@ MSRA-NER 数据集由微软亚研院发布，其目标是命名实体识别，�
 ChnSentiCorp 是中文情感分析数据集，其目标是判断一段话的情感态度。
 ```
 
- - **检索式问答任务** nlpcc-dbqa 
+ - **检索式问答任务** nlpcc-dbqa
 
  ```text
 nlpcc-dbqa是由国际自然语言处理和中文计算会议NLPCC于2016年举办的评测任务，其目标是选择能够回答问题的答案。[链接: http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf]
@@ -166,7 +166,7 @@ nlpcc-dbqa是由国际自然语言处理和中文计算会议NLPCC于2016年举�
 2) [任务数据下载](https://ernie.bj.bcebos.com/task_data.tgz)
 
 ### 安装
-本项目依赖于 Paddle Fluid 1.3，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+本项目依赖于 Paddle Fluid 1.3.0，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
 
 **Note**: 预训练任务和finetune任务测试机器为P40, 显存22G；如果显存低于22G, 某些任务可能会因显存不足报错；
 
