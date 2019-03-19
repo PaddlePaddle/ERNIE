@@ -1,6 +1,5 @@
 language: cpp
 cache: ccache
-sudo: required
 dist: trusty
 services:
   - docker
