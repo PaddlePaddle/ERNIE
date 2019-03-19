@@ -17,11 +17,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import argparse
+import collections
+import multiprocessing
 import os
 import time
-import argparse
+
 import numpy as np
-import collections
 
 import paddle
 import paddle.fluid as fluid
