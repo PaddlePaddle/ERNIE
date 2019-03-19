@@ -19,6 +19,7 @@ matrix:
             - python2.7-dev
         ssh_known_hosts: 13.229.163.131
     - python: 3.7
+      dist: xenial  # required for Python >= 3.7 (travis-ci/travis-ci#9069)
       addons:
         apt:
           packages:
