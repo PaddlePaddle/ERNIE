@@ -22,6 +22,8 @@ import numpy as np
 
 import paddle.fluid as fluid
 
+from six.moves import xrange
+
 from model.ernie import ErnieModel
 
 

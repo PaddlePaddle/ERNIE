@@ -73,7 +73,7 @@ class BertModel(object):
         self._sent_emb_name = "sent_embedding"
         self._dtype = "float16" if use_fp16 else "float32"
 
-        # Initialize all weigths by truncated normal initializer, and all biases 
+        # Initialize all weigths by truncated normal initializer, and all biases
         # will be initialized by constant zero by default.
         self._param_initializer = fluid.initializer.TruncatedNormal(
             scale=config['initializer_range'])
@@ -109,7 +109,7 @@ class BertModel(object):
         emb_out = pre_process_layer(
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
 
-        if self._dtype is "float16":
+        if self._dtype == "float16":
             self_attn_mask = fluid.layers.cast(
                 x=self_attn_mask, dtype=self._dtype)
 
@@ -175,7 +175,7 @@ class BertModel(object):
                 name='mask_lm_trans_fc.w_0',
                 initializer=self._param_initializer),
             bias_attr=fluid.ParamAttr(name='mask_lm_trans_fc.b_0'))
-        # transform: layer norm 
+        # transform: layer norm
         mask_trans_feat = pre_process_layer(
             mask_trans_feat, 'n', name='mask_lm_trans')
 
