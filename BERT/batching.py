@@ -151,7 +151,7 @@ def pad_batch_data(insts,
     # will be masked out by weights and make no effect on parameter gradients.
 
     inst_data = np.array(
-        [inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
+        [list(inst) + list([pad_idx] * (max_len - len(inst))) for inst in insts])
     return_list += [inst_data.astype("int64").reshape([-1, max_len, 1])]
 
     # next_sent_pos for extract first token embedding of each sentence
