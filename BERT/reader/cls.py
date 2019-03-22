@@ -82,7 +82,7 @@ class DataProcessor(object):
                             total_token_num,
                             voc_size=-1,
                             mask_id=-1,
-                            return_attn_bias=True,
+                            return_input_mask=True,
                             return_max_len=False,
                             return_num_token=False):
         return prepare_batch_data(
@@ -93,7 +93,7 @@ class DataProcessor(object):
             cls_id=self.vocab["[CLS]"],
             sep_id=self.vocab["[SEP]"],
             mask_id=-1,
-            return_attn_bias=True,
+            return_input_mask=True,
             return_max_len=False,
             return_num_token=False)
 
@@ -185,7 +185,7 @@ class DataProcessor(object):
                     total_token_num,
                     voc_size=-1,
                     mask_id=-1,
-                    return_attn_bias=True,
+                    return_input_mask=True,
                     return_max_len=False,
                     return_num_token=False)
                 yield batch_data

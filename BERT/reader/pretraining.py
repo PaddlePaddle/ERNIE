@@ -278,7 +278,7 @@ class DataReader(object):
                     cls_id=self.cls_id,
                     sep_id=self.sep_id,
                     mask_id=self.mask_id,
-                    return_attn_bias=True,
+                    return_input_mask=True,
                     return_max_len=False,
                     return_num_token=False)
 

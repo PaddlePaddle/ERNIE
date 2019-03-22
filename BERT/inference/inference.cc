@@ -16,15 +16,19 @@
 #include <glog/logging.h>
 #include <paddle_inference_api.h>
 #include <chrono>
+#include <iostream>
 #include <fstream>
 #include <numeric>
 #include <sstream>
 #include <string>
 #include <vector>
 
-DEFINE_string(model_dir, "", "model directory");
-DEFINE_string(data, "", "input data path");
-DEFINE_int32(repeat, 1, "repeat");
+DEFINE_string(model_dir, "", "Inference model directory.");
+DEFINE_string(data, "", "Input data path.");
+DEFINE_int32(repeat, 1, "Repeat times.");
+DEFINE_int32(num_labels, 3, "Number of labels.");
+DEFINE_bool(output_prediction, false, "Whether to output the prediction results.");
+DEFINE_bool(use_gpu, false, "Whether to use GPU for prediction.");
 
 template <typename T>
 void GetValueFromStream(std::stringstream *ss, T *t) {
@@ -73,12 +77,16 @@ constexpr paddle::PaddleDType GetPaddleDType<float>() {
   return paddle::PaddleDType::FLOAT32;
 }
 
+
 // Parse tensor from string
 template <typename T>
 bool ParseTensor(const std::string &field, paddle::PaddleTensor *tensor) {
   std::vector<std::string> data;
   Split(field, ':', &data);
-  if (data.size() < 2) return false;
+  if (data.size() < 2) {
+    LOG(ERROR) << "parse tensor error!";
+    return false;
+  }
 
   std::string shape_str = data[0];
 
@@ -107,10 +115,10 @@ bool ParseLine(const std::string &line,
   std::vector<std::string> fields;
   Split(line, ';', &fields);
 
-  if (fields.size() < 5) return false;
+  if (fields.size() < 4) return false;
 
   tensors->clear();
-  tensors->reserve(5);
+  tensors->reserve(4);
 
   int i = 0;
   // src_id
@@ -128,29 +136,53 @@ bool ParseLine(const std::string &line,
   ParseTensor<int64_t>(fields[i++], &segment_id);
   tensors->push_back(segment_id);
 
-  // self_attention_bias
-  paddle::PaddleTensor self_attention_bias;
-  ParseTensor<float>(fields[i++], &self_attention_bias);
-  tensors->push_back(self_attention_bias);
-
-  // next_segment_index
-  paddle::PaddleTensor next_segment_index;
-  ParseTensor<int64_t>(fields[i++], &next_segment_index);
-  tensors->push_back(next_segment_index);
+  // input mask
+  paddle::PaddleTensor input_mask;
+  ParseTensor<float>(fields[i++], &input_mask);
+  tensors->push_back(input_mask);
 
   return true;
 }
 
-// Print outputs to log
-void PrintOutputs(const std::vector<paddle::PaddleTensor> &outputs) {
-  LOG(INFO) << "example_id\tcontradiction\tentailment\tneutral";
+template <typename T>
+void PrintTensor(const paddle::PaddleTensor &t) {
+  std::stringstream ss;
+  ss.str({});
+  ss.clear();
+  ss << "Tensor: shape[";
+  for (auto i: t.shape) {
+    ss << i << " ";
+  }
+  ss << "], data[";
+  T *data = static_cast<T *>(t.data.data());
+  for (int i = 0; i < t.data.length() / sizeof(T); i++) {
+    ss << data[i] << " ";
+  }
 
-  for (size_t i = 0; i < outputs.front().data.length() / sizeof(float); i += 3) {
-    LOG(INFO) << (i / 3) << "\t"
-              << static_cast<float *>(outputs.front().data.data())[i] << "\t"
-              << static_cast<float *>(outputs.front().data.data())[i + 1]
-              << "\t"
-              << static_cast<float *>(outputs.front().data.data())[i + 2];
+  ss << "]";
+  LOG(INFO) << ss.str();
+}
+
+void PrintInputs(const std::vector<paddle::PaddleTensor> &inputs) {
+  for (const auto &t : inputs) {
+    if (t.dtype == paddle::PaddleDType::INT64) {
+      PrintTensor<int64_t>(t);
+    } else {
+      PrintTensor<float>(t);
+    }
+  }
+}
+
+// Print outputs to log
+void PrintOutputs(const std::vector<paddle::PaddleTensor> &outputs, int &cnt) {
+  for (size_t i = 0; i < outputs.front().data.length() / sizeof(float); 
+       i += FLAGS_num_labels) {
+    std::cout << cnt << "\t";
+    for (size_t j = 0; j < FLAGS_num_labels; ++j) {
+      std::cout  << static_cast<float *>(outputs.front().data.data())[i+j] << "\t";
+    }
+    std::cout << std::endl;
+    cnt += 1;
   }
 }
 
@@ -176,11 +208,6 @@ bool LoadInputData(std::vector<std::vector<paddle::PaddleTensor>> *inputs) {
   return true;
 }
 
-// Bert inference demo
-// Options:
-//     --model_dir: bert model file directory
-//     --data: data path
-//     --repeat: repeat num
 int main(int argc, char *argv[]) {
   google::InitGoogleLogging(*argv);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -192,7 +219,11 @@ int main(int argc, char *argv[]) {
 
   paddle::NativeConfig config;
   config.model_dir = FLAGS_model_dir;
-  config.use_gpu = false;
+  if (FLAGS_use_gpu) {
+    config.use_gpu = true;
+    config.fraction_of_gpu_memory = 0.15;
+    config.device = 0;
+  }
 
   auto predictor = CreatePaddlePredictor(config);
 
@@ -204,26 +235,31 @@ int main(int argc, char *argv[]) {
 
   std::vector<paddle::PaddleTensor> fetch;
   int total_time{0};
-  // auto predict_timer = []()
   int num_samples{0};
+  int out_cnt = 0;
   for (int i = 0; i < FLAGS_repeat; i++) {
     for (auto feed : inputs) {
+      fetch.clear();
       auto start = std::chrono::system_clock::now();
       predictor->Run(feed, &fetch);
+      if (FLAGS_output_prediction && i == 0) {
+	PrintOutputs(fetch, out_cnt);
+      }
       auto end = std::chrono::system_clock::now();
       if (!fetch.empty()) {
         total_time +=
             std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
                 .count();
-        num_samples += fetch.front().data.length() / 3;
+        num_samples += fetch.front().data.length() / FLAGS_num_labels / sizeof(float);
       }
     }
   }
+  
 
   auto per_sample_ms =
       static_cast<float>(total_time) / num_samples;
-  LOG(INFO) << "Run " << num_samples
-            << " samples, average latency: " << per_sample_ms
+  LOG(INFO) << "Run on " << num_samples 
+            << " samples over "<< FLAGS_repeat << " times, average latency: " << per_sample_ms
             << "ms per sample.";
 
   return 0;

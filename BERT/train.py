@@ -72,10 +72,11 @@ data_g.add_arg("in_tokens",           bool, True,
                "Otherwise, it will be the maximum number of examples in one batch.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
-run_type_g.add_arg("is_distributed",    bool,   False,  "If set, then start distributed training.")
-run_type_g.add_arg("use_cuda",          bool,   True,   "If set, use GPU for training.")
-run_type_g.add_arg("use_fast_executor", bool,   False,  "If set, use fast parallel executor (in experiment).")
-run_type_g.add_arg("do_test",           bool,   False,  "Whether to perform evaluation on test data set.")
+run_type_g.add_arg("is_distributed",               bool,   False,  "If set, then start distributed training.")
+run_type_g.add_arg("use_cuda",                     bool,   True,   "If set, use GPU for training.")
+run_type_g.add_arg("use_fast_executor",            bool,   False,  "If set, use fast parallel executor (in experiment).")
+run_type_g.add_arg("num_iteration_per_drop_scope", int,    1,      "Ihe iteration intervals to clean up temporary variables.")
+run_type_g.add_arg("do_test",                      bool,   False,  "Whether to perform evaluation on test data set.")
 
 args = parser.parse_args()
 # yapf: enable.
@@ -86,30 +87,28 @@ def create_model(pyreader_name, bert_config):
         capacity=70,
         shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
                 [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, args.max_seq_len], [-1, 1], [-1, 1],
-                [-1, 1], [-1, 1]],
+                [-1, args.max_seq_len, 1], [-1, 1], [-1, 1],
+                [-1, 1]],
         dtypes=[
-            'int64', 'int64', 'int64', 'float', 'int64', 'int64', 'int64',
-            'int64'
+            'int64', 'int64', 'int64', 'float32', 'int64', 'int64', 'int64'
         ],
-        lod_levels=[0, 0, 0, 0, 0, 0, 0, 0],
+        lod_levels=[0, 0, 0, 0, 0, 0, 0],
         name=pyreader_name,
         use_double_buffer=True)
 
-    (src_ids, pos_ids, sent_ids, self_attn_mask, mask_label, mask_pos, labels,
-     next_sent_index) = fluid.layers.read_file(pyreader)
+    (src_ids, pos_ids, sent_ids, input_mask, mask_label, mask_pos, labels) = fluid.layers.read_file(pyreader)
 
     bert = BertModel(
         src_ids=src_ids,
         position_ids=pos_ids,
         sentence_ids=sent_ids,
-        self_attn_mask=self_attn_mask,
+        input_mask=input_mask,
         config=bert_config,
         weight_sharing=args.weight_sharing,
         use_fp16=args.use_fp16)
 
     next_sent_acc, mask_lm_loss, total_loss = bert.get_pretraining_output(
-        mask_label, mask_pos, labels, next_sent_index)
+        mask_label, mask_pos, labels)
 
     if args.use_fp16 and args.loss_scaling > 1.0:
         total_loss *= args.loss_scaling
@@ -310,17 +309,13 @@ def train(args):
         generate_neg_sample=args.generate_neg_sample)
 
     exec_strategy = fluid.ExecutionStrategy()
-    if args.use_fast_executor:
-        exec_strategy.use_experimental_executor = True
+    exec_strategy.use_experimental_executor = args.use_fast_executor
     exec_strategy.num_threads = dev_count
-
-    build_strategy = fluid.BuildStrategy()
-    build_strategy.remove_unnecessary_lock = False
+    exec_strategy.num_iteration_per_drop_scope = args.num_iteration_per_drop_scope
 
     train_exe = fluid.ParallelExecutor(
         use_cuda=args.use_cuda,
         loss_name=total_loss.name,
-        build_strategy=build_strategy,
         exec_strategy=exec_strategy,
         main_program=train_program,
         num_trainers=nccl2_num_trainers,

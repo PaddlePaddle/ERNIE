@@ -39,7 +39,7 @@ def main():
         args.batch_size, phase='test', epoch=1, shuffle=False)()
 
     for i, data in enumerate(gen):
-        data = data[:4] + [data[5]]
+        data = data[:4]
         sample = []
         for field in data:
             shape_str = ' '.join(map(str, field.shape))

@@ -30,25 +30,24 @@ def create_model(args,
     pyreader = fluid.layers.py_reader(
         capacity=50,
         shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, args.max_seq_len], [-1, 1], [-1, 1]],
-        dtypes=['int64', 'int64', 'int64', 'float', 'int64', 'int64'],
-        lod_levels=[0, 0, 0, 0, 0, 0],
+                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1], [-1, 1]],
+        dtypes=['int64', 'int64', 'int64', 'float32', 'int64'],
+        lod_levels=[0, 0, 0, 0, 0],
         name=pyreader_name,
         use_double_buffer=True)
 
-    (src_ids, pos_ids, sent_ids, self_attn_mask, labels,
-     next_sent_index) = fluid.layers.read_file(pyreader)
+    (src_ids, pos_ids, sent_ids, input_mask,
+     labels) = fluid.layers.read_file(pyreader)
 
     bert = BertModel(
         src_ids=src_ids,
         position_ids=pos_ids,
         sentence_ids=sent_ids,
-        self_attn_mask=self_attn_mask,
+        input_mask=input_mask,
         config=bert_config,
         use_fp16=args.use_fp16)
 
-    cls_feats = bert.get_pooled_output(next_sent_index)
+    cls_feats = bert.get_pooled_output()
     cls_feats = fluid.layers.dropout(
         x=cls_feats,
         dropout_prob=0.1,
@@ -65,8 +64,7 @@ def create_model(args,
     if is_prediction:
         probs = fluid.layers.softmax(logits)
         feed_targets_name = [
-            src_ids.name, pos_ids.name, sent_ids.name, self_attn_mask.name,
-            next_sent_index.name
+            src_ids.name, pos_ids.name, sent_ids.name, input_mask.name
         ]
         return pyreader, probs, feed_targets_name
 
