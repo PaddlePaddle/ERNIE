@@ -29,8 +29,8 @@ WEIGHT_DECAY=0.01
 MAX_LEN=512
 TRAIN_DATA_DIR=data/train
 VALIDATION_DATA_DIR=data/validation
-CONFIG_PATH=config/bert_config.json
-VOCAB_PATH=config/vocab.txt
+CONFIG_PATH=data/demo_config/bert_config.json
+VOCAB_PATH=data/demo_config/vocab.txt
 
 # Change your train arguments:
 python -u ./train.py ${is_distributed}\
@@ -48,4 +48,8 @@ python -u ./train.py ${is_distributed}\
         --weight_decay ${WEIGHT_DECAY:-0} \
         --max_seq_len ${MAX_LEN} \
         --skip_steps 20 \
-        --validation_steps 1000
+        --validation_steps 1000 \
+        --num_iteration_per_drop_scope 10 \
+        --use_fp16 false \
+        --loss_scaling 8.0
+       

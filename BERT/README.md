@@ -1,4 +1,3 @@
-
 # BERT on PaddlePaddle
 
 [BERT](https://arxiv.org/abs/1810.04805) 是一个迁移能力很强的通用语义表示模型， 以 [Transformer](https://arxiv.org/abs/1706.03762) 为网络基本组件，以双向 `Masked Language Model`  
@@ -6,11 +5,11 @@
 
 ### 发布要点
 
-1）完整支持 BERT 模型训练, 包括:
+1）完整支持 BERT 模型训练到部署, 包括:
 
 - 支持 BERT GPU 单机、分布式预训练
 - 支持 BERT GPU 多卡 Fine-tuning
-
+- 提供 BERT 预测接口 demo, 方便多硬件设备生产环境的部署
 
 2）支持 FP16/FP32 混合精度训练和 Fine-tuning，节省显存开销、加速训练过程；
 
@@ -37,29 +36,31 @@
   - [数据预处理](#数据预处理)
   - [单机训练](#单机训练)
   - [分布式训练](#分布式训练)
-- [**Fine-Tuning**: 预训练模型如何应用到特定 NLP 任务上](#fine-tuning-任务)
+- [**Fine-Tuning**: 预训练模型如何应用到特定 NLP 任务上](#nlp-任务的-fine-tuning)
   - [语句和句对分类任务](#语句和句对分类任务)
   - [阅读理解 SQuAD](#阅读理解-squad)
 - [**混合精度训练**: 利用混合精度加速训练](#混合精度训练)
 - [**模型转换**: 如何将 BERT TensorFlow 模型转换为 Paddle Fluid 模型](#模型转换)
-
+- [**模型部署**: 多硬件环境模型部署支持](#模型部署)
+  - [产出用于部署的 inference model](#保存-inference-model)
+  - [inference 接口调用示例](#inference-接口调用示例)
 
 ## 安装
-本项目依赖于 Paddle Fluid 1.3.0，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+本项目依赖于 Paddle Fluid **1.3.1**，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。如果需要进行 TensorFlow 模型到 Paddle Fluid 参数的转换，则需要同时安装 TensorFlow 1.12。
 
 ## 预训练
 
 ### 数据预处理
 
-以中文模型的预训练为例，可基于中文维基百科数据构造具有上下文关系的句子对作为训练数据，用 [`tokenization.py`](tokenization.py) 中的 CharTokenizer 对构造出的句子对数据进行 token 化处理，得到 token 化的明文数据，然后将明文数据根据词典 [`config/vocab.txt`](config/vocab.txt) 映射为 id 数据并作为训练数据；
+以中文模型的预训练为例，可基于中文维基百科数据构造具有上下文关系的句子对作为训练数据，用 [`tokenization.py`](tokenization.py) 中的 CharTokenizer 对构造出的句子对数据进行 token 化处理，得到 token 化的明文数据，然后将明文数据根据词典 [`vocab.txt`](data/demo_config/vocab.txt) 映射为 id 数据并作为训练数据，该示例词典和模型配置[`bert_config.json`](./data/demo_config/bert_config.json)均来自[BERT-Base, Chinese](https://bert-models.bj.bcebos.com/chinese_L-12_H-768_A-12.tar.gz)。
 
-我们给出了 token 化后的示例明文数据: [`data/demo_wiki_tokens.txt`](./data/demo_wiki_tokens.txt)，其中每行数据为2个 tab 分隔的句子，示例如下:
+我们给出了 token 化后的示例明文数据: [`demo_wiki_tokens.txt`](./data/demo_wiki_tokens.txt)，其中每行数据为2个 tab 分隔的句子，示例如下:
 
 ```
 1 . 雏 凤 鸣 剧 团   2 . 古 典 之 门 ： 帝 女 花 3 . 戏 曲 之 旅 ： 第 155 期 心 系 唐 氏 慈 善 戏 曲 晚 会 4 . 区 文 凤 , 郑 燕 虹 1999 编 ， 香 港 当 代 粤 剧 人 名 录 ， 中 大 音 乐 系 5 . 王 胜 泉 , 张 文 珊 2011 编 ， 香 港 当 代 粤 剧 人 名 录 ， 中 大 音 乐 系
 ```
 
-同时我们也给出了 id 化后的部分训练数据：[`data/train/demo_wiki_train.gz`](./data/train/demo_wiki_train.gz)、和测试数据：[`data/validation/demo_wiki_validation.gz`](./data/validation/demo_wiki_validation.gz)，每行数据为1个训练样本，示例如下:
+同时我们也给出了 id 化后的部分训练数据：[`demo_wiki_train.gz`](./data/train/demo_wiki_train.gz)、和测试数据：[`demo_wiki_validation.gz`](./data/validation/demo_wiki_validation.gz)，每行数据为1个训练样本，示例如下:
 
 ```
 1 7987 3736 8577 8020 2398 969 1399 8038 8021 3221 855 754 7270 7029 1344 7649 4506 2356 4638 676 6823 1298 928 5632 1220 6756 6887 722 769 3837 6887 511 2 4385 3198 6820 3313 1423 4500 511 2;0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1;0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41;1
@@ -76,7 +77,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 ./train.sh -local y
 ```
 
-这里需要特别说明的是，参数 `generate_neg_sample` 为 `True` 表示在预训练过程中，`next sentence prediction` 任务的负样本是根据训练数据中的正样本动态生成的，我们给出的样例训练数据 `data/train/demo_wiki_train.gz` 只包含 `next sentence prediction` 任务的正样本；如果已事先构造了 `next sentence prediction` 任务的正负样本，则需要将 `generate_neg_sample` 置为 `False`。
+这里需要特别说明的是，参数 `generate_neg_sample` 为 `True` 表示在预训练过程中，`Next Sentence Prediction` 任务的负样本是根据训练数据中的正样本动态生成的，我们给出的样例训练数据 [`demo_wiki_train.gz`](data/train/demo_wiki_train.gz) 只包含 `Next Sentence Prediction` 任务的正样本；如果已事先构造了 `Next Sentence Prediction` 任务的正负样本，则需要将 `generate_neg_sample` 置为 `False`。
 
 预训练任务进行的过程中会输出当前学习率、训练数据所经过的轮数、当前迭代的总步数、训练误差、训练速度等信息，根据 `--validation_steps ${N}` 的配置，每间隔 `N` 步输出模型在验证集的各种指标:
 
@@ -112,7 +113,7 @@ export current_endpoint=192.168.0.17:9185
 ./train.sh -local n
 ```
 
-## Fine-tuning 任务
+## NLP 任务的 Fine-tuning
 
 在完成 BERT 模型的预训练后，即可利用预训练参数在特定的 NLP 任务上做 Fine-tuning。以下利用开源的预训练模型，示例如何进行分类任务和阅读理解任务的 Fine-tuning，如果要运行这些任务，请通过 [发布要点](#发布要点) 一节提供的链接预先下载好对应的预训练模型。
 
@@ -191,8 +192,8 @@ CHECKPOINT_PATH=/path/to/save/checkpoints/
 SQUAD_PATH=/path/to/squad/data/
 
 python -u run_squad.py --use_cuda true\
-                    --batch_size 4068 \
-                    --in_tokens true\
+                    --batch_size 12 \
+                    --in_tokens false\
                     --init_pretraining_params ${BERT_BASE_PATH}/params \
                     --checkpoints ${CHECKPOINT_PATH} \
                     --vocab_path ${BERT_BASE_PATH}/vocab.txt \
@@ -207,7 +208,6 @@ python -u run_squad.py --use_cuda true\
                     --predict_file ${SQUAD_PATH}/dev-v1.1.json \
                     --do_lower_case true \
                     --doc_stride 128 \
-                    --n_best_size 20 \
                     --train_file ${SQUAD_PATH}/train-v1.1.json \
                     --learning_rate 3e-5 \
                     --lr_scheduler linear_warmup_decay \
@@ -217,7 +217,7 @@ python -u run_squad.py --use_cuda true\
 对预测结果进行测评
 
 ```shell
-python ${SQUAD_PATH}/evaluate-v1.1.py ${SQUAD_PATH}/dev-v1.1.json ${CHECKPOINT_PATH}predictions.json
+python ${SQUAD_PATH}/evaluate-v1.1.py ${SQUAD_PATH}/dev-v1.1.json ${CHECKPOINT_PATH}/predictions.json
 ```
 
 会得到类似如下的输出
@@ -235,8 +235,8 @@ CHECKPOINT_PATH=/path/to/save/checkpoints/
 SQUAD_PATH=/path/tp/squad/data/
 
 python -u run_squad.py --use_cuda true \
-                    --batch_size 4068 \
-                    --in_tokens true\
+                    --batch_size 12 \
+                    --in_tokens false\
                     --init_pretraining_params ${BERT_BASE_PATH}/params \
                     --checkpoints ${CHECKPOINT_PATH} \
                     --vocab_path ${BERT_BASE_PATH}/vocab.txt \
@@ -316,8 +316,80 @@ python convert_params.py \
 ```
 即可完成模型转换。
 
-**注意**：要成功运行转换脚本，需同时安装 TensorFlow 和 Paddle Fluid 1.3。
 
+## 模型部署
+
+深度学习模型需要应用于实际情景，则需要进行模型的部署，把训练好的模型部署到不同的机器上去，这需要考虑不同的硬件环境，包括 GPU/CPU 的环境，单机/分布式集群，或者嵌入式设备；同时还要考虑软件环境，比如部署的机器上是否都安装了对应的深度学习框架；还要考虑运行性能等。但是要求部署环境都安装整个框架会给部署带来不便，为了解决深度学习模型的部署，一种可行的方案是使得模型可以脱离框架运行，Paddle Fluid 采用这种方法进行部署，编译 [Paddle Fluid inference](http://paddlepaddle.org/documentation/docs/zh/1.2/advanced_usage/deploy/inference/build_and_install_lib_cn.html) 库，并且编写加载模型的 `C++` inference 接口。预测的时候则只要加载保存的预测网络结构和模型参数，就可以对输入数据进行预测，不再需要整个框架而只需要 Paddle Fluid inference 库，这带来了模型部署的灵活性。
+
+以语句和语句对分类任务为例子，下面讲述如何进行模型部署。首先需要进行模型的训练，其次是要保存用于部署的模型。最后编写 `C++` inference 程序加载模型和参数进行预测。
+
+前面 [语句和句对分类任务](#语句和句对分类任务) 一节中讲到了如何训练 XNLI 任务的模型，并且保存了 checkpoints。但是值得注意的是这些 checkpoint 中只是包含了模型参数以及对于训练过程中必要的状态信息（参见 [params](http://paddlepaddle.org/documentation/docs/zh/1.3/api_cn/io_cn.html#save-params) 和 [persistables](http://paddlepaddle.org/documentation/docs/zh/1.3/api_cn/io_cn.html#save-persistables) ), 现在要生成预测用的 [inference model](http://paddlepaddle.org/documentation/docs/zh/1.2/api_cn/io_cn.html#permalink-5-save_inference_model)，可以按照下面的步骤进行。
+
+### 保存 inference model
+
+```shell
+BERT_BASE_PATH="chinese_L-12_H-768_A-12"
+TASK_NAME="XNLI"
+DATA_PATH=/path/to/xnli/data/
+INIT_CKPT_PATH=/path/to/a/finetuned/checkpoint/
+
+python -u predict_classifier.py --task_name ${TASK_NAME} \
+       --use_cuda true \
+       --batch_size 64 \
+       --data_dir ${DATA_PATH} \
+       --vocab_path ${BERT_BASE_PATH}/vocab.txt \
+       --init_checkpoint ${INIT_CKPT_PATH} \
+       --do_lower_case true \
+       --max_seq_len 128 \
+       --bert_config_path ${BERT_BASE_PATH}/bert_config.json \
+       --do_predict true \
+       --save_inference_model_path ${INIT_CKPT_PATH}
+```
+
+以上的脚本完成可以两部分工作：
+
+1. 从某一个 `init_checkpoint` 加载模型参数，此时如果设定参数 `--do_predict` 为 `true` 则在 `test` 数据集上进行测试，输出预测结果。
+2. 生成对应于 `init_checkpoint` 的 inference model，这会被保存在 `${INIT_CKPT_PATH}/{CKPT_NAME}_inference_model` 目录。
+
+### inference 接口调用示例
+
+使用 `C++` 进行预测的过程需要使用 Paddle Fluid inference 库，具体的使用例子参考 [`inference`](./inference) 目录下的 `README.md`.
+
+下面的代码演示了如何使用 `C++` 进行预测，更多细节请见 [`inference`](./inference) 目录下的例子，可以参考例子写 inference。
+
+``` cpp
+#include <paddle_inference_api.h>
+
+// create and set configuration
+paddle::NativeConfig config;
+config.model_dir = "xxx";
+config.use_gpu = false;
+
+// create predictor
+auto predictor = CreatePaddlePredictor(config);
+
+// create input tensors
+paddle::PaddleTensor src_id;
+src.dtype = paddle::PaddleDType::INT64;
+src.shape = ...;
+src.data.Reset(...);
+
+paddle::PaddleTensor pos_id;
+paddle::PaddleTensor segmeng_id;
+paddle::PaddleTensor self_attention_bias;
+paddle::PaddleTensor next_segment_index;
+
+// create iutput tensors and run prediction
+std::vector<paddle::PaddleTensor> output;
+predictor->Run({src_id, pos_id, segmeng_id, self_attention_bias, next_segment_index}, &output);
+
+std::cout << "example_id\tcontradiction\tentailment\tneutral";
+for (size_t i = 0; i < output.front().data.length() / sizeof(float); i += 3) {
+  std::cout << static_cast<float *>(output.front().data.data())[i] << "\t"
+            << static_cast<float *>(output.front().data.data())[i + 1] << "\t"
+            << static_cast<float *>(output.front().data.data())[i + 2] << std::endl;
+}
+```
 
 ## Contributors
 

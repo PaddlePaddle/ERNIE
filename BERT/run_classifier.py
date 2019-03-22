@@ -76,6 +76,7 @@ data_g.add_arg("random_seed",   int,  0,     "Random seed.")
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")
 run_type_g.add_arg("use_fast_executor",            bool,   False, "If set, use fast parallel executor (in experiment).")
+run_type_g.add_arg("num_iteration_per_drop_scope", int,    1,     "Ihe iteration intervals to clean up temporary variables.")
 run_type_g.add_arg("task_name",                    str,    None,
                    "The name of task to perform fine-tuning, should be in {'xnli', 'mnli', 'cola', 'mrpc'}.")
 run_type_g.add_arg("do_train",                     bool,   True,  "Whether to perform training.")
@@ -244,9 +245,9 @@ def main(args):
 
     if args.do_train:
         exec_strategy = fluid.ExecutionStrategy()
-        if args.use_fast_executor:
-            exec_strategy.use_experimental_executor = True
+        exec_strategy.use_experimental_executor = args.use_fast_executor
         exec_strategy.num_threads = dev_count
+        exec_strategy.num_iteration_per_drop_scope = args.num_iteration_per_drop_scope
 
         train_exe = fluid.ParallelExecutor(
             use_cuda=args.use_cuda,

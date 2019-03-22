@@ -81,7 +81,7 @@ def prepare_batch_data(insts,
                        cls_id=None,
                        sep_id=None,
                        mask_id=None,
-                       return_attn_bias=True,
+                       return_input_mask=True,
                        return_max_len=True,
                        return_num_token=False):
     """
@@ -114,22 +114,25 @@ def prepare_batch_data(insts,
     else:
         out = batch_src_ids
     # Second step: padding
-    src_id, next_sent_index, self_attn_bias = pad_batch_data(
-        out, pad_idx=pad_id, return_next_sent_pos=True, return_attn_bias=True)
+    src_id, self_input_mask = pad_batch_data(
+        out, pad_idx=pad_id, return_input_mask=True)
     pos_id = pad_batch_data(
-        batch_pos_ids, pad_idx=pad_id, return_pos=False, return_attn_bias=False)
+        batch_pos_ids,
+        pad_idx=pad_id,
+        return_pos=False,
+        return_input_mask=False)
     sent_id = pad_batch_data(
         batch_sent_ids,
         pad_idx=pad_id,
         return_pos=False,
-        return_attn_bias=False)
+        return_input_mask=False)
 
     if mask_id >= 0:
-        return_list = [src_id, pos_id, sent_id, self_attn_bias, mask_label, mask_pos] \
-                      + labels_list + [next_sent_index]
+        return_list = [
+            src_id, pos_id, sent_id, self_input_mask, mask_label, mask_pos
+        ] + labels_list
     else:
-        return_list = [src_id, pos_id, sent_id, self_attn_bias] + labels_list \
-                     + [next_sent_index]
+        return_list = [src_id, pos_id, sent_id, self_input_mask] + labels_list
 
     return return_list if len(return_list) > 1 else return_list[0]
 
@@ -137,31 +140,22 @@ def prepare_batch_data(insts,
 def pad_batch_data(insts,
                    pad_idx=0,
                    return_pos=False,
-                   return_next_sent_pos=False,
-                   return_attn_bias=False,
+                   return_input_mask=False,
                    return_max_len=False,
                    return_num_token=False):
     """
     Pad the instances to the max sequence length in batch, and generate the
-    corresponding position data and attention bias.
+    corresponding position data and input mask.
     """
     return_list = []
     max_len = max(len(inst) for inst in insts)
     # Any token included in dict can be used to pad, since the paddings' loss
     # will be masked out by weights and make no effect on parameter gradients.
 
-    inst_data = np.array(
-        [inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
+    inst_data = np.array([
+        list(inst) + list([pad_idx] * (max_len - len(inst))) for inst in insts
+    ])
     return_list += [inst_data.astype("int64").reshape([-1, max_len, 1])]
-
-    # next_sent_pos for extract first token embedding of each sentence
-    if return_next_sent_pos:
-        batch_size = inst_data.shape[0]
-        max_seq_len = inst_data.shape[1]
-        next_sent_index = np.array(
-            range(0, batch_size * max_seq_len, max_seq_len)).astype(
-                "int64").reshape(-1, 1)
-        return_list += [next_sent_index]
 
     # position data
     if return_pos:
@@ -172,13 +166,12 @@ def pad_batch_data(insts,
 
         return_list += [inst_pos.astype("int64").reshape([-1, max_len, 1])]
 
-    if return_attn_bias:
+    if return_input_mask:
         # This is used to avoid attention on paddings.
-        slf_attn_bias_data = np.array([[0] * len(inst) + [-1e9] *
-                                       (max_len - len(inst)) for inst in insts])
-        slf_attn_bias_data = np.tile(
-            slf_attn_bias_data.reshape([-1, 1, max_len]), [1, max_len, 1])
-        return_list += [slf_attn_bias_data.astype("float32")]
+        input_mask_data = np.array([[1] * len(inst) + [0] *
+                                    (max_len - len(inst)) for inst in insts])
+        input_mask_data = np.expand_dims(input_mask_data, axis=-1)
+        return_list += [input_mask_data.astype("float32")]
 
     if return_max_len:
         return_list += [max_len]

@@ -21,8 +21,8 @@ import os
 import time
 import argparse
 import numpy as np
-import paddle.fluid as fluid
 import multiprocessing
+import paddle.fluid as fluid
 
 import reader.cls as reader
 from model.bert import BertConfig

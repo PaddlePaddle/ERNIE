@@ -22,9 +22,7 @@ import collections
 import multiprocessing
 import os
 import time
-
 import numpy as np
-
 import paddle
 import paddle.fluid as fluid
 
@@ -85,10 +83,11 @@ data_g.add_arg("null_score_diff_threshold", float, 0.0,
 data_g.add_arg("random_seed",               int,   0,      "Random seed.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
-run_type_g.add_arg("use_cuda",              bool,   True,  "If set, use GPU for training.")
-run_type_g.add_arg("use_fast_executor",     bool,   False, "If set, use fast parallel executor (in experiment).")
-run_type_g.add_arg("do_train",              bool,   True,  "Whether to perform training.")
-run_type_g.add_arg("do_predict",            bool,   True,  "Whether to perform prediction.")
+run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")
+run_type_g.add_arg("use_fast_executor",            bool,   False, "If set, use fast parallel executor (in experiment).")
+run_type_g.add_arg("num_iteration_per_drop_scope", int,    1,     "Ihe iteration intervals to clean up temporary variables.")
+run_type_g.add_arg("do_train",                     bool,   True,  "Whether to perform training.")
+run_type_g.add_arg("do_predict",                   bool,   True,  "Whether to perform prediction.")
 
 args = parser.parse_args()
 # yapf: enable.
@@ -99,34 +98,31 @@ def create_model(pyreader_name, bert_config, is_training=False):
             capacity=50,
             shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
                     [-1, args.max_seq_len, 1],
-                    [-1, args.max_seq_len, args.max_seq_len], [-1, 1], [-1, 1],
-                    [-1, 1]],
+                    [-1, args.max_seq_len, 1], [-1, 1], [-1, 1]],
             dtypes=[
-                'int64', 'int64', 'int64', 'float', 'int64', 'int64', 'int64'
-            ],
-            lod_levels=[0, 0, 0, 0, 0, 0, 0],
+                'int64', 'int64', 'int64', 'float32', 'int64', 'int64'],
+            lod_levels=[0, 0, 0, 0, 0, 0],
             name=pyreader_name,
             use_double_buffer=True)
-        (src_ids, pos_ids, sent_ids, self_attn_mask, start_positions,
-         end_positions, next_sent_index) = fluid.layers.read_file(pyreader)
+        (src_ids, pos_ids, sent_ids, input_mask, start_positions,
+         end_positions) = fluid.layers.read_file(pyreader)
     else:
         pyreader = fluid.layers.py_reader(
             capacity=50,
             shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
                     [-1, args.max_seq_len, 1],
-                    [-1, args.max_seq_len, args.max_seq_len], [-1, 1], [-1, 1]],
-            dtypes=['int64', 'int64', 'int64', 'float', 'int64', 'int64'],
-            lod_levels=[0, 0, 0, 0, 0, 0],
+                    [-1, args.max_seq_len, 1], [-1, 1]],
+            dtypes=['int64', 'int64', 'int64', 'float32', 'int64'],
+            lod_levels=[0, 0, 0, 0, 0],
             name=pyreader_name,
             use_double_buffer=True)
-        (src_ids, pos_ids, sent_ids, self_attn_mask, unique_id,
-         next_sent_index) = fluid.layers.read_file(pyreader)
+        (src_ids, pos_ids, sent_ids, input_mask, unique_id) = fluid.layers.read_file(pyreader)
 
     bert = BertModel(
         src_ids=src_ids,
         position_ids=pos_ids,
         sentence_ids=sent_ids,
-        self_attn_mask=self_attn_mask,
+        input_mask=input_mask,
         config=bert_config,
         use_fp16=args.use_fp16)
 
@@ -343,9 +339,9 @@ def train(args):
 
     if args.do_train:
         exec_strategy = fluid.ExecutionStrategy()
-        if args.use_fast_executor:
-            exec_strategy.use_experimental_executor = True
+        exec_strategy.use_experimental_executor = args.use_fast_executor
         exec_strategy.num_threads = dev_count
+        exec_strategy.num_iteration_per_drop_scope = args.num_iteration_per_drop_scope
 
         train_exe = fluid.ParallelExecutor(
             use_cuda=args.use_cuda,
