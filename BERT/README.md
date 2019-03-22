@@ -376,13 +376,13 @@ src.data.Reset(...);
 
 paddle::PaddleTensor pos_id;
 paddle::PaddleTensor segmeng_id;
-paddle::PaddleTensor self_attention_bias;
-paddle::PaddleTensor next_segment_index;
+paddle::PaddleTensor input_mask;
 
 // create iutput tensors and run prediction
 std::vector<paddle::PaddleTensor> output;
-predictor->Run({src_id, pos_id, segmeng_id, self_attention_bias, next_segment_index}, &output);
+predictor->Run({src_id, pos_id, segmeng_id, input_mask}, &output);
 
+// XNLI task for example
 std::cout << "example_id\tcontradiction\tentailment\tneutral";
 for (size_t i = 0; i < output.front().data.length() / sizeof(float); i += 3) {
   std::cout << static_cast<float *>(output.front().data.data())[i] << "\t"
