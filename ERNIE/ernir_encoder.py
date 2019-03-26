@@ -45,16 +45,13 @@ data_g.add_arg("max_seq_len",         int,  512,   "Number of words of the longe
 data_g.add_arg("batch_size",          int,  32,    "Total examples' number in batch for training.")
 data_g.add_arg("do_lower_case",       bool, True,
                "Whether to lower case the input text. Should be True for uncased models and False for cased models.")
-data_g.add_arg("random_seed",         int,  0,     "Random seed.")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")
-run_type_g.add_arg("use_fast_executor",            bool,   False, "If set, use fast parallel executor (in experiment).")
-run_type_g.add_arg("num_iteration_per_drop_scope", int,    10,    "Iteration intervals to drop scope.")
 # yapf: enable
 
 
-def create_model(args, pyreader_name, ernie_config, is_prediction=False):
+def create_model(args, pyreader_name, ernie_config):
     pyreader = fluid.layers.py_reader(
         capacity=50,
         shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
@@ -108,35 +105,31 @@ def main(args):
     reader = task_reader.ExtractEmbeddingReader(
         vocab_path=args.vocab_path,
         max_seq_len=args.max_seq_len,
-        do_lower_case=args.do_lower_case,
-        random_seed=args.random_seed)
+        do_lower_case=args.do_lower_case)
 
     startup_prog = fluid.Program()
-    if args.random_seed is not None:
-        startup_prog.random_seed = args.random_seed
 
     data_generator = reader.data_generator(
         input_file=args.data_set,
         batch_size=args.batch_size,
         epoch=1,
-        shuffle=False,
-        phase="train")
+        shuffle=False)
 
     total_examples = reader.get_num_examples(args.data_set)
 
     print("Device count: %d" % dev_count)
     print("Total num examples: %d" % total_examples)
 
-    train_program = fluid.Program()
+    infer_program = fluid.Program()
 
-    with fluid.program_guard(train_program, startup_prog):
+    with fluid.program_guard(infer_program, startup_prog):
         with fluid.unique_name.guard():
             pyreader, graph_vars = create_model(
                 args, pyreader_name='reader', ernie_config=ernie_config)
 
-            fluid.memory_optimize(input_program=train_program)
+            fluid.memory_optimize(input_program=infer_program)
 
-    train_program = train_program.clone(for_test=True)
+    infer_program = infer_program.clone(for_test=True)
 
     exe.run(startup_prog)
 
@@ -148,10 +141,7 @@ def main(args):
             "WARNING: args 'init_pretraining_params' must be specified")
 
     exec_strategy = fluid.ExecutionStrategy()
-    if args.use_fast_executor:
-        exec_strategy.use_experimental_executor = True
     exec_strategy.num_threads = dev_count
-    exec_strategy.num_iteration_per_drop_scope = args.num_iteration_per_drop_scope
 
     pyreader.decorate_tensor_provider(data_generator)
     pyreader.start()
@@ -162,7 +152,7 @@ def main(args):
     while True:
         try:
             cls_emb, unpad_top_layer_emb = exe.run(
-                program=train_program,
+                program=infer_program,
                 fetch_list=[
                     graph_vars["cls_embeddings"].name, graph_vars[
                         "top_layer_embeddings"].name
