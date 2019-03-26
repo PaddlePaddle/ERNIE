@@ -17,10 +17,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import six
 import json
-import numpy as np
+
+import six
 import paddle.fluid as fluid
+
 from model.transformer_encoder import encoder, pre_process_layer
 
 

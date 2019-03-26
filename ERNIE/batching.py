@@ -166,7 +166,8 @@ def pad_batch_data(insts,
                    return_pos=False,
                    return_input_mask=False,
                    return_max_len=False,
-                   return_num_token=False):
+                   return_num_token=False,
+                   return_seq_lens=False):
     """
     Pad the instances to the max sequence length in batch, and generate the
     corresponding position data and attention bias.
@@ -204,6 +205,10 @@ def pad_batch_data(insts,
         for inst in insts:
             num_token += len(inst)
         return_list += [num_token]
+
+    if return_seq_lens:
+        seq_lens = np.array([len(inst) for inst in insts])
+        return_list += [seq_lens.astype("int64").reshape([-1, 1])]
 
     return return_list if len(return_list) > 1 else return_list[0]
 

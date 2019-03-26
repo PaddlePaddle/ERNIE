@@ -19,17 +19,15 @@ from __future__ import print_function
 
 import os
 import time
-import argparse
-import numpy as np
 import multiprocessing
 
-import paddle
+import numpy as np
 import paddle.fluid as fluid
 
 from reader.pretraining import ErnieDataReader
 from model.ernie import ErnieModel, ErnieConfig
 from optimization import optimization
-from utils.args import ArgumentGroup, print_arguments
+from utils.args import print_arguments
 from utils.init import init_checkpoint, init_pretraining_params
 
 from pretrain_args import parser
