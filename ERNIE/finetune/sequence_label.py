@@ -156,17 +156,19 @@ def chunk_eval(np_labels, np_infers, np_lens, tag_num, dev_count=1):
 
             infer_index = 0
             label_index = 0
-            while label_index < len(label_chunks) and infer_index < len(
-                    infer_chunks):
-                if infer_chunks[infer_index]["st"] < label_chunks[label_index][
-                        "st"]:
+            while label_index < len(label_chunks) \
+                   and infer_index < len(infer_chunks):
+                if infer_chunks[infer_index]["st"] \
+                    < label_chunks[label_index]["st"]:
                     infer_index += 1
-                elif infer_chunks[infer_index]["st"] > label_chunks[
-                        label_index]["st"]:
+                elif infer_chunks[infer_index]["st"] \
+                    > label_chunks[label_index]["st"]:
                     label_index += 1
                 else:
-                    if infer_chunks[infer_index]["en"] == label_chunks[label_index]["en"] and \
-                            infer_chunks[infer_index]["type"] == label_chunks[label_index]["type"]:
+                    if infer_chunks[infer_index]["en"] \
+                        == label_chunks[label_index]["en"] \
+                        and infer_chunks[infer_index]["type"] \
+                        == label_chunks[label_index]["type"]:
                         num_correct += 1
 
                     infer_index += 1
