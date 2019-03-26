@@ -171,9 +171,12 @@ class ErnieDataReader(object):
             if len(token_seq) > self.max_seq_len:
                 miss_num += 1
                 continue
-            type_seq = [0] * (len(left_tokens) + 2) + [1] * (len(right_tokens) + 1)
+            type_seq = [0] * (len(left_tokens) + 2) + [1] * (len(right_tokens) +
+                                                             1)
             pos_seq = range(len(token_seq))
-            seg_label_seq = [-1] + left_seg_labels + [-1] + right_seg_labels + [-1]
+            seg_label_seq = [-1] + left_seg_labels + [-1] + right_seg_labels + [
+                -1
+            ]
 
             assert len(token_seq) == len(type_seq) == len(pos_seq) == len(seg_label_seq), \
                     "[ERROR]len(src_id) == lne(sent_id) == len(pos_id) must be True"
@@ -290,7 +293,7 @@ class ErnieDataReader(object):
                     cls_id=self.cls_id,
                     sep_id=self.sep_id,
                     mask_id=self.mask_id,
-                    return_attn_bias=True,
+                    return_input_mask=True,
                     return_max_len=False,
                     return_num_token=False)
 

@@ -247,11 +247,8 @@ class ClassifyReader(BaseReader):
             batch_qids = np.array([]).astype("int64").reshape([-1, 1])
 
         # padding
-        padded_token_ids, next_sent_index, self_attn_bias = pad_batch_data(
-            batch_token_ids,
-            pad_idx=self.pad_id,
-            return_next_sent_pos=True,
-            return_attn_bias=True)
+        padded_token_ids, input_mask = pad_batch_data(
+            batch_token_ids, pad_idx=self.pad_id, return_input_mask=True)
         padded_text_type_ids = pad_batch_data(
             batch_text_type_ids, pad_idx=self.pad_id)
         padded_position_ids = pad_batch_data(
@@ -259,7 +256,7 @@ class ClassifyReader(BaseReader):
 
         return_list = [
             padded_token_ids, padded_text_type_ids, padded_position_ids,
-            self_attn_bias, batch_labels, next_sent_index, batch_qids
+            input_mask, batch_labels, batch_qids
         ]
 
         return return_list
@@ -274,11 +271,8 @@ class SequenceLabelReader(BaseReader):
         batch_seq_lens = [len(record.token_ids) for record in batch_records]
 
         # padding
-        padded_token_ids, self_attn_bias = pad_batch_data(
-            batch_token_ids,
-            pad_idx=self.pad_id,
-            return_next_sent_pos=False,
-            return_attn_bias=True)
+        padded_token_ids, input_mask = pad_batch_data(
+            batch_token_ids, pad_idx=self.pad_id, return_input_mask=True)
         padded_text_type_ids = pad_batch_data(
             batch_text_type_ids, pad_idx=self.pad_id)
         padded_position_ids = pad_batch_data(
@@ -290,7 +284,7 @@ class SequenceLabelReader(BaseReader):
 
         return_list = [
             padded_token_ids, padded_text_type_ids, padded_position_ids,
-            self_attn_bias, padded_label_ids, batch_seq_lens
+            input_mask, padded_label_ids, batch_seq_lens
         ]
         return return_list
 
