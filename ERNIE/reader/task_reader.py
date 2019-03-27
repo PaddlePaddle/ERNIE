@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import csv
 import json
 import numpy as np
@@ -50,7 +49,6 @@ class BaseReader(object):
                 self.label_map = json.load(f)
         else:
             self.label_map = None
-        pass
 
     def get_train_progress(self):
         """Gets progress for training phase."""
@@ -183,7 +181,7 @@ class BaseReader(object):
                 yield self._pad_batch_records(batch_records)
                 batch_records, max_len = [record], len(record.token_ids)
 
-        if len(batch_records) > 0:
+        if batch_records:
             yield self._pad_batch_records(batch_records)
 
     def get_num_examples(self, input_file):
@@ -268,19 +266,19 @@ class SequenceLabelReader(BaseReader):
         batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
         batch_label_ids = [record.label_ids for record in batch_records]
-        batch_seq_lens = [len(record.token_ids) for record in batch_records]
 
         # padding
-        padded_token_ids, input_mask = pad_batch_data(
-            batch_token_ids, pad_idx=self.pad_id, return_input_mask=True)
+        padded_token_ids, input_mask, batch_seq_lens = pad_batch_data(
+            batch_token_ids,
+            pad_idx=self.pad_id,
+            return_input_mask=True,
+            return_seq_lens=True)
         padded_text_type_ids = pad_batch_data(
             batch_text_type_ids, pad_idx=self.pad_id)
         padded_position_ids = pad_batch_data(
             batch_position_ids, pad_idx=self.pad_id)
         padded_label_ids = pad_batch_data(
             batch_label_ids, pad_idx=len(self.label_map) - 1)
-        batch_seq_lens = np.array(batch_seq_lens).astype("int64").reshape(
-            [-1, 1])
 
         return_list = [
             padded_token_ids, padded_text_type_ids, padded_position_ids,
@@ -335,6 +333,31 @@ class SequenceLabelReader(BaseReader):
             position_ids=position_ids,
             label_ids=label_ids)
         return record
+
+
+class ExtractEmbeddingReader(BaseReader):
+    def _pad_batch_records(self, batch_records):
+        batch_token_ids = [record.token_ids for record in batch_records]
+        batch_text_type_ids = [record.text_type_ids for record in batch_records]
+        batch_position_ids = [record.position_ids for record in batch_records]
+
+        # padding
+        padded_token_ids, input_mask, seq_lens = pad_batch_data(
+            batch_token_ids,
+            pad_idx=self.pad_id,
+            return_input_mask=True,
+            return_seq_lens=True)
+        padded_text_type_ids = pad_batch_data(
+            batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(
+            batch_position_ids, pad_idx=self.pad_id)
+
+        return_list = [
+            padded_token_ids, padded_text_type_ids, padded_position_ids,
+            input_mask, seq_lens
+        ]
+
+        return return_list
 
 
 if __name__ == '__main__':

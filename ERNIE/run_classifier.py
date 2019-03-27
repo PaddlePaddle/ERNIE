@@ -19,18 +19,15 @@ from __future__ import print_function
 
 import os
 import time
-import argparse
-import numpy as np
 import multiprocessing
 
-import paddle
 import paddle.fluid as fluid
 
 import reader.task_reader as task_reader
 from model.ernie import ErnieConfig
 from finetune.classifier import create_model, evaluate
 from optimization import optimization
-from utils.args import ArgumentGroup, print_arguments
+from utils.args import print_arguments
 from utils.init import init_pretraining_params, init_checkpoint
 from finetune_args import parser
 
@@ -184,12 +181,6 @@ def main(args):
     else:
         train_exe = None
 
-    if args.do_val or args.do_test:
-        test_exe = fluid.ParallelExecutor(
-            use_cuda=args.use_cuda,
-            main_program=test_prog,
-            share_vars_from=train_exe)
-
     if args.do_train:
         train_pyreader.start()
         steps = 0
@@ -238,7 +229,8 @@ def main(args):
                                 batch_size=args.batch_size,
                                 epoch=1,
                                 shuffle=False))
-                        evaluate(exe, test_prog, test_pyreader, graph_vars, "dev")
+                        evaluate(exe, test_prog, test_pyreader, graph_vars,
+                                 "dev")
                     # evaluate test set
                     if args.do_test:
                         test_pyreader.decorate_tensor_provider(
@@ -247,7 +239,8 @@ def main(args):
                                 batch_size=args.batch_size,
                                 epoch=1,
                                 shuffle=False))
-                        evaluate(exe, test_prog, test_pyreader, graph_vars, "test")
+                        evaluate(exe, test_prog, test_pyreader, graph_vars,
+                                 "test")
             except fluid.core.EOFException:
                 save_path = os.path.join(args.checkpoints, "step_" + str(steps))
                 fluid.io.save_persistables(exe, save_path, train_program)

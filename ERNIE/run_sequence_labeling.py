@@ -19,10 +19,8 @@ from __future__ import print_function
 
 import os
 import time
-import numpy as np
 import multiprocessing
 
-import paddle
 import paddle.fluid as fluid
 
 import reader.task_reader as task_reader
@@ -264,7 +262,8 @@ def main(args):
                 epoch=1,
                 shuffle=False))
         print("Final validation result:")
-        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels, "dev")
+        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels,
+                 "dev")
 
     # final eval on test set
     if args.do_test:
@@ -275,7 +274,8 @@ def main(args):
                 epoch=1,
                 shuffle=False))
         print("Final test result:")
-        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels, "test")
+        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels,
+                 "test")
 
 
 if __name__ == '__main__':

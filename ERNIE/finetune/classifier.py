@@ -20,9 +20,8 @@ from __future__ import print_function
 import time
 import numpy as np
 
-import paddle.fluid as fluid
-
 from six.moves import xrange
+import paddle.fluid as fluid
 
 from model.ernie import ErnieModel
 
