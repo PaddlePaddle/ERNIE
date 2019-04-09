@@ -300,7 +300,8 @@ def train(args):
                     bert_config=bert_config,
                     is_training=False)
 
-                fluid.memory_optimize(test_prog, skip_opt_set=[unique_ids.name, start_logits.name, end_logits.name, num_seqs.name])
+                fluid.memory_optimize(test_prog, skip_opt_set=[unique_ids.name,
+                    start_logits.name, end_logits.name, num_seqs.name])
 
         test_prog = test_prog.clone(for_test=True)
 
