@@ -1,5 +1,7 @@
 ## ERNIE: **E**nhanced **R**epresentation through k**N**owledge **I**nt**E**gration
 
+**** **2019-04-10 更新**: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布 ****
+
 **** **2019-03-18 更新**: update ERNIE_stable.tgz ****
 
 **ERNIE** 通过建模海量数据中的词、实体及实体关系，学习真实世界的语义知识。相较于 **BERT** 学习原始语言信号，**ERNIE** 直接对先验语义知识单元进行建模，增强了模型语义表示能力。
@@ -23,7 +25,7 @@
         <br></th>
       <th colspan="2"><strong>XNLI</strong></th>
       <th colspan="2"><strong>LCQMC</strong></th>
-      <th colspan="2"><strong>MSRA-NER</strong></th>
+      <th colspan="2"><strong>MSRA-NER(SIGHAN 2006)</strong></th>
       <th colspan="2"><strong>ChnSentiCorp</strong></th>
       <th colspan="4"><strong>nlpcc-dbqa</strong></th></tr>
     <tr>
@@ -141,10 +143,10 @@ XNLI 由 Facebook 和纽约大学的研究者联合构建，旨在评测模型�
 LCQMC 是哈尔滨工业大学在自然语言处理国际顶会 COLING2018 构建的问答匹配数据集，其目标是判断两个问题的语义是否相同。[链接: http://aclweb.org/anthology/C18-1166]
 ```
 
- - **命名实体识别任务** MSRA-NER
+ - **命名实体识别任务** MSRA-NER(SIGHAN 2006)
 
 ```text
-MSRA-NER 数据集由微软亚研院发布，其目标是命名实体识别，是指识别文本中具有特定意义的实体，主要包括人名、地名、机构名等。
+MSRA-NER(SIGHAN 2006) 数据集由微软亚研院发布，其目标是命名实体识别，是指识别文本中具有特定意义的实体，主要包括人名、地名、机构名等。
 ```
 
  - **情感分析任务** ChnSentiCorp
@@ -161,7 +163,12 @@ nlpcc-dbqa是由国际自然语言处理和中文计算会议NLPCC于2016年举�
 
 ### 模型&数据
 
-1) [预训练模型下载](https://ernie.bj.bcebos.com/ERNIE_stable.tgz)
+1) 预训练模型下载
+
+| Model | Description |
+| :------| :------ |
+| [模型](https://ernie.bj.bcebos.com/ERNIE_stable.tgz) | 包含预训练模型参数 |
+| [模型(含配置文件及词典)](https://baidu-nlp.bj.bcebos.com/ERNIE_stable-1.0.1.tar.gz)) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 
 2) [任务数据下载](https://ernie.bj.bcebos.com/task_data.tgz)
 
@@ -247,7 +254,7 @@ text_a  text_b  label
 
 1) **实体识别**
 
- 以 `MSRA-NER` 作为示例，数据格式为包含2个字段的tsv文件，2个字段分别为: `text_a  label`, 示例数据如下:
+ 以 `MSRA-NER(SIGHAN 2006)` 作为示例，数据格式为包含2个字段的tsv文件，2个字段分别为: `text_a  label`, 示例数据如下:
  ```
  label  text_a
  在 这 里 恕 弟 不 恭 之 罪 ， 敢 在 尊 前 一 诤 ： 前 人 论 书 ， 每 曰 “ 字 字 有 来 历 ， 笔 笔 有 出 处 ” ， 细 读 公 字 ， 何 尝 跳 出 前 人 藩 篱 ， 自 隶 变 而 后 ， 直 至 明 季 ， 兄 有 何 新 出 ？    O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
