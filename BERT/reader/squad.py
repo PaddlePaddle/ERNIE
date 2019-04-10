@@ -488,6 +488,7 @@ class DataProcessor(object):
                        batch_size,
                        phase='train',
                        shuffle=False,
+                       dev_count=1,
                        version_2_with_negative=False,
                        epoch=1):
         if phase == 'train':
@@ -549,9 +550,10 @@ class DataProcessor(object):
                 else:
                     features = self.get_features(examples, is_training=False)
 
+                all_dev_batches = []
                 for batch_data, total_token_num in batch_reader(
                         features, batch_size, self._in_tokens):
-                    yield prepare_batch_data(
+                    batch_data = prepare_batch_data(
                         batch_data,
                         total_token_num,
                         voc_size=-1,
@@ -562,6 +564,12 @@ class DataProcessor(object):
                         return_input_mask=True,
                         return_max_len=False,
                         return_num_token=False)
+                    if len(all_dev_batches) < dev_count:
+                        all_dev_batches.append(batch_data)
+                    else:
+                        for batch in all_dev_batches:
+                            yield batch
+                        all_dev_batches = [batch_data]
 
         return wrapper
 
