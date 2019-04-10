@@ -242,6 +242,7 @@ def train(args):
             batch_size=args.batch_size,
             phase='train',
             shuffle=False,
+            dev_count=dev_count,
             version_2_with_negative=args.version_2_with_negative,
             epoch=args.epoch)
 
@@ -413,6 +414,7 @@ def train(args):
                 batch_size=args.batch_size,
                 phase='predict',
                 shuffle=False,
+                dev_count=1,
                 epoch=1))
 
         predict(exe, test_prog, test_pyreader, [

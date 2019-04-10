@@ -118,7 +118,12 @@ class DataProcessor(object):
         """Gets progress for training phase."""
         return self.current_train_example, self.current_train_epoch
 
-    def data_generator(self, batch_size, phase='train', epoch=1, shuffle=True):
+    def data_generator(self,
+                       batch_size,
+                       phase='train',
+                       epoch=1,
+                       dev_count=1,
+                       shuffle=True):
         """
         Generate data for train, dev or test.
     
@@ -178,6 +183,7 @@ class DataProcessor(object):
                 yield batch, total_token_num
 
         def wrapper():
+            all_dev_batches = []
             for batch_data, total_token_num in batch_reader(
                     instance_reader, batch_size, self.in_tokens):
                 batch_data = self.generate_batch_data(
@@ -188,7 +194,12 @@ class DataProcessor(object):
                     return_input_mask=True,
                     return_max_len=False,
                     return_num_token=False)
-                yield batch_data
+                if len(all_dev_batches) < dev_count:
+                    all_dev_batches.append(batch_data)
+                else:
+                    for batch in all_dev_batches:
+                        yield batch
+                    all_dev_batches = [batch_data]
 
         return wrapper
 
