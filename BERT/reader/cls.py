@@ -196,10 +196,11 @@ class DataProcessor(object):
                     return_num_token=False)
                 if len(all_dev_batches) < dev_count:
                     all_dev_batches.append(batch_data)
-                else:
+
+                if len(all_dev_batches) == dev_count:
                     for batch in all_dev_batches:
                         yield batch
-                    all_dev_batches = [batch_data]
+                    all_dev_batches = []
 
         return wrapper
 
