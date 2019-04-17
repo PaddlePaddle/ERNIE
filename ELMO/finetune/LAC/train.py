@@ -112,7 +112,7 @@ def parse_args():
     parser.add_argument(
         "--word_dict_path",
         type=str,
-        default="../data/vocabulary_min5k.txt",
+        default="../../data/vocabulary_min5k.txt",
         help="The path of the word dictionary."
     )
     parser.add_argument(
