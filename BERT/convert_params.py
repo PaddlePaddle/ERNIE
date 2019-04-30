@@ -135,7 +135,12 @@ def parse(init_checkpoint):
             else:
                 print("ignored param: %s" % var_name)
         else:
-            print("ignored param: %s" % var_name)
+            if var_name == 'output_weights':
+                fluid_param_name = 'cls_out_w'
+            elif var_name == 'output_bias':
+                fluid_param_name = 'cls_out_b'
+            else:
+                print("ignored param: %s" % var_name)
 
         if fluid_param_name != '':
             tf_fluid_param_name_map[var_name] = fluid_param_name
@@ -171,6 +176,8 @@ def convert(args):
         if param == 'cls/seq_relationship/output_weights':
             value = np.transpose(value)
         if param == 'cls/squad/output_weights':
+            value = np.transpose(value)
+        if param == 'output_weights':
             value = np.transpose(value)
         fluid.global_scope().find_var(tf_fluid_param_name_map[
             param]).get_tensor().set(value, place)
