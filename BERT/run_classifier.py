@@ -76,6 +76,7 @@ data_g.add_arg("random_seed",   int,  0,     "Random seed.")
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")
 run_type_g.add_arg("use_fast_executor",            bool,   False, "If set, use fast parallel executor (in experiment).")
+run_type_g.add_arg("shuffle",                      bool,   True,  "")
 run_type_g.add_arg("num_iteration_per_drop_scope", int,    1,     "Ihe iteration intervals to clean up temporary variables.")
 run_type_g.add_arg("task_name",                    str,    None,
                    "The name of task to perform fine-tuning, should be in {'xnli', 'mnli', 'cola', 'mrpc'}.")
@@ -139,16 +140,18 @@ def main(args):
         raise ValueError("For args `do_train`, `do_val` and `do_test`, at "
                          "least one of them must be True.")
 
+    train_program = fluid.Program()
     startup_prog = fluid.Program()
     if args.random_seed is not None:
         startup_prog.random_seed = args.random_seed
+        train_program.random_seed = args.random_seed
 
     if args.do_train:
         train_data_generator = processor.data_generator(
             batch_size=args.batch_size,
             phase='train',
             epoch=args.epoch,
-            shuffle=True)
+            shuffle=args.shuffle)
 
         num_train_examples = processor.get_num_examples(phase='train')
 
@@ -163,8 +166,6 @@ def main(args):
         print("Num train examples: %d" % num_train_examples)
         print("Max train steps: %d" % max_train_steps)
         print("Num warmup steps: %d" % warmup_steps)
-
-        train_program = fluid.Program()
 
         with fluid.program_guard(train_program, startup_prog):
             with fluid.unique_name.guard():
@@ -248,11 +249,13 @@ def main(args):
         exec_strategy.use_experimental_executor = args.use_fast_executor
         exec_strategy.num_threads = dev_count
         exec_strategy.num_iteration_per_drop_scope = args.num_iteration_per_drop_scope
-
+        build_strategy = fluid.BuildStrategy()
+        
         train_exe = fluid.ParallelExecutor(
             use_cuda=args.use_cuda,
             loss_name=loss.name,
             exec_strategy=exec_strategy,
+            build_strategy = build_strategy,
             main_program=train_program)
 
         train_pyreader.decorate_tensor_provider(train_data_generator)
@@ -270,9 +273,10 @@ def main(args):
         steps = 0
         total_cost, total_acc, total_num_seqs = [], [], []
         time_begin = time.time()
+        throughput = []
         while True:
             try:
-                steps += 1
+                # steps += 1
                 if steps % args.skip_steps == 0:
                     if warmup_steps <= 0:
                         fetch_list = [loss.name, accuracy.name, num_seqs.name]
@@ -308,21 +312,29 @@ def main(args):
                     )
                     time_end = time.time()
                     used_time = time_end - time_begin
-                    print("epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
-                          "ave acc: %f, speed: %f steps/s" %
-                          (current_epoch, current_example, num_train_examples,
+
+                    log_record = "epoch: {}, progress: {}/{}, step: {}, ave loss: {}, ave acc: {}".format(
+                           current_epoch, current_example, num_train_examples,
                            steps, np.sum(total_cost) / np.sum(total_num_seqs),
-                           np.sum(total_acc) / np.sum(total_num_seqs),
-                           args.skip_steps / used_time))
+                           np.sum(total_acc) / np.sum(total_num_seqs))
+                    if steps > 0 :
+                        throughput.append( args.skip_steps / used_time)
+                        log_record = log_record + ", speed: %f steps/s" % (args.skip_steps / used_time)
+                        print(log_record)
+                    else:
+                        print(log_record)
                     total_cost, total_acc, total_num_seqs = [], [], []
                     time_begin = time.time()
 
+                steps += 1
                 if steps % args.save_steps == 0:
                     save_path = os.path.join(args.checkpoints,
                                              "step_" + str(steps))
                     fluid.io.save_persistables(exe, save_path, train_program)
 
                 if steps % args.validation_steps == 0:
+                    print("Average throughtput: %s" % (np.average(throughput)))
+                    throughput = []
                     # evaluate dev set
                     if args.do_val:
                         test_pyreader.decorate_tensor_provider(
