@@ -9,6 +9,7 @@ import paddle.fluid as fluid
 from paddle.fluid.initializer import NormalInitializer
 import paddle.fluid.layers as layers
 from bilm import elmo_encoder
+import ipdb
 
 
 def lex_net(args, word_dict_len, label_dict_len):
