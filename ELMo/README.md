@@ -31,6 +31,8 @@ ELMo(Embeddings from Language Models) 是重要的通用语义表示模型之一
 
 本项目依赖于 Paddle Fluid **1.4.0**，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
 
+提示：使用Windows GPU环境的用户，需要将示例代码中的[fluid.ParallelExecutor](http://paddlepaddle.org/documentation/docs/zh/1.4/api_cn/fluid_cn.html#parallelexecutor)替换为[fluid.Executor](http://paddlepaddle.org/documentation/docs/zh/1.4/api_cn/fluid_cn.html#executor)。
+
 ### 预训练
 
 #### 数据预处理
