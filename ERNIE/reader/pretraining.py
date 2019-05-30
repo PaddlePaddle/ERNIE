@@ -75,7 +75,7 @@ class ErnieDataReader(object):
     def parse_line(self, line, max_seq_len=512):
         """ parse one line to token_ids, sentence_ids, pos_ids, label
         """
-        line = line.strip().split(";")
+        line = line.strip().decode().split(";")
         assert len(line) == 5, "One sample must have 5 fields!"
         (token_ids, sent_ids, pos_ids, seg_labels, label) = line
         token_ids = [int(token) for token in token_ids.split(" ")]
