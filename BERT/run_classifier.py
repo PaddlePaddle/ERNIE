@@ -278,7 +278,11 @@ def main(args):
             exec_strategy=exec_strategy,
             build_strategy = build_strategy,
             main_program=train_program)
-
+        num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
+        if num_trainers > 1:
+            train_data_generator = fluid.contrib.reader.multi_process_reader(
+                train_data_generator)
+                        
         train_pyreader.decorate_tensor_provider(train_data_generator)
     else:
         train_exe = None
