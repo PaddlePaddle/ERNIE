@@ -156,7 +156,7 @@ def evaluate(exe, test_program, test_pyreader, graph_vars, eval_phase):
         outputs = exe.run(fetch_list=train_fetch_list)
         ret = {"loss": np.mean(outputs[0]), "accuracy": np.mean(outputs[1])}
         if "learning_rate" in graph_vars:
-            ret["learning_rate"] = float(outputs[4][0])
+            ret["learning_rate"] = float(outputs[3][0])
         return ret
 
     test_pyreader.start()
