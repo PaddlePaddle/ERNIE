@@ -76,6 +76,7 @@ data_g.add_arg("random_seed",   int,  0,     "Random seed.")
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")
 run_type_g.add_arg("use_fast_executor",            bool,   False, "If set, use fast parallel executor (in experiment).")
+run_type_g.add_arg("shuffle",                      bool,   True,  "Whether to shuffle the input dataset.")
 run_type_g.add_arg("num_iteration_per_drop_scope", int,    1,     "Ihe iteration intervals to clean up temporary variables.")
 run_type_g.add_arg("task_name",                    str,    None,
                    "The name of task to perform fine-tuning, should be in {'xnli', 'mnli', 'cola', 'mrpc'}.")
@@ -139,9 +140,11 @@ def main(args):
         raise ValueError("For args `do_train`, `do_val` and `do_test`, at "
                          "least one of them must be True.")
 
+    train_program = fluid.Program()
     startup_prog = fluid.Program()
     if args.random_seed is not None:
         startup_prog.random_seed = args.random_seed
+        train_program.random_seed = args.random_seed
 
     if args.do_train:
         train_data_generator = processor.data_generator(
@@ -149,7 +152,7 @@ def main(args):
             phase='train',
             epoch=args.epoch,
             dev_count=dev_count,
-            shuffle=True)
+            shuffle=args.shuffle)
 
         num_train_examples = processor.get_num_examples(phase='train')
 
