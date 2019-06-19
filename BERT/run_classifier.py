@@ -170,6 +170,7 @@ def main(args):
             batch_size=args.batch_size,
             phase='train',
             epoch=args.epoch,
+            dev_count=dev_count,
             shuffle=args.shuffle)
 
         num_train_examples = processor.get_num_examples(phase='train')
@@ -367,6 +368,7 @@ def main(args):
                                 batch_size=args.batch_size,
                                 phase='dev',
                                 epoch=1,
+                                dev_count=1,
                                 shuffle=False))
                         evaluate(exe, test_prog, test_pyreader,
                                  [loss.name, accuracy.name, num_seqs.name],
@@ -378,6 +380,7 @@ def main(args):
                                 batch_size=args.batch_size,
                                 phase='test',
                                 epoch=1,
+                                dev_count=1,
                                 shuffle=False))
                         evaluate(exe, test_prog, test_pyreader,
                                  [loss.name, accuracy.name, num_seqs.name],
@@ -392,7 +395,7 @@ def main(args):
     if args.do_val:
         test_pyreader.decorate_tensor_provider(
             processor.data_generator(
-                batch_size=args.batch_size, phase='dev', epoch=1,
+                batch_size=args.batch_size, phase='dev', epoch=1, dev_count=1,
                 shuffle=False))
         print("Final validation result:")
         evaluate(exe, test_prog, test_pyreader,
@@ -405,6 +408,7 @@ def main(args):
                 batch_size=args.batch_size,
                 phase='test',
                 epoch=1,
+                dev_count=1,
                 shuffle=False))
         print("Final test result:")
         evaluate(exe, test_prog, test_pyreader,

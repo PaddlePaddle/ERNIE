@@ -17,10 +17,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import six
 import json
-import numpy as np
+
+import six
 import paddle.fluid as fluid
+
 from model.transformer_encoder import encoder, pre_process_layer
 
 
@@ -52,7 +53,7 @@ class ErnieModel(object):
                  src_ids,
                  position_ids,
                  sentence_ids,
-                 self_attn_mask,
+                 input_mask,
                  config,
                  weight_sharing=True,
                  use_fp16=False):
@@ -78,9 +79,9 @@ class ErnieModel(object):
         self._param_initializer = fluid.initializer.TruncatedNormal(
             scale=config['initializer_range'])
 
-        self._build_model(src_ids, position_ids, sentence_ids, self_attn_mask)
+        self._build_model(src_ids, position_ids, sentence_ids, input_mask)
 
-    def _build_model(self, src_ids, position_ids, sentence_ids, self_attn_mask):
+    def _build_model(self, src_ids, position_ids, sentence_ids, input_mask):
         # padding id in vocabulary must be set to 0
         emb_out = fluid.layers.embedding(
             input=src_ids,
@@ -110,9 +111,12 @@ class ErnieModel(object):
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
 
         if self._dtype == "float16":
-            self_attn_mask = fluid.layers.cast(
-                x=self_attn_mask, dtype=self._dtype)
+            input_mask = fluid.layers.cast(x=input_mask, dtype=self._dtype)
+        self_attn_mask = fluid.layers.matmul(
+            x=input_mask, y=input_mask, transpose_y=True)
 
+        self_attn_mask = fluid.layers.scale(
+            x=self_attn_mask, scale=10000.0, bias=-1.0, bias_after_scale=False)
         n_head_self_attn_mask = fluid.layers.stack(
             x=[self_attn_mask] * self._n_head, axis=1)
         n_head_self_attn_mask.stop_gradient = True
@@ -138,13 +142,10 @@ class ErnieModel(object):
     def get_sequence_output(self):
         return self._enc_out
 
-    def get_pooled_output(self, next_sent_index):
+    def get_pooled_output(self):
         """Get the first feature of each sequence for classification"""
-        self._reshaped_emb_out = fluid.layers.reshape(
-            x=self._enc_out, shape=[-1, self._emb_size], inplace=True)
-        next_sent_index = fluid.layers.cast(x=next_sent_index, dtype='int32')
-        next_sent_feat = fluid.layers.gather(
-            input=self._reshaped_emb_out, index=next_sent_index)
+        next_sent_feat = fluid.layers.slice(
+            input=self._enc_out, axes=[1], starts=[0], ends=[1])
         next_sent_feat = fluid.layers.fc(
             input=next_sent_feat,
             size=self._emb_size,
@@ -154,17 +155,17 @@ class ErnieModel(object):
             bias_attr="pooled_fc.b_0")
         return next_sent_feat
 
-    def get_pretraining_output(self, mask_label, mask_pos, labels,
-                               next_sent_index):
+    def get_pretraining_output(self, mask_label, mask_pos, labels):
         """Get the loss & accuracy for pretraining"""
 
         mask_pos = fluid.layers.cast(x=mask_pos, dtype='int32')
 
         # extract the first token feature in each sentence
-        next_sent_feat = self.get_pooled_output(next_sent_index)
+        next_sent_feat = self.get_pooled_output()
+        reshaped_emb_out = fluid.layers.reshape(
+            x=self._enc_out, shape=[-1, self._emb_size])
         # extract masked tokens' feature
-        mask_feat = fluid.layers.gather(
-            input=self._reshaped_emb_out, index=mask_pos)
+        mask_feat = fluid.layers.gather(input=reshaped_emb_out, index=mask_pos)
 
         # transform: fc
         mask_trans_feat = fluid.layers.fc(

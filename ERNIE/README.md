@@ -1,5 +1,7 @@
 ## ERNIE: **E**nhanced **R**epresentation through k**N**owledge **I**nt**E**gration
 
+**** **2019-04-10 更新**: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布 ****
+
 **** **2019-03-18 更新**: update ERNIE_stable.tgz ****
 
 **ERNIE** 通过建模海量数据中的词、实体及实体关系，学习真实世界的语义知识。相较于 **BERT** 学习原始语言信号，**ERNIE** 直接对先验语义知识单元进行建模，增强了模型语义表示能力。
@@ -23,7 +25,7 @@
         <br></th>
       <th colspan="2"><strong>XNLI</strong></th>
       <th colspan="2"><strong>LCQMC</strong></th>
-      <th colspan="2"><strong>MSRA-NER</strong></th>
+      <th colspan="2"><strong>MSRA-NER(SIGHAN 2006)</strong></th>
       <th colspan="2"><strong>ChnSentiCorp</strong></th>
       <th colspan="4"><strong>nlpcc-dbqa</strong></th></tr>
     <tr>
@@ -141,10 +143,10 @@ XNLI 由 Facebook 和纽约大学的研究者联合构建，旨在评测模型�
 LCQMC 是哈尔滨工业大学在自然语言处理国际顶会 COLING2018 构建的问答匹配数据集，其目标是判断两个问题的语义是否相同。[链接: http://aclweb.org/anthology/C18-1166]
 ```
 
- - **命名实体识别任务** MSRA-NER
+ - **命名实体识别任务** MSRA-NER(SIGHAN 2006)
 
 ```text
-MSRA-NER 数据集由微软亚研院发布，其目标是命名实体识别，是指识别文本中具有特定意义的实体，主要包括人名、地名、机构名等。
+MSRA-NER(SIGHAN 2006) 数据集由微软亚研院发布，其目标是命名实体识别，是指识别文本中具有特定意义的实体，主要包括人名、地名、机构名等。
 ```
 
  - **情感分析任务** ChnSentiCorp
@@ -161,12 +163,17 @@ nlpcc-dbqa是由国际自然语言处理和中文计算会议NLPCC于2016年举�
 
 ### 模型&数据
 
-1) [预训练模型下载](https://ernie.bj.bcebos.com/ERNIE_stable.tgz)
+1) 预训练模型下载
+
+| Model | Description |
+| :------| :------ |
+| [模型](https://ernie.bj.bcebos.com/ERNIE_stable.tgz) | 包含预训练模型参数 |
+| [模型(含配置文件及词典)](https://baidu-nlp.bj.bcebos.com/ERNIE_stable-1.0.1.tar.gz)) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 
 2) [任务数据下载](https://ernie.bj.bcebos.com/task_data.tgz)
 
 ### 安装
-本项目依赖于 Paddle Fluid 1.3.0，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+本项目依赖于 Paddle Fluid 1.3.1，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
 
 **Note**: 预训练任务和finetune任务测试机器为P40, 显存22G；如果显存低于22G, 某些任务可能会因显存不足报错；
 
@@ -247,10 +254,10 @@ text_a  text_b  label
 
 1) **实体识别**
 
- 以 `MSRA-NER` 作为示例，数据格式为包含2个字段的tsv文件，2个字段分别为: `text_a  label`, 示例数据如下:
+ 以 `MSRA-NER(SIGHAN 2006)` 作为示例，数据格式为包含2个字段的tsv文件，2个字段分别为: `text_a  label`, 示例数据如下:
  ```
- label  text_a
- 在 这 里 恕 弟 不 恭 之 罪 ， 敢 在 尊 前 一 诤 ： 前 人 论 书 ， 每 曰 “ 字 字 有 来 历 ， 笔 笔 有 出 处 ” ， 细 读 公 字 ， 何 尝 跳 出 前 人 藩 篱 ， 自 隶 变 而 后 ， 直 至 明 季 ， 兄 有 何 新 出 ？    O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+text_a  label
+在 这 里 恕 弟 不 恭 之 罪 ， 敢 在 尊 前 一 诤 ： 前 人 论 书 ， 每 曰 “ 字 字 有 来 历 ， 笔 笔 有 出 处 ” ， 细 读 公 字 ， 何 尝 跳 出 前 人 藩 篱 ， 自 隶 变 而 后 ， 直 至 明 季 ， 兄 有 何 新 出 ？    O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
 相 比 之 下 ， 青 岛 海 牛 队 和 广 州 松 日 队 的 雨 中 之 战 虽 然 也 是 0 ∶ 0 ， 但 乏 善 可 陈 。   O O O O O B-ORG I-ORG I-ORG I-ORG I-ORG O B-ORG I-ORG I-ORG I-ORG I-ORG O O O O O O O O O O O O O O O O O O O
 理 由 多 多 ， 最 无 奈 的 却 是 ： 5 月 恰 逢 双 重 考 试 ， 她 攻 读 的 博 士 学 位 论 文 要 通 考 ； 她 任 教 的 两 所 学 校 ， 也 要 在 这 段 时 日 大 考 。    O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
  ```
@@ -261,3 +268,30 @@ text_a  text_b  label
 [dev evaluation] f1: 0.951949, precision: 0.944636, recall: 0.959376, elapsed time: 19.156693 s
 [test evaluation] f1: 0.937390, precision: 0.925988, recall: 0.949077, elapsed time: 36.565929 s
 ```
+
+### FAQ
+
+#### 如何获取输入句子经过 ERNIE 编码后的 Embedding 表示?
+
+可以通过 ernie_encoder.py 抽取出输入句子的 Embedding 表示和句子中每个 token 的 Embedding 表示，数据格式和 [Fine-tuning 任务](#Fine-tuning-任务) 一节中介绍的各种类型 Fine-tuning 任务的训练数据格式一致；以获取 LCQM dev 数据集中的句子 Embedding 和 token embedding 为例，示例脚本如下:
+
+```
+export FLAGS_sync_nccl_allreduce=1
+export CUDA_VISIBLE_DEVICES=7
+
+python -u ernir_encoder.py \
+                   --use_cuda true \
+                   --batch_size 32 \
+                   --output_dir "./test" \
+                   --init_pretraining_params ${MODEL_PATH}/params \
+                   --data_set ${TASK_DATA_PATH}/lcqmc/dev.tsv \
+                   --vocab_path config/vocab.txt \
+                   --max_seq_len 128 \
+                   --ernie_config_path config/ernie_config.json
+```
+
+上述脚本运行结束后，会在当前路径的 test 目录下分别生成 `cls_emb.npy` 文件存储句子 embeddings 和 `top_layer_emb.npy` 文件存储 token embeddings; 实际使用时，参照示例脚本修改数据路径、embeddings 文件存储路径等配置即可运行；
+
+#### 如何获取输入句子中每个 token 经过 ERNIE 编码后的 Embedding 表示？
+
+[解决方案同上](#如何获取输入句子经过-ERNIE-编码后的-Embedding-表示?)

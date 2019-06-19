@@ -75,7 +75,7 @@ class ErnieDataReader(object):
     def parse_line(self, line, max_seq_len=512):
         """ parse one line to token_ids, sentence_ids, pos_ids, label
         """
-        line = line.strip().split(";")
+        line = line.strip().decode().split(";")
         assert len(line) == 5, "One sample must have 5 fields!"
         (token_ids, sent_ids, pos_ids, seg_labels, label) = line
         token_ids = [int(token) for token in token_ids.split(" ")]
@@ -171,9 +171,12 @@ class ErnieDataReader(object):
             if len(token_seq) > self.max_seq_len:
                 miss_num += 1
                 continue
-            type_seq = [0] * (len(left_tokens) + 2) + [1] * (len(right_tokens) + 1)
+            type_seq = [0] * (len(left_tokens) + 2) + [1] * (len(right_tokens) +
+                                                             1)
             pos_seq = range(len(token_seq))
-            seg_label_seq = [-1] + left_seg_labels + [-1] + right_seg_labels + [-1]
+            seg_label_seq = [-1] + left_seg_labels + [-1] + right_seg_labels + [
+                -1
+            ]
 
             assert len(token_seq) == len(type_seq) == len(pos_seq) == len(seg_label_seq), \
                     "[ERROR]len(src_id) == lne(sent_id) == len(pos_id) must be True"
@@ -290,7 +293,7 @@ class ErnieDataReader(object):
                     cls_id=self.cls_id,
                     sep_id=self.sep_id,
                     mask_id=self.mask_id,
-                    return_attn_bias=True,
+                    return_input_mask=True,
                     return_max_len=False,
                     return_num_token=False)
 

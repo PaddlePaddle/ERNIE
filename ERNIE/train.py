@@ -19,17 +19,15 @@ from __future__ import print_function
 
 import os
 import time
-import argparse
-import numpy as np
 import multiprocessing
 
-import paddle
+import numpy as np
 import paddle.fluid as fluid
 
 from reader.pretraining import ErnieDataReader
 from model.ernie import ErnieModel, ErnieConfig
 from optimization import optimization
-from utils.args import ArgumentGroup, print_arguments
+from utils.args import print_arguments
 from utils.init import init_checkpoint, init_pretraining_params
 
 from pretrain_args import parser
@@ -43,31 +41,29 @@ def create_model(pyreader_name, ernie_config):
     pyreader = fluid.layers.py_reader(
         capacity=70,
         shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, args.max_seq_len], [-1, 1], [-1, 1],
+                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1], [-1, 1],
                 [-1, 1], [-1, 1]],
         dtypes=[
-            'int64', 'int64', 'int64', 'float', 'int64', 'int64', 'int64',
-            'int64'
+            'int64', 'int64', 'int64', 'float32', 'int64', 'int64', 'int64'
         ],
-        lod_levels=[0, 0, 0, 0, 0, 0, 0, 0],
+        lod_levels=[0, 0, 0, 0, 0, 0, 0],
         name=pyreader_name,
         use_double_buffer=True)
 
-    (src_ids, pos_ids, sent_ids, self_attn_mask, mask_label, mask_pos, labels,
-     next_sent_index) = fluid.layers.read_file(pyreader)
+    (src_ids, pos_ids, sent_ids, input_mask, mask_label, mask_pos,
+     labels) = fluid.layers.read_file(pyreader)
 
     ernie = ErnieModel(
         src_ids=src_ids,
         position_ids=pos_ids,
         sentence_ids=sent_ids,
-        self_attn_mask=self_attn_mask,
+        input_mask=input_mask,
         config=ernie_config,
         weight_sharing=args.weight_sharing,
         use_fp16=args.use_fp16)
 
     next_sent_acc, mask_lm_loss, total_loss = ernie.get_pretraining_output(
-        mask_label, mask_pos, labels, next_sent_index)
+        mask_label, mask_pos, labels)
 
     if args.use_fp16 and args.loss_scaling > 1.0:
         total_loss *= args.loss_scaling
