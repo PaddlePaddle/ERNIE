@@ -177,6 +177,8 @@ def evaluate(exe, test_program, test_pyreader, graph_vars, eval_phase):
             total_acc += np.sum(np_acc * np_num_seqs)
             total_num_seqs += np.sum(np_num_seqs)
             labels.extend(np_labels.reshape((-1)).tolist())
+            if np_qids is None:
+                np_qids = np.array([])
             qids.extend(np_qids.reshape(-1).tolist())
             scores.extend(np_probs[:, 1].reshape(-1).tolist())
             np_preds = np.argmax(np_probs, axis=1).astype(np.float32)

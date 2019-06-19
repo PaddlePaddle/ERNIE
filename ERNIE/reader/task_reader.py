@@ -238,7 +238,7 @@ class ClassifyReader(BaseReader):
         batch_labels = [record.label_id for record in batch_records]
         batch_labels = np.array(batch_labels).astype("int64").reshape([-1, 1])
 
-        if batch_records[0].qid:
+        if batch_records[0].qid is not None:
             batch_qids = [record.qid for record in batch_records]
             batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
         else:
