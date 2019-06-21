@@ -123,7 +123,8 @@ class DataProcessor(object):
                        phase='train',
                        epoch=1,
                        dev_count=1,
-                       shuffle=True):
+                       shuffle=True,
+                       shuffle_seed=None):
         """
         Generate data for train, dev or test.
     
@@ -149,6 +150,8 @@ class DataProcessor(object):
         def instance_reader():
             for epoch_index in range(epoch):
                 if shuffle:
+                    if shuffle_seed is not None:
+                        np.random.seed(shuffle_seed)
                     np.random.shuffle(examples)
                 if phase == 'train':
                     self.current_train_epoch = epoch_index
