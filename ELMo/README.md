@@ -30,6 +30,7 @@ ELMo(Embeddings from Language Models) 是重要的通用语义表示模型之一
 ### 安装
 
 本项目依赖于 Paddle Fluid **1.4.0**，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+其他安装依赖：python2.7
 
 提示：使用Windows GPU环境的用户，需要将示例代码中的[fluid.ParallelExecutor](http://paddlepaddle.org/documentation/docs/zh/1.4/api_cn/fluid_cn.html#parallelexecutor)替换为[fluid.Executor](http://paddlepaddle.org/documentation/docs/zh/1.4/api_cn/fluid_cn.html#executor)。
 
@@ -70,14 +71,16 @@ init_pretraining_params(exe, args.pretrain_elmo_model_path,
                         fluid.default_main_program())
 ```
 
-2） 基于 [ELMo 字典](data/vocabulary_min5k.txt) 将输入数据转化为 word_ids，利用 elmo_encoder 接口获取 ELMo embedding
+2） 基于 [ELMo 字典](data/vocabulary_min5k.txt) 将输入数据转化为 word_ids
+
+3）利用 elmo_encoder 接口获取 ELMo embedding
 
 ```
 from bilm import elmo_encoder
 elmo_embedding = elmo_encoder(word_ids)
 ```
 
-3） ELMo embedding 与 LAC 原有 word_embedding 拼接得到最终的 embedding
+4） ELMo embedding 与 LAC 原有 word_embedding 拼接得到最终的 embedding
 ```
 word_embedding=fluid.layers.concat(input=[elmo_embedding, word_embedding], axis=1)
 ```
