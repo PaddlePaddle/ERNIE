@@ -28,7 +28,7 @@ import paddle.fluid as fluid
 
 from reader.squad import DataProcessor, write_predictions
 from model.bert import BertConfig, BertModel
-from utils.args import ArgumentGroup, print_arguments
+from utils.args import ArgumentGroup, print_arguments, check_cuda
 from optimization import optimization
 from utils.init import init_pretraining_params, init_checkpoint
 
@@ -424,4 +424,5 @@ def train(args):
 
 if __name__ == '__main__':
     print_arguments(args)
+    check_cuda(args.use_cuda)
     train(args)
