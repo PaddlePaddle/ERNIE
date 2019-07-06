@@ -46,3 +46,14 @@ def print_arguments(args):
     for arg, value in sorted(six.iteritems(vars(args))):
         print('%s: %s' % (arg, value))
     print('------------------------------------------------')
+
+def check_cuda(use_cuda, err = \
+    "\nYou can not set use_cuda = True in the model because you are using paddlepaddle-cpu.\n \
+    Please: 1. Install paddlepaddle-gpu to run your models on GPU or 2. Set use_cuda = False to run models on CPU.\n"
+                                                                                                                     ):
+    try:
+        if use_cuda == True and fluid.is_compiled_with_cuda() == False:
+            print(err)
+            sys.exit(1)
+    except Exception as e:
+        pass

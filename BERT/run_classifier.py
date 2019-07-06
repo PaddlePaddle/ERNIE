@@ -30,7 +30,7 @@ import reader.cls as reader
 from model.bert import BertConfig
 from model.classifier import create_model
 from optimization import optimization
-from utils.args import ArgumentGroup, print_arguments
+from utils.args import ArgumentGroup, print_arguments, check_cuda
 from utils.init import init_pretraining_params, init_checkpoint
 import dist_utils
 
@@ -281,7 +281,7 @@ def main(args):
             exec_strategy=exec_strategy,
             build_strategy = build_strategy,
             main_program=train_program)
-                        
+
         train_pyreader.decorate_tensor_provider(train_data_generator)
     else:
         train_exe = None
@@ -415,4 +415,5 @@ def main(args):
 
 if __name__ == '__main__':
     print_arguments(args)
+    check_cuda(args.use_cuda)
     main(args)
