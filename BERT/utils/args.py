@@ -20,6 +20,7 @@ from __future__ import print_function
 import six
 import argparse
 
+import paddle.fluid as fluid
 
 def str2bool(v):
     # because argparse does not support to parse "true, False" as python

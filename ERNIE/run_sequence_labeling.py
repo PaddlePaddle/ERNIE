@@ -27,7 +27,7 @@ import reader.task_reader as task_reader
 from model.ernie import ErnieConfig
 from optimization import optimization
 from utils.init import init_pretraining_params, init_checkpoint
-from utils.args import print_arguments
+from utils.args import print_arguments, check_cuda
 from finetune.sequence_label import create_model, evaluate
 from finetune_args import parser
 
@@ -280,4 +280,5 @@ def main(args):
 
 if __name__ == '__main__':
     print_arguments(args)
+    check_cuda(args.use_cuda)
     main(args)
