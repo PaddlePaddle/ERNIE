@@ -27,7 +27,7 @@ import paddle.fluid as fluid
 from reader.pretraining import ErnieDataReader
 from model.ernie import ErnieModel, ErnieConfig
 from optimization import optimization
-from utils.args import print_arguments
+from utils.args import print_arguments, check_cuda
 from utils.init import init_checkpoint, init_pretraining_params
 
 from pretrain_args import parser
@@ -351,6 +351,7 @@ def train(args):
 
 if __name__ == '__main__':
     print_arguments(args)
+    check_cuda(args.use_cuda)
     if args.do_test:
         test(args)
     else:
