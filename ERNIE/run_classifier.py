@@ -29,6 +29,7 @@ from finetune.classifier import create_model, evaluate
 from optimization import optimization
 from utils.args import print_arguments, check_cuda
 from utils.init import init_pretraining_params, init_checkpoint
+from utils.cards import get_cards
 from finetune_args import parser
 
 args = parser.parse_args()
@@ -67,7 +68,7 @@ def main(args):
             input_file=args.train_set,
             batch_size=args.batch_size,
             epoch=args.epoch,
-            shuffle=True,
+            shuffle=args.shuffle,
             phase="train")
 
         num_train_examples = reader.get_num_examples(args.train_set)
@@ -85,6 +86,8 @@ def main(args):
         print("Num warmup steps: %d" % warmup_steps)
 
         train_program = fluid.Program()
+        if args.random_seed is not None and args.enable_ce:
+            train_program.random_seed = args.random_seed
 
         with fluid.program_guard(train_program, startup_prog):
             with fluid.unique_name.guard():
@@ -187,6 +190,7 @@ def main(args):
         if warmup_steps > 0:
             graph_vars["learning_rate"] = scheduled_lr
 
+        ce_info = []
         time_begin = time.time()
         while True:
             try:
@@ -213,6 +217,7 @@ def main(args):
                           (current_epoch, current_example, num_train_examples,
                            steps, outputs["loss"], outputs["accuracy"],
                            args.skip_steps / used_time))
+                    ce_info.append([outputs["loss"], outputs["accuracy"], used_time])
                     time_begin = time.time()
 
                 if steps % args.save_steps == 0:
@@ -246,6 +251,24 @@ def main(args):
                 fluid.io.save_persistables(exe, save_path, train_program)
                 train_pyreader.reset()
                 break
+        if args.enable_ce:
+            card_num = get_cards()
+            ce_loss = 0
+            ce_acc = 0
+            ce_time = 0
+            try:
+                ce_loss = ce_info[-2][0]
+                ce_acc = ce_info[-2][1]
+                ce_time = ce_info[-2][2]
+            except:
+                print("ce info error")
+            print("kpis\ttrain_duration_card%s\t%s" %
+                (card_num, ce_time))
+            print("kpis\ttrain_loss_card%s\t%f" %
+                (card_num, ce_loss))
+            print("kpis\ttrain_acc_card%s\t%f" %
+                (card_num, ce_acc))
+
 
     # final eval on dev set
     if args.do_val:
