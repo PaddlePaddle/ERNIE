@@ -74,4 +74,7 @@ run_type_g.add_arg("do_train",                     bool,   True,  "Whether to pe
 run_type_g.add_arg("do_val",                       bool,   True,  "Whether to perform evaluation on dev data set.")
 run_type_g.add_arg("do_test",                      bool,   True,  "Whether to perform evaluation on test data set.")
 run_type_g.add_arg("metrics",                      bool,   True,  "Whether to perform evaluation on test data set.")
+run_type_g.add_arg("shuffle",                      bool,   True,  "")
+
+parser.add_argument("--enable_ce", action='store_true', help="The flag indicating whether to run the task for continuous evaluation.")
 # yapf: enable
