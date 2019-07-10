@@ -87,6 +87,8 @@ run_type_g.add_arg("do_train",                     bool,   True,  "Whether to pe
 run_type_g.add_arg("do_val",                       bool,   True,  "Whether to perform evaluation on dev data set.")
 run_type_g.add_arg("do_test",                      bool,   True,  "Whether to perform evaluation on test data set.")
 
+parser.add_argument("--enable_ce", action='store_true', help="The flag indicating whether to run the task for continuous evaluation.")
+
 args = parser.parse_args()
 # yapf: enable.
 
@@ -298,6 +300,7 @@ def main(args):
         total_cost, total_acc, total_num_seqs = [], [], []
         time_begin = time.time()
         throughput = []
+        ce_info = []
         while True:
             try:
                 # steps += 1
@@ -341,6 +344,7 @@ def main(args):
                            current_epoch, current_example, num_train_examples,
                            steps, np.sum(total_cost) / np.sum(total_num_seqs),
                            np.sum(total_acc) / np.sum(total_num_seqs))
+                    ce_info.append([np.sum(total_cost) / np.sum(total_num_seqs), np.sum(total_acc) / np.sum(total_num_seqs), used_time])
                     if steps > 0 :
                         throughput.append( args.skip_steps / used_time)
                         log_record = log_record + ", speed: %f steps/s" % (args.skip_steps / used_time)
@@ -388,6 +392,24 @@ def main(args):
                 fluid.io.save_persistables(exe, save_path, train_program)
                 train_pyreader.reset()
                 break
+        if args.enable_ce:
+            card_num = get_cards()
+            ce_cost = 0
+            ce_acc = 0
+            ce_time = 0
+            try:
+                ce_cost = ce_info[-2][0]
+                ce_acc = ce_info[-2][1]
+                ce_time = ce_info[-2][2]
+            except:
+                print("ce info error")
+            print("kpis\ttrain_duration_%s_card%s\t%s" %
+                (args.task_name, card_num, ce_time))
+            print("kpis\ttrain_cost_%s_card%s\t%f" %
+                (args.task_name, card_num, ce_cost))
+            print("kpis\ttrain_acc_%s_card%s\t%f" %
+                (args.task_name, card_num, ce_acc))
+
 
     # final eval on dev set
     if args.do_val:
@@ -411,6 +433,14 @@ def main(args):
         print("Final test result:")
         evaluate(exe, test_prog, test_pyreader,
                  [loss.name, accuracy.name, num_seqs.name], "test")
+
+
+def get_cards():
+    num = 0
+    cards = os.environ.get('CUDA_VISIBLE_DEVICES', '')
+    if cards != '':
+        num = len(cards.split(","))
+    return num
 
 
 if __name__ == '__main__':
