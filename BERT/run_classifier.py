@@ -32,6 +32,7 @@ from model.classifier import create_model
 from optimization import optimization
 from utils.args import ArgumentGroup, print_arguments, check_cuda
 from utils.init import init_pretraining_params, init_checkpoint
+from utils.cards import get_cards
 import dist_utils
 
 num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
@@ -433,14 +434,6 @@ def main(args):
         print("Final test result:")
         evaluate(exe, test_prog, test_pyreader,
                  [loss.name, accuracy.name, num_seqs.name], "test")
-
-
-def get_cards():
-    num = 0
-    cards = os.environ.get('CUDA_VISIBLE_DEVICES', '')
-    if cards != '':
-        num = len(cards.split(","))
-    return num
 
 
 if __name__ == '__main__':
