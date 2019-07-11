@@ -18,6 +18,7 @@ from __future__ import print_function
 
 import six
 import numpy as np
+import random
 import time
 import os
 import math
