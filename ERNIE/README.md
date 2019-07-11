@@ -279,7 +279,7 @@ text_a  label
 export FLAGS_sync_nccl_allreduce=1
 export CUDA_VISIBLE_DEVICES=7
 
-python -u ernir_encoder.py \
+python -u ernie_encoder.py \
                    --use_cuda true \
                    --batch_size 32 \
                    --output_dir "./test" \
