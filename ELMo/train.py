@@ -29,6 +29,7 @@ import paddle.fluid.framework as framework
 from paddle.fluid.executor import Executor
 import data
 from args import *
+from utils.cards import get_cards
 import lm_model
 import logging
 
@@ -502,6 +503,7 @@ def train_loop(args,
     n_batches_per_epoch = int(args.all_train_tokens / n_tokens_per_batch)
     n_batches_total = args.max_epoch * n_batches_per_epoch
     begin_time = time.time()
+    ce_info = []
     for batch_id, batch_list in enumerate(train_reader(), 1):
         if batch_id > n_batches_total:
             break
@@ -549,6 +551,7 @@ def train_loop(args,
                 "[train] step:{}, loss:{:.3f}, ppl:{:.3f}, smoothed_ppl:{:.3f}, speed:{:.3f}".
                 format(batch_id, n_batch_loss / n_batch_cnt, ppl, smoothed_ppl,
                        speed))
+            ce_info.append([n_batch_loss / n_batch_cnt, used_time])
             n_batch_loss = 0.0
             n_batch_cnt = 0
             begin_time = time.time()
@@ -563,6 +566,21 @@ def train_loop(args,
                 os.makedirs(model_path)
             fluid.io.save_persistables(
                 executor=exe, dirname=model_path, main_program=train_prog)
+
+    if args.enable_ce:
+        card_num = get_cards()
+        ce_loss = 0
+        ce_time = 0
+        try:
+            ce_loss = ce_info[-2][0]
+            ce_time = ce_info[-2][1]
+        except:
+            print("ce info error")
+        print("kpis\ttrain_duration_card%s\t%s" %
+            (card_num, ce_time))
+        print("kpis\ttrain_loss_card%s\t%f" %
+            (card_num, ce_loss))
+
 
     end_time = time.time()
     total_time += end_time - start_time
