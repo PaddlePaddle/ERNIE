@@ -65,7 +65,7 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     if is_prediction:
         probs = fluid.layers.softmax(logits)
         feed_targets_name = [
-            src_ids.name, pos_ids.name, sent_ids.name, input_mask.name
+            src_ids.name, sent_ids.name, pos_ids.name, input_mask.name
         ]
         return pyreader, probs, feed_targets_name
 

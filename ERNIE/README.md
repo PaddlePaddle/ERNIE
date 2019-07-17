@@ -316,4 +316,4 @@ python -u predict_classifier.py \
 
 实际使用时，需要通过 `init_checkpoint` 指定预测用的模型，通过 `predict_set` 指定待预测的数据文件，通过 `num_labels` 配置分类的类别数目;
 
-**Note**: predict_set 的数据格式与 dev_set 和 test_set 的数据格式完全一致，是由 text_a、text_b(可选) 、label 组成的2列/3列 tsv 文件，predict_set 中的 label 列起到占位符的作用，全部置 0 即可;
+**Note**: predict_set 的数据格式是由 text_a、text_b(可选) 组成的1列/2列 tsv 文件;
