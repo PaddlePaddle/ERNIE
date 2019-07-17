@@ -37,6 +37,7 @@ parser = argparse.ArgumentParser(__doc__)
 model_g = ArgumentGroup(parser, "model", "options to init, resume and save model.")
 model_g.add_arg("ernie_config_path",            str,  None,  "Path to the json file for bert model config.")
 model_g.add_arg("init_checkpoint",              str,  None,  "Init checkpoint to resume training from.")
+model_g.add_arg("save_inference_model_path",    str,  "inference_model",  "If set, save the inference model to this path.")
 model_g.add_arg("use_fp16",                     bool, False, "Whether to resume parameters from fp16 checkpoint.")
 model_g.add_arg("num_labels",                   int,  2,     "num labels for classify")
 
@@ -65,7 +66,8 @@ def main(args):
         label_map_config=args.label_map_config,
         max_seq_len=args.max_seq_len,
         do_lower_case=args.do_lower_case,
-        in_tokens=False)
+        in_tokens=False,
+        is_inference=True)
 
     predict_prog = fluid.Program()
     predict_startup = fluid.Program()
@@ -95,7 +97,25 @@ def main(args):
     else:
         raise ValueError("args 'init_checkpoint' should be set for prediction!")
 
-    predict_exe = fluid.Executor(place)
+    assert args.save_inference_model_path, "args save_inference_model_path should be set for prediction"
+    _, ckpt_dir = os.path.split(args.init_checkpoint.rstrip('/'))
+    dir_name = ckpt_dir + '_inference_model'
+    model_path = os.path.join(args.save_inference_model_path, dir_name)
+    print("save inference model to %s" % model_path)
+    fluid.io.save_inference_model(
+        model_path,
+        feed_target_names, [probs],
+        exe,
+        main_program=predict_prog)
+
+    print("load inference model from %s" % model_path)
+    infer_program, feed_target_names, probs = fluid.io.load_inference_model(
+            model_path, exe)
+
+    src_ids = feed_target_names[0]
+    sent_ids = feed_target_names[1]
+    pos_ids = feed_target_names[2]
+    input_mask = feed_target_names[3]
 
     predict_data_generator = reader.data_generator(
         input_file=args.predict_set,
@@ -103,25 +123,24 @@ def main(args):
         epoch=1,
         shuffle=False)
 
-    predict_pyreader.decorate_tensor_provider(predict_data_generator)
-
-    predict_pyreader.start()
-    all_results = []
-    time_begin = time.time()
-    while True:
-        try:
-            results = predict_exe.run(program=predict_prog, fetch_list=[probs.name])
-            all_results.extend(results[0])
-        except fluid.core.EOFException:
-            predict_pyreader.reset()
-            break
-    time_end = time.time()
-
-    np.set_printoptions(precision=4, suppress=True)
     print("-------------- prediction results --------------")
-    for index, result in enumerate(all_results):
-        print(str(index) + '\t{}'.format(result))
-
+    np.set_printoptions(precision=4, suppress=True)
+    index = 0
+    for sample in predict_data_generator():
+        src_ids_data = sample[0]
+        sent_ids_data = sample[1]
+        pos_ids_data = sample[2]
+        input_mask_data = sample[3]
+        output = exe.run(
+            infer_program,
+            feed={src_ids: src_ids_data,
+                  sent_ids: sent_ids_data,
+                  pos_ids: pos_ids_data,
+                  input_mask: input_mask_data},
+            fetch_list=probs)
+        for single_result in output[0]:
+            print("example_index:{}\t{}".format(index, single_result))
+            index += 1
 
 if __name__ == '__main__':
     print_arguments(args)
