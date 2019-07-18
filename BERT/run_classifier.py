@@ -21,6 +21,7 @@ import os
 import time
 import argparse
 import numpy as np
+import subprocess
 import multiprocessing
 
 import paddle
