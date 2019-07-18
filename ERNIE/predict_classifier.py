@@ -22,6 +22,12 @@ import time
 import argparse
 import numpy as np
 import multiprocessing
+
+# NOTE(paddle-dev): All of these flags should be
+# set before `import paddle`. Otherwise, it would
+# not take any effect.
+os.environ['FLAGS_eager_delete_tensor_gb'] = '0'  # enable gc
+
 import paddle.fluid as fluid
 
 from reader.task_reader import ClassifyReader
