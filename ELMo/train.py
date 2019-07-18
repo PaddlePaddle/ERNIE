@@ -17,24 +17,27 @@ from __future__ import division
 from __future__ import print_function
 
 import six
-import numpy as np
+import os
 import random
 import time
-import os
 import math
+import pickle
+import logging
+
+import numpy as np
 import paddle
 import paddle.fluid as fluid
 import paddle.fluid.core as core
 import paddle.fluid.framework as framework
 from paddle.fluid.executor import Executor
+
 import data
-from args import *
-from utils.cards import get_cards
 import lm_model
-import logging
+from args import parse_args
+from utils.cards import get_cards
+from utils.init import init_pretraining_params
 
 logging.basicConfig()
-import pickle
 
 
 def prepare_batch_input(batch, args):
@@ -576,11 +579,8 @@ def train_loop(args,
             ce_time = ce_info[-2][1]
         except:
             print("ce info error")
-        print("kpis\ttrain_duration_card%s\t%s" %
-            (card_num, ce_time))
-        print("kpis\ttrain_loss_card%s\t%f" %
-            (card_num, ce_loss))
-
+        print("kpis\ttrain_duration_card%s\t%s" % (card_num, ce_time))
+        print("kpis\ttrain_loss_card%s\t%f" % (card_num, ce_loss))
 
     end_time = time.time()
     total_time += end_time - start_time
