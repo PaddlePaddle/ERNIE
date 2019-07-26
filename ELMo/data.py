@@ -1,4 +1,5 @@
 # originally based on https://github.com/tensorflow/models/tree/master/lm_1b
+from __future__ import generators
 import glob
 import random
 
@@ -290,7 +291,7 @@ def _get_batch(generator, batch_size, num_steps, max_word_length):
                 if cur_stream[i] is None or len(cur_stream[i][0]) <= 1:
                     try:
                         cur_stream[i] = list(next(generator))
-                    except StopIteration:
+                    except:
                         # No more data, exhaust current streams and quit
                         no_more_data = True
                         break
