@@ -36,6 +36,8 @@
 - **Structure-aware Tasks**: 语法 (syntactic) 级别信息的学习
 - **Semantic-aware Tasks**:  语义 (semantic) 级别信息的学习
 
+同时，针对不同的 pre-training 任务，ERNIE 2.0 引入了 Task Embedding 来精细化地建模不同类型的任务。不同的任务用从 0 到 N 的 ID 表示，每个 ID 代表了不同的预训练任务。
+
 ![ernie2.0_model](.metas/ernie2.0_model.png)
 
 

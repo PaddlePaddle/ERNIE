@@ -36,6 +36,8 @@ We construct several tasks to capture different aspects of information in the tr
 - **Structure-aware Tasks**:  to capture the syntactic information
 - **Semantic-aware Tasks**:  in charge of semantic signals
 
+At the same time, ERINE 2.0 feeds task embedding to model the characteristic of different tasks. We represent different tasks with an ID ranging from 0 to N. Each task ID is assigned to one unique task embedding.
+
 ![ernie2.0_model](.metas/ernie2.0_model.png)
 
 
