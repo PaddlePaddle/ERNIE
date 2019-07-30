@@ -1,3 +1,30 @@
+
+<div align="center">
+    <h1>
+        <font color="red">
+        ERNIE 项目已经迁移至 <a href="../README.zh.md">这里</a>
+        </font>
+    </h1>
+</div>
+
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+
+
 ## ERNIE: **E**nhanced **R**epresentation through k**N**owledge **I**nt**E**gration
 
 **** **2019-04-10 更新**: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布 ****
@@ -170,7 +197,7 @@ nlpcc-dbqa是由国际自然语言处理和中文计算会议NLPCC于2016年举�
 | [模型](https://ernie.bj.bcebos.com/ERNIE_stable.tgz) | 包含预训练模型参数 |
 | [模型(含配置文件及词典)](https://baidu-nlp.bj.bcebos.com/ERNIE_stable-1.0.1.tar.gz)) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 
-2) [任务数据下载](https://ernie.bj.bcebos.com/task_data.tgz)
+2) [任务数据下载](https://ernie.bj.bcebos.com/task_data_zh.tgz)
 
 ### 安装
 本项目依赖于 Paddle Fluid 1.3.1，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
