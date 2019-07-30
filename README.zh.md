@@ -3,7 +3,7 @@
 ## ERNIE 2.0: A Continual Pre-training Framework for Language Understanding
 
 
-  * [可持续学习语义理解框架](#可持续学习语义理解框架)
+  * [持续学习语义理解框架](#持续学习语义理解框架)
   * [Pre-Training 任务](#pre-training-任务)
      * [Word-aware Tasks](#word-aware-tasks)
         * [Knowledge Masking Task](#knowledge-masking-task)
@@ -20,9 +20,9 @@
   * [英文效果验证](#英文效果验证)
 
 
-### 可持续学习语义理解框架
+### 持续学习语义理解框架
 
-**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1)** 是基于可持续学习的语义理解预训练框架，使用多任务学习增量式构建预训练任务。**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1)** 中，新构建的预训练任务类型可以无缝的加入训练框架，持续的进行语义理解学习。 通过新增的实体预测、句子因果关系判断、文章句子结构重建等语义任务，**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1)** 语义理解预训练模型从训练数据中获取了词法、句法、语义等多个维度的自然语言信息，极大地增强了通用语义表示能力。
+**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1)** 是基于持续学习的语义理解预训练框架，使用多任务学习增量式构建预训练任务。**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1)** 中，新构建的预训练任务类型可以无缝的加入训练框架，持续的进行语义理解学习。 通过新增的实体预测、句子因果关系判断、文章句子结构重建等语义任务，**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1)** 语义理解预训练模型从训练数据中获取了词法、句法、语义等多个维度的自然语言信息，极大地增强了通用语义表示能力。
 
 ![ernie2.0_arch](.metas/ernie2.0_arch.png)
 
@@ -51,7 +51,7 @@
 
 ##### Token-Document Relation Prediction Task
 
-- 针对一个 segment 中出现的词汇，去预测该词汇是否也在原文档的其他 segments 从出现。
+- 针对一个 segment 中出现的词汇，去预测该词汇是否也在原文档的其他 segments 中出现。
 
 #### Structure-aware Tasks
 
@@ -61,7 +61,7 @@
 
 ##### Sentence Distance Task
 
-- 通过一个 3 分类任务，去判断句对 (sentence pairs) 位置关系，更好的建模语义相关性。
+- 通过一个 3 分类任务，去判断句对 (sentence pairs) 位置关系 (包含邻近句子、文档内非邻近句子、非同文档内句子 3 种类别)，更好的建模语义相关性。
 
 #### Semantic-aware Tasks
 
