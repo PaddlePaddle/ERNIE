@@ -122,8 +122,8 @@ export current_endpoint=192.168.0.17:9185
 对于 [GLUE 数据](https://gluebenchmark.com/tasks)，请运行这个[脚本](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e)予以下载; 对于 XNLI 任务，则需分别下载 [XNLI dev/test set](https://bert-data.bj.bcebos.com/XNLI-1.0.zip) 和 [XNLI machine-translated training set](https://bert-data.bj.bcebos.com/XNLI-MT-1.0.zip)，然后解压到同一个目录。以 XNLI 任务为例，启动 Fine-tuning 的方式如下：
 
 ```shell
-export FLAGS_enable_parallel_graph=1
-export FLAGS_sync_nccl_allreduce=1
+export FLAGS_sync_nccl_allreduce=0
+export FLAGS_eager_delete_tensor_gb=1
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 BERT_BASE_PATH="chinese_L-12_H-768_A-12"
@@ -183,8 +183,8 @@ SQuAD v1.1
  对于 SQuAD v1.1, 按如下方式启动 Fine-tuning:
 
  ```shell
-export FLAGS_enable_parallel_graph=1
-export FLAGS_sync_nccl_allreduce=1
+export FLAGS_sync_nccl_allreduce=0
+export FLAGS_eager_delete_tensor_gb=1
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 BERT_BASE_PATH="uncased_L-12_H-768_A-12"
@@ -229,6 +229,8 @@ python ${SQUAD_PATH}/evaluate-v1.1.py ${SQUAD_PATH}/dev-v1.1.json ${CHECKPOINT_P
  对于 SQuAD v2.0, 按如下方式启动 Fine-tuning:
 
 ```shell
+export FLAGS_sync_nccl_allreduce=0
+export FLAGS_eager_delete_tensor_gb=1
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 BERT_BASE_PATH="uncased_L-12_H-768_A-12"
 CHECKPOINT_PATH=/path/to/save/checkpoints/
