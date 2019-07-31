@@ -16,6 +16,7 @@
         * [Discourse Relation Task](#discourse-relation-task)
         * [IR Relevance Task](#ir-relevance-task)
   * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
+  * [对比 ERNIE 1.0 和 ERNIE 2.0](#对比-ernie-10-和-ernie-20)
   * [中文效果验证](#中文效果验证)
   * [英文效果验证](#英文效果验证)
 
@@ -90,6 +91,15 @@
 
 训练数据方面，除百科类、资讯类中文语料外，**ERNIE** 还引入了论坛对话类数据，利用 **DLM**（Dialogue Language Model）建模 Query-Response 对话结构，将对话 Pair 对作为输入，引入 Dialogue Embedding 标识对话的角色，利用 Dialogue Response Loss 学习对话的隐式关系，进一步提升模型的语义表示能力。
 
+### 对比 ERNIE 1.0 和 ERNIE 2.0
+
+#### Pre-Training Tasks
+
+| 任务 | ERNIE 1.0 模型 | ERNIE 2.0 英文模型 | ERNIE 2.0 中文模型 |
+| ------------------- | -------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
+| **Word-aware**      | ✅ Knowledge Masking        | ✅ Knowledge Masking <br> ✅ Capitalization Prediction <br> ✅ Token-Document Relation Prediction | ✅ Knowledge Masking                       |
+| **Structure-aware** |                            | ✅ Sentence Reordering                                        | ✅ Sentence Reordering <br> ✅ Sentence Distance |
+| **Semantic-aware**  | ✅ Next Sentence Prediction | ✅ Discourse Relation                                         | ✅ Discourse Relation <br> ✅ IR Relevance  |
 
 
 ## 开源记录
