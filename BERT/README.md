@@ -77,6 +77,8 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 ./train.sh -local y
 ```
 
+如果采用 CPU 多核的方式进行预训练，则需要通过环境设置所用 CPU 的核数，例如 `export CPU_NUM=5`，否则会占据所有的CPU。
+
 这里需要特别说明的是，参数 `generate_neg_sample` 为 `True` 表示在预训练过程中，`Next Sentence Prediction` 任务的负样本是根据训练数据中的正样本动态生成的，我们给出的样例训练数据 [`demo_wiki_train.gz`](data/train/demo_wiki_train.gz) 只包含 `Next Sentence Prediction` 任务的正样本；如果已事先构造了 `Next Sentence Prediction` 任务的正负样本，则需要将 `generate_neg_sample` 置为 `False`。
 
 预训练任务进行的过程中会输出当前学习率、训练数据所经过的轮数、当前迭代的总步数、训练误差、训练速度等信息，根据 `--validation_steps ${N}` 的配置，每间隔 `N` 步输出模型在验证集的各种指标:
