@@ -16,6 +16,7 @@ English | [简体中文](./README.zh.md)
         * [Discourse Relation Task](#discourse-relation-task)
         * [IR Relevance Task](#ir-relevance-task)
   * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
+  * [Compare the ERNIE 1.0 and ERNIE 2.0](#compare-the-ernie-10-and-ernie-20)
   * [Results on English Datasets](#results-on-english-datasets)
   * [Results on Chinese Datasets](#results-on-chinese-datasets)
 
@@ -95,6 +96,15 @@ At the same time, ERINE 2.0 feeds task embedding to model the characteristic of 
 In the example sentence above, BERT can identify the  “K.” through the local co-occurring words J., K., and Rowling, but the model fails to learn any knowledge related to the word "J. K. Rowling". ERNIE however can extrapolate the relationship between Harry Potter and J. K. Rowling by analyzing implicit knowledge of words and entities, and infer that Harry Potter is a novel written by J. K. Rowling.
 
 Integrating both phrase information and named entity information enables the model to obtain better language representation compare to BERT. ERNIE is trained on multi-source data and knowledge collected from encyclopedia articles, news, and forum dialogues, which improves its performance in context-based knowledge reasoning.
+
+### Compare the ERNIE 1.0 and ERNIE 2.0
+
+#### Pre-Training Tasks
+| Tasks | ERNIE model 1.0 | ERNIE model 2.0 (en) | ERNIE model 2.0 (zh) |
+| ------------------- | -------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
+| **Word-aware**      | ✅ Knowledge Masking        | ✅ Knowledge Masking <br> ✅ Capitalization Prediction <br> ✅ Token-Document Relation Prediction | ✅ Knowledge Masking                       |
+| **Structure-aware** |                            | ✅ Sentence Reordering                                        | ✅ Sentence Reordering <br> ✅ Sentence Distance |
+| **Semantic-aware**  | ✅ Next Sentence Prediction | ✅ Discourse Relation                                         | ✅ Discourse Relation <br> ✅ IR Relevance  |
 
 ## Release Notes
 
@@ -326,7 +336,7 @@ XNLI is a natural language inference dataset in 15 languages. It was jointly bui
 
 *\*The DRCD dataset is converted from Traditional Chinese to Simplified Chinese based on tool: https://github.com/skydark/nstools/tree/master/zhtools*
 
-\* *The pre-training data of ERNIE 1.0 BASE does not contain instances whose length exceeds 128, but other models is pre-trained with the instances whose length are 512. It causes poorer performance of ERNIE 1.0 BASE on long-text tasks. So We have released [ERNIE 1.0 Base(max-len-512)](https://ernie.bj.bcebos.com/ERNIE_1.0_max-len-512.tar.gz) in July 29th, 2019*
+\* *The pre-training data of ERNIE 1.0 BASE does not contain instances whose length exceeds 128, but other models is pre-trained with the instances whose length are 512. It causes poorer performance of ERNIE 1.0 BASE on long-text tasks. So We have released [ERNIE 1.0 Base(max-len-512)](https://ernie.bj.bcebos.com/ERNIE_1.0_max-len-512.tar.gz) on July 29th, 2019*
 
 
 
