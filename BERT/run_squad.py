@@ -279,7 +279,6 @@ def train(args):
                     use_fp16=args.use_fp16,
                     loss_scaling=args.loss_scaling)
 
-                fluid.memory_optimize(train_program, skip_opt_set=[loss.name, num_seqs.name])
 
         if args.verbose:
             if args.in_tokens:
@@ -301,8 +300,6 @@ def train(args):
                     bert_config=bert_config,
                     is_training=False)
 
-                fluid.memory_optimize(test_prog, skip_opt_set=[unique_ids.name,
-                    start_logits.name, end_logits.name, num_seqs.name])
 
         test_prog = test_prog.clone(for_test=True)
 
@@ -341,11 +338,8 @@ def train(args):
         exec_strategy.num_threads = dev_count
         exec_strategy.num_iteration_per_drop_scope = args.num_iteration_per_drop_scope
 
-        train_exe = fluid.ParallelExecutor(
-            use_cuda=args.use_cuda,
-            loss_name=loss.name,
-            exec_strategy=exec_strategy,
-            main_program=train_program)
+        train_compiled_program = fluid.CompiledProgram(train_program).with_data_parallel(
+                 loss_name=loss.name, exec_strategy=exec_strategy)
 
         train_pyreader.decorate_tensor_provider(train_data_generator)
 
@@ -366,7 +360,7 @@ def train(args):
                 else:
                     fetch_list = []
 
-                outputs = train_exe.run(fetch_list=fetch_list)
+                outputs = exe.run(train_compiled_program, fetch_list=fetch_list)
 
                 if steps % args.skip_steps == 0:
                     if warmup_steps <= 0:

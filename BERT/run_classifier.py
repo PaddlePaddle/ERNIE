@@ -208,12 +208,6 @@ def main(args):
                     use_fp16=args.use_fp16,
                     loss_scaling=args.loss_scaling)
 
-                fluid.memory_optimize(
-                    input_program=train_program,
-                    skip_opt_set=[
-                        loss.name, probs.name, accuracy.name, num_seqs.name
-                    ])
-
         if args.verbose:
             if args.in_tokens:
                 lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
@@ -279,22 +273,11 @@ def main(args):
             train_data_generator = fluid.contrib.reader.distributed_batch_reader(
                   train_data_generator)
 
-        train_exe = fluid.ParallelExecutor(
-            use_cuda=args.use_cuda,
-            loss_name=loss.name,
-            exec_strategy=exec_strategy,
-            build_strategy = build_strategy,
-            main_program=train_program)
+        train_compiled_program = fluid.CompiledProgram(train_program).with_data_parallel(
+                 loss_name=loss.name, build_strategy=build_strategy)
 
         train_pyreader.decorate_tensor_provider(train_data_generator)
-    else:
-        train_exe = None
 
-    if args.do_val or args.do_test:
-        test_exe = fluid.ParallelExecutor(
-            use_cuda=args.use_cuda,
-            main_program=test_prog,
-            share_vars_from=train_exe)
 
     if args.do_train:
         train_pyreader.start()
@@ -317,7 +300,7 @@ def main(args):
                 else:
                     fetch_list = []
 
-                outputs = train_exe.run(fetch_list=fetch_list)
+                outputs = exe.run(train_compiled_program, fetch_list=fetch_list)
 
                 if steps % args.skip_steps == 0:
                     if warmup_steps <= 0:
