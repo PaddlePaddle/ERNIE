@@ -79,7 +79,7 @@ At the same time, ERINE 2.0 feeds task embedding to model the characteristic of 
 
 ### ERNIE 1.0: **E**nhanced **R**epresentation through k**N**owledge **I**nt**E**gration
 
-**[ERNIE 1.0](https://arxiv.org/abs/1904.09223)** is a new unsupervised language representation learning method enhanced by knowledge masking strategies, which includes entity-level masking and phrase-level masking. Inspired by the masking strategy of BERT ([Devlin et al., 2018](https://arxiv.org/abs/1810.04805)), **ERNIE** introduced phrase masking and named entity masking and predicts the whole masked phrases or named entities. Phrase-level strategy masks the whole phrase which is a group of words that functions as a conceptual unit. Entity-level strategy masks named entites including persons, locations, organizations, products, etc., which can be denoted with proper names.
+**[ERNIE 1.0](https://arxiv.org/abs/1904.09223)** is a new unsupervised language representation learning method enhanced by knowledge masking strategies, which includes entity-level masking and phrase-level masking. Inspired by the masking strategy of BERT ([Devlin et al., 2018](https://arxiv.org/abs/1810.04805)), **ERNIE** introduced phrase masking and named entity masking and predicts the whole masked phrases or named entities. Phrase-level strategy masks the whole phrase which is a group of words that functions as a conceptual unit. Entity-level strategy masks named entities including persons, locations, organizations, products, etc., which can be denoted with proper names.
 
 **Example**:
 
@@ -664,7 +664,7 @@ If you have been armed with certain level of deep learning knowledge, and it hap
 > - [Programming with Fluid](https://www.paddlepaddle.org.cn/documentation/docs/en/1.5/beginners_guide/programming_guide/programming_guide_en.html) ： Core concepts and basic usage of Fluid
 > - [Deep Learning Basics](https://www.paddlepaddle.org.cn/documentation/docs/en/1.5/beginners_guide/basics/index_en.html)： This section encompasses various fields of fundamental deep learning knowledge, such as image classification, customized recommendation, machine translation, and examples implemented by Fluid are provided.
 
-For more information about paddlepadde, Please refer to [PaddlePaddle Github](https://github.com/PaddlePaddle/Paddle) or [Official Website](https://www.paddlepaddle.org.cn/)for details.
+For more information about paddlepadde, Please refer to [PaddlePaddle Github](https://github.com/PaddlePaddle/Paddle) or [Official Website](https://www.paddlepaddle.org.cn/) for details.
 
 
 
@@ -784,7 +784,7 @@ Similarly, for the Chinese task `ChnSentCorp`, after setting the environment var
 
 #### Sentence Pair Classification Tasks
 
-Take `RTE` as an example,  the data should have 3 fields `text_a    text_b   label`with tsv format. Here is some example datas:
+Take `RTE` as an example,  the data should have 3 fields `text_a    text_b   label` with tsv format. Here is some example datas:
 ```
 text_a  text_b  label
 Oil prices fall back as Yukos oil threat lifted Oil prices rise.    0
