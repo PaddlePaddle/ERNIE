@@ -17,6 +17,7 @@ python -u run_classifier.py \
                    --train_set ${TASK_DATA_PATH}/xnli/train.tsv \
                    --dev_set ${TASK_DATA_PATH}/xnli/dev.tsv \
                    --test_set ${TASK_DATA_PATH}/xnli/test.tsv \
+                   --test_save ./test_save_xnli \
                    --vocab_path config/vocab.txt \
                    --label_map ${TASK_DATA_PATH}/xnli/label_map.json \
                    --ernie_config_path config/ernie_config.json \
