@@ -1,3 +1,30 @@
+
+<div align="center">
+    <h1>
+        <font color="red">
+        ERNIE 项目已经迁移至 <a href="../README.zh.md">这里</a>
+        </font>
+    </h1>
+</div>
+
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+
+
 ## ERNIE: **E**nhanced **R**epresentation through k**N**owledge **I**nt**E**gration
 
 **** **2019-04-10 更新**: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布 ****
@@ -170,7 +197,7 @@ nlpcc-dbqa是由国际自然语言处理和中文计算会议NLPCC于2016年举�
 | [模型](https://ernie.bj.bcebos.com/ERNIE_stable.tgz) | 包含预训练模型参数 |
 | [模型(含配置文件及词典)](https://baidu-nlp.bj.bcebos.com/ERNIE_stable-1.0.1.tar.gz)) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 
-2) [任务数据下载](https://ernie.bj.bcebos.com/task_data.tgz)
+2) [任务数据下载](https://ernie.bj.bcebos.com/task_data_zh.tgz)
 
 ### 安装
 本项目依赖于 Paddle Fluid 1.3.1，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
@@ -316,4 +343,4 @@ python -u predict_classifier.py \
 
 实际使用时，需要通过 `init_checkpoint` 指定预测用的模型，通过 `predict_set` 指定待预测的数据文件，通过 `num_labels` 配置分类的类别数目;
 
-**Note**: predict_set 的数据格式与 dev_set 和 test_set 的数据格式完全一致，是由 text_a、text_b(可选) 、label 组成的2列/3列 tsv 文件，predict_set 中的 label 列起到占位符的作用，全部置 0 即可;
+**Note**: predict_set 的数据格式是由 text_a、text_b(可选) 组成的1列/2列 tsv 文件;
