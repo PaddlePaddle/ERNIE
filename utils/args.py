@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import six
 import argparse
+import sys
 
 import paddle.fluid as fluid
 
