@@ -3,7 +3,6 @@ English | [简体中文](./README.zh.md)
 ## ERNIE 2.0: A Continual Pre-training Framework for Language Understanding
 
 
-  * [Continual Pre-training Framework for Language Understanding](#continual-pre-training-framework-for-language-understanding)
   * [Pre-training Tasks](#pre-training-tasks)
      * [Word-aware Tasks](#word-aware-tasks)
         * [Knowledge Masking Task](#knowledge-masking-task)
@@ -21,7 +20,11 @@ English | [简体中文](./README.zh.md)
   * [Results on Chinese Datasets](#results-on-chinese-datasets)
 
 
-### Continual Pre-training Framework for Language Understanding
+![ernie2.0_paper](.metas/ernie2.0_paper.png)
+
+<div align="center"><i>arxiv: ERNIE 2.0: A Continual Pre-training Framework for Language Understanding</i>, <a href="https://arxiv.org/abs/1907.12412v1" target="_blank"><i>link</i></a> </div>
+
+---
 
 **[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1) is a continual pre-training framework for language understanding** in which pre-training tasks can be incrementally built and learned through multi-task learning. In this framework, different customized tasks can be incrementally introduced at any time. For example, the tasks including named entity prediction, discourse relation recognition, sentence order prediction are leveraged in order to enable the models to learn language representations.
 
