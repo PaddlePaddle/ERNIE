@@ -134,7 +134,7 @@ class ErnieModel(object):
         emb_out = pre_process_layer(
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
 
-        if self._dtype is "float16":
+        if self._dtype == "float16":
             emb_out = fluid.layers.cast(x=emb_out, dtype=self._dtype)
             input_mask = fluid.layers.cast(x=input_mask, dtype=self._dtype)
         self_attn_mask = fluid.layers.matmul(
