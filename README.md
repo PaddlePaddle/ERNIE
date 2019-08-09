@@ -18,6 +18,7 @@ English | [简体中文](./README.zh.md)
   * [Compare the ERNIE 1.0 and ERNIE 2.0](#compare-the-ernie-10-and-ernie-20)
   * [Results on English Datasets](#results-on-english-datasets)
   * [Results on Chinese Datasets](#results-on-chinese-datasets)
+  * [Quick start](https://www.paddlepaddle.org.cn/support/news?action=detail&id=1362)
 
 
 ![ernie2.0_paper](.metas/ernie2.0_paper.png)
@@ -26,7 +27,9 @@ English | [简体中文](./README.zh.md)
 
 ---
 
-**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1) is a continual pre-training framework for language understanding** in which pre-training tasks can be incrementally built and learned through multi-task learning. In this framework, different customized tasks can be incrementally introduced at any time. For example, the tasks including named entity prediction, discourse relation recognition, sentence order prediction are leveraged in order to enable the models to learn language representations.
+**[ERNIE 2.0](https://arxiv.org/abs/1907.12412v1) is a continual pre-training framework for language understanding** in which pre-training tasks can be incrementally built and learned through multi-task learning. In this framework, different customized tasks can be incrementally introduced at any time. For example, the tasks including named entity prediction, discourse relation recognition, sentence order prediction are leveraged in order to enable the models to learn language representations. 
+
+\>\>[Quick start](https://www.paddlepaddle.org.cn/support/news?action=detail&id=1362)
 
 ![ernie2.0_arch](.metas/ernie2.0_arch.png)
 
