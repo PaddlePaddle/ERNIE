@@ -16,6 +16,9 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 
 import numpy as np
 import paddle.fluid as fluid
@@ -59,12 +62,7 @@ def optimization(loss,
                  weight_decay,
                  scheduler='linear_warmup_decay',
                  use_fp16=False,
-                 use_dynamic_loss_scaling=False,
-                 init_loss_scaling=1.0,
-                 incr_every_n_steps=1000,
-                 decr_every_n_nan_or_inf=2,
-                 incr_ratio=2.0,
-                 decr_ratio=0.8):
+                 loss_scaling=1.0):
     if warmup_steps > 0:
         if scheduler == 'noam_decay':
             scheduled_lr = fluid.layers.learning_rate_scheduler\
@@ -78,18 +76,17 @@ def optimization(loss,
                              "'noam_decay' or 'linear_warmup_decay'")
         optimizer = fluid.optimizer.Adam(learning_rate=scheduled_lr)
     else:
-        scheduled_lr = fluid.layers.create_global_var(
-            name=fluid.unique_name.generate("learning_rate"),
-            shape=[1],
-            value=learning_rate,
-            dtype='float32',
-            persistable=True)
-        optimizer = fluid.optimizer.Adam(learning_rate=scheduled_lr)
-        optimizer._learning_rate_map[fluid.default_main_program(
-        )] = scheduled_lr
+        lr_tensor = fluid.layers.fill_constant(shape=[1], dtype='float32', value=learning_rate)
+        optimizer = fluid.optimizer.Adam(learning_rate=lr_tensor)
+        scheduled_lr = lr_tensor
 
+    clip_norm_thres = 1.0
+    # When using mixed precision training, scale the gradient clip threshold
+    # by loss_scaling
+    if use_fp16 and loss_scaling > 1.0:
+        clip_norm_thres *= loss_scaling
     fluid.clip.set_gradient_clip(
-        clip=fluid.clip.GradientClipByGlobalNorm(clip_norm=1.0))
+        clip=fluid.clip.GradientClipByGlobalNorm(clip_norm=clip_norm_thres))
 
     def exclude_from_weight_decay(name):
         if name.find("layer_norm") > -1:
@@ -102,28 +99,14 @@ def optimization(loss,
 
     param_list = dict()
 
-    loss_scaling = fluid.layers.create_global_var(
-        name=fluid.unique_name.generate("loss_scaling"),
-        shape=[1],
-        value=init_loss_scaling,
-        dtype='float32',
-        persistable=True)
-
     if use_fp16:
-        loss *= loss_scaling
         param_grads = optimizer.backward(loss)
-
         master_param_grads = create_master_params_grads(
             param_grads, train_program, startup_prog, loss_scaling)
 
         for param, _ in master_param_grads:
             param_list[param.name] = param * 1.0
             param_list[param.name].stop_gradient = True
-
-        if use_dynamic_loss_scaling:
-            apply_dynamic_loss_scaling(
-                loss_scaling, master_param_grads, incr_every_n_steps,
-                decr_every_n_nan_or_inf, incr_ratio, decr_ratio)
 
         optimizer.apply_gradients(master_param_grads)
 
@@ -157,4 +140,4 @@ def optimization(loss,
                         param.name] * weight_decay * scheduled_lr
                     fluid.layers.assign(output=param, input=updated_param)
 
-    return scheduled_lr, loss_scaling
+    return scheduled_lr

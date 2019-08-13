@@ -16,14 +16,18 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import json
-
 import six
+import logging
 import paddle.fluid as fluid
+from io import open
 
 from model.transformer_encoder import encoder, pre_process_layer
 
+log = logging.getLogger(__name__)
 
 class ErnieConfig(object):
     def __init__(self, config_path):
@@ -31,7 +35,7 @@ class ErnieConfig(object):
 
     def _parse(self, config_path):
         try:
-            with open(config_path) as json_file:
+            with open(config_path, 'r', encoding='utf8') as json_file:
                 config_dict = json.load(json_file)
         except Exception:
             raise IOError("Error in parsing Ernie model config file '%s'" %
@@ -44,8 +48,8 @@ class ErnieConfig(object):
 
     def print_config(self):
         for arg, value in sorted(six.iteritems(self._config_dict)):
-            print('%s: %s' % (arg, value))
-        print('------------------------------------------------')
+            log.info('%s: %s' % (arg, value))
+        log.info('------------------------------------------------')
 
 
 class ErnieModel(object):
@@ -98,7 +102,7 @@ class ErnieModel(object):
         emb_out = fluid.layers.embedding(
             input=src_ids,
             size=[self._voc_size, self._emb_size],
-            dtype=self._emb_dtype,
+            dtype=self._dtype,
             param_attr=fluid.ParamAttr(
                 name=self._word_emb_name, initializer=self._param_initializer),
             is_sparse=False)
@@ -106,14 +110,14 @@ class ErnieModel(object):
         position_emb_out = fluid.layers.embedding(
             input=position_ids,
             size=[self._max_position_seq_len, self._emb_size],
-            dtype=self._emb_dtype,
+            dtype=self._dtype,
             param_attr=fluid.ParamAttr(
                 name=self._pos_emb_name, initializer=self._param_initializer))
 
         sent_emb_out = fluid.layers.embedding(
             sentence_ids,
             size=[self._sent_types, self._emb_size],
-            dtype=self._emb_dtype,
+            dtype=self._dtype,
             param_attr=fluid.ParamAttr(
                 name=self._sent_emb_name, initializer=self._param_initializer))
 
@@ -135,7 +139,6 @@ class ErnieModel(object):
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
 
         if self._dtype == "float16":
-            emb_out = fluid.layers.cast(x=emb_out, dtype=self._dtype)
             input_mask = fluid.layers.cast(x=input_mask, dtype=self._dtype)
         self_attn_mask = fluid.layers.matmul(
             x=input_mask, y=input_mask, transpose_y=True)
@@ -171,9 +174,6 @@ class ErnieModel(object):
         """Get the first feature of each sequence for classification"""
         next_sent_feat = fluid.layers.slice(
             input=self._enc_out, axes=[1], starts=[0], ends=[1])
-        if self._dtype == "float16":
-            next_sent_feat = fluid.layers.cast(
-                x=next_sent_feat, dtype=self._emb_dtype)
         next_sent_feat = fluid.layers.fc(
             input=next_sent_feat,
             size=self._emb_size,
@@ -194,8 +194,6 @@ class ErnieModel(object):
             x=self._enc_out, shape=[-1, self._emb_size])
         # extract masked tokens' feature
         mask_feat = fluid.layers.gather(input=reshaped_emb_out, index=mask_pos)
-        if self._dtype == "float16":
-            mask_feat = fluid.layers.cast(x=mask_feat, dtype=self._emb_dtype)
 
         # transform: fc
         mask_trans_feat = fluid.layers.fc(
@@ -232,7 +230,7 @@ class ErnieModel(object):
                 transpose_y=True)
             fc_out += fluid.layers.create_parameter(
                 shape=[self._voc_size],
-                dtype=self._emb_dtype,
+                dtype=self._dtype,
                 attr=mask_lm_out_bias_attr,
                 is_bias=True)
 

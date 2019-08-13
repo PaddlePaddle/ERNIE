@@ -16,12 +16,15 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import time
 import numpy as np
 import os
 import math
 import json
+import logging
 import collections
 import six
 
@@ -33,6 +36,8 @@ from utils.cmrc2018_eval import eval_file
 from model.ernie import ErnieModel
 import tokenization
 
+
+log = logging.getLogger(__name__)
 
 def create_model(args, pyreader_name, ernie_config, is_training):
     pyreader = fluid.layers.py_reader(
@@ -151,7 +156,7 @@ def evaluate(exe,
                 program=test_program, fetch_list=fetch_list)
             for idx in range(np_unique_ids.shape[0]):
                 if len(all_results) % 1000 == 0:
-                    print("Processing example: %d" % len(all_results))
+                    log.info("Processing example: %d" % len(all_results))
                 unique_id = int(np_unique_ids[idx])
                 start_logits = [float(x) for x in np_start_logits[idx].flat]
                 end_logits = [float(x) for x in np_end_logits[idx].flat]
@@ -179,7 +184,7 @@ def evaluate(exe,
     time_end = time.time()
     elapsed_time = time_end - time_begin
 
-    print(
+    log.info(
         "[%s evaluation] em: %f, f1: %f, avg: %f, questions: %d, elapsed time: %f"
         % (eval_phase, em, f1, avg, total, elapsed_time))
 
@@ -188,8 +193,8 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                       max_answer_length, do_lower_case, output_prediction_file,
                       output_nbest_file):
     """Write final predictions to the json file and log-odds of null if needed."""
-    print("Writing predictions to: %s" % (output_prediction_file))
-    print("Writing nbest to: %s" % (output_nbest_file))
+    log.info("Writing predictions to: %s" % (output_prediction_file))
+    log.info("Writing nbest to: %s" % (output_nbest_file))
 
     example_index_to_features = collections.defaultdict(list)
     for feature in all_features:

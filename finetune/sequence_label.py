@@ -15,6 +15,9 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 
 import os
 import time
@@ -23,12 +26,14 @@ import numpy as np
 import multiprocessing
 
 import paddle
+import logging
 import paddle.fluid as fluid
 
 from six.moves import xrange
 
 from model.ernie import ErnieModel
 
+log = logging.getLogger(__name__)
 
 def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     pyreader = fluid.layers.py_reader(
@@ -70,9 +75,6 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
             initializer=fluid.initializer.Constant(0.)))
 
     ret_labels = fluid.layers.reshape(x=labels, shape=[-1, 1])
-    ret_infers = fluid.layers.reshape(
-        x=fluid.layers.argmax(
-            logits, axis=2), shape=[-1, 1])
 
     labels = fluid.layers.flatten(labels, axis=2)
     ce_loss, probs = fluid.layers.softmax_with_cross_entropy(
@@ -84,14 +86,11 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     ce_loss = ce_loss * input_mask
     loss = fluid.layers.mean(x=ce_loss)
 
-    if args.use_fp16 and args.loss_scaling > 1.0:
-        loss *= args.loss_scaling
-
     graph_vars = {
+        "inputs": src_ids,
         "loss": loss,
         "probs": probs,
         "labels": ret_labels,
-        "infers": ret_infers,
         "seq_lens": seq_lens
     }
 
@@ -101,7 +100,7 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     return pyreader, graph_vars
 
 
-def chunk_eval(np_labels, np_infers, np_lens, tag_num, dev_count=1):
+def chunk_eval(np_labels, np_probs, np_lens, tag_num, dev_count=1):
     def extract_bio_chunk(seq):
         chunks = []
         cur_chunk = None
@@ -143,7 +142,7 @@ def chunk_eval(np_labels, np_infers, np_lens, tag_num, dev_count=1):
     num_infer = 0
     num_correct = 0
     labels = np_labels.reshape([-1]).astype(np.int32).tolist()
-    infers = np_infers.reshape([-1]).astype(np.int32).tolist()
+    probs = np_probs.reshape([-1, np_probs.shape[-1]])
     all_lens = np_lens.reshape([dev_count, -1]).astype(np.int32).tolist()
 
     base_index = 0
@@ -156,7 +155,9 @@ def chunk_eval(np_labels, np_infers, np_lens, tag_num, dev_count=1):
         for i in xrange(len(lens)):
             seq_st = base_index + i * max_len + 1
             seq_en = seq_st + (lens[i] - 2)
-            infer_chunks = extract_bio_chunk(infers[seq_st:seq_en])
+            prob = probs[seq_st:seq_en, :]
+            infers = np.argmax(prob, -1)
+            infer_chunks = extract_bio_chunk(infers)
             label_chunks = extract_bio_chunk(labels[seq_st:seq_en])
             num_infer += len(infer_chunks)
             num_label += len(label_chunks)
@@ -209,54 +210,89 @@ def evaluate(exe,
              pyreader,
              graph_vars,
              tag_num,
-             eval_phase,
              dev_count=1):
     fetch_list = [
-        graph_vars["labels"].name, graph_vars["infers"].name,
+        graph_vars["probs"].name,
+        graph_vars["labels"].name,
         graph_vars["seq_lens"].name
     ]
 
-    if eval_phase == "train":
-        fetch_list.append(graph_vars["loss"].name)
-        if "learning_rate" in graph_vars:
-            fetch_list.append(graph_vars["learning_rate"].name)
-        outputs = exe.run(fetch_list=fetch_list)
-        np_labels, np_infers, np_lens, np_loss = outputs[:4]
-        num_label, num_infer, num_correct = chunk_eval(
-            np_labels, np_infers, np_lens, tag_num, dev_count)
-        precision, recall, f1 = calculate_f1(num_label, num_infer, num_correct)
-        rets = {
-            "precision": precision,
-            "recall": recall,
-            "f1": f1,
-            "loss": np.mean(np_loss)
-        }
-        if "learning_rate" in graph_vars:
-            rets["lr"] = float(outputs[4][0])
-        return rets
+    total_label, total_infer, total_correct = 0.0, 0.0, 0.0
+    time_begin = time.time()
+    pyreader.start()
+    while True:
+        try:
+            np_probs, np_labels, np_lens = exe.run(program=program,
+                                                    fetch_list=fetch_list)
+            label_num, infer_num, correct_num = chunk_eval(
+                np_labels, np_probs, np_lens, tag_num, dev_count)
+            total_infer += infer_num
+            total_label += label_num
+            total_correct += correct_num
 
-    else:
-        total_label, total_infer, total_correct = 0.0, 0.0, 0.0
-        time_begin = time.time()
-        pyreader.start()
-        while True:
-            try:
-                np_labels, np_infers, np_lens = exe.run(program=program,
-                                                        fetch_list=fetch_list)
-                label_num, infer_num, correct_num = chunk_eval(
-                    np_labels, np_infers, np_lens, tag_num, dev_count)
-                total_infer += infer_num
-                total_label += label_num
-                total_correct += correct_num
+        except fluid.core.EOFException:
+            pyreader.reset()
+            break
 
-            except fluid.core.EOFException:
-                pyreader.reset()
-                break
+    precision, recall, f1 = calculate_f1(total_label, total_infer,
+                                         total_correct)
+    time_end = time.time()
+    return  \
+        "[evaluation] f1: %f, precision: %f, recall: %f, elapsed time: %f s" \
+        % (f1, precision, recall, time_end - time_begin)
 
-        precision, recall, f1 = calculate_f1(total_label, total_infer,
-                                             total_correct)
-        time_end = time.time()
 
-        print(
-            "[%s evaluation] f1: %f, precision: %f, recall: %f, elapsed time: %f s"
-            % (eval_phase, f1, precision, recall, time_end - time_begin))
+def chunk_predict(np_inputs, np_probs, np_lens, dev_count=1):
+    inputs = np_inputs.reshape([-1]).astype(np.int32)
+    probs = np_probs.reshape([-1, np_probs.shape[-1]])
+
+    all_lens = np_lens.reshape([dev_count, -1]).astype(np.int32).tolist()
+
+    base_index = 0
+    out = []
+    for dev_index in xrange(dev_count):
+        lens = all_lens[dev_index]
+        max_len = 0
+        for l in lens:
+            max_len = max(max_len, l)
+
+        for i in xrange(len(lens)):
+            seq_st = base_index + i * max_len + 1
+            seq_en = seq_st + (lens[i] - 2)
+            prob = probs[seq_st:seq_en, :]
+            infers = np.argmax(probs, -1)
+            out.append((
+                    inputs[seq_st:seq_en].tolist(), 
+                    infers.tolist(),
+                    probs.tolist()))
+        base_index += max_len * len(lens)
+    return out
+
+
+def predict(exe,
+            test_program,
+            test_pyreader,
+            graph_vars,
+            dev_count=1):
+    fetch_list = [
+        graph_vars["inputs"].name,
+        graph_vars["probs"].name,
+        graph_vars["seq_lens"].name,
+        graph_vars["probs"].name,
+    ]
+
+    test_pyreader.start()
+    res = []
+    while True:
+        try:
+            inputs, probs, np_lens, np_probs = exe.run(program=test_program,
+                                        fetch_list=fetch_list)
+            r = chunk_predict(inputs, probs, np_lens, dev_count)
+            res += r
+        except fluid.core.EOFException:
+            test_pyreader.reset()
+            break
+    log.info(len(res))
+    return res
+
+

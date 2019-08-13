@@ -17,6 +17,10 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
+from io import open
 
 import collections
 import unicodedata
@@ -69,15 +73,15 @@ def printable_text(text):
 def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
     vocab = collections.OrderedDict()
-    fin = open(vocab_file)
-    for num, line in enumerate(fin):
-        items = convert_to_unicode(line.strip()).split("\t")
-        if len(items) > 2:
-            break
-        token = items[0]
-        index = items[1] if len(items) == 2 else num
-        token = token.strip()
-        vocab[token] = int(index)
+    with open(vocab_file, encoding='utf8') as fin:
+        for num, line in enumerate(fin):
+            items = convert_to_unicode(line.strip()).split("\t")
+            if len(items) > 2:
+                break
+            token = items[0]
+            index = items[1] if len(items) == 2 else num
+            token = token.strip()
+            vocab[token] = int(index)
     return vocab
 
 

@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Inference by """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import os
 import time
@@ -39,7 +40,7 @@ from reader.task_reader import ClassifyReader
 from model.ernie import ErnieConfig
 from finetune.classifier import create_model
 
-from utils.args import ArgumentGroup, print_arguments
+from utils.args import print_arguments, check_cuda, prepare_logger
 from utils.init import init_pretraining_params
 from finetune_args import parser
 
@@ -66,6 +67,7 @@ run_type_g.add_arg("use_cuda",          bool,   True,  "If set, use GPU for trai
 run_type_g.add_arg("do_prediction",     bool,   True,  "Whether to do prediction on test set.")
 
 args = parser.parse_args()
+log = logging.getLogger()
 # yapf: enable.
 
 def main(args):
@@ -113,7 +115,7 @@ def main(args):
     _, ckpt_dir = os.path.split(args.init_checkpoint.rstrip('/'))
     dir_name = ckpt_dir + '_inference_model'
     model_path = os.path.join(args.save_inference_model_path, dir_name)
-    print("save inference model to %s" % model_path)
+    log.info("save inference model to %s" % model_path)
     fluid.io.save_inference_model(
         model_path,
         feed_target_names, [probs],
@@ -125,7 +127,7 @@ def main(args):
     #config = AnalysisConfig(os.path.join(model_path, "__model__"), os.path.join(model_path, ""))
     config = AnalysisConfig(model_path)
     if not args.use_cuda:
-        print("disable gpu")
+        log.info("disable gpu")
         config.disable_gpu()
 
     # Create PaddlePredictor
@@ -137,7 +139,7 @@ def main(args):
         epoch=1,
         shuffle=False)
 
-    print("-------------- prediction results --------------")
+    log.info("-------------- prediction results --------------")
     np.set_printoptions(precision=4, suppress=True)
     index = 0
     total_time = 0
@@ -156,14 +158,14 @@ def main(args):
 
         # parse outputs
         output = outputs[0]
-        print(output.name)
+        log.info(output.name)
         output_data = output.data.float_data()
         #assert len(output_data) == args.num_labels * args.batch_size
         batch_result  = np.array(output_data).reshape((-1, args.num_labels))
         for single_example_probs in batch_result:
-            print("{} example\t{}".format(index, single_example_probs))
+            log.info("{} example\t{}".format(index, single_example_probs))
             index += 1
-    print("qps:{}\ttotal_time:{}\ttotal_example:{}\tbatch_size:{}".format(index/total_time, total_time, index, args.batch_size))
+    log.info("qps:{}\ttotal_time:{}\ttotal_example:{}\tbatch_size:{}".format(index/total_time, total_time, index, args.batch_size))
 
 
 def array2tensor(ndarray):
@@ -183,5 +185,6 @@ def array2tensor(ndarray):
     return tensor
 
 if __name__ == '__main__':
+    prepare_logger(log)
     print_arguments(args)
     main(args)

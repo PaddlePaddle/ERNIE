@@ -12,19 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 
 import os
 import six
 import ast
 import copy
+import logging
 
 import numpy as np
 import paddle.fluid as fluid
 
+log = logging.getLogger(__name__)
 
 def cast_fp32_to_fp16(exe, main_program):
-    print("Cast parameters to float16 data format.")
+    log.info("Cast parameters to float16 data format.")
     for param in main_program.global_block().all_parameters():
         if not param.name.endswith(".master"):
             param_t = fluid.global_scope().find_var(param.name).get_tensor()
@@ -51,7 +58,7 @@ def init_checkpoint(exe, init_checkpoint_path, main_program, use_fp16=False):
         init_checkpoint_path,
         main_program=main_program,
         predicate=existed_persitables)
-    print("Load model from {}".format(init_checkpoint_path))
+    log.info("Load model from {}".format(init_checkpoint_path))
 
     if use_fp16:
         cast_fp32_to_fp16(exe, main_program)
@@ -74,7 +81,7 @@ def init_pretraining_params(exe,
         pretraining_params_path,
         main_program=main_program,
         predicate=existed_params)
-    print("Load pretraining parameters from {}.".format(
+    log.info("Load pretraining parameters from {}.".format(
         pretraining_params_path))
 
     if use_fp16:

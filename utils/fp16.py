@@ -12,10 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
+import logging
 import paddle
 import paddle.fluid as fluid
 
+
+log = logging.getLogger(__name__)
 
 def cast_fp16_to_fp32(i, o, prog):
     prog.global_block().append_op(

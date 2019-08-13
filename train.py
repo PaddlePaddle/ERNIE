@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ERNIE pretraining."""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import os
 import time
 import multiprocessing
+import logging
 
 import numpy as np
 import paddle.fluid as fluid
@@ -27,11 +29,12 @@ import paddle.fluid as fluid
 from reader.pretraining import ErnieDataReader
 from model.ernie_v1 import ErnieModel, ErnieConfig
 from optimization import optimization
-from utils.args import print_arguments, check_cuda
+from utils.args import print_arguments, check_cuda, prepare_logger
 from utils.init import init_checkpoint, init_pretraining_params
 
 from pretrain_args import parser
 
+log = logging.getLogger()
 args = parser.parse_args()
 
 # yapf: enable.
@@ -114,7 +117,7 @@ def predict_wrapper(args,
                 cost += each_total_cost
                 steps += 1
                 if args.do_test and steps % args.skip_steps == 0:
-                    print("[test_set] steps: %d" % steps)
+                    log.info("[test_set] steps: %d" % steps)
 
             except fluid.core.EOFException:
                 pyreader.reset()
@@ -151,9 +154,9 @@ def test(args):
         pyreader=test_pyreader,
         fetch_list=[next_sent_acc.name, mask_lm_loss.name, total_loss.name])
 
-    print("test begin")
+    log.info("test begin")
     loss, lm_loss, acc, steps, speed = predict()
-    print(
+    log.info(
         "[test_set] loss: %f, global ppl: %f, next_sent_acc: %f, speed: %f steps/s"
         % (np.mean(np.array(loss) / steps),
            np.exp(np.mean(np.array(lm_loss) / steps)),
@@ -161,7 +164,7 @@ def test(args):
 
 
 def train(args):
-    print("pretraining start")
+    log.info("pretraining start")
     ernie_config = ErnieConfig(args.ernie_config_path)
     ernie_config.print_config()
 
@@ -171,7 +174,7 @@ def train(args):
         with fluid.unique_name.guard():
             train_pyreader, next_sent_acc, mask_lm_loss, total_loss = create_model(
                 pyreader_name='train_reader', ernie_config=ernie_config)
-            scheduled_lr, loss_scaling = optimization(
+            scheduled_lr = optimization(
                 loss=total_loss,
                 warmup_steps=args.warmup_steps,
                 num_train_steps=args.num_train_steps,
@@ -196,31 +199,34 @@ def train(args):
 
     test_prog = test_prog.clone(for_test=True)
 
+    if len(fluid.cuda_places()) == 0:
+        raise RuntimeError('not cuda device cound, check ur env setting')
+
     if args.use_cuda:
-        place = fluid.CUDAPlace(0)
+        place = fluid.cuda_places()[0]
         dev_count = fluid.core.get_cuda_device_count()
     else:
         place = fluid.CPUPlace()
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
 
-    print("Device count %d" % dev_count)
-    print("theoretical memory usage: ")
-    print(fluid.contrib.memory_usage(
+    log.info("Device count %d" % dev_count)
+    log.info("theoretical memory usage: ")
+    log.info(fluid.contrib.memory_usage(
         program=train_program, batch_size=args.batch_size // args.max_seq_len))
 
     nccl2_num_trainers = 1
     nccl2_trainer_id = 0
-    print("args.is_distributed:", args.is_distributed)
+    log.info("args.is_distributed:", args.is_distributed)
     if args.is_distributed:
-        worker_endpoints_env = os.getenv("worker_endpoints")
+        worker_endpoints_env = os.getenv("PADDLE_TRAINER_ENDPOINTS")
         worker_endpoints = worker_endpoints_env.split(",")
         trainers_num = len(worker_endpoints)
-        current_endpoint = os.getenv("current_endpoint")
+        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
         trainer_id = worker_endpoints.index(current_endpoint)
         if trainer_id == 0:
-            print("train_id == 0, sleep 60s")
+            log.info("train_id == 0, sleep 60s")
             time.sleep(60)
-        print("worker_endpoints:{} trainers_num:{} current_endpoint:{} \
+        log.info("worker_endpoints:{} trainers_num:{} current_endpoint:{} \
               trainer_id:{}".format(worker_endpoints, trainers_num,
                                     current_endpoint, trainer_id))
 
@@ -309,13 +315,13 @@ def train(args):
                 lm_cost.extend(each_mask_lm_cost)
                 cost.extend(each_total_cost)
 
-                print("feed_queue size", train_pyreader.queue.size())
+                log.info("feed_queue size", train_pyreader.queue.size())
                 time_end = time.time()
                 used_time = time_end - time_begin
                 epoch, current_file_index, total_file, current_file, mask_type = data_reader.get_progress(
                 )
-                print("current learning_rate:%f" % np_lr[0])
-                print(
+                log.info("current learning_rate:%f" % np_lr[0])
+                log.info(
                     "epoch: %d, progress: %d/%d, step: %d, loss: %f, "
                     "ppl: %f, next_sent_acc: %f, speed: %f steps/s, file: %s, mask_type: %s"
                     % (epoch, current_file_index, total_file, steps,
@@ -335,7 +341,7 @@ def train(args):
             if args.valid_filelist and steps % args.validation_steps == 0:
                 vali_cost, vali_lm_cost, vali_acc, vali_steps, vali_speed = predict(
                 )
-                print("[validation_set] epoch: %d, step: %d, "
+                log.info("[validation_set] epoch: %d, step: %d, "
                       "loss: %f, global ppl: %f, batch-averged ppl: %f, "
                       "next_sent_acc: %f, speed: %f steps/s" %
                       (epoch, steps, np.mean(np.array(vali_cost) / vali_steps),
@@ -349,6 +355,7 @@ def train(args):
 
 
 if __name__ == '__main__':
+    prepare_logger(log)
     print_arguments(args)
     check_cuda(args.use_cuda)
     if args.do_test:

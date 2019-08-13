@@ -11,16 +11,44 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
+import sys
 import os
-import csv
 import json
 import random
+import logging
 import numpy as np
+import six
+from io import open
 from collections import namedtuple
 
 import tokenization
 from batching import pad_batch_data
+
+
+log = logging.getLogger(__name__)
+
+if six.PY3:
+    from itertools import accumulate
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+
+def csv_reader(fd, delimiter='\t'):
+    def gen():
+        for i in fd:
+            slots = i.rstrip('\n').split(delimiter)
+            if len(slots) == 1:
+                yield slots,
+            else:
+                yield slots
+    return gen()
 
 
 class BaseReader(object):
@@ -58,7 +86,7 @@ class BaseReader(object):
         self.num_examples = 0
 
         if label_map_config:
-            with open(label_map_config) as f:
+            with open(label_map_config, encoding='utf8') as f:
                 self.label_map = json.load(f)
         else:
             self.label_map = None
@@ -69,8 +97,8 @@ class BaseReader(object):
 
     def _read_tsv(self, input_file, quotechar=None):
         """Reads a tab separated value file."""
-        with open(input_file, "r") as f:
-            reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
+        with open(input_file, 'r', encoding='utf8') as f:
+            reader = csv_reader(f)
             headers = next(reader)
             Example = namedtuple('Example', headers)
 
@@ -249,8 +277,8 @@ class BaseReader(object):
 class ClassifyReader(BaseReader):
     def _read_tsv(self, input_file, quotechar=None):
         """Reads a tab separated value file."""
-        with open(input_file, "r") as f:
-            reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
+        with open(input_file, 'r', encoding='utf8') as f:
+            reader = csv_reader(f)
             headers = next(reader)
             text_indices = [
                 index for index, h in enumerate(headers) if h != "label"
@@ -453,7 +481,7 @@ class MRCReader(BaseReader):
 
     def _read_json(self, input_file, is_training):
         examples = []
-        with open(input_file, "r") as f:
+        with open(input_file, "r", encoding='utf8') as f:
             input_data = json.load(f)["data"]
             for entry in input_data:
                 for paragraph in entry["paragraphs"]:
@@ -488,7 +516,7 @@ class MRCReader(BaseReader):
                             actual_text = " ".join(doc_tokens[start_pos:(end_pos
                                                                          + 1)])
                             if actual_text.find(orig_answer_text) == -1:
-                                print("Could not find answer: '%s' vs. '%s'",
+                                log.info("Could not find answer: '%s' vs. '%s'",
                                       actual_text, orig_answer_text)
                                 continue
                         else:
