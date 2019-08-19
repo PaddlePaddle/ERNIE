@@ -82,6 +82,7 @@ data_g.add_arg("doc_stride",                int,   128,
                "When splitting up a long document into chunks, how much stride to take between chunks.")
 data_g.add_arg("n_best_size",               int,   20,
                "The total number of n-best predictions to generate in the nbest_predictions.json output file.")
+data_g.add_arg("chunk_scheme", type=str,  default="IOB", choices=["IO", "IOB", "IOE", "IOBES"], help="chunk scheme")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use GPU for training.")

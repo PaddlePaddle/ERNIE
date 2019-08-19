@@ -118,14 +118,6 @@ def main(args):
                     weight_decay=args.weight_decay,
                     scheduler=args.lr_scheduler,
                     use_fp16=args.use_fp16)
-                """
-                fluid.memory_optimize(
-                    input_program=train_program,
-                    skip_opt_set=[
-                        graph_vars["loss"].name,
-                        graph_vars["num_seqs"].name,
-                    ])
-                """
 
         if args.verbose:
             if args.in_tokens:

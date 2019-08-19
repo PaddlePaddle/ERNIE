@@ -11,6 +11,7 @@ python -u run_sequence_labeling.py \
                    --batch_size 16 \
                    --init_pretraining_params ${MODEL_PATH}/params \
                    --num_labels 7 \
+                   --chunk_scheme "IOB" \
                    --label_map_config ${TASK_DATA_PATH}/msra_ner/label_map.json \
                    --train_set ${TASK_DATA_PATH}/msra_ner/train.tsv \
                    --dev_set ${TASK_DATA_PATH}/msra_ner/dev.tsv \
