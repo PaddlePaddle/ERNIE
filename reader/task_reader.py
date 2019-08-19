@@ -347,13 +347,23 @@ class SequenceLabelReader(BaseReader):
             if len(sub_token) == 0:
                 continue
             ret_tokens.extend(sub_token)
-            ret_labels.append(label)
-            if len(sub_token) < 2:
+            if len(sub_token) == 1:
+                ret_labels.append(label)
                 continue
-            sub_label = label
-            if label.startswith("B-"):
-                sub_label = "I-" + label[2:]
-            ret_labels.extend([sub_label] * (len(sub_token) - 1))
+
+            if label == "O" or label.startswith("I-"):
+                ret_labels.extend([label] * len(sub_token))
+            elif label.startswith("B-"):
+                i_label = "I-" + label[2:]
+                ret_labels.extend([label] + [i_label] * (len(sub_token) - 1))
+            elif label.startswith("S-"):
+                b_laebl = "B-" + label[2:]
+                e_label = "E-" + label[2:]
+                i_label = "I-" + label[2:]
+                ret_labels.extend([b_laebl] + [i_label] * (len(sub_token) - 2) + [e_label])
+            elif label.startswith("E-"):
+                i_label = "I-" + label[2:]
+                ret_labels.extend([i_label] * (len(sub_token) - 1) + [label])
 
         assert len(ret_tokens) == len(ret_labels)
         return ret_tokens, ret_labels
@@ -451,6 +461,15 @@ class MRCReader(BaseReader):
         self.current_epoch = 0
         self.num_examples = 0
 
+        self.Example = namedtuple('Example',
+                ['qas_id', 'question_text', 'doc_tokens', 'orig_answer_text',
+                'start_position', 'end_position'])
+        self.Feature = namedtuple("Feature", ["unique_id", "example_index", "doc_span_index",
+                "tokens", "token_to_orig_map", "token_is_max_context",
+                "token_ids", "position_ids", "text_type_ids",
+                "start_position", "end_position"])
+        self.DocSpan = namedtuple("DocSpan", ["start", "length"])
+
     def _read_json(self, input_file, is_training):
         examples = []
         with open(input_file, "r") as f:
@@ -495,12 +514,7 @@ class MRCReader(BaseReader):
                             doc_tokens = tokenization.tokenize_chinese_chars(
                                 paragraph_text)
 
-                        Example = namedtuple('Example', [
-                            'qas_id', 'question_text', 'doc_tokens',
-                            'orig_answer_text', 'start_position', 'end_position'
-                        ])
-
-                        example = Example(
+                        example = self.Example(
                             qas_id=qas_id,
                             question_text=question_text,
                             doc_tokens=doc_tokens,
@@ -544,11 +558,6 @@ class MRCReader(BaseReader):
 
     def _convert_example_to_feature(self, examples, max_seq_length, tokenizer,
                                     is_training):
-        Feature = namedtuple("Feature", [
-            "unique_id", "example_index", "doc_span_index", "tokens",
-            "token_to_orig_map", "token_is_max_context", "token_ids",
-            "position_ids", "text_type_ids", "start_position", "end_position"
-        ])
         features = []
         unique_id = 1000000000
 
@@ -581,14 +590,13 @@ class MRCReader(BaseReader):
                      tokenizer, example.orig_answer_text)
 
             max_tokens_for_doc = max_seq_length - len(query_tokens) - 3
-            _DocSpan = namedtuple("DocSpan", ["start", "length"])
             doc_spans = []
             start_offset = 0
             while start_offset < len(all_doc_tokens):
                 length = len(all_doc_tokens) - start_offset
                 if length > max_tokens_for_doc:
                     length = max_tokens_for_doc
-                doc_spans.append(_DocSpan(start=start_offset, length=length))
+                doc_spans.append(self.DocSpan(start=start_offset, length=length))
                 if start_offset + length == len(all_doc_tokens):
                     break
                 start_offset += min(length, self.doc_stride)
@@ -638,7 +646,7 @@ class MRCReader(BaseReader):
                         start_position = tok_start_position - doc_start + doc_offset
                         end_position = tok_end_position - doc_start + doc_offset
 
-                feature = Feature(
+                feature = self.Feature(
                     unique_id=unique_id,
                     example_index=example_index,
                     doc_span_index=doc_span_index,

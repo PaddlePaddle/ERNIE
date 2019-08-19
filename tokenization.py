@@ -395,11 +395,16 @@ def tokenize_chinese_chars(text):
 
         return False
 
+    def _is_whitespace(c):
+        if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
+            return True
+        return False
+
     output = []
     buff = ""
     for char in text:
         cp = ord(char)
-        if _is_chinese_char(cp):
+        if _is_chinese_char(cp) or _is_whitespace(char):
             if buff != "":
                 output.append(buff)
                 buff = ""

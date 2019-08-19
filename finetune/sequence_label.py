@@ -68,11 +68,19 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
         bias_attr=fluid.ParamAttr(
             name="cls_seq_label_out_b",
             initializer=fluid.initializer.Constant(0.)))
+    infers = fluid.layers.argmax(logits, axis=2)
 
     ret_labels = fluid.layers.reshape(x=labels, shape=[-1, 1])
-    ret_infers = fluid.layers.reshape(
-        x=fluid.layers.argmax(
-            logits, axis=2), shape=[-1, 1])
+    ret_infers = fluid.layers.reshape(x=infers, shape=[-1, 1])
+
+    lod_labels = fluid.layers.sequence_unpad(labels, seq_lens)
+    lod_infers = fluid.layers.sequence_unpad(infers, seq_lens)
+
+    (_, _, _, num_infer, num_label, num_correct) = fluid.layers.chunk_eval(
+         input=lod_infers,
+         label=lod_labels,
+         chunk_scheme=args.chunk_scheme,
+         num_chunk_types=((args.num_labels-1)//(len(args.chunk_scheme)-1)))
 
     labels = fluid.layers.flatten(labels, axis=2)
     ce_loss, probs = fluid.layers.softmax_with_cross_entropy(
@@ -92,6 +100,9 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
         "probs": probs,
         "labels": ret_labels,
         "infers": ret_infers,
+        "num_infer": num_infer,
+        "num_label": num_label,
+        "num_correct": num_correct,
         "seq_lens": seq_lens
     }
 
@@ -212,8 +223,8 @@ def evaluate(exe,
              eval_phase,
              dev_count=1):
     fetch_list = [
-        graph_vars["labels"].name, graph_vars["infers"].name,
-        graph_vars["seq_lens"].name
+        graph_vars["num_infer"].name, graph_vars["num_label"].name,
+        graph_vars["num_correct"].name
     ]
 
     if eval_phase == "train":
@@ -221,9 +232,10 @@ def evaluate(exe,
         if "learning_rate" in graph_vars:
             fetch_list.append(graph_vars["learning_rate"].name)
         outputs = exe.run(fetch_list=fetch_list)
-        np_labels, np_infers, np_lens, np_loss = outputs[:4]
-        num_label, num_infer, num_correct = chunk_eval(
-            np_labels, np_infers, np_lens, tag_num, dev_count)
+        np_num_infer, np_num_label, np_num_correct, np_loss = outputs[:4]
+        num_label = np.sum(np_num_label)
+        num_infer = np.sum(np_num_infer)
+        num_correct = np.sum(np_num_correct)
         precision, recall, f1 = calculate_f1(num_label, num_infer, num_correct)
         rets = {
             "precision": precision,
@@ -241,13 +253,11 @@ def evaluate(exe,
         pyreader.start()
         while True:
             try:
-                np_labels, np_infers, np_lens = exe.run(program=program,
+                np_num_infer, np_num_label, np_num_correct = exe.run(program=program,
                                                         fetch_list=fetch_list)
-                label_num, infer_num, correct_num = chunk_eval(
-                    np_labels, np_infers, np_lens, tag_num, dev_count)
-                total_infer += infer_num
-                total_label += label_num
-                total_correct += correct_num
+                total_infer += np.sum(np_num_infer)
+                total_label += np.sum(np_num_label)
+                total_correct += np.sum(np_num_correct)
 
             except fluid.core.EOFException:
                 pyreader.reset()

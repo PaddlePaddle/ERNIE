@@ -109,12 +109,14 @@ def main(args):
                     scheduler=args.lr_scheduler,
                     use_fp16=args.use_fp16)
 
+                """
                 fluid.memory_optimize(
                     input_program=train_program,
                     skip_opt_set=[
                         graph_vars["loss"].name, graph_vars["labels"].name,
                         graph_vars["infers"].name, graph_vars["seq_lens"].name
                     ])
+                """
 
         if args.verbose:
             if args.in_tokens:
