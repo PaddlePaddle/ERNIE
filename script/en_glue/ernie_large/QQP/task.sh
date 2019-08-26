@@ -16,8 +16,13 @@ for i in {1..5};do
 
   timestamp=`date "+%Y-%m-%d-%H-%M-%S"`
 
-  python -u run_classifier.py                                                      \
-       --for_cn False                                                              \
+    python ./finetune_launch.py  \
+        --nproc_per_node 8 \
+        --selected_gpus 0,1,2,3,4,5,6,7 \
+        --node_ips $(hostname -i) \
+        --node_id 0 \
+    ./run_classifier.py                                                      \
+           --for_cn False                                                              \
        --ernie_config_path script/en_glue/ernie_large/ernie_config.json            \
        --validation_steps 1000000000000                                            \
        --use_cuda true                                                             \

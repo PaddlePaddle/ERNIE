@@ -21,7 +21,12 @@ for i in {1..5};do
 
     timestamp=`date "+%Y-%m-%d-%H-%M-%S"`
 
-    python -u run_classifier.py                                            \
+python ./finetune_launch.py  \
+    --nproc_per_node 8 \
+    --selected_gpus 0,1,2,3,4,5,6,7 \
+    --node_ips $(hostname -i) \
+    --node_id 0 \
+./run_classifier.py                                            \
            --use_cuda true                                                 \
            --for_cn False                                                  \
            --use_fast_executor ${e_executor:-"true"}                       \

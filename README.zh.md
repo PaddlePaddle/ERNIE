@@ -371,10 +371,10 @@ DRCD 是台达研究院发布的繁体中文阅读理解数据集，目标是从
   </tbody>
 </table>
 
- - **MSRA-NER(SIGHAN2006)**
+ - **MSRA-NER (SIGHAN2006)**
 
 ```text
-MSRA-NER(SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文本中具有特定意义的实体，包括人名、地名、机构名。
+MSRA-NER (SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文本中具有特定意义的实体，包括人名、地名、机构名。
 ```
 
 
@@ -640,6 +640,7 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
         * [英文数据](#英文数据)
   * [Fine-tuning 任务](#fine-tuning-任务)
      * [运行参数配置](#运行参数配置)
+     * [多进程训练与fp16混合精度](#多进程训练与fp16混合精度)
      * [单句和句对分类任务](#单句和句对分类任务)
         * [单句分类任务](#单句分类任务)
         * [句对分类任务](#句对分类任务)
@@ -720,8 +721,8 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 | MRPC   | 16 / 32 (base) | 2 |
 | WNLI | 8 | 1 |
 | XNLI | 65536 (tokens) | 8 |
-| CMRC2018 | 64 | 8 (large) / 4(base) |
-| DRCD | 64 | 8 (large) / 4(base) |
+| CMRC2018 | 64 | 8 (large) / 4 (base) |
+| DRCD | 64 | 8 (large) / 4 (base) |
 | MSRA-NER(SIGHAN 2006) | 16 | 1 |
 | ChnSentiCorp | 24 | 1 |
 | LCQMC | 32 | 1 |
@@ -731,6 +732,12 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 \* *MNLI 和 QNLI 的任务中，使用了 32 GB 显存的 V100。除此之外的显卡皆为22 GB 的 P40。*
 
 
+### 多进程训练与fp16混合精度
+
+使用`finetune_launch.py`脚本来启动多进程训练 。多进程训练可以提升充分利用多核CPU/多卡GPU 的能力来加速finetune过程。
+`finetune_launch.py` 需要放在原来finetune脚本前面, 同时指定每个节点的进程数`--nproc_per_node`, 以及每个节点上的gpu卡号`--selected_gpus`, 一般数量与进程数, `CUDA_VISIBLE_DEVICES`相同且从0开始编号 (参考`script/zh_task/ernie_base/run_xnli.sh`)
+
+只需在训练脚本中加入`--use_fp16 true`即可启用fp16混合精度训练（确保您的硬件支持Tensor Core技术）。ERNIE会将计算Op转换成fp16精度，同时仍然使用fp32精度存储参数。ERNIE使用动态loss scale来避免梯度消失。在XNLI任务上可以观察到大约60%加速。
 
 ### 单句和句对分类任务
 

@@ -111,6 +111,7 @@ Integrating both phrase information and named entity information enables the mod
 
 ## Release Notes
 
+- Aug 21, 2019: featuers update: fp16 finetuning, multiprocess finetining.
 - July 30, 2019: release ERNIE 2.0
 - Apr 10, 2019: update ERNIE_stable-1.0.1.tar.gz, update config and vocab
 - Mar 18, 2019: update ERNIE_stable.tgz
@@ -339,7 +340,7 @@ XNLI is a natural language inference dataset in 15 languages. It was jointly bui
 
 *\*The DRCD dataset is converted from Traditional Chinese to Simplified Chinese based on tool: https://github.com/skydark/nstools/tree/master/zhtools*
 
-\* *The pre-training data of ERNIE 1.0 BASE does not contain instances whose length exceeds 128, but other models is pre-trained with the instances whose length are 512. It causes poorer performance of ERNIE 1.0 BASE on long-text tasks. So We have released [ERNIE 1.0 Base(max-len-512)](https://ernie.bj.bcebos.com/ERNIE_1.0_max-len-512.tar.gz) on July 29th, 2019*
+\* *The pre-training data of ERNIE 1.0 BASE does not contain instances whose length exceeds 128, but other models is pre-trained with the instances whose length are 512. It causes poorer performance of ERNIE 1.0 BASE on long-text tasks. So We have released [ERNIE 1.0 Base (max-len-512)](https://ernie.bj.bcebos.com/ERNIE_1.0_max-len-512.tar.gz) on July 29th, 2019*
 
 
 
@@ -371,7 +372,7 @@ DRCD is an open domain Traditional Chinese machine reading comprehension (MRC) d
     <tr>
       <th><strong>Dataset</strong>
         <br></th>
-      <th colspan="2"><center><strong>MSRA-NER(SIGHAN2006)</strong></center></th>
+      <th colspan="2"><center><strong>MSRA-NER (SIGHAN2006)</strong></center></th>
     <tr>
       <td rowspan="2">
         <p>
@@ -413,10 +414,10 @@ DRCD is an open domain Traditional Chinese machine reading comprehension (MRC) d
   </tbody>
 </table>
 
- - **MSRA-NER(SIGHAN2006)**
+ - **MSRA-NER (SIGHAN2006)**
 
 ```text
-MSRA-NER(SIGHAN2006) dataset is released by MSRA for recognizing the names of people, locations and organizations in text.
+MSRA-NER (SIGHAN2006) dataset is released by MSRA for recognizing the names of people, locations and organizations in text.
 ```
 
 #### Results on Sentiment Analysis Task
@@ -622,7 +623,7 @@ LCQMC is a Chinese question semantic matching corpus published in COLING2018. [u
  - **BQ Corpus**
 
 ```text
-BQ Corpus(Bank Question corpus) is a Chinese corpus for sentence semantic equivalence identification. This dataset was published in EMNLP 2018. [url: https://www.aclweb.org/anthology/D18-1536]
+BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equivalence identification. This dataset was published in EMNLP 2018. [url: https://www.aclweb.org/anthology/D18-1536]
 ```
 
 
@@ -635,6 +636,7 @@ BQ Corpus(Bank Question corpus) is a Chinese corpus for sentence semantic equiva
         * [Chinese Datasets](#chinese-datasets)
   * [Fine-tuning](#fine-tuning)
      * [Batchsize and GPU Settings](#batchsize-and-gpu-settings)
+     * [Multiprocessing and fp16 auto mix-precision finetune](#multiprocessing-and-fp16-auto-mix-precision-finetune)
      * [Classification](#classification)
         * [Single Sentence Classification Tasks](#single-sentence-classification-tasks)
         * [Sentence Pair Classification Tasks](#sentence-pair-classification-tasks)
@@ -705,14 +707,14 @@ In our experiments, we found that the batch size is important for different task
 
 | Dataset      | Batch Size      | GPU                 |
 | ------------ | --------------- | ------------------- |
-| CoLA         | 32 / 64(base)   | 1                   |
-| SST-2        | 64 / 256(base)  | 8                   |
+| CoLA         | 32 / 64 (base)   | 1                   |
+| SST-2        | 64 / 256 (base)  | 8                   |
 | STS-B        | 128             | 8                   |
 | QQP          | 256             | 8                   |
-| MNLI         | 256 / 512(base) | 8                   |
+| MNLI         | 256 / 512 (base) | 8                   |
 | QNLI         | 256             | 8                   |
-| RTE          | 16 / 4(base)    | 1                   |
-| MRPC         | 16 / 32(base)   | 2                   |
+| RTE          | 16 / 4 (base)    | 1                   |
+| MRPC         | 16 / 32 (base)   | 2                   |
 | WNLI         | 8               | 1                   |
 | XNLI         | 65536 (tokens) | 8                   |
 | CMRC2018     | 64              | 8 (large) / 4(base) |
@@ -724,6 +726,17 @@ In our experiments, we found that the batch size is important for different task
 | NLPCC2016-DBQA         | 64              | 8                   |
 
 \* *For MNLI, QNLI，we used 32GB V100, for other tasks we used 22GB P40*
+
+
+### Multiprocessing and fp16 auto mix-precision finetune
+
+multiprocessing finetuning can be simply enabled with `finetune_launch.py`  in your finetune script.
+with multiprocessing finetune paddle can fully utilize your CPU/GPU capacity to accelerate finetuning.
+`finetune_launch.py` should place in front of your finetune command. make sure to provide number of process and device id per node by specifiying `--nproc_per_node` and `--selected_gpus`. Number of device ids should match `nproc_per_node` and `CUDA_VISIBLE_DEVICES`, and the indexing should start from 0.
+
+fp16 finetuning can be simply enable by specifing `--use_fp16 true` in your training script (make sure you use have a Tensor Core device). ERNIE will cast computation op to fp16 precision, while maintain storage in fp32 precision. approximately 60% speedup is seen on XNLI finetuning.
+dynamic loss scale is used to avoid gradient vanish.
+
 
 ### Classification
 

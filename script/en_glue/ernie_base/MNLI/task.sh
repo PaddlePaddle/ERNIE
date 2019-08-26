@@ -20,7 +20,12 @@ for i in {1..5};do
 
 timestamp=`date "+%Y-%m-%d-%H-%M-%S"`
 
-python -u run_classifier.py                                                             \
+python ./finetune_launch.py  \
+    --nproc_per_node 4 \
+    --selected_gpus 0,1,2,3 \
+    --node_ips $(hostname -i) \
+    --node_id 0 \
+./run_classifier.py                                                             \
        --use_cuda true                                                                  \
        --use_fast_executor ${e_executor:-"true"}                                        \
        --tokenizer ${TOKENIZER:-"FullTokenizer"}                                        \

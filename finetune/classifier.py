@@ -16,8 +16,11 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import time
+import logging
 import numpy as np
 
 from scipy.stats import pearsonr, spearmanr
@@ -26,6 +29,7 @@ import paddle.fluid as fluid
 
 from model.ernie import ErnieModel
 
+log = logging.getLogger(__name__)
 
 def create_model(args,
                  pyreader_name,

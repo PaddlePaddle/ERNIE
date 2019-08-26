@@ -18,7 +18,12 @@ epoch=4
 
 for i in {1..5};do
 
- python -u run_classifier.py                                                       \
+ python ./finetune_launch.py  \
+    --nproc_per_node 8 \
+    --selected_gpus 0,1,2,3,4,5,6,7 \
+    --node_ips $(hostname -i) \
+    --node_id 0 \
+ ./run_classifier.py                                                       \
       --for_cn  False                                                              \
       --use_cuda true                                                              \
       --use_fast_executor ${e_executor:-"true"}                                    \
@@ -47,7 +52,7 @@ for i in {1..5};do
       --num_iteration_per_drop_scope 1                                             \
       --num_labels 2                                                               \
       --test_save output/test_out.$i.$lr.$batch_size.$epoch.tsv                    \
-      --random_seed 1 2>&1 | tee  log/job.$i.$lr.$batch_size.$epoch.$timestamp.log \
+      --random_seed 1 \
 
 done
 

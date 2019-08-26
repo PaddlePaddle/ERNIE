@@ -14,15 +14,16 @@ python -u run_sequence_labeling.py \
                    --chunk_scheme "IOB" \
                    --label_map_config ${TASK_DATA_PATH}/msra_ner/label_map.json \
                    --train_set ${TASK_DATA_PATH}/msra_ner/train.tsv \
-                   --dev_set ${TASK_DATA_PATH}/msra_ner/dev.tsv \
+   		   --dev_set ${TASK_DATA_PATH}/msra_ner/dev.tsv,${TASK_DATA_PATH}/msra_ner/test.tsv \
                    --test_set ${TASK_DATA_PATH}/msra_ner/test.tsv \
-                   --vocab_path config/vocab.txt \
-                   --ernie_config_path config/ernie_config.json \
+                   --vocab_path ${MODEL_PATH}/vocab.txt \
+                   --ernie_config_path ${MODEL_PATH}/ernie_config.json \
                    --checkpoints ./checkpoints \
                    --save_steps 100000 \
                    --weight_decay  0.01 \
                    --warmup_proportion 0.0 \
                    --validation_steps 100 \
+                   --use_fp16 false \
                    --epoch 6 \
                    --max_seq_len 256 \
                    --learning_rate 1e-5 \
