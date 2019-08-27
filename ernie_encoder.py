@@ -168,10 +168,10 @@ def main(args):
     total_top_layer_emb = np.concatenate(total_top_layer_emb)
 
     with open(os.path.join(args.output_dir, "cls_emb.npy"),
-              "w") as cls_emb_file:
+              "wb") as cls_emb_file:
         np.save(cls_emb_file, total_cls_emb)
     with open(os.path.join(args.output_dir, "top_layer_emb.npy"),
-              "w") as top_layer_emb_file:
+              "wb") as top_layer_emb_file:
         np.save(top_layer_emb_file, total_top_layer_emb)
 
 
