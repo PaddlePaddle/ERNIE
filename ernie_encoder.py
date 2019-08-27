@@ -129,8 +129,6 @@ def main(args):
             pyreader, graph_vars = create_model(
                 args, pyreader_name='reader', ernie_config=ernie_config)
 
-            fluid.memory_optimize(input_program=infer_program)
-
     infer_program = infer_program.clone(for_test=True)
 
     exe.run(startup_prog)

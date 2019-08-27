@@ -16,10 +16,13 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 
 import numpy as np
 import paddle.fluid as fluid
-from utils.fp16 import create_master_params_grads, master_param_to_train_param
+from utils.fp16 import create_master_params_grads, master_param_to_train_param, apply_dynamic_loss_scaling
 
 
 def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
@@ -101,7 +104,7 @@ def optimization(loss,
         return False
 
     param_list = dict()
-
+    
     loss_scaling = fluid.layers.create_global_var(
         name=fluid.unique_name.generate("loss_scaling"),
         shape=[1],

@@ -16,9 +16,11 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import os
 import time
+import logging
 import multiprocessing
 
 # NOTE(paddle-dev): All of these flags should be
@@ -32,11 +34,12 @@ import reader.task_reader as task_reader
 from model.ernie import ErnieConfig
 from finetune.mrc import create_model, evaluate
 from optimization import optimization
-from utils.args import print_arguments
+from utils.args import print_arguments, prepare_logger
 from utils.init import init_pretraining_params, init_checkpoint
 from finetune_args import parser
 
 args = parser.parse_args()
+log = logging.getLogger()
 
 
 def main(args):
@@ -44,8 +47,9 @@ def main(args):
     ernie_config.print_config()
 
     if args.use_cuda:
-        place = fluid.CUDAPlace(int(os.getenv('FLAGS_selected_gpus', '0')))
-        dev_count = fluid.core.get_cuda_device_count()
+        dev_list = fluid.cuda_places()
+        place = dev_list[0]
+        dev_count = len(dev_list)
     else:
         place = fluid.CPUPlace()
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
@@ -70,6 +74,8 @@ def main(args):
         raise ValueError("For args `do_train`, `do_val` and `do_test`, at "
                          "least one of them must be True.")
 
+    if args.do_test:
+        assert args.test_save is not None
     startup_prog = fluid.Program()
     if args.random_seed is not None:
         startup_prog.random_seed = args.random_seed
@@ -77,11 +83,12 @@ def main(args):
     if args.predict_batch_size == None:
         args.predict_batch_size = args.batch_size
     if args.do_train:
+        trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
         train_data_generator = reader.data_generator(
             input_file=args.train_set,
             batch_size=args.batch_size,
             epoch=args.epoch,
-            dev_count=dev_count,
+            dev_count=trainers_num,
             shuffle=True,
             phase="train")
 
@@ -94,10 +101,10 @@ def main(args):
             max_train_steps = args.epoch * num_train_examples // args.batch_size // dev_count
 
         warmup_steps = int(max_train_steps * args.warmup_proportion)
-        print("Device count: %d" % dev_count)
-        print("Num train examples: %d" % num_train_examples)
-        print("Max train steps: %d" % max_train_steps)
-        print("Num warmup steps: %d" % warmup_steps)
+        log.info("Device count: %d" % dev_count)
+        log.info("Num train examples: %d" % num_train_examples)
+        log.info("Max train steps: %d" % max_train_steps)
+        log.info("Num warmup steps: %d" % warmup_steps)
 
         train_program = fluid.Program()
 
@@ -108,7 +115,7 @@ def main(args):
                     pyreader_name='train_reader',
                     ernie_config=ernie_config,
                     is_training=True)
-                scheduled_lr, loss_scaling = optimization(
+                scheduled_lr, _ = optimization(
                     loss=graph_vars["loss"],
                     warmup_steps=warmup_steps,
                     num_train_steps=max_train_steps,
@@ -117,7 +124,13 @@ def main(args):
                     startup_prog=startup_prog,
                     weight_decay=args.weight_decay,
                     scheduler=args.lr_scheduler,
-                    use_fp16=args.use_fp16)
+		    use_fp16=args.use_fp16,
+		    use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
+		    init_loss_scaling=args.init_loss_scaling,
+		    incr_every_n_steps=args.incr_every_n_steps,
+		    decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
+		    incr_ratio=args.incr_ratio,
+		    decr_ratio=args.decr_ratio)
 
         if args.verbose:
             if args.in_tokens:
@@ -127,7 +140,7 @@ def main(args):
             else:
                 lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
                     program=train_program, batch_size=args.batch_size)
-            print("Theoretical memory usage in training: %.3f - %.3f %s" %
+            log.info("Theoretical memory usage in training: %.3f - %.3f %s" %
                   (lower_mem, upper_mem, unit))
 
     if args.do_val or args.do_test:
@@ -144,11 +157,36 @@ def main(args):
 
     nccl2_num_trainers = 1
     nccl2_trainer_id = 0
+    if args.is_distributed:
+        trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
+        worker_endpoints_env = os.getenv("PADDLE_TRAINER_ENDPOINTS")
+        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
+        worker_endpoints = worker_endpoints_env.split(",")
+        trainers_num = len(worker_endpoints)
+        
+        log.info("worker_endpoints:{} trainers_num:{} current_endpoint:{} \
+              trainer_id:{}".format(worker_endpoints, trainers_num,
+                                    current_endpoint, trainer_id))
+
+        # prepare nccl2 env.
+        config = fluid.DistributeTranspilerConfig()
+        config.mode = "nccl2"
+        t = fluid.DistributeTranspiler(config=config)
+        t.transpile(
+            trainer_id,
+            trainers=worker_endpoints_env,
+            current_endpoint=current_endpoint,
+            program=train_program if args.do_train else test_prog,
+            startup_program=startup_prog)
+        nccl2_num_trainers = trainers_num
+        nccl2_trainer_id = trainer_id
+
+    exe = fluid.Executor(place)
     exe.run(startup_prog)
 
     if args.do_train:
         if args.init_checkpoint and args.init_pretraining_params:
-            print(
+            log.warning(
                 "WARNING: args 'init_checkpoint' and 'init_pretraining_params' "
                 "both are set! Only arg 'init_checkpoint' is made valid.")
         if args.init_checkpoint:
@@ -214,12 +252,12 @@ def main(args):
                         verbose += "learning rate: %f" % (
                             outputs["learning_rate"]
                             if warmup_steps > 0 else args.learning_rate)
-                        print(verbose)
+                        log.info(verbose)
 
                     current_example, current_epoch = reader.get_train_progress()
                     time_end = time.time()
                     used_time = time_end - time_begin
-                    print("epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
+                    log.info("epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
                           "speed: %f steps/s" %
                           (current_epoch, current_example, num_train_examples,
                            steps, outputs["loss"], args.skip_steps / used_time))
@@ -277,7 +315,7 @@ def main(args):
 
     # final eval on dev set
     if args.do_val:
-        print("Final validation result:")
+        log.info("Final validation result:")
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(
                 args.dev_set,
@@ -298,7 +336,7 @@ def main(args):
 
     # final eval on test set
     if args.do_test:
-        print("Final test result:")
+        log.info("Final test result:")
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(
                 args.test_set,
@@ -319,6 +357,8 @@ def main(args):
 
 
 if __name__ == '__main__':
+    prepare_logger(log)
+    print_arguments(args)
     while True:
         scope = fluid.core.Scope()
         with fluid.scope_guard(scope):

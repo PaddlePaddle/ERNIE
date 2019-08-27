@@ -16,14 +16,18 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import json
-
+import logging
 import six
 import paddle.fluid as fluid
+from io import open
 
 from model.transformer_encoder import encoder, pre_process_layer
 
+log = logging.getLogger(__name__)
 
 class ErnieConfig(object):
     def __init__(self, config_path):
@@ -31,7 +35,7 @@ class ErnieConfig(object):
 
     def _parse(self, config_path):
         try:
-            with open(config_path) as json_file:
+            with open(config_path, 'r', encoding='utf8') as json_file:
                 config_dict = json.load(json_file)
         except Exception:
             raise IOError("Error in parsing Ernie model config file '%s'" %
@@ -44,8 +48,8 @@ class ErnieConfig(object):
 
     def print_config(self):
         for arg, value in sorted(six.iteritems(self._config_dict)):
-            print('%s: %s' % (arg, value))
-        print('------------------------------------------------')
+            log.info('%s: %s' % (arg, value))
+        log.info('------------------------------------------------')
 
 
 class ErnieModel(object):

@@ -2,7 +2,7 @@ set -eux
 
 export FLAGS_eager_delete_tensor_gb=0
 export FLAGS_sync_nccl_allreduce=1
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLDE_DEVICES=0
 
 python -u run_sequence_labeling.py \
                    --use_cuda true \
@@ -15,7 +15,7 @@ python -u run_sequence_labeling.py \
                    --chunk_scheme "IOB" \
                    --label_map_config ${TASK_DATA_PATH}/msra_ner/label_map.json \
                    --train_set ${TASK_DATA_PATH}/msra_ner/train.tsv \
-                   --dev_set ${TASK_DATA_PATH}/msra_ner/dev.tsv \
+   		   --dev_set ${TASK_DATA_PATH}/msra_ner/dev.tsv,${TASK_DATA_PATH}/msra_ner/test.tsv \
                    --test_set ${TASK_DATA_PATH}/msra_ner/test.tsv \
                    --vocab_path ${MODEL_PATH}/vocab.txt \
                    --ernie_config_path ${MODEL_PATH}/ernie_config.json \
@@ -24,6 +24,7 @@ python -u run_sequence_labeling.py \
                    --weight_decay  0.01 \
                    --warmup_proportion 0.0 \
                    --validation_steps 100 \
+                   --use_fp16 false \
                    --epoch 6 \
                    --max_seq_len 256 \
                    --learning_rate 5e-5 \

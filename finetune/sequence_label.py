@@ -15,6 +15,9 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 
 import os
 import time
@@ -23,12 +26,14 @@ import numpy as np
 import multiprocessing
 
 import paddle
+import logging
 import paddle.fluid as fluid
 
 from six.moves import xrange
 
 from model.ernie import ErnieModel
 
+log = logging.getLogger(__name__)
 
 def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     pyreader = fluid.layers.py_reader(
@@ -70,9 +75,7 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
             initializer=fluid.initializer.Constant(0.)))
     infers = fluid.layers.argmax(logits, axis=2)
 
-    ret_labels = fluid.layers.reshape(x=labels, shape=[-1, 1])
     ret_infers = fluid.layers.reshape(x=infers, shape=[-1, 1])
-
     lod_labels = fluid.layers.sequence_unpad(labels, seq_lens)
     lod_infers = fluid.layers.sequence_unpad(infers, seq_lens)
 
@@ -92,109 +95,20 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     ce_loss = ce_loss * input_mask
     loss = fluid.layers.mean(x=ce_loss)
 
-    if args.use_fp16 and args.loss_scaling > 1.0:
-        loss *= args.loss_scaling
-
     graph_vars = {
+        "inputs": src_ids,
         "loss": loss,
         "probs": probs,
-        "labels": ret_labels,
-        "infers": ret_infers,
+        "seqlen": seq_lens,
         "num_infer": num_infer,
         "num_label": num_label,
         "num_correct": num_correct,
-        "seq_lens": seq_lens
     }
 
     for k, v in graph_vars.items():
         v.persistable = True
 
     return pyreader, graph_vars
-
-
-def chunk_eval(np_labels, np_infers, np_lens, tag_num, dev_count=1):
-    def extract_bio_chunk(seq):
-        chunks = []
-        cur_chunk = None
-        null_index = tag_num - 1
-        for index in xrange(len(seq)):
-            tag = seq[index]
-            tag_type = tag // 2
-            tag_pos = tag % 2
-
-            if tag == null_index:
-                if cur_chunk is not None:
-                    chunks.append(cur_chunk)
-                    cur_chunk = None
-                continue
-
-            if tag_pos == 0:
-                if cur_chunk is not None:
-                    chunks.append(cur_chunk)
-                    cur_chunk = {}
-                cur_chunk = {"st": index, "en": index + 1, "type": tag_type}
-
-            else:
-                if cur_chunk is None:
-                    cur_chunk = {"st": index, "en": index + 1, "type": tag_type}
-                    continue
-
-                if cur_chunk["type"] == tag_type:
-                    cur_chunk["en"] = index + 1
-                else:
-                    chunks.append(cur_chunk)
-                    cur_chunk = {"st": index, "en": index + 1, "type": tag_type}
-
-        if cur_chunk is not None:
-            chunks.append(cur_chunk)
-        return chunks
-
-    null_index = tag_num - 1
-    num_label = 0
-    num_infer = 0
-    num_correct = 0
-    labels = np_labels.reshape([-1]).astype(np.int32).tolist()
-    infers = np_infers.reshape([-1]).astype(np.int32).tolist()
-    all_lens = np_lens.reshape([dev_count, -1]).astype(np.int32).tolist()
-
-    base_index = 0
-    for dev_index in xrange(dev_count):
-        lens = all_lens[dev_index]
-        max_len = 0
-        for l in lens:
-            max_len = max(max_len, l)
-
-        for i in xrange(len(lens)):
-            seq_st = base_index + i * max_len + 1
-            seq_en = seq_st + (lens[i] - 2)
-            infer_chunks = extract_bio_chunk(infers[seq_st:seq_en])
-            label_chunks = extract_bio_chunk(labels[seq_st:seq_en])
-            num_infer += len(infer_chunks)
-            num_label += len(label_chunks)
-
-            infer_index = 0
-            label_index = 0
-            while label_index < len(label_chunks) \
-                   and infer_index < len(infer_chunks):
-                if infer_chunks[infer_index]["st"] \
-                    < label_chunks[label_index]["st"]:
-                    infer_index += 1
-                elif infer_chunks[infer_index]["st"] \
-                    > label_chunks[label_index]["st"]:
-                    label_index += 1
-                else:
-                    if infer_chunks[infer_index]["en"] \
-                        == label_chunks[label_index]["en"] \
-                        and infer_chunks[infer_index]["type"] \
-                        == label_chunks[label_index]["type"]:
-                        num_correct += 1
-
-                    infer_index += 1
-                    label_index += 1
-
-        base_index += max_len * len(lens)
-
-    return num_label, num_infer, num_correct
 
 
 def calculate_f1(num_label, num_infer, num_correct):
@@ -220,53 +134,85 @@ def evaluate(exe,
              pyreader,
              graph_vars,
              tag_num,
-             eval_phase,
              dev_count=1):
     fetch_list = [
         graph_vars["num_infer"].name, graph_vars["num_label"].name,
         graph_vars["num_correct"].name
     ]
 
-    if eval_phase == "train":
-        fetch_list.append(graph_vars["loss"].name)
-        if "learning_rate" in graph_vars:
-            fetch_list.append(graph_vars["learning_rate"].name)
-        outputs = exe.run(fetch_list=fetch_list)
-        np_num_infer, np_num_label, np_num_correct, np_loss = outputs[:4]
-        num_label = np.sum(np_num_label)
-        num_infer = np.sum(np_num_infer)
-        num_correct = np.sum(np_num_correct)
-        precision, recall, f1 = calculate_f1(num_label, num_infer, num_correct)
-        rets = {
-            "precision": precision,
-            "recall": recall,
-            "f1": f1,
-            "loss": np.mean(np_loss)
-        }
-        if "learning_rate" in graph_vars:
-            rets["lr"] = float(outputs[4][0])
-        return rets
+    total_label, total_infer, total_correct = 0.0, 0.0, 0.0
+    time_begin = time.time()
+    pyreader.start()
+    while True:
+        try:
+            np_num_infer, np_num_label, np_num_correct = exe.run(program=program,
+                                                    fetch_list=fetch_list)
+            total_infer += np.sum(np_num_infer)
+            total_label += np.sum(np_num_label)
+            total_correct += np.sum(np_num_correct)
 
-    else:
-        total_label, total_infer, total_correct = 0.0, 0.0, 0.0
-        time_begin = time.time()
-        pyreader.start()
-        while True:
-            try:
-                np_num_infer, np_num_label, np_num_correct = exe.run(program=program,
-                                                        fetch_list=fetch_list)
-                total_infer += np.sum(np_num_infer)
-                total_label += np.sum(np_num_label)
-                total_correct += np.sum(np_num_correct)
+        except fluid.core.EOFException:
+            pyreader.reset()
+            break
 
-            except fluid.core.EOFException:
-                pyreader.reset()
-                break
+    precision, recall, f1 = calculate_f1(total_label, total_infer,
+                                         total_correct)
+    time_end = time.time()
+    return  \
+        "[evaluation] f1: %f, precision: %f, recall: %f, elapsed time: %f s" \
+        % (f1, precision, recall, time_end - time_begin)
 
-        precision, recall, f1 = calculate_f1(total_label, total_infer,
-                                             total_correct)
-        time_end = time.time()
 
-        print(
-            "[%s evaluation] f1: %f, precision: %f, recall: %f, elapsed time: %f s"
-            % (eval_phase, f1, precision, recall, time_end - time_begin))
+def chunk_predict(np_inputs, np_probs, np_lens, dev_count=1):
+    inputs = np_inputs.reshape([-1]).astype(np.int32)
+    probs = np_probs.reshape([-1, np_probs.shape[-1]])
+
+    all_lens = np_lens.reshape([dev_count, -1]).astype(np.int32).tolist()
+
+    base_index = 0
+    out = []
+    for dev_index in xrange(dev_count):
+        lens = all_lens[dev_index]
+        max_len = 0
+        for l in lens:
+            max_len = max(max_len, l)
+
+        for i in xrange(len(lens)):
+            seq_st = base_index + i * max_len + 1
+            seq_en = seq_st + (lens[i] - 2)
+            prob = probs[seq_st:seq_en, :]
+            infers = np.argmax(probs, -1)
+            out.append((
+                    inputs[seq_st:seq_en].tolist(), 
+                    infers.tolist(),
+                    probs.tolist()))
+        base_index += max_len * len(lens)
+    return out
+
+
+def predict(exe,
+            test_program,
+            test_pyreader,
+            graph_vars,
+            dev_count=1):
+    fetch_list = [
+        graph_vars["inputs"].name,
+        graph_vars["probs"].name,
+        graph_vars["seqlen"].name,
+        graph_vars["probs"].name,
+    ]
+
+    test_pyreader.start()
+    res = []
+    while True:
+        try:
+            inputs, probs, np_lens, np_probs = exe.run(program=test_program,
+                                        fetch_list=fetch_list)
+            r = chunk_predict(inputs, probs, np_lens, dev_count)
+            res += r
+        except fluid.core.EOFException:
+            test_pyreader.reset()
+            break
+    log.info(len(res))
+    return res
+

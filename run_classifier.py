@@ -16,9 +16,12 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import os
 import time
+import logging
 import multiprocessing
 
 # NOTE(paddle-dev): All of these flags should be
@@ -32,12 +35,13 @@ import reader.task_reader as task_reader
 from model.ernie import ErnieConfig
 from finetune.classifier import create_model, evaluate, predict
 from optimization import optimization
-from utils.args import print_arguments, check_cuda
+from utils.args import print_arguments, check_cuda, prepare_logger
 from utils.init import init_pretraining_params, init_checkpoint
 from utils.cards import get_cards
 from finetune_args import parser
 
 args = parser.parse_args()
+log = logging.getLogger()
 
 
 def main(args):
@@ -45,8 +49,9 @@ def main(args):
     ernie_config.print_config()
 
     if args.use_cuda:
-        place = fluid.CUDAPlace(int(os.getenv('FLAGS_selected_gpus', '0')))
-        dev_count = fluid.core.get_cuda_device_count()
+        dev_list = fluid.cuda_places()
+        place = dev_list[0]
+        dev_count = len(dev_list)
     else:
         place = fluid.CPUPlace()
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
@@ -95,10 +100,10 @@ def main(args):
             max_train_steps = args.epoch * num_train_examples // args.batch_size // dev_count
 
         warmup_steps = int(max_train_steps * args.warmup_proportion)
-        print("Device count: %d" % dev_count)
-        print("Num train examples: %d" % num_train_examples)
-        print("Max train steps: %d" % max_train_steps)
-        print("Num warmup steps: %d" % warmup_steps)
+        log.info("Device count: %d" % dev_count)
+        log.info("Num train examples: %d" % num_train_examples)
+        log.info("Max train steps: %d" % max_train_steps)
+        log.info("Num warmup steps: %d" % warmup_steps)
 
         train_program = fluid.Program()
         if args.random_seed is not None and args.enable_ce:
@@ -121,7 +126,13 @@ def main(args):
                     startup_prog=startup_prog,
                     weight_decay=args.weight_decay,
                     scheduler=args.lr_scheduler,
-                    use_fp16=args.use_fp16)
+		    use_fp16=args.use_fp16,
+		    use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
+		    init_loss_scaling=args.init_loss_scaling,
+		    incr_every_n_steps=args.incr_every_n_steps,
+		    decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
+		    incr_ratio=args.incr_ratio,
+		    decr_ratio=args.decr_ratio)
 
         if args.verbose:
             if args.in_tokens:
@@ -131,7 +142,7 @@ def main(args):
             else:
                 lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
                     program=train_program, batch_size=args.batch_size)
-            print("Theoretical memory usage in training: %.3f - %.3f %s" %
+            log.info("Theoretical memory usage in training: %.3f - %.3f %s" %
                   (lower_mem, upper_mem, unit))
 
     if args.do_val or args.do_test:
@@ -148,11 +159,36 @@ def main(args):
         test_prog = test_prog.clone(for_test=True)
     nccl2_num_trainers = 1
     nccl2_trainer_id = 0
+    if args.is_distributed:
+        trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
+        worker_endpoints_env = os.getenv("PADDLE_TRAINER_ENDPOINTS")
+        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
+        worker_endpoints = worker_endpoints_env.split(",")
+        trainers_num = len(worker_endpoints)
+        
+        log.info("worker_endpoints:{} trainers_num:{} current_endpoint:{} \
+              trainer_id:{}".format(worker_endpoints, trainers_num,
+                                    current_endpoint, trainer_id))
+
+        # prepare nccl2 env.
+        config = fluid.DistributeTranspilerConfig()
+        config.mode = "nccl2"
+        t = fluid.DistributeTranspiler(config=config)
+        t.transpile(
+            trainer_id,
+            trainers=worker_endpoints_env,
+            current_endpoint=current_endpoint,
+            program=train_program if args.do_train else test_prog,
+            startup_program=startup_prog)
+        nccl2_num_trainers = trainers_num
+        nccl2_trainer_id = trainer_id
+
+    exe = fluid.Executor(place)
     exe.run(startup_prog)
 
     if args.do_train:
         if args.init_checkpoint and args.init_pretraining_params:
-            print(
+            log.warning(
                 "WARNING: args 'init_checkpoint' and 'init_pretraining_params' "
                 "both are set! Only arg 'init_checkpoint' is made valid.")
         if args.init_checkpoint:
@@ -236,14 +272,14 @@ def main(args):
                         verbose += "learning rate: %f" % (
                             outputs["learning_rate"]
                             if warmup_steps > 0 else args.learning_rate)
-                        print(verbose)
+                        log.info(verbose)
 
                     current_example, current_epoch = reader.get_train_progress()
                     time_end = time.time()
                     used_time = time_end - time_begin
 
                     if args.is_classify:
-                        print(
+                        log.info(
                             "epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
                             "ave acc: %f, speed: %f steps/s" %
                             (current_epoch, current_example, num_train_examples,
@@ -252,7 +288,7 @@ def main(args):
                         ce_info.append(
                             [outputs["loss"], outputs["accuracy"], used_time])
                     if args.is_regression:
-                        print(
+                        log.info(
                             "epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
                             " speed: %f steps/s" %
                             (current_epoch, current_example, num_train_examples,
@@ -260,22 +296,23 @@ def main(args):
                              args.skip_steps / used_time))
                     time_begin = time.time()
 
-                if steps % args.save_steps == 0:
-                    save_path = os.path.join(args.checkpoints,
-                                             "step_" + str(steps))
-                    fluid.io.save_persistables(exe, save_path, train_program)
+                if nccl2_trainer_id == 0:
+                    if steps % args.save_steps == 0:
+                        save_path = os.path.join(args.checkpoints,
+                                                 "step_" + str(steps))
+                        fluid.io.save_persistables(exe, save_path, train_program)
 
-                if steps % args.validation_steps == 0 or last_epoch != current_epoch:
-                    # evaluate dev set
-                    if args.do_val:
-                        evaluate_wrapper(args, reader, exe, test_prog,
-                                         test_pyreader, graph_vars,
-                                         current_epoch, steps)
+                    if steps % args.validation_steps == 0 or last_epoch != current_epoch:
+                        # evaluate dev set
+                        if args.do_val:
+                            evaluate_wrapper(args, reader, exe, test_prog,
+                                             test_pyreader, graph_vars,
+                                             current_epoch, steps)
 
-                    if args.do_test:
-                        predict_wrapper(args, reader, exe, test_prog,
-                                        test_pyreader, graph_vars,
-                                        current_epoch, steps)
+                        if args.do_test:
+                            predict_wrapper(args, reader, exe, test_prog,
+                                            test_pyreader, graph_vars,
+                                            current_epoch, steps)
 
                 if last_epoch != current_epoch:
                     last_epoch = current_epoch
@@ -295,10 +332,10 @@ def main(args):
                 ce_acc = ce_info[-2][1]
                 ce_time = ce_info[-2][2]
             except:
-                print("ce info error")
-            print("kpis\ttrain_duration_card%s\t%s" % (card_num, ce_time))
-            print("kpis\ttrain_loss_card%s\t%f" % (card_num, ce_loss))
-            print("kpis\ttrain_acc_card%s\t%f" % (card_num, ce_acc))
+                log.info("ce info error")
+            log.info("kpis\ttrain_duration_card%s\t%s" % (card_num, ce_time))
+            log.info("kpis\ttrain_loss_card%s\t%f" % (card_num, ce_loss))
+            log.info("kpis\ttrain_acc_card%s\t%f" % (card_num, ce_acc))
 
     # final eval on dev set
     if args.do_val:
@@ -320,7 +357,7 @@ def main(args):
                 dev_count=1,
                 shuffle=False))
 
-        print("Final diagnostic")
+        log.info("Final diagnostic")
         qids, preds, probs = predict(
             test_exe,
             test_prog,
@@ -334,7 +371,7 @@ def main(args):
             for id, s, p in zip(qids, preds, probs):
                 f.write('{}\t{}\t{}\n'.format(id, s, p))
 
-        print("Done final diagnostic, saving to {}".format(
+        log.info("Done final diagnostic, saving to {}".format(
             args.diagnostic_save))
 
 
@@ -349,7 +386,7 @@ def evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
                 epoch=1,
                 dev_count=1,
                 shuffle=False))
-        print("validation result of dataset {}:".format(ds))
+        log.info("validation result of dataset {}:".format(ds))
         evaluate_info = evaluate(
             exe,
             test_prog,
@@ -359,7 +396,7 @@ def evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
             metric=args.metric,
             is_classify=args.is_classify,
             is_regression=args.is_regression)
-        print(evaluate_info + ', file: {}, epoch: {}, steps: {}'.format(
+        log.info(evaluate_info + ', file: {}, epoch: {}, steps: {}'.format(
             ds, epoch, steps))
 
 
@@ -379,7 +416,7 @@ def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
                 shuffle=False))
 
         save_path = save_f + '.' + str(epoch) + '.' + str(steps)
-        print("testing {}, save to {}".format(test_f, save_path))
+        log.info("testing {}, save to {}".format(test_f, save_path))
         qids, preds, probs = predict(
             exe,
             test_prog,
@@ -391,6 +428,9 @@ def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
         save_dir = os.path.dirname(save_path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
+        else:
+            log.warning('save dir exsits: %s, will skip saving' % save_dir)
+
 
         with open(save_path, 'w') as f:
             for id, s, p in zip(qids, preds, probs):
@@ -398,6 +438,7 @@ def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
 
 
 if __name__ == '__main__':
+    prepare_logger(log)
     print_arguments(args)
     check_cuda(args.use_cuda)
     main(args)
