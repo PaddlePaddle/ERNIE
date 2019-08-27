@@ -945,7 +945,7 @@ Here is an example to get sentence embedding and token embedding for LCQMC dev d
 export FLAGS_sync_nccl_allreduce=1
 export CUDA_VISIBLE_DEVICES=0
 
-python -u ernir_encoder.py \
+python -u ernie_encoder.py \
                    --use_cuda true \
                    --batch_size 32 \
                    --output_dir "./test" \
