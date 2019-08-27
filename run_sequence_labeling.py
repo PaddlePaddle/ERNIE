@@ -16,10 +16,15 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import os
 import time
+import six
+import logging
 import multiprocessing
+from io import open
 
 # NOTE(paddle-dev): All of these flags should be
 # set before `import paddle`. Otherwise, it would
@@ -32,11 +37,12 @@ import reader.task_reader as task_reader
 from model.ernie import ErnieConfig
 from optimization import optimization
 from utils.init import init_pretraining_params, init_checkpoint
-from utils.args import print_arguments, check_cuda
-from finetune.sequence_label import create_model, evaluate
+from utils.args import print_arguments, check_cuda, prepare_logger
+from finetune.sequence_label import create_model, evaluate, predict, calculate_f1
 from finetune_args import parser
 
 args = parser.parse_args()
+log = logging.getLogger()
 
 
 def main(args):
@@ -44,12 +50,12 @@ def main(args):
     ernie_config.print_config()
 
     if args.use_cuda:
-        place = fluid.CUDAPlace(int(os.getenv('FLAGS_selected_gpus', '0')))
-        dev_count = fluid.core.get_cuda_device_count()
+        dev_list = fluid.cuda_places()
+        place = dev_list[0]
+        dev_count = len(dev_list)
     else:
         place = fluid.CPUPlace()
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
-    exe = fluid.Executor(place)
 
     reader = task_reader.SequenceLabelReader(
         vocab_path=args.vocab_path,
@@ -85,10 +91,10 @@ def main(args):
             max_train_steps = args.epoch * num_train_examples // args.batch_size // dev_count
 
         warmup_steps = int(max_train_steps * args.warmup_proportion)
-        print("Device count: %d" % dev_count)
-        print("Num train examples: %d" % num_train_examples)
-        print("Max train steps: %d" % max_train_steps)
-        print("Num warmup steps: %d" % warmup_steps)
+        log.info("Device count: %d" % dev_count)
+        log.info("Num train examples: %d" % num_train_examples)
+        log.info("Max train steps: %d" % max_train_steps)
+        log.info("Num warmup steps: %d" % warmup_steps)
 
         train_program = fluid.Program()
 
@@ -107,7 +113,13 @@ def main(args):
                     startup_prog=startup_prog,
                     weight_decay=args.weight_decay,
                     scheduler=args.lr_scheduler,
-                    use_fp16=args.use_fp16)
+		    use_fp16=args.use_fp16,
+		    use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
+		    init_loss_scaling=args.init_loss_scaling,
+		    incr_every_n_steps=args.incr_every_n_steps,
+		    decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
+		    incr_ratio=args.incr_ratio,
+		    decr_ratio=args.decr_ratio)
 
         if args.verbose:
             if args.in_tokens:
@@ -117,7 +129,7 @@ def main(args):
             else:
                 lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
                     program=train_program, batch_size=args.batch_size)
-            print("Theoretical memory usage in training: %.3f - %.3f %s" %
+            log.info("Theoretical memory usage in training: %.3f - %.3f %s" %
                   (lower_mem, upper_mem, unit))
 
     if args.do_val or args.do_test:
@@ -131,11 +143,38 @@ def main(args):
 
         test_prog = test_prog.clone(for_test=True)
 
+    nccl2_num_trainers = 1
+    nccl2_trainer_id = 0
+    if args.is_distributed:
+        trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
+        worker_endpoints_env = os.getenv("PADDLE_TRAINER_ENDPOINTS")
+        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
+        worker_endpoints = worker_endpoints_env.split(",")
+        trainers_num = len(worker_endpoints)
+        
+        log.info("worker_endpoints:{} trainers_num:{} current_endpoint:{} \
+              trainer_id:{}".format(worker_endpoints, trainers_num,
+                                    current_endpoint, trainer_id))
+
+        # prepare nccl2 env.
+        config = fluid.DistributeTranspilerConfig()
+        config.mode = "nccl2"
+        t = fluid.DistributeTranspiler(config=config)
+        t.transpile(
+            trainer_id,
+            trainers=worker_endpoints_env,
+            current_endpoint=current_endpoint,
+            program=train_program if args.do_train else test_prog,
+            startup_program=startup_prog)
+        nccl2_num_trainers = trainers_num
+        nccl2_trainer_id = trainer_id
+
+    exe = fluid.Executor(place)
     exe.run(startup_prog)
 
     if args.do_train:
         if args.init_checkpoint and args.init_pretraining_params:
-            print(
+            log.info(
                 "WARNING: args 'init_checkpoint' and 'init_pretraining_params' "
                 "both are set! Only arg 'init_checkpoint' is made valid.")
         if args.init_checkpoint:
@@ -171,7 +210,9 @@ def main(args):
             use_cuda=args.use_cuda,
             loss_name=graph_vars["loss"].name,
             exec_strategy=exec_strategy,
-            main_program=train_program)
+            main_program=train_program,
+            num_trainers=nccl2_num_trainers,
+            trainer_id=nccl2_trainer_id)
 
         train_pyreader.decorate_tensor_provider(train_data_generator)
     else:
@@ -186,8 +227,7 @@ def main(args):
     if args.do_train:
         train_pyreader.start()
         steps = 0
-        if warmup_steps > 0:
-            graph_vars["learning_rate"] = scheduled_lr
+        graph_vars["learning_rate"] = scheduled_lr
 
         time_begin = time.time()
         while True:
@@ -196,54 +236,47 @@ def main(args):
                 if steps % args.skip_steps != 0:
                     train_exe.run(fetch_list=[])
                 else:
-                    outputs = evaluate(train_exe, train_program, train_pyreader,
-                                       graph_vars, args.num_labels, "train",
-                                       dev_count)
+                    fetch_list = [
+                        graph_vars["num_infer"].name, graph_vars["num_label"].name,
+                        graph_vars["num_correct"].name,
+                        graph_vars["loss"].name,
+                        graph_vars['learning_rate'].name,
+                    ]
+                    
+                    out = train_exe.run(fetch_list=fetch_list)
+                    num_infer, num_label, num_correct, np_loss, np_lr = out
+                    lr = float(np_lr[0])
+                    loss = np_loss.mean()
+                    precision, recall, f1 = calculate_f1(num_label, num_infer, num_correct)
                     if args.verbose:
-                        verbose = "train pyreader queue size: %d, " % train_pyreader.queue.size(
-                        )
-                        verbose += "learning rate: %f" % (
-                            outputs["lr"]
-                            if warmup_steps > 0 else args.learning_rate)
-                        print(verbose)
+                        log.info("train pyreader queue size: %d, learning rate: %f" % (train_pyreader.queue.size(),
+                                lr if warmup_steps > 0 else args.learning_rate))
 
                     current_example, current_epoch = reader.get_train_progress()
                     time_end = time.time()
                     used_time = time_end - time_begin
-                    print("epoch: %d, progress: %d/%d, step: %d, loss: %f, "
+                    log.info("epoch: %d, progress: %d/%d, step: %d, loss: %f, "
                           "f1: %f, precision: %f, recall: %f, speed: %f steps/s"
                           % (current_epoch, current_example, num_train_examples,
-                             steps, outputs["loss"], outputs["f1"],
-                             outputs["precision"], outputs["recall"],
+                             steps, loss, f1, precision, recall,
                              args.skip_steps / used_time))
                     time_begin = time.time()
 
-                if steps % args.save_steps == 0:
+                if nccl2_trainer_id == 0 and steps % args.save_steps == 0:
                     save_path = os.path.join(args.checkpoints,
                                              "step_" + str(steps))
                     fluid.io.save_persistables(exe, save_path, train_program)
 
-                if steps % args.validation_steps == 0:
+                if nccl2_trainer_id == 0 and steps % args.validation_steps == 0:
                     # evaluate dev set
                     if args.do_val:
-                        test_pyreader.decorate_tensor_provider(
-                            reader.data_generator(
-                                args.dev_set,
-                                batch_size=args.batch_size,
-                                epoch=1,
-                                shuffle=False))
-                        evaluate(exe, test_prog, test_pyreader, graph_vars,
-                                 args.num_labels, "dev")
+                        evaluate_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
+                                current_epoch, steps)
                     # evaluate test set
                     if args.do_test:
-                        test_pyreader.decorate_tensor_provider(
-                            reader.data_generator(
-                                args.test_set,
-                                batch_size=args.batch_size,
-                                epoch=1,
-                                shuffle=False))
-                        evaluate(exe, test_prog, test_pyreader, graph_vars,
-                                 args.num_labels, "test")
+                        predict_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
+                                current_epoch, steps)
+
 
             except fluid.core.EOFException:
                 save_path = os.path.join(args.checkpoints, "step_" + str(steps))
@@ -252,31 +285,65 @@ def main(args):
                 break
 
     # final eval on dev set
-    if args.do_val:
+    if nccl2_trainer_id ==0 and args.do_val:
+        evaluate_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
+                current_epoch, 'final')
+
+    if nccl2_trainer_id == 0 and args.do_test:
+        predict_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
+                current_epoch, 'final')
+
+
+def evaluate_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
+                     epoch, steps):
+    # evaluate dev set
+    for ds in args.dev_set.split(','): #single card eval
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(
-                args.dev_set,
-                batch_size=args.batch_size,
+                ds,
+                batch_size=args.predict_batch_size,
                 epoch=1,
+                dev_count=1,
                 shuffle=False))
-        print("Final validation result:")
-        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels,
-                 "dev")
+        log.info("validation result of dataset {}:".format(ds))
+        info = evaluate(exe, test_prog, test_pyreader, graph_vars,
+                 args.num_labels)
+        log.info(info + ', file: {}, epoch: {}, steps: {}'.format(
+            ds, epoch, steps))
 
-    # final eval on test set
-    if args.do_test:
-        test_pyreader.decorate_tensor_provider(
-            reader.data_generator(
-                args.test_set,
-                batch_size=args.batch_size,
-                epoch=1,
-                shuffle=False))
-        print("Final test result:")
-        evaluate(exe, test_prog, test_pyreader, graph_vars, args.num_labels,
-                 "test")
 
+def predict_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
+                    epoch, steps):
+    test_sets = args.test_set.split(',')
+    save_dirs = args.test_save.split(',')
+    assert len(test_sets) == len(save_dirs), 'number of test_sets & test_save not match, got %d vs %d' % (len(test_sets), len(save_dirs))
+
+    for test_f, save_f in zip(test_sets, save_dirs):
+        test_pyreader.decorate_tensor_provider(reader.data_generator(
+                    test_f,
+                    batch_size=args.predict_batch_size,
+                    epoch=1,
+                    dev_count=1,
+                    shuffle=False))
+
+        save_path = save_f + '.' + str(epoch) + '.' + str(steps)
+        log.info("testing {}, save to {}".format(test_f, save_path))
+        res = predict(exe, test_prog, test_pyreader, graph_vars, dev_count=1)
+        save_dir = os.path.dirname(save_path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        tokenizer = reader.tokenizer
+        rev_label_map = {v: k for k, v in six.iteritems(reader.label_map)}
+        with open(save_path, 'w', encoding='utf8') as f:
+            for id, s, p in res:
+                id = ' '.join(tokenizer.convert_ids_to_tokens(id))
+                p = ' '.join(['%.5f' % pp[ss] for ss, pp in zip(s, p)])
+                s = ' '.join([rev_label_map[ss]for ss in s])
+                f.write('{}\t{}\t{}\n'.format(id, s, p))
 
 if __name__ == '__main__':
+    prepare_logger(log)
     print_arguments(args)
     check_cuda(args.use_cuda)
     main(args)

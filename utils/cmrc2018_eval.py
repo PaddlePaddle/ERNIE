@@ -1,4 +1,17 @@
 # -*- coding: utf-8 -*-
+#   Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 '''
 Evaluation script for CMRC 2018
 version: v5
@@ -6,22 +19,25 @@ Note:
 v5 formatted output, add usage description
 v4 fixed segmentation issues
 '''
+from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 from collections import Counter, OrderedDict
 import string
 import re
 import argparse
 import json
 import sys
-reload(sys)
-sys.setdefaultencoding('utf8')
 import nltk
 import pdb
 
 
 # split Chinese with English
 def mixed_segmentation(in_str, rm_punc=False):
-    in_str = str(in_str).decode('utf-8').lower().strip()
+    in_str = in_str.lower().strip()
     segs_out = []
     temp_str = ""
     sp_char = [
@@ -32,7 +48,7 @@ def mixed_segmentation(in_str, rm_punc=False):
     for char in in_str:
         if rm_punc and char in sp_char:
             continue
-        if re.search(ur'[\u4e00-\u9fa5]', char) or char in sp_char:
+        if re.search(r'[\u4e00-\u9fa5]', char) or char in sp_char:
             if temp_str != "":
                 ss = nltk.word_tokenize(temp_str)
                 segs_out.extend(ss)
@@ -51,7 +67,7 @@ def mixed_segmentation(in_str, rm_punc=False):
 
 # remove punctuation
 def remove_punctuation(in_str):
-    in_str = str(in_str).decode('utf-8').lower().strip()
+    in_str = in_str.lower().strip()
     sp_char = [
         '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
         '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
@@ -102,7 +118,7 @@ def evaluate(ground_truth_file, prediction_file):
                     skip_count += 1
                     continue
 
-                prediction = str(prediction_file[query_id])
+                prediction = prediction_file[query_id]
                 f1 += calc_f1_score(answers, prediction)
                 em += calc_em_score(answers, prediction)
 

@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import print_function
+from __future__ import absolute_import
 from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import os
 import numpy as np
@@ -36,8 +38,10 @@ class ErnieDataReader(object):
                  filelist,
                  vocab_path,
                  batch_size=4096,
+                 in_tokens=True,
                  max_seq_len=512,
                  shuffle_files=True,
+                 random_seed=1,
                  epoch=100,
                  voc_size=0,
                  is_test=False,
@@ -46,6 +50,8 @@ class ErnieDataReader(object):
         self.vocab = self.load_vocab(vocab_path)
         self.filelist = filelist
         self.batch_size = batch_size
+        self.in_tokens = in_tokens
+        self.random_seed = random_seed
         self.shuffle_files = shuffle_files
         self.epoch = epoch
         self.current_epoch = 0
@@ -60,12 +66,42 @@ class ErnieDataReader(object):
         self.mask_id = self.vocab["[MASK]"]
         self.is_test = is_test
         self.generate_neg_sample = generate_neg_sample
-        assert self.batch_size > 100, "Current batch size means total token's number, \
-                                       it should not be set to too small number."
-
+        
+        self.trainer_id = 0
+        self.trainer_nums = 1
+        self.files = open(filelist).readlines()
+        self.total_file = len(self.files)
+        
         if self.is_test:
             self.epoch = 1
             self.shuffle_files = False
+        
+        self.global_rng = np.random.RandomState(random_seed)
+        if self.shuffle_files:
+            if os.getenv("PADDLE_TRAINER_ID"):
+                self.trainer_id = int(os.getenv("PADDLE_TRAINER_ID"))
+            if os.getenv("PADDLE_NODES_NUM"):
+                self.trainer_nums = int(os.getenv("PADDLE_TRAINERS_NUM"))
+            #renew total_file
+            self.total_file = len(self.files) // self.trainer_nums * self.trainer_nums
+            if len(self.files) < self.trainer_nums:
+                raise RuntimeError('not enouph train file to shard, file:%d num_trainer:%d' % (len(self.files), self.trainer_nums))
+
+            tmp_files = []
+            for each in range(epoch):
+                each_files = self.files 
+                self.global_rng.shuffle(each_files)
+                tmp_files += each_files
+            self.files = tmp_files
+            #renew epochs
+            self.epoch = len(self.files) // self.total_file * self.total_file
+        
+        assert self.total_file > 0, \
+            "[Error] data_dir is empty or less than %d" % self.trainer_nums
+
+        if self.in_tokens:
+            assert self.batch_size > 100, "Current batch size means total token's number, \
+                                       it should not be set to too small number."
 
     def get_progress(self):
         """return current progress of traning data
@@ -75,13 +111,16 @@ class ErnieDataReader(object):
     def parse_line(self, line, max_seq_len=512):
         """ parse one line to token_ids, sentence_ids, pos_ids, label
         """
-        line = line.strip().decode().split(";")
-        assert len(line) == 5, "One sample must have 5 fields!"
+        line = line.strip().split(";")
+        assert len(line) == 5, \
+                "One sample must have %d fields!" % 5
+
         (token_ids, sent_ids, pos_ids, seg_labels, label) = line
         token_ids = [int(token) for token in token_ids.split(" ")]
         sent_ids = [int(token) for token in sent_ids.split(" ")]
         pos_ids = [int(token) for token in pos_ids.split(" ")]
         seg_labels = [int(seg_label) for seg_label in seg_labels.split(" ")]
+    
         assert len(token_ids) == len(sent_ids) == len(pos_ids) == len(
             seg_labels
         ), "[Must be true]len(token_ids) == len(sent_ids) == len(pos_ids) == len(seg_labels)"
@@ -94,6 +133,7 @@ class ErnieDataReader(object):
         assert file.endswith('.gz'), "[ERROR] %s is not a gzip file" % file
         with gzip.open(file, "rb") as f:
             for line in f:
+                line = line.decode('utf8')
                 parsed_line = self.parse_line(
                     line, max_seq_len=self.max_seq_len)
                 if parsed_line is None:
@@ -232,35 +272,63 @@ class ErnieDataReader(object):
             print("miss_num:%d\tideal_total_sample_num:%d\tmiss_rate:%f" %
                   (num_total_miss, pos_sample_num * 2,
                    num_total_miss / (pos_sample_num * 2)))
+    
+    def shuffle_samples(self, sample_generator, buffer=1000):
+        samples = []
+        try:
+            while True:
+                while len(samples) < buffer:
+                    sample = next(sample_generator)
+                    samples.append(sample)
+                np.random.shuffle(samples)
+                for sample in samples:
+                    yield sample
+                samples = []
+        except StopIteration:
+            print("stopiteration: reach end of file")
+            if len(samples) == 0:
+                yield None
+            else:
+                np.random.shuffle(samples)
+                for sample in samples:
+                    yield sample
 
     def data_generator(self):
         """
         data_generator
         """
-        files = open(self.filelist).readlines()
-        self.total_file = len(files)
-        assert self.total_file > 0, "[Error] data_dir is empty"
-
         def wrapper():
             def reader():
                 for epoch in range(self.epoch):
                     self.current_epoch = epoch + 1
+                    files = self.files
+                    #during training, data are sliced by trainers
                     if self.shuffle_files:
-                        np.random.shuffle(files)
-                    for index, file in enumerate(files):
-                        file, mask_word_prob = file.strip().split("\t")
+                        start = epoch * self.total_file
+                        end = start + self.total_file
+                        files = [file_ for index, file_ in enumerate(self.files[start:end]) \
+                            if index % self.trainer_nums == self.trainer_id]
+                    
+                    for index, file_ in enumerate(files):
+                        file_, mask_word_prob = file_.strip().split("\t")
                         mask_word = (np.random.random() < float(mask_word_prob))
-                        self.current_file_index = index + 1
-                        self.current_file = file
+                        self.current_file_index = (index + 1) * self.trainer_nums
+                        self.current_file = file_
                         if mask_word:
                             self.mask_type = "mask_word"
                         else:
                             self.mask_type = "mask_char"
 
-                        sample_generator = self.read_file(file)
-                        if not self.is_test and self.generate_neg_sample:
-                            sample_generator = self.mixin_negtive_samples(
-                                sample_generator)
+                        sample_generator = self.read_file(file_)
+                        if not self.is_test:
+                            if self.generate_neg_sample:
+                                sample_generator = self.mixin_negtive_samples(
+                                    sample_generator)
+                            else:
+                                #shuffle buffered sample
+                                sample_generator = self.shuffle_samples(
+                                    sample_generator)
+
                         for sample in sample_generator:
                             if sample is None:
                                 continue
@@ -272,7 +340,11 @@ class ErnieDataReader(object):
                 for parsed_line in reader():
                     token_ids, sent_ids, pos_ids, label, seg_labels, mask_word = parsed_line
                     max_len = max(max_len, len(token_ids))
-                    if (len(batch) + 1) * max_len <= batch_size:
+                    if self.in_tokens:
+                        to_append = (len(batch) + 1) * max_len <= batch_size
+                    else:
+                        to_append = len(batch) < batch_size
+                    if to_append:
                         batch.append(parsed_line)
                         total_token_num += len(token_ids)
                     else:
