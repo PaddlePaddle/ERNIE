@@ -34,7 +34,6 @@ from batching import pad_batch_data
 log = logging.getLogger(__name__)
 
 if six.PY3:
-    from itertools import accumulate
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
