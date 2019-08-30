@@ -38,7 +38,7 @@ def create_model(args,
                  task_name="",
                  is_classify=False,
                  is_regression=False,
-                 hid_dim=32,
+                 hid_dim=128,
                  ernie_version="1.0"):
     if is_classify:
         pyreader = fluid.layers.py_reader(
