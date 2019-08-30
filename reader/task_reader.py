@@ -349,6 +349,49 @@ class ClassifyReader(BaseReader):
         return return_list
 
 
+class ClassifySequenceReader(ClassifyReader):
+    def _pad_batch_records(self, batch_records):
+        batch_token_ids = [record.token_ids for record in batch_records]
+        batch_text_type_ids = [record.text_type_ids for record in batch_records]
+        batch_position_ids = [record.position_ids for record in batch_records]
+
+        if not self.is_inference:
+            batch_labels = [record.label_id for record in batch_records]
+            if self.is_classify:
+                batch_labels = np.array(batch_labels).astype("int64").reshape(
+                    [-1, 1])
+            elif self.is_regression:
+                batch_labels = np.array(batch_labels).astype("float32").reshape(
+                    [-1, 1])
+
+            if batch_records[0].qid:
+                batch_qids = [record.qid for record in batch_records]
+                batch_qids = np.array(batch_qids).astype("int64").reshape(
+                    [-1, 1])
+            else:
+                batch_qids = np.array([]).astype("int64").reshape([-1, 1])
+
+        # padding
+        padded_token_ids, input_mask, batch_seq_lens = pad_batch_data(
+            batch_token_ids, pad_idx=self.pad_id, return_input_mask=True,
+            return_seq_lens=True)
+        padded_text_type_ids = pad_batch_data(
+            batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(
+            batch_position_ids, pad_idx=self.pad_id)
+        padded_task_ids = np.ones_like(
+            padded_token_ids, dtype="int64") * self.task_id
+
+        return_list = [
+            padded_token_ids, padded_text_type_ids, padded_position_ids,
+            padded_task_ids, input_mask, batch_seq_lens
+        ]
+        if not self.is_inference:
+            return_list += [batch_labels, batch_qids]
+
+        return return_list
+    
+
 class SequenceLabelReader(BaseReader):
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
