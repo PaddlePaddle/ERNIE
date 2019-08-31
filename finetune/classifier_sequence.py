@@ -104,7 +104,10 @@ def create_model(args,
             initializer=fluid.initializer.Constant(0.)))
 
     if is_prediction:
-        probs = fluid.layers.softmax(logits)
+        if is_classify:
+            probs = fluid.layers.softmax(logits)
+        else:
+            probs = logits
         feed_targets_name = [
             src_ids.name, sent_ids.name, pos_ids.name, input_mask.name, seq_lens.name
         ]
