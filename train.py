@@ -189,12 +189,6 @@ def train(args):
                 decr_ratio=args.decr_ratio)
 
 
-            fluid.memory_optimize(
-                input_program=train_program,
-                skip_opt_set=[
-                    next_sent_acc.name, mask_lm_loss.name, total_loss.name
-                ])
-
     test_prog = fluid.Program()
     with fluid.program_guard(test_prog, startup_prog):
         with fluid.unique_name.guard():
