@@ -80,8 +80,6 @@ def main(args):
     if args.random_seed is not None:
         startup_prog.random_seed = args.random_seed
 
-    if args.predict_batch_size == None:
-        args.predict_batch_size = args.batch_size
     if args.do_train:
         train_data_generator = reader.data_generator(
             input_file=args.train_set,
