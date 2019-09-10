@@ -658,7 +658,7 @@ BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equiv
 
 This code base has been tested with Paddle Fluid 1.5.1 under Python2.
 
-**\*Important\*** When finished installing Paddle Fluid, remember to update LD_LIBRARY_PATH about CUDA, cuDNN, NCCL2, for more information, you can click [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/index_en.html) and [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/install/install_Ubuntu_en.html). Also, you can read FAQ at the end of this document when you encounter errors.
+**\*Important\*** When finished installing Paddle Fluid, remember to update LD_LIBRARY_PATH about CUDA, cuDNN, NCCL2, for more information on paddlepaddle setup, you can click [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/index_en.html) and [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/install/install_Ubuntu_en.html). Also, you can read FAQ at the end of this document when you encounter errors.
 
 For beginners of PaddlePaddle, the following documentation will tutor you about installing PaddlePaddle:
 
@@ -748,7 +748,7 @@ Take an English task `SST-2` and a Chinese task `ChnSentCorp` for example,
 
 Step1: Download and unarchive  the model in path `${MODEL_PATH}`, if everything goes well, there should be a folder named `params` in `$MODEL_PATH`;
 
-Step2: Download and unarchive the data set in `${TASK_DATA_PATH}`, for English tasks, there should be 9 folders named `CoLA` , `MNLI`,  `MRPC`,  `QNLI` , `QQP`,  `RTE` , `SST-2`,  `STS-B` , `WNLI`; for Chinese tasks, there should be 5 folders named  `lcqmc`, `xnli`, `msra-ner`, `chnsentcorp`,  `nlpcc-dbqa` in `${TASK_DATA_PATH}`;
+Step2: Download and unarchive the data set in `${TASK_DATA_PATH}`, for English tasks, there should be 9 folders named `CoLA` , `MNLI`,  `MRPC`,  `QNLI` , `QQP`,  `RTE` , `SST-2`,  `STS-B` , `WNLI`; for Chinese tasks, there should be 6 folders named  `cmrc2018` `drc`, `xnli`, `msra-ner`, `chnsentcorp`,  `nlpcc-dbqa` in `${TASK_DATA_PATH}`;
 
 Step3: Follow the instructions below based on your own task type for starting  your programs.
 
