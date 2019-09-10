@@ -662,7 +662,7 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 
 本项目依赖于 Paddle Fluid 1.5，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
 
-**【重要】安装后，需要及时的将 CUDA、cuDNN、NCCL2 等动态库路径加入到环境变量 LD_LIBRARY_PATH 之中，否则训练过程中会报相关的库错误。具体的安装细节请查阅[这里](http://en.paddlepaddle.org/documentation/docs/zh/1.5/beginners_guide/quick_start_cn.html)**
+**【重要】安装后，需要及时的将 CUDA、cuDNN、NCCL2 等动态库路径加入到环境变量 LD_LIBRARY_PATH 之中，否则训练过程中会报相关的库错误。具体的paddlepaddle配置细节请查阅[这里](http://en.paddlepaddle.org/documentation/docs/zh/1.5/beginners_guide/quick_start_cn.html)**
 
 如果您想了解更多的 Paddle 的相关信息，例如针对实际问题建模、搭建自己网络等，这里有更多的来自官方的文档供您参考：
 
