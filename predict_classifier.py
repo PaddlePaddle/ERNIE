@@ -41,7 +41,7 @@ from finetune_args import parser
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 model_g = ArgumentGroup(parser, "model", "options to init, resume and save model.")
-model_g.add_arg("ernie_config_path",            str,  None,  "Path to the json file for bert model config.")
+model_g.add_arg("ernie_config_path",            str,  None,  "Path to the json file for ernie model config.")
 model_g.add_arg("init_checkpoint",              str,  None,  "Init checkpoint to resume training from.")
 model_g.add_arg("save_inference_model_path",    str,  "inference_model",  "If set, save the inference model to this path.")
 model_g.add_arg("use_fp16",                     bool, False, "Whether to resume parameters from fp16 checkpoint.")
