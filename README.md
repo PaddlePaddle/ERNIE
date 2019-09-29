@@ -3,21 +3,25 @@ English | [简体中文](./README.zh.md)
 ## ERNIE 2.0: A Continual Pre-training Framework for Language Understanding
 
 
-  * [Pre-training Tasks](#pre-training-tasks)
-     * [Word-aware Tasks](#word-aware-tasks)
-        * [Knowledge Masking Task](#knowledge-masking-task)
-        * [Capitalization Prediction Task](#capitalization-prediction-task)
-        * [Token-Document Relation Prediction Task](#token-document-relation-prediction-task)
-     * [Structure-aware Tasks](#structure-aware-tasks)
-        * [Sentence Reordering Task](#sentence-reordering-task)
-        * [Sentence Distance Task](#sentence-distance-task)
-     * [Semantic-aware Tasks](#semantic-aware-tasks)
-        * [Discourse Relation Task](#discourse-relation-task)
-        * [IR Relevance Task](#ir-relevance-task)
-  * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
-  * [Compare the ERNIE 1.0 and ERNIE 2.0](#compare-the-ernie-10-and-ernie-20)
-  * [Results on English Datasets](#results-on-english-datasets)
-  * [Results on Chinese Datasets](#results-on-chinese-datasets)
+ * [Pre-training Tasks](#pre-training-tasks)
+    * [Word-aware Tasks](#word-aware-tasks)
+       * [Knowledge Masking Task](#knowledge-masking-task)
+       * [Capitalization Prediction Task](#capitalization-prediction-task)
+       * [Token-Document Relation Prediction Task](#token-document-relation-prediction-task)
+    * [Structure-aware Tasks](#structure-aware-tasks)
+       * [Sentence Reordering Task](#sentence-reordering-task)
+       * [Sentence Distance Task](#sentence-distance-task)
+    * [Semantic-aware Tasks](#semantic-aware-tasks)
+       * [Discourse Relation Task](#discourse-relation-task)
+       * [IR Relevance Task](#ir-relevance-task)
+ * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
+ * [Compare the ERNIE 1.0 and ERNIE 2.0](#compare-the-ernie-10-and-ernie-20)
+ * [Results](#results)
+   * [Results on English Datasets](#results-on-english-datasets)
+   * [Results on Chinese Datasets](#results-on-chinese-datasets)
+ * [Release Notes](#release-notes)
+ * [Communication](#communication)
+ * [Usage](#usage)
 
 
 ![ernie2.0_paper](.metas/ernie2.0_paper.png)
@@ -108,21 +112,6 @@ Integrating both phrase information and named entity information enables the mod
 | **Word-aware**      | ✅ Knowledge Masking        | ✅ Knowledge Masking <br> ✅ Capitalization Prediction <br> ✅ Token-Document Relation Prediction | ✅ Knowledge Masking                       |
 | **Structure-aware** |                            | ✅ Sentence Reordering                                        | ✅ Sentence Reordering <br> ✅ Sentence Distance |
 | **Semantic-aware**  | ✅ Next Sentence Prediction | ✅ Discourse Relation                                         | ✅ Discourse Relation <br> ✅ IR Relevance  |
-
-## Release Notes
-
-- Aug 21, 2019: featuers update: fp16 finetuning, multiprocess finetining.
-- July 30, 2019: release ERNIE 2.0
-- Apr 10, 2019: update ERNIE_stable-1.0.1.tar.gz, update config and vocab
-- Mar 18, 2019: update ERNIE_stable.tgz
-- Mar 15, 2019: release ERNIE 1.0
-
-
-## Communication
-
-- [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
-- QQ discussion group: 760439550 (ERNIE discussion group).
-- [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
 
 
 ## Results
@@ -626,6 +615,21 @@ LCQMC is a Chinese question semantic matching corpus published in COLING2018. [u
 BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equivalence identification. This dataset was published in EMNLP 2018. [url: https://www.aclweb.org/anthology/D18-1536]
 ```
 
+## Release Notes
+
+- Aug 21, 2019: featuers update: fp16 finetuning, multiprocess finetining.
+- July 30, 2019: release ERNIE 2.0
+- Apr 10, 2019: update ERNIE_stable-1.0.1.tar.gz, update config and vocab
+- Mar 18, 2019: update ERNIE_stable.tgz
+- Mar 15, 2019: release ERNIE 1.0
+
+
+## Communication
+
+- [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
+- QQ discussion group: 760439550 (ERNIE discussion group).
+- [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
+
 
 ## Usage
   * [Install PaddlePaddle](#install-paddlepaddle)
@@ -645,7 +649,8 @@ BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equiv
      * [Machine Reading Comprehension](#machine-reading-comprehension)
   * [Pre-training with ERNIE 1.0](#pre-training-with-ernie-10)
      * [Data Preprocessing](#data-preprocessing)
-     * [PreTrain ERNIE1.0](#pretrain-ernie10)
+     * [Pretrain ERNIE1.0](#pretrain-ernie10)
+  * [Distillation](#distillation)
   * [FAQ](#faq)
      * [FAQ1: How to get sentence/tokens embedding of ERNIE?](#faq1-how-to-get-sentencetokens-embedding-of-ernie)
      * [FAQ2: How to predict on new data with Fine-tuning model?](#faq2-how-to-predict-on-new-data-with-fine-tuning-model)
@@ -654,7 +659,7 @@ BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equiv
      * [FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.](#faq5-can-not-find-library-libncclso-please-try-to-add-the-lib-path-to-ld_library_path)
 
 
-## Install PaddlePaddle
+### Install PaddlePaddle
 
 This code base has been tested with Paddle Fluid 1.5.1 under Python2.
 
@@ -671,11 +676,15 @@ If you have been armed with certain level of deep learning knowledge, and it hap
 
 For more information about paddlepadde, Please refer to [PaddlePaddle Github](https://github.com/PaddlePaddle/Paddle) or [Official Website](https://www.paddlepaddle.org.cn/) for details.
 
+Other dependency of ERNIE is listed in `requirements.txt`, you can install it by
+```script
+pip install -r requirements.txt
+```
 
 
-## Pre-trained Models & Datasets
+### Pre-trained Models & Datasets
 
-### Models
+#### Models
 
 | Model                                              | Description                                                 |
 | :------------------------------------------------- | :----------------------------------------------------------- |
@@ -685,23 +694,23 @@ For more information about paddlepadde, Please refer to [PaddlePaddle Github](ht
 | [ERNIE 2.0 Base for English](https://ernie.bj.bcebos.com/ERNIE_Base_en_stable-2.0.0.tar.gz)   | with params, config and vocabs |
 | [ERNIE 2.0 Large for English](https://ernie.bj.bcebos.com/ERNIE_Large_en_stable-2.0.0.tar.gz) | with params, config and vocabs |
 
-### Datasets
+#### Datasets
 
-#### English Datasets
+##### English Datasets
 
 Download the [GLUE data](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) and unpack it to some directory `${TASK_DATA_PATH}`
 
 After the dataset is downloaded, you should run `sh ./script/en_glue/preprocess/cvt.sh $TASK_DATA_PATH` to convert the data format for training. If everything goes well, there will be a folder named `glue_data_processed`  created with all the converted datas in it.
 
-#### Chinese Datasets
+##### Chinese Datasets
 
 You can download Chinese Datasets from [here](https://ernie.bj.bcebos.com/task_data_zh.tgz)
 
 
 
-## Fine-tuning
+#### Fine-tuning
 
-### Batchsize and GPU Settings
+##### Batchsize and GPU Settings
 
 In our experiments, we found that the batch size is important for different tasks. For users can more easily reproducing results, we list the batch size and gpu cards here:
 
@@ -728,7 +737,7 @@ In our experiments, we found that the batch size is important for different task
 \* *For MNLI, QNLI，we used 32GB V100, for other tasks we used 22GB P40*
 
 
-### Multiprocessing and fp16 auto mix-precision finetune
+#### Multiprocessing and fp16 auto mix-precision finetune
 
 multiprocessing finetuning can be simply enabled with `finetune_launch.py`  in your finetune script.
 with multiprocessing finetune paddle can fully utilize your CPU/GPU capacity to accelerate finetuning.
@@ -738,9 +747,9 @@ fp16 finetuning can be simply enable by specifing `--use_fp16 true` in your trai
 dynamic loss scale is used to avoid gradient vanish.
 
 
-### Classification
+#### Classification
 
-#### Single Sentence Classification Tasks
+##### Single Sentence Classification Tasks
 
 The code used to perform classification/regression finetuning is in `run_classifier.py`, we also provide the shell scripts for each task including best hyperpameters.
 
@@ -798,7 +807,7 @@ Similarly, for the Chinese task `ChnSentCorp`, after setting the environment var
 
 
 
-#### Sentence Pair Classification Tasks
+##### Sentence Pair Classification Tasks
 
 Take `RTE` as an example,  the data should have 3 fields `text_a    text_b   label` with tsv format. Here is some example datas:
 ```
@@ -834,9 +843,9 @@ testing ./data/test.tsv, save to output/test_out.5.2019-07-23-15-25-06.tsv.4.781
 
 
 
-### Sequence Labeling
+#### Sequence Labeling
 
-#### Named Entity Recognition
+##### Named Entity Recognition
 
  Take `MSRA-NER(SIGHAN2006)` as an example, the data should have 2 fields,  `text_a  label`, with tsv format. Here is some example datas :
  ```
@@ -853,7 +862,7 @@ Also, remember to set environmental variables like above, and run `sh script/zh_
 [test evaluation] f1: 0.937390, precision: 0.925988, recall: 0.949077, elapsed time: 36.565929 s
 ```
 
-### Machine Reading Comprehension
+#### Machine Reading Comprehension
 
 
  Take `DRCD` as an example, convert the data into SQUAD format firstly:
@@ -896,9 +905,9 @@ Also, remember to set environmental variables like above, and run `sh script/zh_
 ```
 
 
-## Pre-training with ERNIE 1.0
+### Pre-training with ERNIE 1.0
 
-### Data Preprocessing
+#### Data Preprocessing
 
 We construct the training dataset based on [Baidu Baike](https://en.wikipedia.org/wiki/Baidu_Baike), [Baidu Knows(Baidu Zhidao)](https://en.wikipedia.org/wiki/Baidu_Knows), [Baidu Tieba](https://en.wikipedia.org/wiki/Baidu_Tieba) for Chinese version ERNIE, and [Wikipedia](https://en.wikipedia.org/wiki/Wikipedia:Database_download), [Reddit](https://en.wikipedia.org/wiki/Reddit), [BookCorpus](https://github.com/soskek/bookcorpus) for English version ERNIE.
 
@@ -912,7 +921,7 @@ Here are some train instances after processing (which can be found in [`data/dem
 
 Each instance is composed of 5 fields, which are joined by `;`in one line, represented `token_ids; sentence_type_ids; position_ids; seg_labels; next_sentence_label` respectively. Especially, in the field`seg_labels`,  0 means the begin of one word, 1 means non-begin of one word, -1 means placeholder, the other number means  `CLS` or `SEP`.
 
-### PreTrain ERNIE 1.0
+#### Pretrain ERNIE 1.0
 
 The start entry for pretrain is  [`script/zh_task/pretrain.sh`](./script/zh_task/pretrain.sh). Before we run the train program, remember to set  CUDA、cuDNN、NCCL2 etc. in the environment variable LD_LIBRARY_PATH.
 
@@ -932,10 +941,15 @@ epoch: 1, progress: 1/1, step: 50, loss: 10.360563, ppl: 16398.287109, next_sent
 ```
 
 
+### Distillation
 
-## FAQ
 
-### FAQ1: How to get sentence/tokens embedding of ERNIE?
+ERNIE provide a toolkit for data distillation to further accelerate your ineference, see <a href="./distill/README.md">here</a> for detail
+
+
+### FAQ
+
+#### FAQ1: How to get sentence/tokens embedding of ERNIE?
 
 Run ```ernie_encoder.py ``` we can get the both sentence embedding and tokens embeddings. The input data format should be same as that mentioned in chapter [Fine-tuning](#fine-tuning).
 
@@ -960,7 +974,7 @@ when finished running this script,  `cls_emb.npy` and `top_layer_emb.npy `will b
 
 
 
-### FAQ2: How to predict on new data with Fine-tuning model?
+#### FAQ2: How to predict on new data with Fine-tuning model?
 
 Take classification tasks for example, here is the script for batch prediction:
 
@@ -984,18 +998,18 @@ Argument  `init_checkpoint` is the path of the model, `predict_set` is the path 
 
 
 
-### FAQ3: Is the  argument batch_size for one GPU card or for all GPU cards?
+#### FAQ3: Is the  argument batch_size for one GPU card or for all GPU cards?
 
 For one GPU card.
 
 
 
-### FAQ4: Can not find library: libcudnn.so. Please try to add the lib path to LD_LIBRARY_PATH.
+#### FAQ4: Can not find library: libcudnn.so. Please try to add the lib path to LD_LIBRARY_PATH.
 
 Export the path of cuda to LD_LIBRARY_PATH, e.g.: `export LD_LIBRARY_PATH=/home/work/cudnn/cudnn_v[your cudnn version]/cuda/lib64`
 
 
 
-### FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.
+#### FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.
 
 Download [NCCL2](https://developer.nvidia.com/nccl/nccl-download), and export the library path to LD_LIBRARY_PATH, e.g.:`export LD_LIBRARY_PATH=/home/work/nccl/lib`

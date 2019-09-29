@@ -3,21 +3,25 @@
 ## ERNIE 2.0: A Continual Pre-training Framework for Language Understanding
 
 
-  * [Pre-Training 任务](#pre-training-任务)
-     * [Word-aware Tasks](#word-aware-tasks)
-        * [Knowledge Masking Task](#knowledge-masking-task)
-        * [Capitalization Prediction Task](#capitalization-prediction-task)
-        * [Token-Document Relation Prediction Task](#token-document-relation-prediction-task)
-     * [Structure-aware Tasks](#structure-aware-tasks)
-        * [Sentence Reordering Task](#sentence-reordering-task)
-        * [Sentence Distance Task](#sentence-distance-task)
-     * [Semantic-aware Tasks](#semantic-aware-tasks)
-        * [Discourse Relation Task](#discourse-relation-task)
-        * [IR Relevance Task](#ir-relevance-task)
-  * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
-  * [对比 ERNIE 1.0 和 ERNIE 2.0](#对比-ernie-10-和-ernie-20)
-  * [中文效果验证](#中文效果验证)
-  * [英文效果验证](#英文效果验证)
+ * [Pre-Training 任务](#pre-training-任务)
+    * [Word-aware Tasks](#word-aware-tasks)
+       * [Knowledge Masking Task](#knowledge-masking-task)
+       * [Capitalization Prediction Task](#capitalization-prediction-task)
+       * [Token-Document Relation Prediction Task](#token-document-relation-prediction-task)
+    * [Structure-aware Tasks](#structure-aware-tasks)
+       * [Sentence Reordering Task](#sentence-reordering-task)
+       * [Sentence Distance Task](#sentence-distance-task)
+    * [Semantic-aware Tasks](#semantic-aware-tasks)
+       * [Discourse Relation Task](#discourse-relation-task)
+       * [IR Relevance Task](#ir-relevance-task)
+ * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
+ * [对比 ERNIE 1.0 和 ERNIE 2.0](#对比-ernie-10-和-ernie-20)
+ * [效果验证](#效果验证)
+    * [中文效果验证](#中文效果验证)
+    * [英文效果验证](#英文效果验证)
+ * [开源记录](#开源记录)
+ * [技术交流](#技术交流)
+ * [使用](#使用)
 
 
 ![ernie2.0_paper](.metas/ernie2.0_paper.png)
@@ -105,26 +109,16 @@
 | **Semantic-aware**  | ✅ Next Sentence Prediction | ✅ Discourse Relation                                         | ✅ Discourse Relation <br> ✅ IR Relevance  |
 
 
-## 开源记录
-- 2019-07-30 发布 ERNIE 2.0
-- 2019-04-10 更新: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布
-- 2019-03-18 更新: update ERNIE_stable.tgz
-- 2019-03-15 发布 ERNIE 1.0
 
-## 技术交流
+## 效果验证
 
-- [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
-- ERNIE QQ 群: 760439550 (ERNIE discussion group).
-- [论坛](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
-
-
-## 中文效果验证
+### 中文效果验证
 
 我们在 9 个任务上验证 ERNIE 2.0 中文模型的效果。这些任务包括：自然语言推断任务 XNLI；阅读理解任务 DRCD、DuReader、CMRC2018；命名实体识别任务 MSRA-NER (SIGHAN2006)；情感分析任务 ChnSentiCorp；语义相似度任务 BQ Corpus、LCQMC；问答任务 NLPCC2016-DBQA 。任务的详情和效果会在如下章节中介绍。
 
 
 
-### 自然语言推断任务
+#### 自然语言推断任务
 
 <table>
   <tbody>
@@ -189,7 +183,7 @@
 XNLI 是由 Facebook 和纽约大学的研究者联合构建的自然语言推断数据集，包括 15 种语言的数据。我们用其中的中文数据来评估模型的语言理解能力。[链接: https://github.com/facebookresearch/XNLI]
 ```
 
-### 阅读理解任务
+#### 阅读理解任务
 
 <table>
   <tbody>
@@ -318,9 +312,7 @@ CMRC2018 是中文信息学会举办的评测，评测的任务是抽取类阅�
 DRCD 是台达研究院发布的繁体中文阅读理解数据集，目标是从篇章中抽取出连续片段作为答案。我们在实验时先将其转换成简体中文。[链接: https://github.com/DRCKnowledgeTeam/DRCD]
 ```
 
-
-
-### 命名实体识别任务
+#### 命名实体识别任务
 
 <table>
   <tbody>
@@ -377,9 +369,7 @@ DRCD 是台达研究院发布的繁体中文阅读理解数据集，目标是从
 MSRA-NER (SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文本中具有特定意义的实体，包括人名、地名、机构名。
 ```
 
-
-
-### 情感分析任务
+#### 情感分析任务
 
 <table>
   <tbody>
@@ -436,9 +426,7 @@ MSRA-NER (SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文�
 ChnSentiCorp 是一个中文情感分析数据集，包含酒店、笔记本电脑和书籍的网购评论。
 ```
 
-
-
-### 问答任务
+#### 问答任务
 
 <table>
   <tbody>
@@ -512,9 +500,7 @@ ChnSentiCorp 是一个中文情感分析数据集，包含酒店、笔记本电�
 NLPCC2016-DBQA 是由国际自然语言处理和中文计算会议 NLPCC 于 2016 年举办的评测任务，其目标是从候选中找到合适的文档作为问题的答案。[链接: http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf]
 ```
 
-
-
-### 语义相似度
+#### 语义相似度
 
 <table>
   <tbody>
@@ -597,14 +583,14 @@ BQ Corpus 是在自然语言处理国际顶会 EMNLP 2018 发布的语义匹配�
 
 
 
-##  英文效果验证
+###  英文效果验证
 
 ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址为  https://gluebenchmark.com/ ，该评测涵盖了不同类型任务的 10 个数据集，其中包含 11 个测试集，涉及到 Accuracy, F1-score, Spearman Corr,. Pearson Corr,. Matthew Corr., 5 类指标。GLUE 排行榜使用每个数据集的平均分作为总体得分，并以此为依据将不同算法进行排名。
 
 
 
 
-### GLUE - 验证集结果
+#### GLUE - 验证集结果
 
 | <strong>数据集</strong> | <strong>CoLA</strong> | <strong>SST-2</strong> | <strong>MRPC</strong> | <strong>STS-B</strong> | <strong>QQP</strong>  | <strong>MNLI-m</strong> | <strong>QNLI</strong> | <strong>RTE</strong>  |
 | ----------- | ---- | ----- | ---- | ----- | ---- | ---- | ---- | ---- |
@@ -617,7 +603,7 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 
 
 
-### GLUE - 测试集结果
+#### GLUE - 测试集结果
 
 | <strong>数据集</strong> | - | <strong>CoLA</strong> | <strong>SST-2</strong> | <strong>MRPC</strong> | <strong>STS-B</strong> | <strong>QQP</strong>  | <strong>MNLI-m</strong> | <strong>MNLI-mm</strong> | <strong>QNLI</strong> | <strong>RTE</strong>  | <strong>WNLI</strong> |<strong>AX</strong>|
 | ----------- | ----- | ---- | ----- | ---- | ----- | ---- | ------ | ------- | ---- | ---- | ---- | ---- |
@@ -629,6 +615,19 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 
 
 由于 XLNet 暂未公布 GLUE 测试集上的单模型结果，所以我们只与 BERT 进行单模型比较。上表为ERNIE 2.0 单模型在 GLUE 测试集的表现结果。
+
+
+## 开源记录
+- 2019-07-30 发布 ERNIE 2.0
+- 2019-04-10 更新: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布
+- 2019-03-18 更新: update ERNIE_stable.tgz
+- 2019-03-15 发布 ERNIE 1.0
+
+## 技术交流
+
+- [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
+- ERNIE QQ 群: 760439550 (ERNIE discussion group).
+- [论坛](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
 
 
 ## 使用
@@ -650,6 +649,10 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
   * [预训练 (ERNIE 1.0)](#预训练-ernie-10)
      * [数据预处理](#数据预处理)
      * [开始训练](#开始训练)
+  * [蒸馏](#蒸馏)
+  * [上线](#上线)
+       * [生成inference_model](#生成inference_model)
+       * [在线预测](#在线预测)
   * [FAQ](#faq)
      * [FAQ1: 如何获取输入句子/词经过 ERNIE 编码后的 Embedding 表示?](#faq1-如何获取输入句子词经过-ernie-编码后的-embedding-表示)
      * [FAQ2: 如何利用 Fine-tuning 得到的模型对新数据进行批量预测？](#faq2-如何利用-fine-tuning-得到的模型对新数据进行批量预测)
@@ -672,6 +675,11 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 > - [训练神经网络](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/user_guides/howto/training/index_cn.html)：介绍如何使用 Fluid 进行单机训练、多机训练、以及保存和载入模型变量
 > - [模型评估与调试](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/user_guides/howto/evaluation_and_debugging/index_cn.html)：介绍在 Fluid 下进行模型评估和调试的方法
 
+ERNIE的其他依赖列在`requirements.txt`文件中，使用以下命令安装
+
+```script
+pip install -r requirements.txt
+```
 
 ## 模型&数据
 
@@ -918,6 +926,36 @@ epoch: 1, progress: 1/1, step: 50, loss: 10.360563, ppl: 16398.287109, next_sent
 
 如果用自定义的真实数据进行训练，请参照[`script/zh_task/pretrain.sh`](./script/zh_task/pretrain.sh)脚本对参数做相应修改。
 
+## 蒸馏
+
+ERNIE提供了通过数据蒸馏从而达到模型压缩、加速的开发套件，具体开发流程请参考 <a href="./distill/README.md">这里</a>
+
+## 上线
+
+完成finetune之后只需几步操作即可生成inference\_model, PaddlePaddle可以在生产环境中加载生成的预测模型并进行高效地预测。
+
+### 生成inference\_model
+运行`classify_infer.py`或者`predict_classifier.py` 脚本时通过指定 `--save_inference_model_path` 便可生成 inference_model 到指定位置。 
+
+如果您采用 `propeller` 完成finetune，则 `BestInferenceExporter` 会在finetune过程中根据预测指标，挑最好的模型生成 inference_model . 使用 `propeller` 完成finetune的流程请参考 `propeller_xnli_demo.ipynb` 
+
+### 在线预测
+随后您可以使用[PaddleInference C++ API](https://www.paddlepaddle.org.cn/documentation/docs/zh/advanced_usage/deploy/inference/native_infer.html)将模型的前向预测代码联编到您的生产环境中。或者您可以使用我们为您构建好的python预测引擎来完成一个简单的服务。只需将本代码库中的 `./propeller` 文件夹放入您的 `PYTHONPATH` 中并执行如下指令，便可以开启一个propeller server：
+
+```script
+python -m propeller.tools.start_server -m /path/to/saved/model -p 8888
+```
+
+您可以在python脚本很方便地调用propeller server:
+```python
+from propeller.service.client import InferenceClient
+client = InferenceClient('tcp://localhost:8113')
+result = client(sentence_id, position_id, token_type_id, input_mask)
+```
+`client`的请求参数类型是numpy array,对应了save_inference_model时指定的输入tensor. 如果是使用`classify_infer.py` 生成的inference_model则请求参数有四个：(sentence_id, position_id, token_type_id, input_mask)。 如果是`propeller` 生成的inference_model, client的请求参数对应您`eval_dataset` 的元素类型。
+
+
+
 ## FAQ
 
 ### FAQ1: 如何获取输入句子/词经过 ERNIE 编码后的 Embedding 表示?
@@ -981,3 +1019,4 @@ python -u predict_classifier.py \
 ### FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.
 
 需要先下载 [NCCL](https://developer.nvidia.com/nccl/nccl-download)，然后在 LD_LIBRARY_PATH 中添加 NCCL 库的路径，如`export LD_LIBRARY_PATH=/home/work/nccl/lib`
+
