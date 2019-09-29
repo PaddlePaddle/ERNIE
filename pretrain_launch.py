@@ -139,12 +139,19 @@ def start_procs(args):
         cmds.append(cmd)
 
         if args.split_log_path:
-            fn = open("%s/%sjob.log.%d" % (args.split_log_path, args.log_prefix, trainer_id), "a")
+            logdir = "%s/%sjob.log.%d" % (args.split_log_path, args.log_prefix, trainer_id)
+            try:
+                os.mkdir(os.path.dirname(logdir))
+            except OSError:
+                pass
+
+            fn = open(logdir, "a")
             log_fns.append(fn)
             process = subprocess.Popen(cmd, env=current_env, stdout=fn, stderr=fn)
+            log.info('subprocess launched, check log at %s' % logdir)
         else:
             process = subprocess.Popen(cmd, env=current_env)
-        log.info('subprocess launched')
+            log.info('subprocess launched')
         procs.append(process)
 
     try:

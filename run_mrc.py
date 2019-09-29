@@ -95,6 +95,8 @@ def main(args):
         num_train_examples = reader.get_num_examples("train")
 
         if args.in_tokens:
+            if args.batch_size < args.max_seq_len:
+                raise ValueError('if in_tokens=True, batch_size should greater than max_sqelen, got batch_size:%d seqlen:%d' % (args.batch_size, args.max_seq_len))
             max_train_steps = args.epoch * num_train_examples // (
                 args.batch_size // args.max_seq_len) // dev_count
         else:

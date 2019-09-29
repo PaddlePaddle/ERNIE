@@ -252,12 +252,6 @@ class BaseReader(object):
                        phase=None):
         examples = self._read_tsv(input_file)
 
-        if phase == 'train':
-            trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
-            trainer_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
-            examples = examples[trainer_id: (len(examples) //trainer_num) * trainer_num : trainer_num]
-            log.info('apply sharding %d/%d' % (trainer_id, trainer_num))
-
         def wrapper():
             all_dev_batches = []
             for epoch_index in range(epoch):

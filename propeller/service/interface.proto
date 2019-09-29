@@ -1,0 +1,46 @@
+// Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package interface;
+
+service Inference {
+  rpc Infer(Slots) returns (Slots){}
+}
+
+message Slots {
+  repeated Slot slots = 1;
+}
+
+message Slot {
+  enum Type {
+    // Pod Types
+    BOOL = 0;
+    INT16 = 1;
+    INT32 = 2;
+    INT64 = 3;
+    FP16 = 4;
+    FP32 = 5;
+    FP64 = 6;
+    // Tensor<size_t> is used in C++.
+    SIZE_T = 19;
+    UINT8 = 20;
+    INT8 = 21;
+  }
+
+  Type type = 1;
+  repeated int64 dims = 2; // [UNK, 640, 480] is saved as [-1, 640, 480]
+  bytes data = 3;
+}
+

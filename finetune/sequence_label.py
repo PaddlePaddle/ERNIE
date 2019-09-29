@@ -212,6 +212,5 @@ def predict(exe,
         except fluid.core.EOFException:
             test_pyreader.reset()
             break
-    log.info(len(res))
     return res
 

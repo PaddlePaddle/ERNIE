@@ -85,6 +85,9 @@ def main(args):
         num_train_examples = reader.get_num_examples(args.train_set)
 
         if args.in_tokens:
+            if args.batch_size < args.max_seq_len:
+                raise ValueError('if in_tokens=True, batch_size should greater than max_sqelen, got batch_size:%d seqlen:%d' % (args.batch_size, args.max_seq_len))
+
             max_train_steps = args.epoch * num_train_examples // (
                 args.batch_size // args.max_seq_len) // dev_count
         else:
@@ -297,11 +300,12 @@ def main(args):
 def evaluate_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
                      epoch, steps):
     # evaluate dev set
+    batch_size = args.batch_size if args.predict_batch_size is None else args.predict_batch_size
     for ds in args.dev_set.split(','): #single card eval
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(
                 ds,
-                batch_size=args.predict_batch_size,
+                batch_size=batch_size,
                 epoch=1,
                 dev_count=1,
                 shuffle=False))
@@ -318,10 +322,11 @@ def predict_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
     save_dirs = args.test_save.split(',')
     assert len(test_sets) == len(save_dirs), 'number of test_sets & test_save not match, got %d vs %d' % (len(test_sets), len(save_dirs))
 
+    batch_size = args.batch_size if args.predict_batch_size is None else args.predict_batch_size
     for test_f, save_f in zip(test_sets, save_dirs):
         test_pyreader.decorate_tensor_provider(reader.data_generator(
                     test_f,
-                    batch_size=args.predict_batch_size,
+                    batch_size=batch_size,
                     epoch=1,
                     dev_count=1,
                     shuffle=False))
