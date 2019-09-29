@@ -155,8 +155,8 @@ def calc_em_score(answers, prediction):
 
 
 def eval_file(dataset_file, prediction_file):
-    ground_truth_file = json.load(open(dataset_file, 'rb'))
-    prediction_file = json.load(open(prediction_file, 'rb'))
+    ground_truth_file = json.load(open(dataset_file, 'r'))
+    prediction_file = json.load(open(prediction_file, 'r'))
     F1, EM, TOTAL, SKIP = evaluate(ground_truth_file, prediction_file)
     AVG = (EM + F1) * 0.5
     return EM, F1, AVG, TOTAL
