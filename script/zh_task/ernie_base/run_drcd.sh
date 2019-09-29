@@ -2,7 +2,7 @@ set -eux
 
 export FLAGS_eager_delete_tensor_gb=0
 export FLAGS_sync_nccl_allreduce=1
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 python ./finetune_launch.py  \
     --nproc_per_node 8 \
