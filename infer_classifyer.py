@@ -22,6 +22,7 @@ import os
 import time
 import argparse
 import numpy as np
+import logging
 import multiprocessing
 
 # NOTE(paddle-dev): All of these flags should be
@@ -40,7 +41,7 @@ from reader.task_reader import ClassifyReader
 from model.ernie import ErnieConfig
 from finetune.classifier import create_model
 
-from utils.args import print_arguments, check_cuda, prepare_logger
+from utils.args import print_arguments, check_cuda, prepare_logger, ArgumentGroup
 from utils.init import init_pretraining_params
 from finetune_args import parser
 
@@ -129,6 +130,9 @@ def main(args):
     if not args.use_cuda:
         log.info("disable gpu")
         config.disable_gpu()
+    else:
+        log.info("using gpu")
+        config.enable_use_gpu(1024)
 
     # Create PaddlePredictor
     predictor = create_paddle_predictor(config)
@@ -158,12 +162,10 @@ def main(args):
 
         # parse outputs
         output = outputs[0]
-        log.info(output.name)
         output_data = output.data.float_data()
-        #assert len(output_data) == args.num_labels * args.batch_size
-        batch_result  = np.array(output_data).reshape((-1, args.num_labels))
+        batch_result  = np.array(output_data).reshape(output.shape)
         for single_example_probs in batch_result:
-            log.info("{} example\t{}".format(index, single_example_probs))
+            print('\t'.join(map(str, single_example_probs.tolist())))
             index += 1
     log.info("qps:{}\ttotal_time:{}\ttotal_example:{}\tbatch_size:{}".format(index/total_time, total_time, index, args.batch_size))
 

@@ -935,7 +935,7 @@ ERNIE提供了通过数据蒸馏从而达到模型压缩、加速的开发套件
 完成finetune之后只需几步操作即可生成inference\_model, PaddlePaddle可以在生产环境中加载生成的预测模型并进行高效地预测。
 
 ### 生成inference\_model
-运行`classify_infer.py`或者`predict_classifier.py` 脚本时通过指定 `--save_inference_model_path` 便可生成 inference_model 到指定位置。 
+运行`infer_classifyer.py`  脚本时通过指定 `--save_inference_model_path` 便可生成 inference_model 到指定位置。 
 
 如果您采用 `propeller` 完成finetune，则 `BestInferenceExporter` 会在finetune过程中根据预测指标，挑最好的模型生成 inference_model . 使用 `propeller` 完成finetune的流程请参考 `propeller_xnli_demo.ipynb` 
 
@@ -985,17 +985,14 @@ python -u ernie_encoder.py \
 我们以分类任务为例，给出了分类任务进行批量预测的脚本, 使用示例如下:
 
 ```
-python -u predict_classifier.py \
-       --use_cuda true \
-       --batch_size 32 \
-       --vocab_path ${MODEL_PATH}/vocab.txt \
-       --init_checkpoint "./checkpoints/step_100" \
-       --do_lower_case true \
-       --max_seq_len 128 \
-       --ernie_config_path ${MODEL_PATH}/ernie_config.json \
-       --do_predict true \
-       --predict_set ${TASK_DATA_PATH}/lcqmc/test.tsv \
-       --num_labels 2
+python -u infer_classifyer.py \
+    --ernie_config_path ${MODEL_PATH}/ernie_config.json \
+    --init_checkpoint "./checkpoints/step_100" \
+    --save_inference_model_path ./saved_model \
+    --predict_set  ${TASK_DATA_PATH}/xnli/test.tsv \
+    --vocab_path ${MODEL_PATH}/vocab.txt  
+    --num_labels 3 
+
 ```
 
 实际使用时，需要通过 `init_checkpoint` 指定预测用的模型，通过 `predict_set` 指定待预测的数据文件，通过 `num_labels` 配置分类的类别数目;
