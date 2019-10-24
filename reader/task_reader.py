@@ -42,11 +42,7 @@ if six.PY3:
 def csv_reader(fd, delimiter='\t'):
     def gen():
         for i in fd:
-            slots = i.rstrip('\n').split(delimiter)
-            if len(slots) == 1:
-                yield slots,
-            else:
-                yield slots
+            yield i.rstrip('\n').split(delimiter)
     return gen()
 
 
