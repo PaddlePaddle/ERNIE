@@ -979,17 +979,13 @@ when finished running this script,  `cls_emb.npy` and `top_layer_emb.npy `will b
 Take classification tasks for example, here is the script for batch prediction:
 
 ```
-python -u predict_classifier.py \
-       --use_cuda true \
-       --batch_size 32 \
-       --vocab_path ${MODEL_PATH}/vocab.txt \
-       --init_checkpoint "./checkpoints/step_100" \
-       --do_lower_case true \
-       --max_seq_len 128 \
-       --ernie_config_path ${MODEL_PATH}/ernie_config.json \
-       --do_predict true \
-       --predict_set ${TASK_DATA_PATH}/lcqmc/test.tsv \
-       --num_labels 2
+python -u infer_classifyer.py \
+    --ernie_config_path ${MODEL_PATH}/ernie_config.json \
+    --init_checkpoint "./checkpoints/step_100" \
+    --save_inference_model_path ./saved_model \
+    --predict_set  ${TASK_DATA_PATH}/xnli/test.tsv \
+    --vocab_path ${MODEL_PATH}/vocab.txt \
+    --num_labels 3 
 ```
 
 Argument  `init_checkpoint` is the path of the model, `predict_set` is the path of test file,  `num_labels` is the number of target labels.

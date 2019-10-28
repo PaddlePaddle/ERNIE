@@ -118,7 +118,7 @@ class ClassificationBowModel(propeller.train.Model):
         return {'acc': acc}
 
 if __name__ == '__main__':
-    parser = propeller.ArgumentParser('DAN model with Paddle')
+    parser = propeller.ArgumentParser('distill model with ERNIE')
     parser.add_argument('--max_seqlen', type=int, default=128)
     parser.add_argument('--vocab_file', type=str, required=True)
     parser.add_argument('--teacher_vocab_file', type=str, required=True)

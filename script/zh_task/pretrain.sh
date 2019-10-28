@@ -3,12 +3,12 @@ set -eux
 export FLAGS_eager_delete_tensor_gb=0
 export FLAGS_sync_nccl_allreduce=1
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-python ./pretrain_launch.py  \
+python ./ernie/pretrain_launch.py  \
     --nproc_per_node 8 \
     --selected_gpus 0,1,2,3,4,5,6,7 \
     --node_ips $(hostname -i) \
     --node_id 0 \
-./train.py --use_cuda True \
+./ernie/train.py --use_cuda True \
                 --is_distributed False\
                 --use_fast_executor True \
                 --weight_sharing True \

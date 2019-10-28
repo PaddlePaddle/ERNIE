@@ -1,3 +1,4 @@
 *.pyc
 *.un~
 *.swp
+*.egg-info/

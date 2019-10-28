@@ -3,7 +3,8 @@ set -eux
 export FLAGS_sync_nccl_allreduce=1
 export CUDA_VISIBLE_DEVICES=0
 
-python -u run_sequence_labeling.py \
+export PYTHONPATH=./ernie:${PYTHONPATH:-}
+python -u ./ernie/run_sequence_labeling.py \
                    --use_cuda true \
                    --do_train true \
                    --do_val true \

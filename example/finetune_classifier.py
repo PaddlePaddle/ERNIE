@@ -43,9 +43,8 @@ class ClassificationErnieModel(propeller.train.Model):
 
     def forward(self, features):
         src_ids, sent_ids = features
-        dtype = 'float16' if self.hparam['fp16'] else 'float32'
         zero = L.fill_constant([1], dtype='int64', value=0)
-        input_mask = L.cast(L.logical_not(L.equal(src_ids, zero)), dtype) # assume pad id == 0
+        input_mask = L.cast(L.logical_not(L.equal(src_ids, zero)), 'float32') # assume pad id == 0
         #input_mask = L.unsqueeze(input_mask, axes=[2])
         d_shape = L.shape(src_ids)
         seqlen = d_shape[1]
@@ -59,17 +58,17 @@ class ClassificationErnieModel(propeller.train.Model):
         task_ids = L.zeros_like(src_ids) + self.hparam.task_id #this shit wont use at the moment
         task_ids.stop_gradient = True
 
-        bert = ErnieModel(
+        ernie = ErnieModel(
             src_ids=src_ids,
             position_ids=pos_ids,
             sentence_ids=sent_ids,
             task_ids=task_ids,
             input_mask=input_mask,
             config=self.hparam,
-            use_fp16=self.hparam['fp16']
+            use_fp16=self.hparam['use_fp16']
         )
 
-        cls_feats = bert.get_pooled_output()
+        cls_feats = ernie.get_pooled_output()
 
         cls_feats = L.dropout(
             x=cls_feats,
@@ -123,7 +122,7 @@ class ClassificationErnieModel(propeller.train.Model):
 
 
 if __name__ == '__main__':
-    parser = propeller.ArgumentParser('DAN model with Paddle')
+    parser = propeller.ArgumentParser('classify model with ERNIE')
     parser.add_argument('--max_seqlen', type=int, default=128)
     parser.add_argument('--data_dir', type=str, required=True)
     parser.add_argument('--vocab_file', type=str, required=True)

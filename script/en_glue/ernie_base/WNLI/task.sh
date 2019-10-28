@@ -3,6 +3,7 @@
 R_DIR=`dirname $0`; MYDIR=`cd $R_DIR;pwd`
 export FLAGS_eager_delete_tensor_gb=0.0
 export FLAGS_sync_nccl_allreduce=1
+export PYTHONPATH=./ernie:${PYTHONPATH:-}
 
 if [[ -f ./model_conf ]];then
     source ./model_conf
@@ -20,7 +21,7 @@ epoch=4
 
 for i in {1..5};do
 
-   python -u run_classifier.py                                            \
+   python -u ./ernie/run_classifier.py                                            \
        --for_cn False                                                     \
        --use_cuda true                                                    \
        --use_fast_executor ${e_executor:-"true"}                          \

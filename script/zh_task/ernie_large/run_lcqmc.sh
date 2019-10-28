@@ -3,7 +3,8 @@ set -eux
 export FLAGS_sync_nccl_allreduce=1
 export CUDA_VISIBLE_DEVICES=0
 
-python -u run_classifier.py \
+export PYTHONPATH=./ernie:${PYTHONPATH:-}
+python -u ./ernie/run_classifier.py \
                    --use_cuda true \
                    --verbose true \
                    --do_train true \

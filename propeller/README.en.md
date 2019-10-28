@@ -21,7 +21,7 @@ Propeller provide the following benefits:
 ## install
 
 ```script
-cd propeller && pip install .
+pip install --user .
 ```
 
 ## Getting Started
@@ -71,7 +71,6 @@ cd propeller && pip install .
     # Start training!
     propeller.train_and_eval(BowModel, hparams, run_config, train_ds, eval_ds)
 ```
-More detail see example/toy/
 
 ## Main Feature
 1. train_and_eval
@@ -91,9 +90,9 @@ More detail see example/toy/
 
 4. Summary
     To trace tensor histogram in training, simply：
-    ```python
-        propeller.summary.histogram('loss', tensor) 
-    ```
+```python
+    propeller.summary.histogram('loss', tensor) 
+```
 
 
 ## Contributing
