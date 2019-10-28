@@ -902,7 +902,7 @@ Propeller基础教程可以参考`./example/propeller_xnli_demo.ipynb`.
 您只需定义好自己的模型以及 Dataset， 剩下的工作，如多卡并行，模型存储等等，都交给Propeller来处理吧。
 ./example/ 里放了使用Propeller进行分类任务、排序任务和命名实体识别任务的finetune流程，可以作为您修改的模板。
 
-模板中使用的demo数据可以从[这里](https://ernie.bj.bcebos.com/demo_data.tar.gz)下载，解压完成后放到 ${TASK_DATA_PATH} 中。
+模板中使用的demo数据可以从[这里](https://ernie.bj.bcebos.com/propeller_demo_data.tar.gz)下载，解压完成后放到 ${TASK_DATA_PATH} 中。
 以分类任务为例，用下面脚本即可启动finetune，在训练的过程中框架会自动把准确率最好的模型保存在 `./output/best/inference` 下面。利用 infernce\_model 进行在线预测的方案请参考: [在线预测](#在线预测)
 
 ```script
