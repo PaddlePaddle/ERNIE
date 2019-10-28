@@ -21,7 +21,7 @@ Propeller 具有下列优势：
 
 ## install|安装
 
-cd propeller && pip install .
+pip install --user .
 
 ## Getting Started|快速开始
 ```python
@@ -70,7 +70,6 @@ cd propeller && pip install .
     # 开始训练！
     propeller.train_and_eval(BowModel, hparams, run_config, train_ds, eval_ds)
 ```
-先洗详细请见example/toy/
 
 ## 主要构件
 1. train_and_eval
@@ -89,10 +88,10 @@ cd propeller && pip install .
 
 4. Summary
     对训练过程中的某些参数进行log追踪，只需要：
-    ```python
-                propeller.summary.histogram('loss', tensor) 
+```python
+            propeller.summary.histogram('loss', tensor) 
 
-    ```
+```
 
 
 ## Contributing|贡献
