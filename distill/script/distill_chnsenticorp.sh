@@ -1,12 +1,12 @@
 set -x
-export PYTHONPATH=.:$PYTHONPATH
+export PYTHONPATH=.:./ernie/:${PYTHONPATH:-}
 output_dir=./output/distill
 teacher_dir=${output_dir}/teacher
 student_dir=${output_dir}/student
 
 # 1. finetune teacher
 CUDA_VISIBLE_DEVICES=0 \
-python3 -u ./distill/finetune_chnsenticorp.py \
+python3 -u ./example/finetune_classifier.py \
     --data_dir ${TASK_DATA_PATH}/distill/chnsenticorp/teacher \
     --warm_start_from ${MODEL_PATH}/params \
     --vocab_file ${MODEL_PATH}/vocab.txt \
@@ -29,7 +29,7 @@ python3 -u ./distill/finetune_chnsenticorp.py \
     --hparam '{ # learn					    
       "warmup_proportion":  0.1,
       "weight_decay": 0.01,
-      "fp16": 0,
+      "use_fp16": 0,
       "learning_rate": 0.00005,
       "num_label": 2,
       "batch_size": 32 
@@ -39,7 +39,7 @@ python3 -u ./distill/finetune_chnsenticorp.py \
 
 # 2. start a prediction server
 export CUDA_VISIBLE_DEVICES=0
-cat ${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug/part.0 |awk -F"\t" '{print $2}' |python3 -u ./distill/finetune_chnsenticorp.py \
+cat ${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug/part.0 |awk -F"\t" '{print $2}' |python3 -u ./example/finetune_classifier.py \
     --do_predict \
     --data_dir ${TASK_DATA_PATH}/distill/chnsenticorp/teacher \
     --warm_start_from ${MODEL_PATH}/params \
@@ -58,7 +58,7 @@ cat ${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug/part.0 |awk -
     --hparam '{ # learn
       "warmup_proportion":  0.1,
       "weight_decay": 0.01,
-      "fp16": 0,
+      "use_fp16": 0,
       "learning_rate": 0.00005,
       "num_label": 2,
       "batch_size": 100 
@@ -94,7 +94,6 @@ python3 ./distill/distill_chnsentocorp.py \
     --hparam '{  					     # lr shit
       "warmup_proportion":  0.1,
       "weight_decay": 0.00,
-      "fp16": 0,
       "learning_rate": 1e-4,
       "batch_size": 100 
     }' 

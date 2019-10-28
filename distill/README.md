@@ -50,11 +50,11 @@ sh ./distill/script/distill_chnsenticorp.sh
 
 该脚本会进行前述的三步：1. 在任务数据上Fine-tune。 2. 加载Fine-tune好的模型对增强数据进行打分。 3.使用Student模型进行训练。脚本采用hard-label蒸馏，在第二步中将会直接预测出ERNIE标注的label。
 
-该脚本涉及两个python文件:`./distill/finetune_chnsenticorp.py` 负责finetune以及预测teacher模型， `distill/distill_chnsentocorp.py` 负责student模型的训练。事先构造好的增强数据放在`${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug`
+该脚本涉及两个python文件:`./example/finetune_classifier.py` 负责finetune以及预测teacher模型， `distill/distill_chnsentocorp.py` 负责student模型的训练。事先构造好的增强数据放在`${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug`
 
 在脚本的第二步中，使用 `--do_predict` 参数进入预测模式:
 ```script
-cat ${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug/part.0 |python3 -u ./distill/finetune_chnsenticorp.py \
+cat ${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug/part.0 |python3 -u ./example/finetune_classifier.py \
     --do_predict \
     --data_dir ${TASK_DATA_PATH}/distill/chnsenticorp/teacher \
     --warm_start_from ${MODEL_PATH}/params \
@@ -86,7 +86,7 @@ sh ./distill/script/distill_chnsenticorp_with_propeller_server.sh
 
 流程包含3步：1. finetune ERNIE模型。2. 取指标最好的ERNIE模型启动`propeller`服务。 3.在student模型的训练过程中访问服务获取teacher模型的标注。
 
-此流程涉及两个python文件: `distill/finetune_chnsenticorp.py` 与 `distill/distill_chnsentocorp_with_propeller_server.py`  。其中第一步与离线蒸馏中的用法完全一样。
+此流程涉及两个python文件: `example/finetune_classifier.py` 与 `distill/distill_chnsentocorp_with_propeller_server.py`  。其中第一步与离线蒸馏中的用法完全一样。
 第二步中使用
 ```script
 python3 -m propeller.tools.start_server -p 8113 -m ${teacher_dir}/best/inference/ &

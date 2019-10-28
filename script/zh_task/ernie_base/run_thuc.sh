@@ -4,7 +4,8 @@ export FLAGS_eager_delete_tensor_gb=0
 export FLAGS_sync_nccl_allreduce=1
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
-python -u run_classifier.py \
+export PYTHONPATH=./ernie:${PYTHONPATH:-}
+python -u ./ernie/run_classifier.py \
                    --use_cuda true \
                    --do_train true \
                    --do_val true \

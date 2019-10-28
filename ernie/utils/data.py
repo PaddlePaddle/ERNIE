@@ -108,7 +108,7 @@ class CharTokenizer(object):
         """
         self.vocab = set(vocab)
         #self.pat = re.compile(r'([,.!?\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]|[\u4e00-\u9fa5]|[a-zA-Z0-9]+)')
-        self.pat = re.compile(r'\S')
+        self.pat =  re.compile(r'([a-zA-Z0-9]+|\S)')
         self.lower = lower
 
     def __call__(self, sen):
@@ -132,7 +132,7 @@ def build_2_pair(seg_a, seg_b, max_seqlen, cls_id, sep_id):
 
     seqlen = sen_emb.shape[0]
     #random truncate
-    random_begin = 0#np.random.randint(0, np.maximum(0, seqlen - max_seqlen) + 1,)
+    random_begin = 0 #np.random.randint(0, np.maximum(0, seqlen - max_seqlen) + 1,)
     sen_emb = sen_emb[random_begin: random_begin + max_seqlen]
     token_type_emb = token_type_emb[random_begin: random_begin + max_seqlen]
 
@@ -147,7 +147,7 @@ def build_1_pair(seg_a, max_seqlen, cls_id, sep_id):
 
     seqlen = sen_emb.shape[0]
     #random truncate
-    random_begin = 0#np.random.randint(0, np.maximum(0, seqlen - max_seqlen) + 1,)
+    random_begin = 0 #np.random.randint(0, np.maximum(0, seqlen - max_seqlen) + 1,)
 
     sen_emb = sen_emb[random_begin: random_begin + max_seqlen]
     token_type_emb = token_type_emb[random_begin: random_begin + max_seqlen]
