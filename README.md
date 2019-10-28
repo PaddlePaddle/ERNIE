@@ -984,7 +984,7 @@ python -u infer_classifyer.py \
     --init_checkpoint "./checkpoints/step_100" \
     --save_inference_model_path ./saved_model \
     --predict_set  ${TASK_DATA_PATH}/xnli/test.tsv \
-    --vocab_path ${MODEL_PATH}/vocab.txt  
+    --vocab_path ${MODEL_PATH}/vocab.txt \
     --num_labels 3 
 ```
 
