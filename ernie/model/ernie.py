@@ -86,7 +86,7 @@ class ErnieModel(object):
         self._sent_emb_name = "sent_embedding"
         self._task_emb_name = "task_embedding"
         self._dtype = "float16" if use_fp16 else "float32"
-        self._emb_dtype = "float32"
+        self._emb_dtype = 'float32'
 
         # Initialize all weigths by truncated normal initializer, and all biases
         # will be initialized by constant zero by default.
@@ -138,7 +138,7 @@ class ErnieModel(object):
         emb_out = pre_process_layer(
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
 
-        if self._dtype == "float16":
+        if self._dtype == 'float16':
             emb_out = fluid.layers.cast(x=emb_out, dtype=self._dtype)
             input_mask = fluid.layers.cast(x=input_mask, dtype=self._dtype)
         self_attn_mask = fluid.layers.matmul(
@@ -167,7 +167,7 @@ class ErnieModel(object):
             postprocess_cmd="dan",
             param_initializer=self._param_initializer,
             name='encoder')
-        if self._dtype == "float16":        
+        if self._dtype == 'float16':
             self._enc_out = fluid.layers.cast(
                 x=self._enc_out, dtype=self._emb_dtype)
 

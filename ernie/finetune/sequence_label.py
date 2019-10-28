@@ -40,7 +40,7 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
         capacity=50,
         shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
                 [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1], [-1, 1]],
+                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1], [-1]],
         dtypes=[
             'int64', 'int64', 'int64', 'int64', 'float32', 'int64', 'int64'
         ],
