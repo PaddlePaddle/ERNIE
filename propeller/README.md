@@ -19,10 +19,6 @@ Propeller 具有下列优势：
     -   创建检查点文件并从故障中恢复
     -   保存可视化的摘要结果
 
-## install|安装
-
-pip install --user .
-
 ## Getting Started|快速开始
 ```python
 
@@ -70,6 +66,7 @@ pip install --user .
     # 开始训练！
     propeller.train_and_eval(BowModel, hparams, run_config, train_ds, eval_ds)
 ```
+详细详细请见example/toy/
 
 ## 主要构件
 1. train_and_eval
