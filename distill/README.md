@@ -12,7 +12,7 @@
 # ERNIE Slim 数据蒸馏
 在ERNIE强大的语义理解能力背后，是需要同样强大的算力才能支撑起如此大规模模型的训练和预测。很多工业应用场景对性能要求较高，若不能有效压缩则无法实际应用。
 
-<img src="http://agroup-bos.cdn.bcebos.com/ae16a29d6a334c74107cebcf56bc2419d385b364" title="ERNIE数据蒸馏示意图" width="900">
+![ernie_distill](../.metas/ernie_distill.png)
 
 因此，如上图所示，我们基于[数据蒸馏技术](https://arxiv.org/pdf/1712.04440.pdf)构建了**ERNIE Slim数据蒸馏系统**。它的原理是通过数据作为桥梁，将ERNIE模型的知识迁移至小模型，以达到损失很小的效果却能达到上千倍的预测速度提升的效果。
 
