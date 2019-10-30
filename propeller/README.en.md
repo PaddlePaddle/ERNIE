@@ -18,11 +18,6 @@ Propeller provide the following benefits:
     -   create checkpoint files and recover from failures
     -   save visualizable results
 
-## install
-
-```script
-pip install --user .
-```
 
 ## Getting Started
 ```python
@@ -71,6 +66,7 @@ pip install --user .
     # Start training!
     propeller.train_and_eval(BowModel, hparams, run_config, train_ds, eval_ds)
 ```
+More detail see example/toy/
 
 ## Main Feature
 1. train_and_eval
