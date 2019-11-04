@@ -41,20 +41,17 @@ args = parser.parse_args()
 
 
 def create_model(pyreader_name, ernie_config):
-    pyreader = fluid.layers.py_reader(
-        capacity=70,
-        shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1], [-1, 1],
-                [-1, 1], [-1, 1]],
-        dtypes=[
-            'int64', 'int64', 'int64', 'float32', 'int64', 'int64', 'int64'
-        ],
-        lod_levels=[0, 0, 0, 0, 0, 0, 0],
-        name=pyreader_name,
-        use_double_buffer=True)
+    src_ids = fluid.layers.data(name='1', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    pos_ids = fluid.layers.data(name='2', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    sent_ids= fluid.layers.data(name='3', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    input_mask = fluid.layers.data(name='4', shape=[-1, args.max_seq_len, 1], dtype='float32')
+    mask_label = fluid.layers.data(name='5', shape=[-1, 1], dtype='int64')
+    mask_pos = fluid.layers.data(name='6', shape=[-1, 1], dtype='int64')
+    labels = fluid.layers.data(name='r', shape=[-1, 1], dtype='int64')
 
-    (src_ids, pos_ids, sent_ids, input_mask, mask_label, mask_pos,
-     labels) = fluid.layers.read_file(pyreader)
+    pyreader = fluid.io.DataLoader.from_generator(feed_list=[
+        src_ids, pos_ids, sent_ids, input_mask, mask_label, mask_pos, labels
+        ], capacity=70, iterable=False)
 
     ernie = ErnieModel(
         src_ids=src_ids,
@@ -97,7 +94,7 @@ def predict_wrapper(args,
 
     def predict(exe=exe, pyreader=pyreader):
 
-        pyreader.decorate_tensor_provider(data_reader.data_generator())
+        pyreader.set_batch_generator(data_reader.data_generator())
         pyreader.start()
 
         cost = 0
@@ -285,7 +282,7 @@ def train(args):
                 next_sent_acc.name, mask_lm_loss.name, total_loss.name
             ])
 
-    train_pyreader.decorate_tensor_provider(data_reader.data_generator())
+    train_pyreader.set_batch_generator(data_reader.data_generator())
     train_pyreader.start()
     steps = 0
     cost = []
