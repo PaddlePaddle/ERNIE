@@ -173,17 +173,13 @@ def main(args):
 def array2tensor(ndarray):
     """ convert numpy array to PaddleTensor"""
     assert isinstance(ndarray, np.ndarray), "input type must be np.ndarray"
-    tensor = PaddleTensor()
-    tensor.name = "data"
-    tensor.shape = ndarray.shape
-    if "float" in str(ndarray.dtype):
-        tensor.dtype = PaddleDType.FLOAT32
-    elif "int" in str(ndarray.dtype):
-        tensor.dtype = PaddleDType.INT64
+    if ndarray.dtype == np.float32:
+        dtype = PaddleDType.FLOAT32
+    elif ndarray.dtype == np.int64:
+        dtype = PaddleDType.INT64
     else:
-        raise ValueError("{} type ndarray is unsupported".format(tensor.dtype))
-
-    tensor.data = PaddleBuf(ndarray.flatten().tolist())
+        raise ValueError("{} type ndarray is unsupported".format(ndarray.dtype))
+    tensor = PaddleTensor(data=ndarray, name="data")
     return tensor
 
 if __name__ == '__main__':
