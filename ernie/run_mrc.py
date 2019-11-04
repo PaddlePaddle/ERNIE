@@ -228,7 +228,7 @@ def main(args):
             num_trainers=nccl2_num_trainers,
             trainer_id=nccl2_trainer_id)
 
-        train_pyreader.decorate_tensor_provider(train_data_generator)
+        train_pyreader.set_batch_generator(train_data_generator)
     else:
         train_exe = None
 
@@ -272,7 +272,7 @@ def main(args):
 
                 if steps % args.validation_steps == 0:
                     if args.do_val:
-                        test_pyreader.decorate_tensor_provider(
+                        test_pyreader.set_batch_generator(
                             reader.data_generator(
                                 args.dev_set,
                                 batch_size=args.batch_size,
@@ -291,7 +291,7 @@ def main(args):
                             args=args)
 
                     if args.do_test:
-                        test_pyreader.decorate_tensor_provider(
+                        test_pyreader.set_batch_generator(
                             reader.data_generator(
                                 args.test_set,
                                 batch_size=args.batch_size,
@@ -318,7 +318,7 @@ def main(args):
     # final eval on dev set
     if args.do_val:
         log.info("Final validation result:")
-        test_pyreader.decorate_tensor_provider(
+        test_pyreader.set_batch_generator(
             reader.data_generator(
                 args.dev_set,
                 batch_size=args.batch_size,
@@ -339,7 +339,7 @@ def main(args):
     # final eval on test set
     if args.do_test:
         log.info("Final test result:")
-        test_pyreader.decorate_tensor_provider(
+        test_pyreader.set_batch_generator(
             reader.data_generator(
                 args.test_set,
                 batch_size=args.batch_size,

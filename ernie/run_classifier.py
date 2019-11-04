@@ -228,7 +228,7 @@ def main(args):
             num_trainers=nccl2_num_trainers,
             trainer_id=nccl2_trainer_id)
 
-        train_pyreader.decorate_tensor_provider(train_data_generator)
+        train_pyreader.set_batch_generator(train_data_generator)
     else:
         train_exe = None
 
@@ -349,7 +349,7 @@ def main(args):
 
     # final eval on dianostic, hack for glue-ax
     if args.diagnostic:
-        test_pyreader.decorate_tensor_provider(
+        test_pyreader.set_batch_generator(
             reader.data_generator(
                 args.diagnostic,
                 batch_size=args.batch_size,
@@ -380,7 +380,7 @@ def evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
     # evaluate dev set
     batch_size = args.batch_size if args.predict_batch_size is None else args.predict_batch_size
     for ds in args.dev_set.split(','):
-        test_pyreader.decorate_tensor_provider(
+        test_pyreader.set_batch_generator(
             reader.data_generator(
                 ds,
                 batch_size=batch_size,
@@ -409,7 +409,7 @@ def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
     batch_size = args.batch_size if args.predict_batch_size is None else args.predict_batch_size
 
     for test_f, save_f in zip(test_sets, save_dirs):
-        test_pyreader.decorate_tensor_provider(
+        test_pyreader.set_batch_generator(
             reader.data_generator(
                 test_f,
                 batch_size=batch_size,
