@@ -73,7 +73,7 @@ def slot_to_paddlearray(slot):
         raise RuntimeError('know type %s' % slot.type)
     num = len(slot.data) // struct.calcsize(type_str)
     arr = struct.unpack('%d%s' % (num, type_str), slot.data)
-    ret = core.PaddleTensor(name='1', data=np.array(arr, dtype=dtype).reshape(slot.dims))
+    ret = core.PaddleTensor(np.array(arr, dtype=dtype).reshape(slot.dims))
     return ret
 
 
