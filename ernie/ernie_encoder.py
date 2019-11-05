@@ -22,12 +22,15 @@ import argparse
 import numpy as np
 import multiprocessing
 
+import logging
 import paddle.fluid as fluid
 
 import reader.task_reader as task_reader
-from model.ernie import ErnieConfig, ErnieModel
-from utils.args import ArgumentGroup, print_arguments
+from model.ernie_v1 import ErnieConfig, ErnieModel
+from utils.args import ArgumentGroup, print_arguments, prepare_logger
 from utils.init import init_pretraining_params
+
+log = logging.getLogger()
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -67,7 +70,6 @@ def create_model(args, pyreader_name, ernie_config):
         src_ids=src_ids,
         position_ids=pos_ids,
         sentence_ids=sent_ids,
-        task_ids=task_ids,
         input_mask=input_mask,
         config=ernie_config)
 
@@ -179,6 +181,7 @@ def main(args):
 
 
 if __name__ == '__main__':
+    prepare_logger(log)
     args = parser.parse_args()
     print_arguments(args)
 

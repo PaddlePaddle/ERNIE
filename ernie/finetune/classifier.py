@@ -52,7 +52,7 @@ def create_model(args,
     elif is_regression:
         labels = fluid.layers.data(name='6', shape=[-1, 1], dtype='float32')
 
-    pyreader = fluid.io.DataLoader.from_generator(feed_list=[src_ids, sent_ids, pos_ids, task_ids, input_mask, qids], 
+    pyreader = fluid.io.DataLoader.from_generator(feed_list=[src_ids, sent_ids, pos_ids, task_ids, input_mask, labels, qids], 
             capacity=70, 
             iterable=False)
 
