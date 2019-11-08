@@ -1102,3 +1102,7 @@ python -u infer_classifyer.py \
 ### FQA6: 运行报错`ModuleNotFoundError: No module named 'propeller'`<a name="faq6"></a>
 
 您可以通过`export PYTHONPATH=./:$PYTHONPATH`的方式引入Propeller.
+
+### FAQ7：显存不足报错: Cannot malloc XXX MB GPU memory. 
+
+您可以通过减小batch_size, 减小max_seq_len, 设置FLAGS_eager_delete_tensor_gb=0.0来减小网络对显存的需求

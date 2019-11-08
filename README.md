@@ -1009,3 +1009,7 @@ Export the path of cuda to LD_LIBRARY_PATH, e.g.: `export LD_LIBRARY_PATH=/home/
 #### FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.
 
 Download [NCCL2](https://developer.nvidia.com/nccl/nccl-download), and export the library path to LD_LIBRARY_PATH, e.g.:`export LD_LIBRARY_PATH=/home/work/nccl/lib`
+
+#### FAQ6: Cannot malloc XXX MB GPU memory.
+
+Try to reduce the batch_size, reduce the max_seq_len and set FLAGS_eager_delete_tensor_gb=0.0
