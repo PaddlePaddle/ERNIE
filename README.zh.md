@@ -19,7 +19,7 @@
  * [效果验证](#效果验证)
     * [中文效果验证](#中文效果验证)
     * [英文效果验证](#英文效果验证)
- * [开源记录](#开源记录)
+ * [ERNIE tiny](#ernie-tiny)
  * [技术交流](#技术交流)
  * [使用](#使用)
 
@@ -589,7 +589,6 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 
 
 
-
 #### GLUE - 验证集结果
 
 | <strong>数据集</strong> | <strong>CoLA</strong> | <strong>SST-2</strong> | <strong>MRPC</strong> | <strong>STS-B</strong> | <strong>QQP</strong>  | <strong>MNLI-m</strong> | <strong>QNLI</strong> | <strong>RTE</strong>  |
@@ -617,11 +616,34 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 由于 XLNet 暂未公布 GLUE 测试集上的单模型结果，所以我们只与 BERT 进行单模型比较。上表为ERNIE 2.0 单模型在 GLUE 测试集的表现结果。
 
 
-## 开源记录
-- 2019-07-30 发布 ERNIE 2.0
-- 2019-04-10 更新: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布
-- 2019-03-18 更新: update ERNIE_stable.tgz
-- 2019-03-15 发布 ERNIE 1.0
+### ERNIE tiny
+
+为了提升ERNIE模型在实际工业应用中的落地能力，我们推出ERNIE-tiny模型。 
+
+![ernie_tiny](.metas/ernie_tiny.png)
+
+ERNIE-tiny作为小型化ERNIE，采用了以下4点技术，保证了在实际真实数据中将近4.3倍的预测提速。
+
+1. 浅：12层的ERNIE Base模型直接压缩为3层，线性提速4倍，但效果也会有较大幅度的下降；
+
+1. 胖：模型变浅带来的损失可通过hidden size的增大来弥补。由于fluid inference框架对于通用矩阵运算（gemm）的最后一维（hidden size）参数的不同取值会有深度的优化，因为将hidden size从768提升至1024并不会带来速度线性的增加；
+
+1. 短：ERNIE Tiny是首个开源的中文subword粒度的预训练模型。这里的短是指通过subword粒度替换字（char）粒度，能够明显地缩短输入文本的长度，而输入文本长度是和预测速度有线性相关。统计表明，在XNLI dev集上采用subword字典切分出来的序列长度比字表平均缩短40%；
+
+1. 萃：为了进一步提升模型的效果，ERNIE Tiny扮演学生角色，利用模型蒸馏的方式在Transformer层和Prediction层去学习教师模型ERNIE模型对应层的分布或输出，这种方式能够缩近ERNIE Tiny和ERNIE的效果差异。
+
+
+#### Benchmark
+
+ERNIE Tiny轻量级模型在公开数据集的效果如下所示，任务均值相对于ERNIE Base只下降了2.37%，但相对于“SOTA Before BERT”提升了8%。在延迟测试中，ERNIE Tiny能够带来4.3倍的速度提升
+（测试环境为：GPU P4，Paddle Inference C++ API，XNLI Dev集，最大maxlen=128，测试结果10次均值）
+
+|model|XNLI(acc)|LCQCM(acc)|CHNSENTICORP(acc)|NLPCC-DBQA(mrr/f1)|Average|Latency
+|--|--|--|--|--|--|--|
+|SOTA-before-ERNIE|68.3|83.4|92.2|72.01/-|78.98|-|
+|ERNIE2.0-base|79.7|87.9|95.5|95.7/85.3|89.70|146ms(4.3x)|
+|ERNIE-tiny-subword|75.1|86.1|95.2|92.9/78.6|87.33|633ms(1x)|
+
 
 ## 技术交流
 
@@ -646,6 +668,7 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
      * [序列标注任务](#序列标注任务)
         * [实体识别](#实体识别)
      * [阅读理解任务](#阅读理解任务-1)
+     * [ERNIE tiny](#tune-ernie-tiny)
   * [利用Propeller进行二次开发](#利用propeller进行二次开发)
   * [预训练 (ERNIE 1.0)](#预训练-ernie-10)
      * [数据预处理](#数据预处理)
@@ -695,6 +718,7 @@ pip install -r requirements.txt
 | [ERNIE 1.0 中文 Base 模型(max_len=512)](https://ernie.bj.bcebos.com/ERNIE_1.0_max-len-512.tar.gz) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 | [ERNIE 2.0 英文 Base 模型](https://ernie.bj.bcebos.com/ERNIE_Base_en_stable-2.0.0.tar.gz) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 | [ERNIE 2.0 英文 Large 模型](https://ernie.bj.bcebos.com/ERNIE_Large_en_stable-2.0.0.tar.gz) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
+| [ERNIE tiny 中文模型]()|包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json 以及切词词表|
 
 
 
@@ -893,6 +917,16 @@ text_a  label
 [dev evaluation] em: 88.450624, f1: 93.749887, avg: 91.100255, question_num: 3524
 [test evaluation] em: 88.061838, f1: 93.520152, avg: 90.790995, question_num: 3493
  ```
+
+
+### ERNIE tiny <a name="tune-ernie-tiny"></a>
+
+ERNIE tiny 模型采用了subword粒度输入，需要在数据前处理中加入切词(segmentation)并使用[sentence piece](https://github.com/google/sentencepiece)进行tokenization. 
+segmentation 以及 tokenization 需要使用的模型包含在了 ERNIE tiny 的[预训练模型文件](#预训练模型下载)中，分别是 `./subword/dict.wordseg.pickle` 和 `./subword/spm_cased_simp_sampled.model`.
+
+目前`./example/`下的代码针对 ERNIE tiny 的前处理进行了适配只需在脚本中通过 `--sentence_piece_model` 引入tokenization 模型，再通过 `--word_dict` 引入 segmentation 模型之后即可进行 ERNIE tiny 的 Fine-tune。
+对于命名实体识别类型的任务，为了跟输入标注对齐，ERNIE tiny 仍然采用中文单字粒度进行作为输入。因此使用 `./example/finetune_ner.py` 时只需要打开 `--use_sentence_piece_vocab` 即可。
+具体的使用方法可以参考[下节](#利用propeller进行二次开发).
 
 ## 利用Propeller进行二次开发
 
@@ -1099,6 +1133,6 @@ python -u infer_classifyer.py \
 
 需要先下载 [NCCL](https://developer.nvidia.com/nccl/nccl-download)，然后在 LD_LIBRARY_PATH 中添加 NCCL 库的路径，如`export LD_LIBRARY_PATH=/home/work/nccl/lib`
 
-### FQA6: 运行报错`ModuleNotFoundError: No module named 'propeller'`<a name="faq6"></a>
+### FAQ6: 运行报错`ModuleNotFoundError: No module named 'propeller'`<a name="faq6"></a>
 
 您可以通过`export PYTHONPATH=./:$PYTHONPATH`的方式引入Propeller.
