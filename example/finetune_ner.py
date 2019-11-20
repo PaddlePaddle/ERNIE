@@ -32,7 +32,6 @@ import paddle.fluid.layers as L
 
 from model.ernie import ErnieModel
 from optimization import optimization
-import tokenization
 import utils.data
 
 from propeller import log
@@ -121,7 +120,7 @@ class SequenceLabelErnieModel(propeller.train.Model):
 def make_sequence_label_dataset(name, input_files, label_list, tokenizer, batch_size, max_seqlen, is_train):
     label_map = {v: i for i, v in enumerate(label_list)}
     no_entity_id = label_map['O']
-    delimiter = ''
+    delimiter = b''
 
     def read_bio_data(filename):
         ds = propeller.data.Dataset.from_file(filename)
@@ -132,10 +131,10 @@ def make_sequence_label_dataset(name, input_files, label_list, tokenizer, batch_
             while 1:
                 line = next(iterator)
                 cols = line.rstrip(b'\n').split(b'\t')
+                tokens = cols[0].split(delimiter)
+                labels = cols[1].split(delimiter)
                 if len(cols) != 2:
                     continue
-                tokens = tokenization.convert_to_unicode(cols[0]).split(delimiter)
-                labels = tokenization.convert_to_unicode(cols[1]).split(delimiter)
                 if len(tokens) != len(labels) or len(tokens) == 0:
                     continue
                 yield [tokens, labels]
@@ -151,7 +150,8 @@ def make_sequence_label_dataset(name, input_files, label_list, tokenizer, batch_
                 ret_tokens = []
                 ret_labels = []
                 for token, label in zip(tokens, labels):
-                    sub_token = tokenizer.tokenize(token)
+                    sub_token = tokenizer(token)
+                    label = label.decode('utf8')
                     if len(sub_token) == 0:
                         continue
                     ret_tokens.extend(sub_token)
@@ -179,7 +179,7 @@ def make_sequence_label_dataset(name, input_files, label_list, tokenizer, batch_
                     labels = labels[: max_seqlen - 2]
 
                 tokens = ['[CLS]'] + tokens + ['[SEP]']
-                token_ids = tokenizer.convert_tokens_to_ids(tokens)
+                token_ids = [vocab[t] for t in tokens]
                 label_ids = [no_entity_id] + [label_map[x] for x in labels] + [no_entity_id]
                 token_type_ids = [0] * len(token_ids)
                 input_seqlen = len(token_ids)
@@ -211,7 +211,7 @@ def make_sequence_label_dataset(name, input_files, label_list, tokenizer, batch_
 
 
 def make_sequence_label_dataset_from_stdin(name, tokenizer, batch_size, max_seqlen):
-    delimiter = ''
+    delimiter = b''
 
     def stdin_gen():
         if six.PY3:
@@ -232,9 +232,9 @@ def make_sequence_label_dataset_from_stdin(name, tokenizer, batch_size, max_seql
             while 1:
                 line, = next(iterator)
                 cols = line.rstrip(b'\n').split(b'\t')
+                tokens = cols[0].split(delimiter)
                 if len(cols) != 1:
                     continue
-                tokens = tokenization.convert_to_unicode(cols[0]).split(delimiter)
                 if len(tokens) == 0:
                     continue
                 yield tokens, 
@@ -247,7 +247,7 @@ def make_sequence_label_dataset_from_stdin(name, tokenizer, batch_size, max_seql
                 tokens, = next(iterator)
                 ret_tokens = []
                 for token in tokens:
-                    sub_token = tokenizer.tokenize(token)
+                    sub_token = tokenizer(token)
                     if len(sub_token) == 0:
                         continue
                     ret_tokens.extend(sub_token)
@@ -266,7 +266,7 @@ def make_sequence_label_dataset_from_stdin(name, tokenizer, batch_size, max_seql
                     tokens = tokens[: max_seqlen - 2]
 
                 tokens = ['[CLS]'] + tokens + ['[SEP]']
-                token_ids = tokenizer.convert_tokens_to_ids(tokens)
+                token_ids = [vocab[t] for t in tokens]
                 token_type_ids = [0] * len(token_ids)
                 input_seqlen = len(token_ids)
 
@@ -296,13 +296,15 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, required=True)
     parser.add_argument('--vocab_file', type=str, required=True)
     parser.add_argument('--do_predict', action='store_true')
+    parser.add_argument('--use_sentence_piece_vocab', action='store_true')
     parser.add_argument('--warm_start_from', type=str)
     args = parser.parse_args()
     run_config = propeller.parse_runconfig(args)
     hparams = propeller.parse_hparam(args)
 
-    tokenizer = tokenization.FullTokenizer(args.vocab_file)
-    vocab = tokenizer.vocab
+
+    vocab = {j.strip().split('\t')[0]: i for i, j in enumerate(open(args.vocab_file, 'r', encoding='utf8'))}
+    tokenizer = utils.data.CharTokenizer(vocab, sentencepiece_style_vocab=args.use_sentence_piece_vocab)
     sep_id = vocab['[SEP]']
     cls_id = vocab['[CLS]']
     unk_id = vocab['[UNK]']
@@ -358,7 +360,7 @@ if __name__ == '__main__':
                 from_dir=warm_start_dir
             )
 
-        best_exporter = propeller.train.exporter.BestExporter(os.path.join(run_config.model_dir, 'best'), cmp_fn=lambda old, new: new['dev']['f1'] > old['dev']['f1'])
+        best_exporter = propeller.train.exporter.BestInferenceModelExporter(os.path.join(run_config.model_dir, 'best'), cmp_fn=lambda old, new: new['dev']['f1'] > old['dev']['f1'])
         propeller.train.train_and_eval(
                 model_class_or_model_fn=SequenceLabelErnieModel,
                 params=hparams, 
@@ -387,7 +389,6 @@ if __name__ == '__main__':
         predict_ds.data_types = types
 
         rev_label_map = {i: v for i, v in enumerate(label_list)}
-        best_exporter = propeller.train.exporter.BestExporter(os.path.join(run_config.model_dir, 'best'), cmp_fn=lambda old, new: new['dev']['f1'] > old['dev']['f1'])
         learner = propeller.Learner(SequenceLabelErnieModel, run_config, hparams)
         for pred, _  in learner.predict(predict_ds, ckpt=-1):
             pred_str = ' '.join([rev_label_map[idx] for idx in np.argmax(pred, 1).tolist()])

@@ -4,6 +4,7 @@ import re
 from propeller import log
 import itertools
 from propeller.paddle.data import Dataset
+import pickle
 
 import six
 
@@ -101,7 +102,7 @@ class SpaceTokenizer(object):
 
 
 class CharTokenizer(object):
-    def __init__(self, vocab, lower=True):
+    def __init__(self, vocab, lower=True, sentencepiece_style_vocab=False):
         """
         char tokenizer (wordpiece english)
         normed txt(space seperated or not) => list of word-piece
@@ -110,6 +111,7 @@ class CharTokenizer(object):
         #self.pat = re.compile(r'([,.!?\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]|[\u4e00-\u9fa5]|[a-zA-Z0-9]+)')
         self.pat =  re.compile(r'([a-zA-Z0-9]+|\S)')
         self.lower = lower
+        self.sentencepiece_style_vocab = sentencepiece_style_vocab
 
     def __call__(self, sen):
         if len(sen) == 0:
@@ -119,9 +121,49 @@ class CharTokenizer(object):
             sen = sen.lower()
         res = []
         for match in self.pat.finditer(sen):
-            words, _ = wordpiece(match.group(0), vocab=self.vocab, unk_token='[UNK]')
+            words, _ = wordpiece(match.group(0), vocab=self.vocab, unk_token='[UNK]', sentencepiece_style_vocab=self.sentencepiece_style_vocab)
             res.extend(words)
         return res
+
+
+class WSSPTokenizer(object):
+    def __init__(self, sp_model_dir, word_dict, ws=True, lower=True):
+        self.ws = ws
+        self.lower = lower
+        self.dict = pickle.load(open(word_dict, 'rb'), encoding='utf8')
+        import sentencepiece as spm
+        self.sp_model = spm.SentencePieceProcessor()
+        self.window_size = 5
+        self.sp_model.Load(sp_model_dir)
+
+    def cut(self, chars):
+        words = []
+        idx = 0
+        while idx < len(chars):
+            matched = False
+            for i in range(self.window_size, 0, -1):
+                cand = chars[idx: idx+i]
+                if cand in self.dict:
+                    words.append(cand)
+                    matched = True
+                    break
+            if not matched: 
+                i = 1
+                words.append(chars[idx])
+            idx += i
+        return words
+ 
+    def __call__(self, sen):
+        sen = sen.decode('utf8')
+        if self.ws:
+            sen = [s for s in self.cut(sen) if s != ' ']
+        else:
+            sen = sen.split(' ')
+        if self.lower:
+            sen = [s.lower() for s in sen]
+        sen = ' '.join(sen)
+        ret = self.sp_model.EncodeAsPieces(sen)
+        return ret
 
 
 def build_2_pair(seg_a, seg_b, max_seqlen, cls_id, sep_id):
