@@ -55,7 +55,7 @@ class ClassificationErnieModel(propeller.train.Model):
         pos_ids = L.cast(pos_ids, 'int64')
         pos_ids.stop_gradient = True
         input_mask.stop_gradient = True
-        task_ids = L.zeros_like(src_ids) + self.hparam.task_id #this shit wont use at the moment
+        task_ids = L.zeros_like(src_ids) + self.hparam.task_id
         task_ids.stop_gradient = True
 
         ernie = ErnieModel(
@@ -128,6 +128,8 @@ if __name__ == '__main__':
     parser.add_argument('--vocab_file', type=str, required=True)
     parser.add_argument('--do_predict', action='store_true')
     parser.add_argument('--warm_start_from', type=str)
+    parser.add_argument('--sentence_piece_model', type=str, default=None)
+    parser.add_argument('--word_dict', type=str, default=None)
     args = parser.parse_args()
     run_config = propeller.parse_runconfig(args)
     hparams = propeller.parse_hparam(args)
@@ -138,7 +140,12 @@ if __name__ == '__main__':
     cls_id = vocab['[CLS]']
     unk_id = vocab['[UNK]']
 
-    tokenizer = utils.data.CharTokenizer(vocab.keys())
+    if args.sentence_piece_model is not None:
+        if args.word_dict is None:
+            raise ValueError('--word_dict no specified in subword Model')
+        tokenizer = utils.data.WSSPTokenizer(args.sentence_piece_model, args.word_dict, ws=True, lower=True)
+    else:
+        tokenizer = utils.data.CharTokenizer(vocab.keys())
 
     def tokenizer_func(inputs):
         '''avoid pickle error'''
@@ -179,7 +186,7 @@ if __name__ == '__main__':
         dev_ds.data_shapes = shapes
         dev_ds.data_types = types
 
-        varname_to_warmstart = re.compile('encoder.*|pooled.*|.*embedding|pre_encoder_.*')
+        varname_to_warmstart = re.compile(r'^encoder.*[wb]_0$|^.*embedding$|^.*bias$|^.*scale$|^pooled_fc.[wb]_0$')
         warm_start_dir = args.warm_start_from
         ws = propeller.WarmStartSetting(
                 predicate_fn=lambda v: varname_to_warmstart.match(v.name) and os.path.exists(os.path.join(warm_start_dir, v.name)),
