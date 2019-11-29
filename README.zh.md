@@ -981,7 +981,7 @@ cat input_file | python3 ./example/finetune_classifier.py --do_predict ... > out
 
 ### 数据预处理
 
-基于百科类、资讯类、论坛对话类数据构造具有上下文关系的句子对数据，利用百度内部词法分析工具对句对数据进行字、词、实体等不同粒度的切分，然后基于 [`tokenization.py`](tokenization.py) 中的 CharTokenizer 对切分后的数据进行 token 化处理，得到明文的 token 序列及切分边界，然后将明文数据根据词典 [`config/vocab.txt`](config/vocab.txt) 映射为 id 数据，在训练过程中，根据切分边界对连续的 token 进行随机 mask 操作；
+基于百科类、资讯类、论坛对话类数据构造具有上下文关系的句子对数据，利用百度内部词法分析工具对句对数据进行字、词、实体等不同粒度的切分，然后基于 [`tokenization.py`](./ernie/tokenization.py) 中的 CharTokenizer 对切分后的数据进行 token 化处理，得到明文的 token 序列及切分边界，然后将明文数据根据词典 [`config/vocab.txt`](config/vocab.txt) 映射为 id 数据，在训练过程中，根据切分边界对连续的 token 进行随机 mask 操作；
 
 我们给出了 id 化后的部分训练数据：[`data/demo_train_set.gz`](./data/demo_train_set.gz)、和测试数据：[`data/demo_valid_set.gz`](./data/demo_valid_set.gz)，每行数据为1个训练样本，示例如下:
 
