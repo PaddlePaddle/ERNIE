@@ -83,7 +83,7 @@ class BestInferenceModelExporter(Exporter):
                 inf_sepc_dict = {'inference': inf_sepc_dict}
             for inf_sepc_name, inf_sepc in six.iteritems(inf_sepc_dict):
                 if not isinstance(inf_sepc, InferenceSpec):
-                    raise ValueError('unkonw inference spec type: %s' % v)
+                    raise ValueError('unknown inference spec type: %s' % inf_sepc)
 
                 save_dir = os.path.join(self._export_dir, inf_sepc_name)
                 log.debug('[Best Exporter]: save inference model: "%s" to %s' %
