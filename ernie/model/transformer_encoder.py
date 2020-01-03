@@ -85,7 +85,7 @@ def multi_head_attention(queries,
         # The value 0 in shape attr means copying the corresponding dimension
         # size of the input as the output dimension size.
         reshaped = layers.reshape(
-            x=x, shape=[0, 0, n_head, hidden_size // n_head], inplace=True)
+            x=x, shape=[0, 0, n_head, hidden_size // n_head], inplace=False)
 
         # permuate the dimensions into:
         # [batch_size, n_head, max_sequence_len, hidden_size_per_head]
@@ -106,7 +106,7 @@ def multi_head_attention(queries,
         return layers.reshape(
             x=trans_x,
             shape=[0, 0, trans_x.shape[2] * trans_x.shape[3]],
-            inplace=True)
+            inplace=False)
 
     def scaled_dot_product_attention(q, k, v, attn_bias, d_key, dropout_rate):
         """
