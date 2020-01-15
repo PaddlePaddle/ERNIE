@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""train hooks"""
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -38,44 +39,56 @@ log = logging.getLogger(__name__)
 
 
 class RunHook(object):
+    """RunHook Base class"""
+
     def __init__(self):
+        """doc"""
         pass
 
-    def before_train(self):
+    def before_train(self, program):
+        """doc"""
         pass
 
     def before_run(self, state):
+        """doc"""
         return []
 
     def after_run(self, res_list, state):
+        """doc"""
         pass
 
     def should_stop(self, state):
+        """doc"""
         return False
 
     def after_train(self):
+        """doc"""
         pass
 
 
 class TqdmProgressBarHook(RunHook):
+    """show a progress bar when training"""
+
     def __init__(self, max_steps, desc=None):
+        """doc"""
         self.tqdm = None
         import tqdm
         from propeller import log as main_log
         hdl = main_log.handlers[0]
 
-        class TqdmLogginHandler(logging.Handler):
+        class _TqdmLogginHandler(logging.Handler):
             def emit(self, record):
+                """doc"""
                 try:
                     msg = self.format(record)
                     tqdm.tqdm.write(msg, file=sys.stderr)
                     self.flush()
-                except (KeyboardInterrupt, SystemExit):
-                    raise
+                except (KeyboardInterrupt, SystemExit) as e:
+                    raise e
                 except:
                     self.handleError(record)
 
-        tqdm_hdl = TqdmLogginHandler()
+        tqdm_hdl = _TqdmLogginHandler()
         tqdm_hdl.setFormatter(hdl.formatter)
         main_log.removeHandler(hdl)
         main_log.addHandler(tqdm_hdl)
@@ -91,46 +104,55 @@ class TqdmProgressBarHook(RunHook):
 
 
 class TqdmNotebookProgressBarHook(RunHook):
+    """show a progress bar when training"""
+
     def __init__(self, max_steps, desc=None):
+        """doc"""
         self.tqdm = None
         import tqdm
         from propeller import log as main_log
         hdl = main_log.handlers[0]
 
-        class TqdmLogginHandler(logging.Handler):
+        class _TqdmLogginHandler(logging.Handler):
             def emit(self, record):
+                """doc"""
                 try:
                     msg = self.format(record)
                     tqdm.tqdm.write(msg, file=sys.stderr)
                     self.flush()
-                except (KeyboardInterrupt, SystemExit):
-                    raise
+                except (KeyboardInterrupt, SystemExit) as e:
+                    raise e
                 except:
                     self.handleError(record)
 
-        tqdm_hdl = TqdmLogginHandler()
+        tqdm_hdl = _TqdmLogginHandler()
         tqdm_hdl.setFormatter(hdl.formatter)
         main_log.removeHandler(hdl)
         main_log.addHandler(tqdm_hdl)
         self.tqdm = tqdm.tqdm_notebook(total=max_steps, desc=None)
 
     def before_run(self, state):
+        """doc"""
         self.tqdm.n = state.gstep
         self.tqdm.refresh()
         return []
 
     def __del__(self):
+        """doc"""
         if self.tqdm:
             self.tqdm.close()
 
 
 class LoggingHook(RunHook):
+    """log tensor in to screan and tensorboard"""
+
     def __init__(self,
                  loss,
                  per_step=10,
                  skip_step=100,
                  summary_writer=None,
                  summary_record=None):
+        """doc"""
         if per_step is None or skip_step is None:
             raise ValueError('wrong step argument, per step: %d skip_step %d' %
                              (per_step, skip_step))
@@ -141,7 +163,8 @@ class LoggingHook(RunHook):
         self.writer = summary_writer
         self.last_state = None
 
-    def before_train(self):
+    def before_train(self, program):
+        """doc"""
         if self.summary_record:
             if self.summary_record.scalar:
                 self.s_name, self.s_tolog = zip(*self.summary_record.scalar)
@@ -154,6 +177,7 @@ class LoggingHook(RunHook):
                 self.h_name, self.h_tolog = [], []
 
     def before_run(self, state):
+        """doc"""
         if state.gstep % self.per_step == 0 and state.step > self.skip_step:
             ret = [self.loss]
             if self.summary_record:
@@ -164,6 +188,7 @@ class LoggingHook(RunHook):
             return []
 
     def after_run(self, res_list, state):
+        """doc"""
         if state.gstep % self.per_step == 0 and state.step > self.skip_step:
             if not self.summary_record:
                 return
@@ -209,11 +234,15 @@ class LoggingHook(RunHook):
 
 
 class StopAtStepHook(RunHook):
+    """stop training at some step"""
+
     def __init__(self, stop_global_step, stop_step):
+        """doc"""
         self._stop_gstep = stop_global_step
         self._stop_step = stop_step
 
     def should_stop(self, state):
+        """doc"""
         if (self._stop_gstep and state.gstep >= self._stop_gstep) or \
            (self._stop_step and state.step >= self._stop_step):
             log.info('StopAtStepHook called stop')
@@ -226,6 +255,7 @@ class EvalHook(RunHook):
     """hook this on a eval Executor"""
 
     def __init__(self, metrics, summary_writer=None):
+        """doc"""
         self.writer = summary_writer
         self._result = None
 
@@ -244,11 +274,13 @@ class EvalHook(RunHook):
         else:
             self.names, self.metrics = [], []
 
-    def before_train(self):
+    def before_train(self, program):
+        """doc"""
         for m in self.metrics:
             m.reset()
 
     def before_run(self, state):
+        """doc"""
         ls = [m.tensor for m in self.metrics]
         for i in ls:
             if not (isinstance(i, list) or isinstance(i, tuple)):
@@ -265,15 +297,18 @@ class EvalHook(RunHook):
         return ls_flt
 
     def after_run(self, res_list, state):
+        """doc"""
         res = util.unflatten(res_list, self.schema)
         for r, m in zip(res, self.metrics):
             m.update(r)
 
     @property
     def result(self):
+        """doc"""
         return self._result
 
     def after_train(self):
+        """doc"""
         printable = []
         self._result = {}
         for n, m in zip(self.names, self.metrics):
@@ -284,12 +319,16 @@ class EvalHook(RunHook):
 
 
 class CheckpointSaverHook(RunHook):
+    """Save checkpoint every n step"""
+
     def __init__(self, saver, per_step=10, skip_step=100):
+        """doc"""
         self.saver = saver
         self.per_step = per_step
         self.skip_step = skip_step
 
     def after_run(self, res_list, state):
+        """doc"""
         if state.gstep % self.per_step == 0 and \
                 state.step > self.skip_step:
             self.saver.save(state)

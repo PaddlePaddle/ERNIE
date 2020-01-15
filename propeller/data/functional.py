@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Basic Dataset API"""
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -39,7 +40,7 @@ __all__ = ['Dataset']
 
 
 @contextmanager
-def open_file(filename, format=None):
+def _open_file(filename, format=None):
     if format is None:
         fd = open(filename, 'rb')
     elif format == 'GZIP':
@@ -50,9 +51,9 @@ def open_file(filename, format=None):
     fd.close()
 
 
-def open_record(filename):
-    def gen():
-        with open_file(filename, format='GZIP') as f:
+def _open_record(filename):
+    def _gen():
+        with _open_file(filename, format='GZIP') as f:
             while True:
                 data = f.read(struct.calcsize('i'))
                 if not len(data):
@@ -61,11 +62,11 @@ def open_record(filename):
                 data = f.read(l)
                 yield data
 
-    return gen
+    return _gen
 
 
-def shuffle_func(dataset, buffer_size):
-    def gen():
+def _shuffle_func(dataset, buffer_size):
+    def _gen():
         buf = []
         iterable = dataset()
         try:
@@ -82,11 +83,11 @@ def shuffle_func(dataset, buffer_size):
                 for i in buf:
                     yield i
 
-    return gen
+    return _gen
 
 
-def interleave_func(iterable, map_fn, cycle_length, block_length):
-    def gen():
+def _interleave_func(iterable, map_fn, cycle_length, block_length):
+    def _gen():
         ls = itertools.tee(iterable(), cycle_length)
         buf = []
         for i, j in enumerate(ls):
@@ -99,11 +100,11 @@ def interleave_func(iterable, map_fn, cycle_length, block_length):
             for ii in (i for i in tup if i is not None):
                 yield ii
 
-    return gen
+    return _gen
 
 
-def repeat_func(dataset, n):
-    def gen():
+def _repeat_func(dataset, n):
+    def _gen():
         iterable = dataset()
         if n >= 0:
             ret = itertools.chain(*itertools.tee(iterable, n))
@@ -113,11 +114,11 @@ def repeat_func(dataset, n):
         for i in ret:
             yield i
 
-    return gen
+    return _gen
 
 
-def filter_func(dataset, fn):
-    def gen():
+def _filter_func(dataset, fn):
+    def _gen():
         for i in dataset():
             if isinstance(i, tuple) or isinstance(i, list):
                 if fn(*i) is True:
@@ -126,41 +127,41 @@ def filter_func(dataset, fn):
                 if fn(i) is True:
                     yield i
 
-    return gen
+    return _gen
 
 
-def map_func(dataset, fn):
-    def gen():
+def _map_func(dataset, fn):
+    def _gen():
         for i in dataset():
             if isinstance(i, tuple) or isinstance(i, list):
                 yield fn(*i)
             else:
                 yield fn(i)
 
-    return gen
+    return _gen
 
 
-def shard_func(dataset, num_shards, index):
-    def gen():
+def _shard_func(dataset, num_shards, index):
+    def _gen():
         iterable = dataset()
         ret = itertools.islice(iterable, index, None, num_shards)
         for i in ret:
             yield i
 
-    return gen
+    return _gen
 
 
-def take_func(dataset, count):
-    def gen():
+def _take_func(dataset, count):
+    def _gen():
         iterable = dataset()
         ret = itertools.islice(iterable, count)
         for i in ret:
             yield i
 
-    return gen
+    return _gen
 
 
-def buffered_func(dataset, size):
+def _buffered_func(dataset, size):
     """
     Creates a buffered data reader.
 
@@ -176,21 +177,21 @@ def buffered_func(dataset, size):
     :returns: the buffered data reader.
     """
 
-    class EndSignal():
+    class _EndSignal(object):
         pass
 
-    end = EndSignal()
+    end = _EndSignal()
 
-    def read_worker(r, q):
+    def _read_worker(r, q):
         for d in r:
             q.put(d)
         q.put(end)
 
-    def data_reader():
+    def _data_reader():
         r = dataset()
         q = multiprocessing.Queue(maxsize=size)
         t = multiprocessing.Process(
-            target=read_worker, args=(
+            target=_read_worker, args=(
                 r,
                 q, ))
         t.daemon = True
@@ -200,14 +201,14 @@ def buffered_func(dataset, size):
             yield e
             e = q.get()
 
-    return data_reader
+    return _data_reader
 
 
-def padded_batch_func(dataset, batch_size, pad_value=0, max_seqlen=None):
+def _padded_batch_func(dataset, batch_size, pad_value=0, max_seqlen=None):
     if not isinstance(batch_size, int):
         raise ValueError('unknown batch_size: %s' % repr(batch_size))
 
-    def gen():
+    def _gen():
         iterable = dataset()
         pad_value_t = pad_value
         while True:
@@ -226,71 +227,86 @@ def padded_batch_func(dataset, batch_size, pad_value=0, max_seqlen=None):
                 if (not np.isscalar(elem)) and elem.shape != ():
                     max_len = max(map(len,
                                       e)) if max_seqlen is None else max_seqlen
-                    e = map(lambda i: np.pad(i, [0, max_len - len(i)], 'constant', constant_values=pv) if max_len >= len(i) else i[: max_len], e)
+
+                    def _fn(i):
+                        if max_len >= len(i):
+                            return np.pad(i, [0, max_len - len(i)],
+                                          'constant',
+                                          constant_values=pv)
+                        else:
+                            return i[:max_len]
+
+                    e = map(_fn, e)
                 padded.append(np.stack(list(e)))
             yield padded
 
-    return gen
+    return _gen
 
 
 class Dataset(object):
-    @classmethod
-    def from_generator_func(cls, gen, data_shapes=None, data_types=None):
-        if not inspect.isgeneratorfunction(gen):
-            raise ValueError('expect generator function, got %s' % repr(gen))
+    """Python Wrapper for PyReader"""
 
-        def wrapper():  #compat to py3.7
+    @classmethod
+    def from_generator_func(cls, _gen, data_shapes=None, data_types=None):
+        """doc"""
+        if not inspect.isgeneratorfunction(_gen):
+            raise ValueError('expect generator function, got %s' % repr(_gen))
+
+        def _wrapper():  #compat to py3.7
             try:
-                for item in gen():
+                for item in _gen():
                     yield item
             except RuntimeError as e:
                 if str(e) != 'generator raised StopIteration':
                     raise e
 
         ret = cls()
-        ret.generator = wrapper
+        ret.generator = _wrapper
         ret.data_shapes = data_shapes
         ret.data_types = data_types
         return ret
 
     @classmethod
     def from_file(cls, filename, format=None):
+        """doc"""
         if os.path.getsize(filename) == 0:
             raise RuntimeError('%s is empty' % filename)
 
-        def gen():
-            with open_file(filename, format) as f:
+        def _gen():
+            with _open_file(filename, format) as f:
                 for line in f:
                     yield line
 
         ret = cls()
-        ret.generator = gen
+        ret.generator = _gen
         ret.data_shapes = []
         ret.data_types = str
         return ret
 
     @classmethod
     def from_record_file(cls, filename):
+        """doc"""
         if os.path.getsize(filename) == 0:
             raise RuntimeError('%s is empty' % filename)
-        gen = open_record(filename)
+        _gen = _open_record(filename)
         ret = cls()
-        ret.generator = gen
+        ret.generator = _gen
         ret.data_shapes = []
         ret.data_types = str
         return ret
 
     @classmethod
     def from_list(cls, ls):
+        """doc"""
         if not isinstance(ls, list):
             raise ValueError('expect list, got %s' % repr(ls))
 
-        def gen():
+        def _gen():
             for i in ls:
                 yield i
 
         ret = cls()
-        ret.generator = gen
+        ret.generator = _gen
         ret.data_shapes = []
         ret.data_types = str
         return ret
@@ -339,6 +355,7 @@ class Dataset(object):
 
     @property
     def data_shapes(self):
+        """doc"""
         if self._data_shapes is None:
             self._infer_shapes_and_types()
             return self._data_shapes
@@ -347,10 +364,12 @@ class Dataset(object):
 
     @data_shapes.setter
     def data_shapes(self, val):
+        """doc"""
         self._data_shapes = val
 
     @property
     def data_types(self):
+        """doc"""
         if self._data_types is None:
             self._infer_shapes_and_types()
             return self._data_types
@@ -359,9 +378,11 @@ class Dataset(object):
 
     @data_types.setter
     def data_types(self, val):
+        """doc"""
         self._data_types = val
 
     def apply(self, transform_func):
+        """apply transform func to datasets"""
         #input_shapes = transform_func.input_shapes
         #input_types = transform_func.input_types
         #data_shapes = transform_func.data_shapes
@@ -377,46 +398,55 @@ class Dataset(object):
         return ret
 
     def shuffle(self, buffer_size):
-        func = functools.partial(shuffle_func, buffer_size=buffer_size)
+        """doc"""
+        func = functools.partial(_shuffle_func, buffer_size=buffer_size)
         return self.apply(func)
 
     def repeat(self, n=-1):
-        func = functools.partial(repeat_func, n=n)
+        """doc"""
+        func = functools.partial(_repeat_func, n=n)
         return self.apply(func)
 
     def map(self, fn):
-        func = functools.partial(map_func, fn=fn)
+        """doc"""
+        func = functools.partial(_map_func, fn=fn)
         return self.apply(func)
 
     def filter(self, fn):
-        func = functools.partial(filter_func, fn=fn)
+        """doc"""
+        func = functools.partial(_filter_func, fn=fn)
         return self.apply(func)
 
     def shard(self, num_shards, index):
+        """doc"""
         func = functools.partial(
-            shard_func, num_shards=num_shards, index=index)
+            _shard_func, num_shards=num_shards, index=index)
         return self.apply(func)
 
     def interleave(self, map_fn, cycle_length, block_length):
+        """doc"""
         func = functools.partial(
-            interleave_func,
+            _interleave_func,
             map_fn=map_fn,
             cycle_length=cycle_length,
             block_length=block_length)
         return self.apply(func)
 
     def padded_batch(self, batch_size, pad_value=0, max_seqlen=None):
+        """doc"""
         func = functools.partial(
-            padded_batch_func,
+            _padded_batch_func,
             batch_size=batch_size,
             pad_value=pad_value,
             max_seqlen=max_seqlen)
         return self.apply(func)
 
     def take(self, count=1):
-        func = functools.partial(take_func, count=count)
+        """doc"""
+        func = functools.partial(_take_func, count=count)
         return self.apply(func)
 
     def buffered(self, size=10):
-        func = functools.partial(buffered_func, size=size)
+        """doc"""
+        func = functools.partial(_buffered_func, size=size)
         return self.apply(func)

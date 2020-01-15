@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""global collections"""
+
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -43,13 +45,16 @@ class Collections(object):
         _global_collection = None
 
     def add(self, key, val):
+        """doc"""
         self.col.setdefault(key, []).append(val)
 
     def get(self, key):
+        """doc"""
         return self.col.get(key, None)
 
 
 def default_collection():
+    """return global collection"""
     global _global_collection
     if _global_collection is None:
         _global_collection = Collections()

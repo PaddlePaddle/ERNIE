@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+""" 
+Never Never Never import paddle.fluid in main process, or any module would import fluid.
+"""
 
 from __future__ import division
 from __future__ import absolute_import
@@ -24,27 +27,27 @@ from time import sleep, time
 import multiprocessing
 
 import zmq
-""" Never Never Never import paddle.fluid in main process, or any module would import fluid.
-"""
 
 log = logging.getLogger(__name__)
 
 
-def profile(msg):
-    def decfn(fn):
-        def retfn(*args, **kwargs):
+def _profile(msg):
+    def _decfn(fn):
+        def _retfn(*args, **kwargs):
             start = time()
             ret = fn(*args, **kwargs)
             end = time()
             log.debug('%s timecost: %.5f' % (msg, end - start))
             return ret
 
-        return retfn
+        return _retfn
 
-    return decfn
+    return _decfn
 
 
 class Predictor(object):
+    """paddle predictor wrapper"""
+
     def __init__(self, model_dir, device_idx=0):
         import paddle.fluid as F
         log.debug('create predictor on card %d' % device_idx)
@@ -52,7 +55,7 @@ class Predictor(object):
         config.enable_use_gpu(5000, device_idx)
         self._predictor = F.core.create_paddle_predictor(config)
 
-    @profile('paddle')
+    @_profile('paddle')
     def __call__(self, args):
         for i, a in enumerate(args):
             a.name = 'placeholder_%d' % i
@@ -61,6 +64,7 @@ class Predictor(object):
 
 
 def run_worker(model_dir, device_idx, endpoint="ipc://worker.ipc"):
+    """worker process entrence"""
     try:
         log.debug("run_worker %s" % device_idx)
         os.environ["CUDA_VISIBLE_DEVICES"] = os.getenv(
@@ -97,6 +101,8 @@ def run_worker(model_dir, device_idx, endpoint="ipc://worker.ipc"):
 
 
 class InferencePredictor(object):
+    """control Predictor for multi gpu card"""
+
     def __init__(self, backend_addr, model_dir, n_devices=1):
         self.backend_addr = backend_addr
         self.model_dir = model_dir
@@ -104,6 +110,7 @@ class InferencePredictor(object):
         self.children = []
 
     def start(self):
+        """doc"""
         for device_idx in range(self.n_devices):
             p = multiprocessing.Process(
                 target=run_worker,
@@ -113,21 +120,27 @@ class InferencePredictor(object):
         return self
 
     def join(self):
+        """doc"""
         for p in self.children:
             p.join()
 
     def term(self):
+        """doc"""
         for p in self.children:
             log.debug("terminating children %s" % repr(p))
             p.terminate()
 
 
 class InferenceProxy(object):
+    """zmq proxy"""
+
     def __init__(self):
+        """doc"""
         self.backend = None
         self.frontend = None
 
     def listen(self, frontend_addr, backend_addr):
+        """doc"""
         log.info("InferenceProxy starting...")
         try:
             context = zmq.Context(1)
@@ -152,11 +165,15 @@ class InferenceProxy(object):
 
 
 class InferenceServer(object):
+    """start InferencePredictor and InferenceProxy"""
+
     def __init__(self, model_dir, n_devices):
+        """doc"""
         self.model_dir = model_dir
         self.n_devices = n_devices
 
     def listen(self, port):
+        """doc"""
         frontend_addr = "tcp://*:%s" % port
         backend_addr = "ipc://backend.ipc"
         predictor = InferencePredictor(backend_addr, self.model_dir,

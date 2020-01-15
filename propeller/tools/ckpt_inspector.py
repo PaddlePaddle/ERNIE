@@ -72,6 +72,10 @@ def parse(filename):
         elif proto.data_type == framework_pb2.VarType.INT8:
             arr = np.array(
                 gen_arr(f.read(), 'B'), dtype=np.int8).reshape(proto.dims)
+        elif proto.data_type == framework_pb2.VarType.FP16:
+            arr = np.array(
+                gen_arr(f.read(), 'H'),
+                dtype=np.uint16).view(np.float16).reshape(proto.dims)
         else:
             raise RuntimeError('Unknown dtype %s' % proto.data_type)
 

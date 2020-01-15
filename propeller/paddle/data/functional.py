@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Pyreader based Dataset"""
 
 import sys
 import numpy as np
@@ -25,7 +26,10 @@ log = logging.getLogger(__name__)
 
 
 class Dataset(DatasetBase):
+    """Pyreader based Dataset"""
+
     def placeholders(self):
+        """doc"""
         if self.name is None:
             raise ValueError('can not get feature from unnamed Dataset')
 
@@ -41,7 +45,7 @@ class Dataset(DatasetBase):
         return ret
 
     def features(self):
-        '''start point of net building. call this in a program scope'''
+        """start point of net building. call this in a program scope"""
         if self.name is None:
             raise ValueError('can not get feature from unnamed Dataset')
 
@@ -51,9 +55,13 @@ class Dataset(DatasetBase):
                 (repr(self._data_shapes), repr(self._data_types)))
         return self.placeholders()
 
-    def start(self, places=F.cuda_places()):
+    def start(self, places=None):
+        """start Pyreader"""
+        if places is None:
+            places = F.cuda_places() if F.core.is_compiled_with_cuda(
+            ) else F.cpu_places()
         #assert self.pyreader is not None, 'use Dataset.features to build net first, then start dataset'
-        def gen():
+        def _gen():
             try:
                 for idx, i in enumerate(self.generator()):
                     yield i
@@ -63,5 +71,5 @@ class Dataset(DatasetBase):
 
         r = F.io.PyReader(
             feed_list=self.placeholders(), capacity=50, iterable=True)
-        r.decorate_batch_generator(gen, places=places)
+        r.decorate_batch_generator(_gen, places=places)
         return r()
