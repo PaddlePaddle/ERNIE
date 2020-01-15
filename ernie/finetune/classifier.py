@@ -40,12 +40,12 @@ def create_model(args,
                  is_regression=False,
                  ernie_version="1.0"):
 
-    src_ids = fluid.layers.data(name='1', shape=[-1, args.max_seq_len, 1], dtype='int64')
-    sent_ids = fluid.layers.data(name='2', shape=[-1, args.max_seq_len, 1], dtype='int64')
-    pos_ids = fluid.layers.data(name='3', shape=[-1, args.max_seq_len, 1], dtype='int64')
-    task_ids = fluid.layers.data(name='4', shape=[-1, args.max_seq_len, 1], dtype='int64')
-    input_mask = fluid.layers.data(name='5', shape=[-1, args.max_seq_len, 1], dtype='float32')
-    qids = fluid.layers.data(name='7', shape=[-1, 1], dtype='int64')
+    src_ids = fluid.layers.data(name='eval_placeholder_0', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    sent_ids = fluid.layers.data(name='eval_placeholder_1', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    pos_ids = fluid.layers.data(name='eval_placeholder_2', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    input_mask = fluid.layers.data(name='eval_placeholder_3', shape=[-1, args.max_seq_len, 1], dtype='float32')
+    task_ids = fluid.layers.data(name='eval_placeholder_4', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    qids = fluid.layers.data(name='eval_placeholder_5', shape=[-1, 1], dtype='int64')
 
     if is_classify:
         labels = fluid.layers.data(name='6', shape=[-1, 1], dtype='int64')
@@ -87,7 +87,7 @@ def create_model(args,
         else:
             probs = logits
         feed_targets_name = [
-            src_ids.name, sent_ids.name, pos_ids.name, input_mask.name
+            src_ids.name, sent_ids.name,  pos_ids.name, input_mask.name
         ]
         if ernie_version == "2.0":
             feed_targets_name += [task_ids.name]

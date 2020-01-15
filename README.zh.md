@@ -1056,7 +1056,7 @@ ERNIE提供了通过数据蒸馏从而达到模型压缩、加速的开发套件
 如果您采用 `propeller` 完成finetune，则 `BestInferenceExporter` 会在finetune过程中根据预测指标，挑最好的模型生成 inference_model .
 
 ### 在线预测
-随后您可以使用[PaddleInference C++ API](https://www.paddlepaddle.org.cn/documentation/docs/zh/advanced_usage/deploy/inference/native_infer.html)将模型的前向预测代码联编到您的生产环境中。或者您可以使用我们为您构建好的python预测引擎来完成一个简单的服务。执行如下指令，便可以开启一个propeller server：
+随后您可以使用[ERNIE fast inference C++ API](./inference/README.md)将模型的前向预测代码联编到您的生产环境中。或者您可以使用我们为您构建好的python预测引擎来完成一个简单的服务。执行如下指令，便可以开启一个propeller server：
 
 ```script
 python -m propeller.tools.start_server -m /path/to/saved/model -p 8888
