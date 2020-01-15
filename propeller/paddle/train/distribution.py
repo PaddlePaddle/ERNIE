@@ -128,6 +128,7 @@ def init_distribuition_env(program):
     elif status.mode == DistributionMode.NCCL:
         config = F.DistributeTranspilerConfig()
         config.mode = "nccl2"
+        config.nccl_comm_num = 1
         F.DistributeTranspiler(config=config).transpile(
             status.replica_id,
             trainers=','.join(status._env),

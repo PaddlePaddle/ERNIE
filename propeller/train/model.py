@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Model template
+"""
+
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -26,7 +30,11 @@ import numpy as np
 
 
 @six.add_metaclass(abc.ABCMeta)
-class Model():
+class Model(object):
+    """
+    template
+    """
+
     def __init__(self, config, mode):
         """
         Args:
@@ -39,9 +47,9 @@ class Model():
     def forward(self, features):
         """
         Args:
-            features (list of Tensor): depends on your Dataset.output_shapes
+            features (list of Tensor): inputs features that depends on your Dataset.output_shapes
         Returns:
-            return (Tensor): 
+            return (Tensor): prediction
         """
         pass
 
@@ -53,8 +61,6 @@ class Model():
             label (Tensor): depends on your Dataset.output_shapes
         Returns:
             return (paddle scalar): loss
-        
-
         """
         pass
 

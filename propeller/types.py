@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Basic types"""
+
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -21,12 +23,15 @@ from collections import namedtuple
 
 
 class RunMode(object):
+    """model_fn will be called in 3 modes"""
     TRAIN = 1
     PREDICT = 2
     EVAL = 3
 
 
 class HParams(object):
+    """Hyper paramerter"""
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             self.__dict__[k] = v
@@ -45,30 +50,36 @@ class HParams(object):
     def __setitem__(self, key, val):
         self.__dict__[key] = val
 
-    @staticmethod
-    def from_json(self, json_str):
+    @classmethod
+    def from_json(cls, json_str):
+        """doc"""
         d = json.loads(json_str)
         if type(d) != dict:
             raise ValueError('json object must be dict.')
         return HParams.from_dict(d)
 
     def get(self, key, default=None):
+        """doc"""
         return self.__dict__.get(key, default)
 
-    @staticmethod
-    def from_dict(self, d):
+    @classmethod
+    def from_dict(cls, d):
+        """doc"""
         if type(d) != dict:
             raise ValueError('input must be dict.')
         hp = HParams(**d)
         return hp
 
     def to_json(self):
+        """doc"""
         return json.dumps(self.__dict__)
 
     def to_dict(self):
+        """doc"""
         return self.__dict__
 
     def join(self, other):
+        """doc"""
         if not isinstance(other, HParams):
             raise ValueError('input must be HParams instance.')
         self.__dict__.update(**other.__dict__)
@@ -95,9 +106,12 @@ ModelSpec = namedtuple('ModelSpec', [
     'metrics',
     'mode',
     'inference_spec',
+    'train_hooks',
+    'eval_hooks',
 ])
 ModelSpec.__new__.__defaults__ = (None, ) * len(ModelSpec._fields)
 
 
 class StopException(Exception):
+    """doc"""
     pass
