@@ -65,22 +65,19 @@ def slot_to_paddlearray(slot):
     """doc"""
     import paddle.fluid.core as core
     if slot.type == interface_pb2.Slot.FP32:
+        dtype = np.float32
         type_str = 'f'
-        dtype = core.PaddleDType.FLOAT32
     elif slot.type == interface_pb2.Slot.INT32:
+        dtype = np.int32
         type_str = 'i'
-        dtype = core.PaddleDType.INT32
     elif slot.type == interface_pb2.Slot.INT64:
+        dtype = np.int64
         type_str = 'q'
-        dtype = core.PaddleDType.INT64
     else:
         raise RuntimeError('know type %s' % slot.type)
-    ret = core.PaddleTensor()
-    ret.shape = slot.dims
-    ret.dtype = dtype
     num = len(slot.data) // struct.calcsize(type_str)
     arr = struct.unpack('%d%s' % (num, type_str), slot.data)
-    ret.data = core.PaddleBuf(arr)
+    ret = core.PaddleTensor(data=np.array(arr, dtype=dtype).reshape(slot.dims))
     return ret
 
 

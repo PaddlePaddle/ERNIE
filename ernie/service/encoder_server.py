@@ -54,6 +54,8 @@ if __name__ == "__main__":
         raise RuntimeError('CUDA_VISIBLE_DEVICES not set')
     if not os.path.exists(args.model_dir):
         raise ValueError('model_dir not found: %s' % args.model_dir)
+    if not os.path.exists(args.model_dir):
+        raise ValueError('model_dir not found: %s' % args.model_dir)
     n_devices = len(cuda_env.split(","))
     if args.encode_layer.lower() == 'pooler':
         model_dir = os.path.join(args.model_dir, 'pooler')
