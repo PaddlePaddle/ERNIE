@@ -653,7 +653,7 @@ BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equiv
 
 ### Install PaddlePaddle
 
-This code base has been tested with Paddle Fluid 1.6 with Python 2/3.5+, since Paddle 1.6 has changed some of APIs, using version before 1.6 might have bug on NER tasks.
+This code base has been tested with Paddle Fluid 1.6.3 with Python 2/3.5+, since Paddle 1.6.3 has changed some of APIs, using version before 1.6.3 might have bug on NER tasks.
 
 **\*Important\*** When finished installing Paddle Fluid, remember to update LD_LIBRARY_PATH about CUDA, cuDNN, NCCL2, for more information on paddlepaddle setup, you can click [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/index_en.html) and [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/install/install_Ubuntu_en.html). Also, you can read FAQ at the end of this document when you encounter errors.
 
