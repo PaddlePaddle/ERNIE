@@ -43,8 +43,8 @@ make
 测试样本：XNLI test集合，输入BatchSize=1, SequenceLength=128.
 重复5遍取平均值。
 
-| mode  | 延迟(ms) |
+| 测试环境 | 延迟(ms) |
 | ----- | -----    |
-| CPU（Intel(R) Xeon(R) Gold 5117 CPU @ 2.00GHz (20 线程)） | 8.5 |
-| GPU （P4）  | 29.8818  |
+| CPU（Intel(R) Xeon(R) Gold 5117 CPU @ 2.00GHz (20 线程)） | 29.8818|
+| GPU （P4）  | 8.5 |
 
