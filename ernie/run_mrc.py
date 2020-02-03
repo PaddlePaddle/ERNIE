@@ -361,7 +361,6 @@ def main(args):
 if __name__ == '__main__':
     prepare_logger(log)
     print_arguments(args)
-    while True:
-        scope = fluid.core.Scope()
-        with fluid.scope_guard(scope):
-            main(args)
+    scope = fluid.core.Scope()
+    with fluid.scope_guard(scope):
+        main(args)

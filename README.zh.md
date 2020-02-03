@@ -689,7 +689,7 @@ ERNIE Tiny轻量级模型在公开数据集的效果如下所示，任务均值�
 
 ## PaddlePaddle安装
 
-本项目依赖于 Paddle 1.6.3，* 由于Paddle 1.6.3版本相比之前版本有较大API改动，使用Paddle 1.6.3以前版本运行本代码库会导致序列标注等任务报错 *，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+本项目依赖于 Paddle 1.6，* 由于Paddle 1.6版本相比之前版本有较大API改动，使用Paddle 1.6以前版本运行本代码库会导致序列标注等任务报错 *，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
 
 **【重要】安装后，需要及时的将 CUDA、cuDNN、NCCL2 等动态库路径加入到环境变量 LD_LIBRARY_PATH 之中，否则训练过程中会报相关的库错误。具体的paddlepaddle配置细节请查阅[这里](http://en.paddlepaddle.org/documentation/docs/zh/1.5/beginners_guide/quick_start_cn.html)**
 

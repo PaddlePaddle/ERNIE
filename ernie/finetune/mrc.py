@@ -44,7 +44,7 @@ def create_model(args, pyreader_name, ernie_config, is_training):
     pos_ids = fluid.layers.data(name='2', shape=[-1, args.max_seq_len, 1], dtype='int64')
     sent_ids= fluid.layers.data(name='3', shape=[-1, args.max_seq_len, 1], dtype='int64')
     task_ids= fluid.layers.data(name='4', shape=[-1, args.max_seq_len, 1], dtype='int64')
-    input_mask = fluid.layers.data(name='5', shape=[-1, 1], dtype='float32')
+    input_mask = fluid.layers.data(name='5', shape=[-1, args.max_seq_len, 1], dtype='float32')
     start_positions = fluid.layers.data(name='6', shape=[-1, 1], dtype='int64')
     end_positions = fluid.layers.data(name='7', shape=[-1, 1], dtype='int64')
     unique_id = fluid.layers.data(name='8', shape=[-1, 1], dtype='int64')
