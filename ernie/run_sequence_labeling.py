@@ -289,10 +289,14 @@ def main(args):
 
     # final eval on dev set
     if nccl2_trainer_id ==0 and args.do_val:
+        if not args.do_train:
+            current_example, current_epoch = reader.get_train_progress()
         evaluate_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
                 current_epoch, 'final')
 
     if nccl2_trainer_id == 0 and args.do_test:
+        if not args.do_train:
+            current_example, current_epoch = reader.get_train_progress()
         predict_wrapper(reader, exe, test_prog, test_pyreader, graph_vars,
                 current_epoch, 'final')
 

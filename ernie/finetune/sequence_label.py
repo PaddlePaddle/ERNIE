@@ -109,6 +109,11 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
 
 
 def calculate_f1(num_label, num_infer, num_correct):
+
+    num_infer = np.sum(num_infer)
+    num_label = np.sum(num_label)
+    num_correct = np.sum(num_correct)
+    
     if num_infer == 0:
         precision = 0.0
     else:
