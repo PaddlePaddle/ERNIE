@@ -75,12 +75,12 @@ def create_model(args, pyreader_name, ernie_config, is_prediction=False):
     ret_infers = fluid.layers.reshape(x=infers, shape=[-1, 1])
     lod_labels = fluid.layers.sequence_unpad(labels, seq_lens)
     lod_infers = fluid.layers.sequence_unpad(infers, seq_lens)
-
+    _num_chunk_types = ((args.num_labels-1)//(len(args.chunk_scheme)-1)) if args.chunk_scheme != "plain" else 1
     (_, _, _, num_infer, num_label, num_correct) = fluid.layers.chunk_eval(
          input=lod_infers,
          label=lod_labels,
          chunk_scheme=args.chunk_scheme,
-         num_chunk_types=((args.num_labels-1)//(len(args.chunk_scheme)-1)))
+         num_chunk_types=_num_chunk_types)
 
     labels = fluid.layers.flatten(labels, axis=2)
     ce_loss, probs = fluid.layers.softmax_with_cross_entropy(
