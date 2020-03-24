@@ -1005,5 +1005,9 @@ Download [NCCL2](https://developer.nvidia.com/nccl/nccl-download), and export th
 ### FAQ6: Runtime error: `ModuleNotFoundError No module named propeller`<a name="faq6"></a>
 
 you can import propeller to your PYTHONPATH by `export PYTHONPATH:./:$PYTHONPATH`
-`
+
+
+#### FAQ7: Cannot malloc XXX MB GPU memory.
+
+Try to reduce the batch_size, reduce the max_seq_len and set FLAGS_eager_delete_tensor_gb=0.0
 
