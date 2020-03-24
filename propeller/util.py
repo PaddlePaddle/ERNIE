@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""global utils"""
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -31,6 +32,7 @@ log = logging.getLogger(__name__)
 
 
 def ArgumentParser(name):
+    """predefined argparser"""
     parser = argparse.ArgumentParser('propeller model')
     parser.add_argument('--run_config', type=str, default='')
     parser.add_argument(
@@ -59,6 +61,7 @@ def _get_dict_from_environ_or_json_or_file(args, env_name):
 
 
 def parse_file(filename):
+    """useless api"""
     d = _get_dict_from_environ_or_json_or_file(filename, None)
     if d is None:
         raise ValueError('file(%s) not found' % filename)
@@ -66,6 +69,7 @@ def parse_file(filename):
 
 
 def parse_runconfig(args=None):
+    """get run_config from env or file"""
     d = _get_dict_from_environ_or_json_or_file(args.run_config,
                                                'PROPELLER_RUNCONFIG')
     if d is None:
@@ -74,6 +78,7 @@ def parse_runconfig(args=None):
 
 
 def parse_hparam(args=None):
+    """get hparam from env or file"""
     if args is not None:
         hparam_strs = reduce(list.__add__, args.hparam)
     else:
@@ -91,6 +96,7 @@ def parse_hparam(args=None):
 
 
 def flatten(s):
+    """doc"""
     assert is_struture(s)
     schema = [len(ss) for ss in s]
     flt = list(itertools.chain(*s))
@@ -98,6 +104,7 @@ def flatten(s):
 
 
 def unflatten(structure, schema):
+    """doc"""
     start = 0
     res = []
     for _range in schema:
@@ -107,10 +114,12 @@ def unflatten(structure, schema):
 
 
 def is_struture(s):
+    """doc"""
     return isinstance(s, list) or isinstance(s, tuple)
 
 
 def map_structure(func, s):
+    """same sa tf.map_structure"""
     if isinstance(s, list) or isinstance(s, tuple):
         return [map_structure(func, ss) for ss in s]
     elif isinstance(s, dict):

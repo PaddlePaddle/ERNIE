@@ -24,6 +24,7 @@ import six
 import logging
 import paddle.fluid as fluid
 from io import open
+from paddle.fluid.layers import core
 
 from model.transformer_encoder import encoder, pre_process_layer
 
@@ -85,8 +86,8 @@ class ErnieModel(object):
         self._pos_emb_name = "pos_embedding"
         self._sent_emb_name = "sent_embedding"
         self._task_emb_name = "task_embedding"
-        self._dtype = "float16" if use_fp16 else "float32"
-        self._emb_dtype = "float32"
+        self._dtype = core.VarDesc.VarType.FP16 if use_fp16 else core.VarDesc.VarType.FP32
+        self._emb_dtype = core.VarDesc.VarType.FP32
 
         # Initialize all weigths by truncated normal initializer, and all biases
         # will be initialized by constant zero by default.
@@ -138,7 +139,7 @@ class ErnieModel(object):
         emb_out = pre_process_layer(
             emb_out, 'nd', self._prepostprocess_dropout, name='pre_encoder')
 
-        if self._dtype == "float16":
+        if self._dtype == core.VarDesc.VarType.FP16:
             emb_out = fluid.layers.cast(x=emb_out, dtype=self._dtype)
             input_mask = fluid.layers.cast(x=input_mask, dtype=self._dtype)
         self_attn_mask = fluid.layers.matmul(
@@ -167,7 +168,7 @@ class ErnieModel(object):
             postprocess_cmd="dan",
             param_initializer=self._param_initializer,
             name='encoder')
-        if self._dtype == "float16":        
+        if self._dtype == core.VarDesc.VarType.FP16:
             self._enc_out = fluid.layers.cast(
                 x=self._enc_out, dtype=self._emb_dtype)
 

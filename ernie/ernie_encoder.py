@@ -22,12 +22,15 @@ import argparse
 import numpy as np
 import multiprocessing
 
+import logging
 import paddle.fluid as fluid
 
 import reader.task_reader as task_reader
-from model.ernie import ErnieConfig, ErnieModel
-from utils.args import ArgumentGroup, print_arguments
+from model.ernie_v1 import ErnieConfig, ErnieModel
+from utils.args import ArgumentGroup, print_arguments, prepare_logger
 from utils.init import init_pretraining_params
+
+log = logging.getLogger()
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -52,24 +55,21 @@ run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use G
 
 
 def create_model(args, pyreader_name, ernie_config):
-    pyreader = fluid.layers.py_reader(
-        capacity=50,
-        shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, 1]],
-        dtypes=['int64', 'int64', 'int64', 'int64', 'float', 'int64'],
-        lod_levels=[0, 0, 0, 0, 0, 0],
-        name=pyreader_name,
-        use_double_buffer=True)
+    src_ids = fluid.layers.data(name='1', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    sent_ids = fluid.layers.data(name='2', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    pos_ids = fluid.layers.data(name='3', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    task_ids = fluid.layers.data(name='4', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    input_mask = fluid.layers.data(name='5', shape=[-1, args.max_seq_len, 1], dtype='float32')
+    seq_lens = fluid.layers.data(name='8', shape=[-1], dtype='int64')
 
-    (src_ids, sent_ids, pos_ids, task_ids, input_mask,
-     seq_lens) = fluid.layers.read_file(pyreader)
+    pyreader = fluid.io.DataLoader.from_generator(feed_list=[src_ids, sent_ids, pos_ids, task_ids, input_mask, seq_lens], 
+            capacity=70,
+            iterable=False)
 
     ernie = ErnieModel(
         src_ids=src_ids,
         position_ids=pos_ids,
         sentence_ids=sent_ids,
-        task_ids=task_ids,
         input_mask=input_mask,
         config=ernie_config)
 
@@ -143,7 +143,7 @@ def main(args):
     exec_strategy = fluid.ExecutionStrategy()
     exec_strategy.num_threads = dev_count
 
-    pyreader.decorate_tensor_provider(data_generator)
+    pyreader.set_batch_generator(data_generator)
     pyreader.start()
 
     total_cls_emb = []
@@ -167,6 +167,11 @@ def main(args):
     total_cls_emb = np.concatenate(total_cls_emb)
     total_top_layer_emb = np.concatenate(total_top_layer_emb)
 
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+    else:
+        raise RuntimeError('output dir exists: %s' % args.output_dir)
+
     with open(os.path.join(args.output_dir, "cls_emb.npy"),
               "wb") as cls_emb_file:
         np.save(cls_emb_file, total_cls_emb)
@@ -176,6 +181,7 @@ def main(args):
 
 
 if __name__ == '__main__':
+    prepare_logger(log)
     args = parser.parse_args()
     print_arguments(args)
 

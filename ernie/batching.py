@@ -208,7 +208,7 @@ def pad_batch_data(insts,
 
     if return_seq_lens:
         seq_lens = np.array([len(inst) for inst in insts])
-        return_list += [seq_lens.astype("int64").reshape([-1, 1])]
+        return_list += [seq_lens.astype("int64").reshape([-1])]
 
     return return_list if len(return_list) > 1 else return_list[0]
 

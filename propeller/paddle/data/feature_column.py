@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""FeatureColumns and many Column"""
 from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -30,7 +31,7 @@ import numpy as np
 from glob import glob
 from propeller.paddle.train import distribution
 
-from propeller.data.functional import interleave_func
+from propeller.data.functional import _interleave_func
 from propeller.paddle.data.functional import Dataset
 from propeller.paddle.data import example_pb2, feature_pb2
 
@@ -43,35 +44,47 @@ __all__ = [
 
 
 def basic_tokenizer(sen):
+    """doc"""
     seg = sen.split(b' ')
     seg = filter(lambda i: i != b' ', seg)
     return seg
 
 
-class Column():
+class Column(object):
+    """doc"""
+
     def __init__(self, name):
+        """doc"""
         pass
 
     def raw_to_proto(self, raw):
+        """doc"""
         return feature_pb2.Feature()
 
     @property
     def output_shapes(self):
+        """doc"""
         pass
 
     @property
     def output_types(self):
+        """doc"""
         pass
 
     def proto_to_instance(self, proto):
+        """doc"""
         raise NotImplementedError()
 
     def raw_to_instance(self, raw):
+        """doc"""
         raise NotImplementedError()
 
 
 class LabelColumn(Column):
+    """doc"""
+
     def __init__(self, name, vocab_dict=None, vocab_file=None):
+        """doc"""
         self.name = name
         self.vocab = None
         if vocab_file:
@@ -84,13 +97,16 @@ class LabelColumn(Column):
 
     @property
     def output_shapes(self):
+        """doc"""
         return [1]
 
     @property
     def output_types(self):
+        """doc"""
         return 'int64'
 
     def raw_to_proto(self, raw):
+        """doc"""
         if self.vocab is None:
             ids = [int(raw)]
         else:
@@ -99,10 +115,12 @@ class LabelColumn(Column):
         return fe
 
     def proto_to_instance(self, feature):
+        """doc"""
         ret = np.array(feature.int64_list.value[0], dtype=np.int64)
         return ret
 
     def raw_to_instance(self, raw):
+        """doc"""
         if self.vocab is None:
             ids = int(raw)
         else:
@@ -111,6 +129,8 @@ class LabelColumn(Column):
 
 
 class TextColumn(Column):
+    """doc"""
+
     def __init__(self,
                  name,
                  unk_id,
@@ -132,63 +152,75 @@ class TextColumn(Column):
 
     @property
     def output_shapes(self):
+        """doc"""
         return [-1]
 
     @property
     def output_types(self):
+        """doc"""
         return 'int64'
 
     def raw_to_proto(self, raw):
+        """doc"""
         ids = [self.vocab.get(s, self.unk_id) for s in self.tokenizer(raw)]
         fe = feature_pb2.Feature(int64_list=feature_pb2.Int64List(value=ids))
         return fe
 
     def proto_to_instance(self, feature):
+        """doc"""
         ret = np.array(feature.int64_list.value, dtype=np.int64)
         return ret
 
     def raw_to_instance(self, raw):
+        """doc"""
         ids = [self.vocab.get(s, self.unk_id) for s in self.tokenizer(raw)]
         return np.array(ids, dtype=np.int64)
 
 
 class TextIDColumn(Column):
+    """doc"""
+
     def __init__(self, name):
+        """doc"""
         self.name = name
 
     @property
     def output_shapes(self):
+        """doc"""
         return [-1]
 
     @property
     def output_types(self):
+        """doc"""
         return 'int64'
 
     def raw_to_proto(self, raw):
+        """doc"""
         ids = [int(s) for s in raw.split(b' ')]
         fe = feature_pb2.Feature(int64_list=feature_pb2.Int64List(value=ids))
         return fe
 
     def proto_to_instance(self, feature):
+        """doc"""
         ret = np.array(feature.int64_list.value, dtype=np.int64)
         return ret
 
     def raw_to_instance(self, raw):
+        """doc"""
         ret = np.array([int(i) for i in raw.split(b' ')], dtype=np.int64)
         return ret
 
 
+def _list_files(raw_dir):
+    return [os.path.join(raw_dir, p) for p in os.listdir(raw_dir)]
+
+
 class FeatureColumns(object):
-    def __init__(self, columns, pad_id=0):
+    """A Dataset Factory object"""
+
+    def __init__(self, columns):
+        """doc"""
         self._columns = columns
-
-    def raw_files(self, raw_dir):
-        return [os.path.join(raw_dir, p) for p in os.listdir(raw_dir)]
-
-    def gz_files(self, gz_dir):
-        return None if gz_dir is None else [
-            os.path.join(gz_dir, p) for p in os.listdir(gz_dir)
-        ]
 
     def _make_gz_dataset(self, raw_dir, gz_dir):
         assert raw_dir or gz_dir, 'data_dir not specified when using gz mode'
@@ -237,7 +269,7 @@ class FeatureColumns(object):
         if shuffle:
             dataset = dataset.shuffle(buffer_size=len(gz_files))
         fn = partial(
-            interleave_func,
+            _interleave_func,
             map_fn=lambda filename: Dataset.from_record_file(filename),
             cycle_length=len(gz_files),
             block_length=1)
@@ -271,7 +303,7 @@ class FeatureColumns(object):
             dataset = dataset.shuffle(buffer_size=len(data_files))
 
         fn = partial(
-            interleave_func,
+            _interleave_func,
             map_fn=lambda filename: Dataset.from_file(filename),
             cycle_length=len(data_files),
             block_length=1)
@@ -294,9 +326,9 @@ class FeatureColumns(object):
     def _read_stdin_dataset(self, encoding='utf8', shuffle=False, **kwargs):
         log.info('reading raw files stdin')
 
-        def gen():
+        def _gen():
             if six.PY3:
-                source = sys.stdin.buffer 
+                source = sys.stdin.buffer
             else:
                 source = sys.stdin
             while True:
@@ -305,12 +337,12 @@ class FeatureColumns(object):
                     break
                 yield line,
 
-        dataset = Dataset.from_generator_func(gen)
+        dataset = Dataset.from_generator_func(_gen)
         if shuffle:
             dataset = dataset.shuffle(buffer_size=1000)
 
         def _parse_stdin(record_str):
-            '''function that takes python_str as input'''
+            """function that takes python_str as input"""
             features = record_str.strip(b'\n').split(b'\t')
             ret = [
                 column.raw_to_instance(feature)
@@ -346,13 +378,17 @@ class FeatureColumns(object):
                       gz_dir=None,
                       data_file=None,
                       **kwargs):
+        """
+        build `Dataset` from `data_dir` or `data_file`
+        if `use_gz`, will try to convert data_files to gz format and save to `gz_dir`, if `gz_dir` not given, will create one.
+        """
         if use_gz:
             gz_dir = self._make_gz_dataset(data_dir, gz_dir)
-            gz_files = self.gz_files(gz_dir)
+            gz_files = _list_files(gz_dir) if gz_dir is not None else gz_dir
             ds = self._read_gz_dataset(gz_files, **kwargs)
         else:
             if data_dir is not None:
-                data_files = self.raw_files(data_dir)
+                data_files = _list_files(data_dir)
             elif data_file is not None:
                 data_files = [data_file]
             else:
@@ -362,6 +398,7 @@ class FeatureColumns(object):
         return ds
 
     def build_dataset_from_stdin(self, name, **kwargs):
+        """doc"""
         ds = self._read_stdin_dataset(**kwargs)
         ds.name = name
         return ds

@@ -36,20 +36,17 @@ from model.ernie import ErnieModel
 log = logging.getLogger(__name__)
 
 def create_model(args, pyreader_name, ernie_config, is_prediction=False):
-    pyreader = fluid.layers.py_reader(
-        capacity=50,
-        shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1], [-1, 1]],
-        dtypes=[
-            'int64', 'int64', 'int64', 'int64', 'float32', 'int64', 'int64'
-        ],
-        lod_levels=[0, 0, 0, 0, 0, 0, 0],
-        name=pyreader_name,
-        use_double_buffer=True)
+    src_ids = fluid.layers.data(name='1', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    sent_ids = fluid.layers.data(name='2', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    pos_ids = fluid.layers.data(name='3', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    task_ids = fluid.layers.data(name='4', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    input_mask = fluid.layers.data(name='5', shape=[-1, args.max_seq_len, 1], dtype='float32')
+    labels = fluid.layers.data(name='7', shape=[-1, args.max_seq_len, 1], dtype='int64')
+    seq_lens = fluid.layers.data(name='8', shape=[-1], dtype='int64')
 
-    (src_ids, sent_ids, pos_ids, task_ids, input_mask, labels,
-     seq_lens) = fluid.layers.read_file(pyreader)
+    pyreader = fluid.io.DataLoader.from_generator(feed_list=[src_ids, sent_ids, pos_ids, task_ids, input_mask, labels, seq_lens], 
+            capacity=70,
+            iterable=False)
 
     ernie = ErnieModel(
         src_ids=src_ids,

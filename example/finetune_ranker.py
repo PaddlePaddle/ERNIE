@@ -146,6 +146,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, required=True)
     parser.add_argument('--warm_start_from', type=str)
     parser.add_argument('--sentence_piece_model', type=str, default=None)
+    parser.add_argument('--word_dict', type=str, default=None)
     args = parser.parse_args()
     run_config = propeller.parse_runconfig(args)
     hparams = propeller.parse_hparam(args)
@@ -157,7 +158,9 @@ if __name__ == '__main__':
     unk_id = vocab['[UNK]']
 
     if args.sentence_piece_model is not None:
-        tokenizer = utils.data.JBSPTokenizer(args.sentence_piece_model, jb=True, lower=True)
+        if args.word_dict is None:
+            raise ValueError('--word_dict no specified in subword Model')
+        tokenizer = utils.data.WSSPTokenizer(args.sentence_piece_model, args.word_dict, ws=True, lower=True)
     else:
         tokenizer = utils.data.CharTokenizer(vocab.keys())
 
@@ -218,7 +221,7 @@ if __name__ == '__main__':
                 from_dir=warm_start_dir
             )
 
-        best_exporter = propeller.train.exporter.BestExporter(os.path.join(run_config.model_dir, 'best'), cmp_fn=lambda old, new: new['dev']['f1'] > old['dev']['f1'])
+        best_exporter = propeller.train.exporter.BestInferenceModelExporter(os.path.join(run_config.model_dir, 'best'), cmp_fn=lambda old, new: new['dev']['f1'] > old['dev']['f1'])
         propeller.train_and_eval(
                 model_class_or_model_fn=RankingErnieModel, 
                 params=hparams, 
@@ -258,6 +261,7 @@ if __name__ == '__main__':
         est = propeller.Learner(RankingErnieModel, run_config, hparams)
         for qid, res in est.predict(predict_ds, ckpt=-1):
             print('%d\t%d\t%.5f\t%.5f' % (qid[0], np.argmax(res), res[0], res[1]))
+
         #for i in predict_ds:
         #    sen = i[0]
         #    for ss in np.squeeze(sen):

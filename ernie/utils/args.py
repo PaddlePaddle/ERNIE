@@ -20,6 +20,8 @@ from __future__ import absolute_import
 
 
 import six
+import os
+import sys
 import argparse
 import logging
 
@@ -33,7 +35,7 @@ def prepare_logger(logger, debug=False, save_to_file=None):
     console_hdl = logging.StreamHandler()
     console_hdl.setFormatter(formatter)
     logger.addHandler(console_hdl)
-    if save_to_file is not None and not os.path.exits(save_to_file):
+    if save_to_file is not None and not os.path.exists(save_to_file):
         file_hdl = logging.FileHandler(save_to_file)
         file_hdl.setFormatter(formatter)
         logger.addHandler(file_hdl)

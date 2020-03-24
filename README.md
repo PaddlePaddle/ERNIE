@@ -19,7 +19,6 @@ English | [简体中文](./README.zh.md)
  * [Results](#results)
    * [Results on English Datasets](#results-on-english-datasets)
    * [Results on Chinese Datasets](#results-on-chinese-datasets)
- * [Release Notes](#release-notes)
  * [Communication](#communication)
  * [Usage](#usage)
 
@@ -615,14 +614,6 @@ LCQMC is a Chinese question semantic matching corpus published in COLING2018. [u
 BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equivalence identification. This dataset was published in EMNLP 2018. [url: https://www.aclweb.org/anthology/D18-1536]
 ```
 
-## Release Notes
-
-- Aug 21, 2019: featuers update: fp16 finetuning, multiprocess finetining.
-- July 30, 2019: release ERNIE 2.0
-- Apr 10, 2019: update ERNIE_stable-1.0.1.tar.gz, update config and vocab
-- Mar 18, 2019: update ERNIE_stable.tgz
-- Mar 15, 2019: release ERNIE 1.0
-
 
 ## Communication
 
@@ -657,11 +648,12 @@ BQ Corpus (Bank Question corpus) is a Chinese corpus for sentence semantic equiv
      * [FAQ3: Is the  argument batch_size for one GPU card or for all GPU cards?](#faq3-is-the--argument-batch_size-for-one-gpu-card-or-for-all-gpu-cards)
      * [FAQ4: Can not find library: libcudnn.so. Please try to add the lib path to LD_LIBRARY_PATH.](#faq4-can-not-find-library-libcudnnso-please-try-to-add-the-lib-path-to-ld_library_path)
      * [FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.](#faq5-can-not-find-library-libncclso-please-try-to-add-the-lib-path-to-ld_library_path)
+     * [FQA6: Runtime error: `ModuleNotFoundError No module named propeller`](#faq6)
 
 
 ### Install PaddlePaddle
 
-This code base has been tested with Paddle Fluid 1.5.1 under Python2.
+This code base has been tested with Paddle Fluid 1.6 with Python 2/3.5+, since Paddle 1.6 has changed some of APIs, using version before 1.6 might have bug on NER tasks.
 
 **\*Important\*** When finished installing Paddle Fluid, remember to update LD_LIBRARY_PATH about CUDA, cuDNN, NCCL2, for more information on paddlepaddle setup, you can click [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/index_en.html) and [here](http://en.paddlepaddle.org/documentation/docs/en/1.5/beginners_guide/install/install_Ubuntu_en.html). Also, you can read FAQ at the end of this document when you encounter errors.
 
@@ -1010,6 +1002,12 @@ Export the path of cuda to LD_LIBRARY_PATH, e.g.: `export LD_LIBRARY_PATH=/home/
 
 Download [NCCL2](https://developer.nvidia.com/nccl/nccl-download), and export the library path to LD_LIBRARY_PATH, e.g.:`export LD_LIBRARY_PATH=/home/work/nccl/lib`
 
-#### FAQ6: Cannot malloc XXX MB GPU memory.
+### FAQ6: Runtime error: `ModuleNotFoundError No module named propeller`<a name="faq6"></a>
+
+you can import propeller to your PYTHONPATH by `export PYTHONPATH:./:$PYTHONPATH`
+
+
+#### FAQ7: Cannot malloc XXX MB GPU memory.
 
 Try to reduce the batch_size, reduce the max_seq_len and set FLAGS_eager_delete_tensor_gb=0.0
+

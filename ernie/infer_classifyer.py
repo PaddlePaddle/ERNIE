@@ -130,6 +130,7 @@ def main(args):
     if not args.use_cuda:
         log.info("disable gpu")
         config.disable_gpu()
+        config.switch_ir_optim(True) 
     else:
         log.info("using gpu")
         config.enable_use_gpu(1024)
@@ -162,8 +163,7 @@ def main(args):
 
         # parse outputs
         output = outputs[0]
-        output_data = output.data.float_data()
-        batch_result  = np.array(output_data).reshape(output.shape)
+        batch_result  = output.as_ndarray()
         for single_example_probs in batch_result:
             print('\t'.join(map(str, single_example_probs.tolist())))
             index += 1
@@ -173,17 +173,7 @@ def main(args):
 def array2tensor(ndarray):
     """ convert numpy array to PaddleTensor"""
     assert isinstance(ndarray, np.ndarray), "input type must be np.ndarray"
-    tensor = PaddleTensor()
-    tensor.name = "data"
-    tensor.shape = ndarray.shape
-    if "float" in str(ndarray.dtype):
-        tensor.dtype = PaddleDType.FLOAT32
-    elif "int" in str(ndarray.dtype):
-        tensor.dtype = PaddleDType.INT64
-    else:
-        raise ValueError("{} type ndarray is unsupported".format(tensor.dtype))
-
-    tensor.data = PaddleBuf(ndarray.flatten().tolist())
+    tensor = PaddleTensor(data=ndarray)
     return tensor
 
 if __name__ == '__main__':
