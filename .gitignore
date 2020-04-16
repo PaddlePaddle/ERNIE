@@ -1,4 +1,6 @@
-*.pyc
 *.un~
+*~
+*.pyc
 *.swp
-*.egg-info/
+*.swn
+*.swo

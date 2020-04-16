@@ -17,6 +17,7 @@ from __future__ import unicode_literals
 
 import functools
 import six
+import os
 import logging
 from time import sleep
 
@@ -51,7 +52,7 @@ class DistributionStatus(object):
                 idx = int(config['task']['index'])
                 self._this = cluster[task][idx]
 
-                self._env = cluster['chief'] + cluster['worker']
+                self._env = cluster['chief'] + cluster.get('worker', [])
                 if len(set(self._env)) != len(self._env):
                     raise ValueError('duplicate host in dis_config %s' %
                                      config)
@@ -59,7 +60,7 @@ class DistributionStatus(object):
             except KeyError as e:
                 raise ValueError(
                     'PROPELLER_DISCONFIG wrong: %s not found in %s' %
-                    (e, repr(dis_config)))
+                    (e, repr(config)))
 
     @property
     def mode(self):
@@ -96,8 +97,40 @@ class DistributionStatus(object):
                              repr(self._mode))
 
 
+def _get_paddlestype_disconfig():
+    env = os.environ.copy()
+    if not ('PADDLE_TRAINER_ID' in env and 'PADDLE_CURRENT_ENDPOINT' in env and
+            'PADDLE_TRAINERS_NUM' in env and
+            'PADDLE_TRAINER_ENDPOINTS' in env):
+        return None
+    else:
+        ip_port_list = env['PADDLE_TRAINER_ENDPOINTS'].split(',')
+        assert len(ip_port_list) == int(env['PADDLE_TRAINERS_NUM'])
+        ip_port_self = env['PADDLE_CURRENT_ENDPOINT']
+        world = {"chief": [ip_port_list[0]]}
+        for ip_port in ip_port_list[1:]:
+            world.setdefault('worker', []).append(ip_port)
+        self_index = ip_port_list.index(ip_port_self)
+        self_type = 'chief' if self_index == 0 else 'worker'
+        if self_type == 'worker':
+            self_index -= 1
+        env_dict = {
+            'cluster': world,
+            'task': {
+                'type': self_type,
+                'index': self_index
+            }
+        }
+        return env_dict
+
+
 dis_config = propeller.util._get_dict_from_environ_or_json_or_file(
     None, 'PROPELLER_DISCONFIG')
+if dis_config is None:
+    log.debug('no PROPELLER_DISCONFIG found, try paddlestype setting')
+    dis_config = _get_paddlestype_disconfig()
+    if dis_config is None:
+        log.debug('no paddle stype setting found')
 status = DistributionStatus(dis_config)
 
 
