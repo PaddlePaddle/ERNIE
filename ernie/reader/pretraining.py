@@ -26,11 +26,15 @@ import re
 import six
 import collections
 import tokenization
+from functools import partial
 
 import paddle
 import paddle.fluid as fluid
 
 from batching import prepare_batch_data
+
+from io import open
+open = partial(open, encoding='utf8')
 
 
 class ErnieDataReader(object):
