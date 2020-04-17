@@ -8,6 +8,26 @@
 
 ![](.metas/dygraph_show.gif)
 
+### Quick Tool
+
+```python
+import numpy as np
+import paddle.fluid.dygraph as D
+from ernie.tokenizing_ernie import ErnieTokenizer
+from ernie.modeling_ernie import ErnieModel
+
+D.guard().__enter__() # acticate paddle `dygrpah` mode
+
+model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+
+ids, _ = tokenizer.encode('hello world')
+ids = D.to_variable(np.expand_dims(ids, 0))  # insert extra `batch` dimension
+pooled, encoded = model(ids)                 # eager execution
+print(pooled.numpy())                        # convert  results to numpy
+
+```
+
 ### Setup
 1. install dependencies with:
 ```script
@@ -23,10 +43,10 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 
 | Model                                              | Description                                                  |
 | :------------------------------------------------- | :----------------------------------------------------------- |
-| [ERNIE 1.0 Base for Chinese](https://ernie.bj.bcebos.com/ERNIE_1.0_max-len-512.tar.gz)    | ernie 1.0 base: L12H768A12|
-| [ERNIE tiny]()                                                                            |erine tiny: L3H1024A16|
-| [ERNIE 2.0 Base for English](https://ernie.bj.bcebos.com/ERNIE_Base_en_stable-2.0.0.tar.gz)   | ernie 2.0 base: L12H768A12  |
-| [ERNIE 2.0 Large for English](https://ernie.bj.bcebos.com/ERNIE_Large_en_stable-2.0.0.tar.gz) | ernie 2.0 large: L24H1024A16 |
+| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | ernie 1.0 base: L12H768A12|
+| [ERNIE tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         |erine tiny: L3H1024A16|
+| [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | ernie 2.0 base: L12H768A12  |
+| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | ernie 2.0 large: L24H1024A16 |
 
 
 4. download datasets
@@ -47,9 +67,14 @@ data/xnli
     └── 1
 ```
 
+[demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI task
+
 **Chinese Datasets**
 
-You can download Chinese Datasets from [here](https://ernie.bj.bcebos.com/propeller_demo_data.tar.gz)
+- [XNLI](https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz)
+- [ChnSentiCorp](https://ernie-github.cdn.bcebos.com/data-chnsenticorp.tar.gz)
+- [MSRA-NER](https://ernie-github.cdn.bcebos.com/data-msra_ner.tar.gz)
+- [NLPCC2016-DBQA](https://ernie-github.cdn.bcebos.com/data-dbqa.tar.gz)
 
 
 ### Finetune 

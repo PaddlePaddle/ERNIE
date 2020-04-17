@@ -123,7 +123,7 @@ if __name__ == '__main__':
         log_steps=10,
         max_ckpt=1,
         skip_steps=0,
-        model_dir=tempfile.TemporaryDirectory(),
+        model_dir=tempfile.mkdtemp(),
         eval_steps=100)
     run_config = dict(default_run_config, **json.loads(args.run_config))
     run_config = propeller.RunConfig(**run_config)

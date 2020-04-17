@@ -73,7 +73,7 @@ def _wordpiece(token, vocab, unk_token, prefix='##', sentencepiece_prefix=''):
 
 
 class ErnieTokenizer(object):
-    bce = 'http://yq01-sys-hic-p40-box-a12-0233.yq01.baidu.com:8003/'
+    bce = 'https://ernie-github.cdn.bcebos.com/'
     resource_map = {
         'ernie-1.0': bce + 'model-ernie1.0.1.tar.gz',
         'ernie-2.0-en': bce + 'model-ernie2.0-en.1.tar.gz',
@@ -165,7 +165,7 @@ class ErnieTokenizer(object):
 
 
 class ErnieTinyTokenizer(ErnieTokenizer):
-    bce = 'http://yq01-sys-hic-p40-box-a12-0233.yq01.baidu.com:8003/'
+    bce = 'https://ernie-github.cdn.bcebos.com/'
     resource_map = {'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz'}
     @classmethod
     def from_pretrained(cls, pretrain_dir_or_url, force_download=False):

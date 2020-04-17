@@ -285,14 +285,14 @@ class FeatureColumns(object):
         if raw_dir is not None:
             if len(raw_file) != 0:
                 log.debug('try making gz')
-                with multiprocessing.Pool(
+                pool = multiprocessing.Pool(
                         initializer=_init_worker,
-                        initargs=(self._columns, )) as pool:
-                    args = [(os.path.join(raw_dir, f), os.path.join(gz_dir, f),
-                             b'\t') for f in raw_file]
-                    pool.map(_worker_entrence, args)
-                    pool.close()
-                    pool.join()
+                        initargs=(self._columns, )) 
+                args = [(os.path.join(raw_dir, f), os.path.join(gz_dir, f),
+                         b'\t') for f in raw_file]
+                pool.map(_worker_entrence, args)
+                pool.close()
+                pool.join()
             else:
                 assert len(
                     os.listdir(gz_dir)

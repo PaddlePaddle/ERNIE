@@ -153,7 +153,7 @@ class ErnieEncoderStack(D.Layer):
 
 
 class PretrainedModel(object):
-    bce = 'http://yq01-sys-hic-p40-box-a12-0233.yq01.baidu.com:8003/'
+    bce = 'https://ernie-github.cdn.bcebos.com/'
     resource_map = {
         'ernie-1.0': bce + 'model-ernie1.0.1.tar.gz',
         'ernie-2.0-en': bce + 'model-ernie2.0-en.1.tar.gz',
