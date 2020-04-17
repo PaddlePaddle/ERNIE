@@ -2,9 +2,9 @@
 
 **key features**
 
-1. pretrain and finetune ERNIE with *PADDLE 1.7*
+1. pretrain and finetune ERNIE with [PaddlePaddle v1.7](https://github.com/PaddlePaddle/Paddle/tree/release/1.7)
 1. supports eager execution with `paddle.fluid.dygraph`
-1. supports `amp` & `distributed training`
+1. supports `automatic mixed precision` & `distributed training`
 
 ![](.metas/dygraph_show.gif)
 
@@ -34,7 +34,7 @@ print(pooled.numpy())                        # convert  results to numpy
 pip install -r requirement.txt
 ```
 
-2.  put `$PWD` into `$PYTHONPATH` with:
+2.  put `$PWD`(root directory of this repo) into `$PYTHONPATH` with:
 ```script
 export PYTHONPATH=$PWD:$PYTHONPATH
 ```
@@ -53,9 +53,9 @@ export PYTHONPATH=$PWD:$PYTHONPATH
  
 **English Datasets**
 
-Download the [GLUE data](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) 
+Download the [GLUE datasets](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) 
 
-the `--data_dir` option in the following section assumes a dictionary tree like this:
+the `--data_dir` option in the following section assumes a directory tree like this:
 
 ```shell
 data/xnli
@@ -67,7 +67,7 @@ data/xnli
     └── 1
 ```
 
-[demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI task
+see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI task.
 
 **Chinese Datasets**
 
