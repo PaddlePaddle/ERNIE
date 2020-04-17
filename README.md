@@ -1,4 +1,4 @@
-# ERNIE_d
+# ERNIE
 
 **key features**
 
