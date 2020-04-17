@@ -8,7 +8,7 @@
 
 ![](.metas/dygraph_show.gif)
 
-### Quick Tool
+### Quick Tour
 
 ```python
 import numpy as np
