@@ -1,5 +1,9 @@
 [English](./README.md) | 简体中文
 
+**
+欢迎试用*动态图*实现的ERNIE，请checkout 分支:`dygraph`
+**
+
 ## ERNIE 2.0: A Continual Pre-training Framework for Language Understanding
 
 

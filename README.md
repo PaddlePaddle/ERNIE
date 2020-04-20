@@ -1,5 +1,9 @@
 English | [简体中文](./README.zh.md)
 
+**
+Try ERNIE with *eager execution*, please checkout to branch: `dygraph`.
+**
+
 ## ERNIE 2.0: A Continual Pre-training Framework for Language Understanding
 
 
