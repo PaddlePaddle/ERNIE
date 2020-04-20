@@ -125,18 +125,14 @@ class ErnieBlock(D.Layer):
 
     def forward(self, inputs, attn_bias=None):
         attn_out = self.attn(inputs, inputs, inputs, attn_bias) #self attn
-        #log.debug(L.reduce_mean(attn_out).numpy())
         attn_out = self.dropout(attn_out)
         hidden = attn_out + inputs 
         hidden = self.ln1(hidden) # dropout/ add/ norm
-        #log.debug(L.reduce_mean(hidden).numpy())
 
         ffn_out = self.ffn(hidden)
-        #log.debug(L.reduce_mean(ffn_out).numpy())
         ffn_out = self.dropout(ffn_out)
         hidden = ffn_out + hidden
         hidden = self.ln2(hidden)
-        #log.debug(L.reduce_mean(hidden).numpy())
         return hidden
 
         
@@ -243,7 +239,6 @@ class ErnieModel(D.Layer, PretrainedModel):
         d_batch = L.shape(src_ids)[0]
         d_seqlen = L.shape(src_ids)[1]
         if pos_ids is None:
-            #log.debug(d_seqlen)
             pos_ids = L.reshape(L.range(0, d_seqlen, 1, dtype='int32'), [1, -1])
             pos_ids = L.cast(pos_ids, 'int64')
         if attn_bias is None:
@@ -257,19 +252,14 @@ class ErnieModel(D.Layer, PretrainedModel):
         if sent_ids is None:
             sent_ids = L.zeros_like(src_ids)
 
-        #log.debug(src_ids)
         src_embedded = self.word_emb(src_ids)
         pos_embedded = self.pos_emb(pos_ids)
         sent_embedded = self.sent_emb(sent_ids)
         
         embedded = src_embedded + pos_embedded + sent_embedded
-        #log.debug(embedded.numpy()[0,0,:10])
         embedded = self.dropout(self.ln(embedded))
 
-        #log.debug(self.ln.bias)
-        #log.debug(embedded.numpy()[0,0,:10])
         encoded = self.encoder_stack(embedded, attn_bias)
-        #log.debug(encoded.numpy()[:10,:10,:10])
         pooled = self.pooler(encoded[:, 0, :])
 
         return pooled, encoded
