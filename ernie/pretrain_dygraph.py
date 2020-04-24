@@ -294,7 +294,7 @@ if __name__ == '__main__':
 
         for step, samples in enumerate(tqdm(train_ds.start(place))):
             (src_ids, sent_ids, mlm_label, mask_pos, nsp_label) = samples
-            loss = model(src_ids, sent_ids, labels=mlm_label, mlm_pos=mask_pos, nsp_labels=nsp_label)
+            loss, mlmloss, nsploss = model(src_ids, sent_ids, labels=mlm_label, mlm_pos=mask_pos, nsp_labels=nsp_label)
             scaled_loss = model.scale_loss(loss)
             scaled_loss.backward()
             model.apply_collective_grads()

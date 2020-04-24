@@ -78,12 +78,14 @@ def ernie_pretrain_model_fn(features, mode, params, run_config):
     src_ids, sent_ids, mlm_label, mask_pos, nsp_label = features
 
     ernie = ErnieModelForPretraining(params, name='')
-    total_loss = ernie(src_ids, sent_ids, labels=mlm_label, mlm_pos=mask_pos, nsp_labels=nsp_label)
+    total_loss, mlm_loss, nsp_loss = ernie(src_ids, sent_ids, labels=mlm_label, mlm_pos=mask_pos, nsp_labels=nsp_label)
 
     metrics = None
     inf_spec = None
 
     propeller.summary.scalar('loss', total_loss)
+    propeller.summary.scalar('nsp-loss', nsp_loss)
+    propeller.summary.scalar('mlm-loss', mlm_loss)
 
     scheduled_lr, loss_scale_coef = optimization(
         loss=total_loss,
@@ -341,13 +343,14 @@ if __name__ == '__main__':
     train_ds.data_types = types
     ws = None
 
-    varname_to_warmstart = re.compile(r'^encoder.*[wb]_0$|^.*embedding$|^.*bias$|^.*scale$|^pooled_fc.[wb]_0$')
-    #if args.from_pretrained is not None:
-    #    warm_start_dir = os.path.join(args.from_pretrained, 'params')
-    #    ws = propeller.WarmStartSetting(
-    #            predicate_fn=lambda v: varname_to_warmstart.match(v.name) and os.path.exists(os.path.join(warm_start_dir, v.name)),
-    #            from_dir=warm_start_dir
-    #        )
+    #varname_to_warmstart = re.compile(r'^encoder.*[wb]_0$|^.*embedding$|^.*bias$|^.*scale$|^pooled_fc.[wb]_0$')
+    varname_to_warmstart = re.compile(r'.*')
+    if args.from_pretrained is not None:
+        warm_start_dir = os.path.join(args.from_pretrained, 'params')
+        ws = propeller.WarmStartSetting(
+                predicate_fn=lambda v: varname_to_warmstart.match(v.name) and os.path.exists(os.path.join(warm_start_dir, v.name)),
+                from_dir=warm_start_dir
+            )
 
     ernie_learner = propeller.Learner(ernie_pretrain_model_fn, run_config, params=hparams, warm_start_setting=ws)
     ernie_learner.train(train_ds)

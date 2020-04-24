@@ -80,7 +80,7 @@ class AttentionLayer(D.Layer):
         score = L.matmul(q, k, transpose_y=True)
         if attn_bias is not None:
             score += attn_bias
-        score = L.softmax(score)
+        score = L.softmax(score, use_cudnn=True)
         score = self.dropout(score)
 
         out = L.matmul(score, v)
@@ -100,7 +100,7 @@ class PositionwiseFeedForwardLayer(D.Layer):
         assert cfg['hidden_act'] in ['relu', 'gelu']
         self.i = _build_linear(d_model, d_ffn, append_name(name, 'fc_0'), initializer, act=cfg['hidden_act'])
         self.o = _build_linear(d_ffn, d_model, append_name(name, 'fc_1'), initializer)
-        prob = cfg.get('intermediate_dropout_prob', cfg['hidden_dropout_prob'])
+        prob = cfg.get('intermediate_dropout_prob', 0.)
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
     def forward(self, inputs):
@@ -188,6 +188,7 @@ class PretrainedModel(object):
             m, _ = D.load_dygraph(state_dict_path)
             for k, v in model.state_dict().items():
                 if k not in m:
+                    log.warn('param:%s not set in pretrained model, skip' % k)
                     m[k] = v # FIXME: no need to do this in the future
             model.set_dict(m)
         else:
@@ -249,14 +250,15 @@ class ErnieModel(D.Layer, PretrainedModel):
             attn_bias = (1. - L.matmul(input_mask, input_mask, transpose_y=True)) * -10000.0
             attn_bias = L.expand(attn_bias, [1, self.n_head, 1, 1]) # avoid broadcast =_=
             attn_bias.stop_gradient = True
+            
         if sent_ids is None:
             sent_ids = L.zeros_like(src_ids)
 
         src_embedded = self.word_emb(src_ids)
         pos_embedded = self.pos_emb(pos_ids)
         sent_embedded = self.sent_emb(sent_ids)
-        
         embedded = src_embedded + pos_embedded + sent_embedded
+
         embedded = self.dropout(self.ln(embedded))
 
         encoded = self.encoder_stack(embedded, attn_bias)
@@ -333,12 +335,13 @@ class NSPHead(D.Layer):
 class ErnieModelForPretraining(ErnieModel):
     def __init__(self, cfg, name=None):
         super(ErnieModelForPretraining, self).__init__(cfg, name=name)
+        initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
         d_model = cfg['hidden_size']
         d_vocab = cfg['vocab_size']
 
         self.pooler_heads = D.LayerList([NSPHead(cfg, name=name)])
-        self.ln = _build_ln(d_model, name = append_name(name, 'mask_lm_trans_fc'))
-        self.embedding = self.word_emb.weight
+        self.mlm = _build_linear(d_model, d_model, append_name(name, 'mask_lm_trans_fc'), initializer, act=cfg['hidden_act'])
+        self.mlm_ln = _build_ln(d_model, name = append_name(name, 'mask_lm_trans'))
         self.bias = L.create_parameter(
                 dtype='float32',
                 shape=[d_vocab], 
@@ -362,13 +365,10 @@ class ErnieModelForPretraining(ErnieModel):
         nsp_loss = self.pooler_heads[0](pooled, nsp_labels)
 
         encoded_2d = L.gather_nd(encoded, mlm_pos)
-        encoded_2d = self.ln(encoded_2d)
+        encoded_2d = self.mlm(encoded_2d)
+        encoded_2d = self.mlm_ln(encoded_2d)
         logits_2d = L.matmul(encoded_2d, self.word_emb.weight, transpose_y=True) + self.bias
         mlm_loss = L.reduce_mean(L.softmax_with_cross_entropy(logits_2d, mlm_labels))
-        mlm_loss = L.reduce_mean(mlm_loss)
-
         total_loss = mlm_loss + nsp_loss
-
-        return total_loss
-
+        return total_loss, mlm_loss, nsp_loss
 
