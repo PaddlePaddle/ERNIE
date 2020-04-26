@@ -342,7 +342,7 @@ class ErnieModelForPretraining(ErnieModel):
         self.pooler_heads = D.LayerList([NSPHead(cfg, name=name)])
         self.mlm = _build_linear(d_model, d_model, append_name(name, 'mask_lm_trans_fc'), initializer, act=cfg['hidden_act'])
         self.mlm_ln = _build_ln(d_model, name = append_name(name, 'mask_lm_trans'))
-        self.bias = L.create_parameter(
+        self.mlm_bias = L.create_parameter(
                 dtype='float32',
                 shape=[d_vocab], 
                 attr=F.ParamAttr(
@@ -367,7 +367,7 @@ class ErnieModelForPretraining(ErnieModel):
         encoded_2d = L.gather_nd(encoded, mlm_pos)
         encoded_2d = self.mlm(encoded_2d)
         encoded_2d = self.mlm_ln(encoded_2d)
-        logits_2d = L.matmul(encoded_2d, self.word_emb.weight, transpose_y=True) + self.bias
+        logits_2d = L.matmul(encoded_2d, self.word_emb.weight, transpose_y=True) + self.mlm_bias
         mlm_loss = L.reduce_mean(L.softmax_with_cross_entropy(logits_2d, mlm_labels))
         total_loss = mlm_loss + nsp_loss
         return total_loss, mlm_loss, nsp_loss

@@ -81,11 +81,11 @@ class ErnieTokenizer(object):
         'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz',
     }
     @classmethod
-    def from_pretrained(cls, pretrain_dir_or_url):
+    def from_pretrained(cls, pretrain_dir_or_url, force_download=False, **kwargs):
         if pretrain_dir_or_url in cls.resource_map:
             url = cls.resource_map[pretrain_dir_or_url]
             log.info('get pretrain dir from %s' % url)
-            pretrain_dir = _fetch_from_remote(url)
+            pretrain_dir = _fetch_from_remote(url, force_download=force_download)
         else:
             log.info('pretrain dir %s not in %s, read from local' % (pretrain_dir_or_url, repr(cls.resource_map)))
             pretrain_dir = pretrain_dir_or_url
@@ -95,14 +95,24 @@ class ErnieTokenizer(object):
         if not os.path.exists(vocab_path):
             raise ValueError('no vocab file in pretrain dir: %s' % pretrain_dir)
         vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(open(vocab_path).readlines())}
-        t = cls(vocab_dict)
+        t = cls(vocab_dict, **kwargs)
         return t
 
-    def __init__(self, vocab, unk_token='[UNK]', sep_token='[SEP]', cls_token='[CLS]', pad_token='[PAD]', wordpiece_prefix='##', sentencepiece_prefix='', lower=True, encoding='utf8'):
+    def __init__(self, 
+            vocab, 
+            unk_token='[UNK]', 
+            sep_token='[SEP]', 
+            cls_token='[CLS]', 
+            pad_token='[PAD]', 
+            mask_token='[MASK]',
+            wordpiece_prefix='##', 
+            sentencepiece_prefix='', 
+            lower=True, 
+            encoding='utf8', 
+            special_token_list=[]):
         if not isinstance(vocab, dict):
             raise ValueError('expect `vocab` to be instance of dict, got %s' % type(vocab))
         self.vocab = vocab
-        self.pat = re.compile(r'([a-zA-Z0-9]+|\S)')
         self.lower = lower
         self.prefix = wordpiece_prefix
         self.sentencepiece_prefix = sentencepiece_prefix
@@ -110,7 +120,15 @@ class ErnieTokenizer(object):
         self.cls_id = self.vocab[cls_token]
         self.sep_id = self.vocab[sep_token]
         self.unk_id = self.vocab[unk_token]
+        self.mask_id = self.vocab[mask_token]
         self.unk_token = unk_token
+        special_tokens = {pad_token, cls_token, sep_token, unk_token, mask_token} | set(special_token_list)
+        pat_str = ''
+        for t in special_tokens:
+            pat_str += '(%s)|' % re.escape(t)
+        pat_str += r'([a-zA-Z0-9]+|\S)'
+        log.debug('regex: %s' % pat_str)
+        self.pat = re.compile(pat_str)
         self.encoding = encoding
 
     def tokenize(self, text):
@@ -120,12 +138,16 @@ class ErnieTokenizer(object):
             text = text.decode(self.encoding)
         if six.PY2 and isinstance(text, str):
             text = text.decode(self.encoding)
-        if self.lower:
-            text = text.lower()
-
+            
         res = []
         for match in self.pat.finditer(text):
-            words, _ = _wordpiece(match.group(0), vocab=self.vocab, unk_token=self.unk_token, prefix=self.prefix, sentencepiece_prefix=self.sentencepiece_prefix)
+            match_group = match.group(0)
+            if match.groups()[-1]:
+                if self.lower:
+                    match_group = match_group.lower()
+                words, _ = _wordpiece(match_group, vocab=self.vocab, unk_token=self.unk_token, prefix=self.prefix, sentencepiece_prefix=self.sentencepiece_prefix)
+            else:
+                words = [match_group]
             res += words
         return res
 
@@ -168,7 +190,7 @@ class ErnieTinyTokenizer(ErnieTokenizer):
     bce = 'https://ernie-github.cdn.bcebos.com/'
     resource_map = {'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz'}
     @classmethod
-    def from_pretrained(cls, pretrain_dir_or_url, force_download=False):
+    def from_pretrained(cls, pretrain_dir_or_url, force_download=False, **kwargs):
         if pretrain_dir_or_url in cls.resource_map:
             url = cls.resource_map[pretrain_dir_or_url]
             log.info('get pretrain dir from %s' % url)
@@ -185,7 +207,7 @@ class ErnieTinyTokenizer(ErnieTokenizer):
             raise ValueError('no vocab file in pretrain dir: %s' % pretrain_dir)
         vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(open(vocab_path).readlines())}
 
-        t = cls(vocab_dict, sp_model_path)
+        t = cls(vocab_dict, sp_model_path, **kwargs)
         return t
 
     def __init__(self, vocab, sp_model_path, **kwargs):
