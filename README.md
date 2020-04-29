@@ -4,7 +4,7 @@
 
 1. pretrain and finetune ERNIE with [PaddlePaddle v1.7](https://github.com/PaddlePaddle/Paddle/tree/release/1.7)
 1. supports eager execution with `paddle.fluid.dygraph`
-1. supports `automatic mixed precision` & `distributed training`
+1. supports `distributed training`
 
 ![](.metas/dygraph_show.gif)
 
@@ -28,6 +28,15 @@ print(pooled.numpy())                        # convert  results to numpy
 
 ```
 
+### Tutorials
+
+Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
+
+1. [Text classification](https://aistudio.baidu.com/aistudio/projectdetail/427482)
+2. [Cloze test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
+3. Knowledge Distillation
+4. ...
+
 ### Setup
 1. install dependencies with:
 ```script
@@ -44,7 +53,7 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 | Model                                              | Description                                                  |
 | :------------------------------------------------- | :----------------------------------------------------------- |
 | [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | ernie 1.0 base: L12H768A12|
-| [ERNIE tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         |erine tiny: L3H1024A16|
+| [ERNIE tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | erine tiny: L3H1024A16|
 | [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | ernie 2.0 base: L12H768A12  |
 | [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | ernie 2.0 large: L24H1024A16 |
 
@@ -104,7 +113,6 @@ python3 -m paddle.distributed.launch \
     --from_pretrained ernie2.0-en
 ```
 
-To activate *Auto Mixed Precesion*, add option `--use_fp16` .
 
 ### Distributed pretrain
 

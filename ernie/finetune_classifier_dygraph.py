@@ -53,8 +53,9 @@ if __name__ == '__main__':
     parser.add_argument('--max_steps', type=int, required=True, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--warmup_proportion', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
+    parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
-    parser.add_argument('--wd', type=int, default=0.01, help='weight decay, aka L2 regularizer')
+    parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 
 
     args = parser.parse_args()
@@ -125,6 +126,14 @@ if __name__ == '__main__':
                     log.debug('acc %.5f' % np.concatenate(acc).mean())
         if args.save_dir is not None:
             F.save_dygraph(model.state_dict(), args.save_dir)
+        if args.inference_model_dir is not None:
+            src_placeholder = FD.to_variable(np.ones([1, 1], dtype=np.int64))
+            sent_placehodler = FD.to_variable(np.zeros([1, 1], dtype=np.int64))
+            model(src_placeholder, sent_placehodler)
+            _, static_model = FD.TracedLayer.trace(model, inputs=[src_placeholder, sent_placehodler])
+            log.debug(static_model)
+            static_model.save_inference_model(args.inference_model_dir)
+
 
 
 
