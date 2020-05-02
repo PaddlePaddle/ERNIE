@@ -50,7 +50,7 @@ python -u ./ernie/run_classifier.py                                             
        --num_labels 3                                                                   \
        --for_cn False                                                                   \
        --test_save output/test_out.$i.m.tsv,output/test_out.$i.mm.tsv                   \
-       --diagnostic ${TASK_DATA_PATH}/diagnostic.tsv                                    \
+       --diagnostic ${TASK_DATA_PATH}/MNLI/diagnostic.tsv                                    \
        --diagnostic_save output/test_out.$i.$lr.$batch_size.$epoch.$timestamp.m.diagnostic.tsv \
        --random_seed 1 2>&1 | tee  log/job.$i.$lr.$batch_size.$epoch.$timestamp.log            \
 
