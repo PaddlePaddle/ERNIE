@@ -38,17 +38,20 @@ Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/inde
 4. ...
 
 ### Setup
-1. install dependencies with:
+
+##### 1. install dependencies with:
+
 ```script
 pip install -r requirement.txt
 ```
 
-2.  put `$PWD`(root directory of this repo) into `$PYTHONPATH` with:
+##### 2.  put `$PWD`(root directory of this repo) into `$PYTHONPATH` with:
+
 ```script
 export PYTHONPATH=$PWD:$PYTHONPATH
 ```
 
-3. download pretrained models
+##### 3. download pretrained models
 
 | Model                                              | Description                                                  |
 | :------------------------------------------------- | :----------------------------------------------------------- |
@@ -57,7 +60,7 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 | [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | ernie 2.0 base: L12H768A12  |
 | [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | ernie 2.0 large: L24H1024A16 |
 
-4. download datasets
+##### 4. download datasets
  
 **English Datasets**
 
