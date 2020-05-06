@@ -1,5 +1,3 @@
-# ERNIE
-
 **key features**
 
 1. pretrain and finetune ERNIE with [PaddlePaddle v1.7](https://github.com/PaddlePaddle/Paddle/tree/release/1.7)
@@ -8,7 +6,7 @@
 
 ![](.metas/dygraph_show.gif)
 
-### Quick Tour
+# Quick Tour
 
 ```python
 import numpy as np
@@ -28,7 +26,7 @@ print(pooled.numpy())                        # convert  results to numpy
 
 ```
 
-### Tutorials
+# Tutorials
 
 Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
 
@@ -37,7 +35,7 @@ Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/inde
 3. Knowledge Distillation
 4. ...
 
-### Setup
+# Setup
 
 ##### 1. install dependencies with:
 
@@ -88,7 +86,7 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 - [NLPCC2016-DBQA](https://ernie-github.cdn.bcebos.com/data-dbqa.tar.gz)
 
 
-### Finetune 
+# Finetune 
 
 - try eager execution with `dygraph model` :
 
@@ -143,11 +141,11 @@ other demo python script:
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
 
-### Distributed pretrain
+# Distributed pretrain
 
 see [here](./ernie/pretrain/README.md)
 
-### Citation
+# Citation
 
 please cite our [Arxiv paper](https://arxiv.org/abs/1907.12412):
 
