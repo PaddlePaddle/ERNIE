@@ -272,16 +272,16 @@ class ErnieModelForSequenceClassification(ErnieModel):
         super(ErnieModelForSequenceClassification, self).__init__(cfg, name=name)
 
         initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
-        self.cls_fc = _build_linear(cfg['hidden_size'], cfg['num_labels'], append_name(name, 'cls'), initializer)
+        self.classifier = _build_linear(cfg['hidden_size'], cfg['num_labels'], append_name(name, 'cls'), initializer)
 
-        prob = cfg.get('pooler_dropout_prob', cfg['hidden_dropout_prob'])
+        prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
     def forward(self, *args, **kwargs):
         labels = kwargs.pop('labels', None)
         pooled, encoded = super(ErnieModelForSequenceClassification, self).forward(*args, **kwargs)
         hidden = self.dropout(pooled)
-        logits = self.cls_fc(hidden)
+        logits = self.classifier(hidden)
 
         if labels is not None:
             if len(labels.shape) == 1:
@@ -298,16 +298,16 @@ class ErnieModelForTokenClassification(ErnieModel):
         super(ErnieModelForTokenClassification, self).__init__(cfg, name=name)
 
         initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
-        self.cls_fc = _build_linear(cfg['hidden_size'], cfg['num_labels'], append_name(name, 'cls'), initializer)
+        self.classifier = _build_linear(cfg['hidden_size'], cfg['num_labels'], append_name(name, 'cls'), initializer)
 
-        prob = cfg.get('pooler_dropout_prob', cfg['hidden_dropout_prob'])
+        prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
     def forward(self, *args, **kwargs):
         labels = kwargs.pop('labels', None)
         pooled, encoded = super(ErnieModelForTokenClassification, self).forward(*args, **kwargs)
         hidden = self.dropout(encoded) # maybe not?
-        logits = self.cls_fc(hidden)
+        logits = self.classifier(hidden)
 
         if labels is not None:
             if len(labels.shape) == 2:
@@ -317,6 +317,36 @@ class ErnieModelForTokenClassification(ErnieModel):
         else:
             loss = None
         return loss, logits
+
+
+class ErnieModelForQuestionAnswering(ErnieModel):
+    def __init__(self, cfg, name=None):
+        super(ErnieModelForQuestionAnswering, self).__init__(cfg, name=name)
+
+        initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
+        self.classifier = _build_linear(cfg['hidden_size'], 2, append_name(name, 'cls_mrc'), initializer)
+
+        prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
+        self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
+
+    def forward(self, *args, **kwargs):
+        start_pos = kwargs.pop('start_pos', None)
+        end_pos = kwargs.pop('end_pos', None)
+        pooled, encoded = super(ErnieModelForQuestionAnswering, self).forward(*args, **kwargs)
+        encoded = self.dropout(encoded)
+        encoded = self.classifier(encoded)
+        start_logit, end_logits = L.unstack(encoded, axis=-1)
+        if start_pos is not None and end_pos is not None:
+            if len(start_pos.shape) == 1:
+                start_pos = L.unsqueeze(start_pos, axes=[-1])
+            if len(end_pos.shape) == 1:
+                end_pos = L.unsqueeze(end_pos, axes=[-1])
+            start_loss = L.softmax_with_cross_entropy(start_logit, start_pos)
+            end_loss = L.softmax_with_cross_entropy(end_logits, end_pos)
+            loss = (L.reduce_mean(start_loss) + L.reduce_mean(end_loss)) / 2.
+        else:
+            loss = None
+        return loss, start_logit, end_logits
 
 
 class NSPHead(D.Layer):
@@ -350,7 +380,7 @@ class ErnieModelForPretraining(ErnieModel):
                     initializer=F.initializer.Constant(value=0.0)
                     ),
                 is_bias=True,
-                )
+            )
 
     def forward(self, *args, **kwargs):
         mlm_labels = kwargs.pop('labels')

@@ -151,13 +151,18 @@ class ErnieTokenizer(object):
             res += words
         return res
 
-    def token_to_ids(self, tokens):
+    def convert_tokens_to_ids(self, tokens):
         return [self.vocab.get(t, self.unk_id) for t in tokens]
 
     def truncate(self, id1, id2, seqlen):
-        id1_len = seqlen
-        id2_len = max(seqlen - len(id1), 0)
-        return id1[: id1_len], id2[: id2_len]
+        len1 = len(id1)
+        len2 = len(id2)
+        half = seqlen // 2
+        if len1 > len2:
+            len1_truncated, len2_truncated = max(half, seqlen - len2), min(half, len2)
+        else:
+            len1_truncated, len2_truncated = min(half, seqlen - len1), max(half, seqlen - len1)
+        return id1[: len1_truncated], id2[: len2_truncated]
 
     def build_for_ernie(self, text_id, pair_id=None):
         """build sentence type id, add [CLS] [SEP]"""
@@ -172,10 +177,10 @@ class ErnieTokenizer(object):
         return ret_id, ret_id_type
 
     def encode(self, text, pair=None, truncate_to=None):
-        text_id = np.array(self.token_to_ids(self.tokenize(text)), dtype=np.int64)
+        text_id = np.array(self.convert_tokens_to_ids(self.tokenize(text)), dtype=np.int64)
         text_id_type = np.zeros_like(text_id)
         if pair is not None:
-            pair_id = np.array(self.token_to_ids(self.tokenize(pair)), dtype=np.int64)
+            pair_id = np.array(self.convert_tokens_to_ids(self.tokenize(pair)), dtype=np.int64)
         else:
             pair_id = None
         if truncate_to is not None:

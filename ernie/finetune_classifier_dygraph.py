@@ -44,7 +44,7 @@ from ernie.optimization import AdamW, LinearDecay
 
 
 if __name__ == '__main__':
-    parser = propeller.ArgumentParser('classify model with ERNIE')
+    parser = argparse.ArgumentParser('classify model with ERNIE')
     parser.add_argument('--from_pretrained', type=str, required=True, help='pretrained model directory or tag')
     parser.add_argument('--max_seqlen', type=int, default=128, help='max sentence length, should not greater than 512')
     parser.add_argument('--bsz', type=int, default=32, help='batchsize')
