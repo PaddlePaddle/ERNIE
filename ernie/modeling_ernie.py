@@ -198,6 +198,9 @@ class PretrainedModel(object):
 
 class ErnieModel(D.Layer, PretrainedModel):
     def __init__(self, cfg, name=None):
+        """
+        Fundamental pretrained Ernie model
+        """
         log.debug('init ErnieModel with config: %s' % repr(cfg))
         D.Layer.__init__(self)
         d_model = cfg['hidden_size']
@@ -235,6 +238,25 @@ class ErnieModel(D.Layer, PretrainedModel):
             l.training = True
 
     def forward(self, src_ids, sent_ids=None, pos_ids=None, input_mask=None, attn_bias=None):
+        """
+        Args:
+            src_ids (`Variable` of shape `[batch_size, seq_len]`): 
+                Indices of input sequence tokens in the vocabulary.
+            sent_ids (optional, `Variable` of shape `[batch_size, seq_len]`): 
+                aka token_type_ids, Segment token indices to indicate first and second portions of the inputs.
+                if None, assume all tokens come from `segment_a`
+            pos_ids(optional, `Variable` of shape `[batch_size, seq_len]`): 
+                Indices of positions of each input sequence tokens in the position embeddings.
+            input_mask(optional `Variable` of shape `[batch_size, seq_len]`): 
+                Mask to avoid performing attention on the padding token indices of the encoder input.
+            attn_bias(optional, `Variable` of shape `[batch_size, seq_len, seq_len]`): 
+                3D version of `input_mask`, if set, overrides `input_mask`.
+        Returns:
+            pooled (`Variable` of shape `[batch_size, hidden_size]`):
+                output logits of pooler classifier
+            encoded(`Variable` of shape `[batch_size, seq_len, hidden_size]`):
+                output logits of transformer stack
+        """
         #d_batch, d_seqlen = src_ids.shape
         assert len(src_ids.shape) == 2, 'expect src_ids.shape = [batch, sequecen], got %s' % (repr(src_ids.shape))
         d_batch = L.shape(src_ids)[0]
@@ -268,6 +290,10 @@ class ErnieModel(D.Layer, PretrainedModel):
         
 
 class ErnieModelForSequenceClassification(ErnieModel):
+    """
+    Ernie Model for text classfication or pointwise ranking tasks 
+    """
+
     def __init__(self, cfg, name=None):
         super(ErnieModelForSequenceClassification, self).__init__(cfg, name=name)
 
@@ -278,6 +304,17 @@ class ErnieModelForSequenceClassification(ErnieModel):
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
     def forward(self, *args, **kwargs):
+        """
+        Args:
+            labels (optional, `Variable` of shape [batch_size]): 
+                ground truth label id for each sentence
+        Retuns:
+            loss (`Variable` of shape []):
+                Cross entropy loss mean over batch
+                if labels not set, returns None
+            logits (`Variable` of shape [batch_size, hidden_size]):
+                output logits of classifier
+        """
         labels = kwargs.pop('labels', None)
         pooled, encoded = super(ErnieModelForSequenceClassification, self).forward(*args, **kwargs)
         hidden = self.dropout(pooled)
@@ -294,6 +331,9 @@ class ErnieModelForSequenceClassification(ErnieModel):
 
 
 class ErnieModelForTokenClassification(ErnieModel):
+    """
+    Ernie Model for Named entity tasks(NER)
+    """
     def __init__(self, cfg, name=None):
         super(ErnieModelForTokenClassification, self).__init__(cfg, name=name)
 
@@ -304,6 +344,18 @@ class ErnieModelForTokenClassification(ErnieModel):
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
     def forward(self, *args, **kwargs):
+        """
+        Args:
+            labels (optional, `Variable` of shape [batch_size, seq_len]): 
+                ground truth label id for each token
+        Retuns:
+            loss (`Variable` of shape []):
+                Cross entropy loss mean over batch and time, ignore positions where label == -100
+                if labels not set, returns None
+            logits (`Variable` of shape [batch_size, seq_len, hidden_size]):
+                output logits of classifier
+        """
+
         labels = kwargs.pop('labels', None)
         pooled, encoded = super(ErnieModelForTokenClassification, self).forward(*args, **kwargs)
         hidden = self.dropout(encoded) # maybe not?
@@ -320,6 +372,9 @@ class ErnieModelForTokenClassification(ErnieModel):
 
 
 class ErnieModelForQuestionAnswering(ErnieModel):
+    """
+    Ernie model for reading comprehension tasks (SQuAD)
+    """
     def __init__(self, cfg, name=None):
         super(ErnieModelForQuestionAnswering, self).__init__(cfg, name=name)
 
@@ -330,6 +385,22 @@ class ErnieModelForQuestionAnswering(ErnieModel):
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
     def forward(self, *args, **kwargs):
+        """
+        Args:
+            start_pos (optional, `Variable` of shape [batch_size]): 
+                token index of start of answer span in `context`
+            end_pos (optional, `Variable` of shape [batch_size]): 
+                token index of end of answer span in `context`
+        Retuns:
+            loss (`Variable` of shape []):
+                Cross entropy loss mean over batch and time, ignore positions where label == -100
+                if labels not set, returns None
+            start_logits (`Variable` of shape [batch_size, hidden_size]):
+                output logits of start position, use argmax(start_logit) to get start index
+            end_logits (`Variable` of shape [batch_size, hidden_size]):
+                output logits of end position, use argmax(end_logit) to get end index
+        """
+
         start_pos = kwargs.pop('start_pos', None)
         end_pos = kwargs.pop('end_pos', None)
         pooled, encoded = super(ErnieModelForQuestionAnswering, self).forward(*args, **kwargs)
@@ -356,6 +427,22 @@ class NSPHead(D.Layer):
         self.nsp = _build_linear(cfg['hidden_size'], 2, append_name(name, 'nsp_fc'), initializer)
 
     def forward(self, inputs, labels):
+        """
+        Args:
+            start_pos (optional, `Variable` of shape [batch_size]): 
+                token index of start of answer span in `context`
+            end_pos (optional, `Variable` of shape [batch_size]): 
+                token index of end of answer span in `context`
+        Retuns:
+            loss (`Variable` of shape []):
+                Cross entropy loss mean over batch and time, ignore positions where label == -100
+                if labels not set, returns None
+            start_logits (`Variable` of shape [batch_size, hidden_size]):
+                output logits of start position
+            end_logits (`Variable` of shape [batch_size, hidden_size]):
+                output logits of end position
+        """
+
         logits = self.nsp(inputs)
         loss = L.softmax_with_cross_entropy(logits, labels)
         loss = L.reduce_mean(loss)
@@ -363,6 +450,9 @@ class NSPHead(D.Layer):
 
 
 class ErnieModelForPretraining(ErnieModel):
+    """
+    Ernie Model for Masked Languate Model pretrain
+    """
     def __init__(self, cfg, name=None):
         super(ErnieModelForPretraining, self).__init__(cfg, name=name)
         initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
@@ -383,6 +473,23 @@ class ErnieModelForPretraining(ErnieModel):
             )
 
     def forward(self, *args, **kwargs):
+        """
+        Args:
+            nsp_labels (optional, `Variable` of shape [batch_size]): 
+                labels for `next sentence prediction` tasks
+            mlm_pos (optional, `Variable` of shape [n_mask, 2]): 
+                index of mask_id in `src_ids`, can obtain from `fluid.layers.where(src_ids==mask_id)`
+            labels (optional, `Variable` of shape [n_mask]): 
+                labels for `mask language model` tasks, the original token indices in masked position in `src_ids`
+        Retuns:
+            loss (`Variable` of shape []):
+                total_loss of `next sentence prediction` and `masked language model`
+            mlm_loss (`Variable` of shape []):
+                loss for `masked language model` task
+            nsp_loss (`Variable` of shape []):
+                loss for `next sentence prediction` task
+        """
+
         mlm_labels = kwargs.pop('labels')
         mlm_pos = kwargs.pop('mlm_pos')
         nsp_labels = kwargs.pop('nsp_labels')
