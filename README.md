@@ -32,8 +32,9 @@ Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/inde
 
 1. [Text classification](https://aistudio.baidu.com/aistudio/projectdetail/427482)
 2. [Cloze test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
-3. Knowledge Distillation
-4. ...
+3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
+4. Ask Ernie
+5. ...
 
 # Setup
 
