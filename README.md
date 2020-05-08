@@ -4,7 +4,7 @@
 1. supports eager execution with `paddle.fluid.dygraph`
 1. supports `distributed training`
 
-![](https://ernie-github.cdn.bcebos.com/gif/dygrpah_show.gif)
+![](.metas/dygraph_show.gif)
 
 # Quick Tour
 
