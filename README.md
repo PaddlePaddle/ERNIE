@@ -4,7 +4,7 @@
 1. supports eager execution with `paddle.fluid.dygraph`
 1. supports `distributed training`
 
-![](.metas/dygraph_show.gif)
+![](https://ernie-github.cdn.bcebos.com/gif%2Fdygrpah_show.gif)
 
 # Quick Tour
 
@@ -14,7 +14,7 @@ import paddle.fluid.dygraph as D
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.modeling_ernie import ErnieModel
 
-D.guard().__enter__() # acticate paddle `dygrpah` mode
+D.guard().__enter__() # activate paddle `dygrpah` mode
 
 model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
