@@ -1,14 +1,12 @@
-# ERNIE
-
 **key features**
 
 1. pretrain and finetune ERNIE with [PaddlePaddle v1.7](https://github.com/PaddlePaddle/Paddle/tree/release/1.7)
 1. supports eager execution with `paddle.fluid.dygraph`
 1. supports `distributed training`
 
-![](.metas/dygraph_show.gif)
+![](https://ernie-github.cdn.bcebos.com/gif%2Fdygrpah_show.gif)
 
-### Quick Tour
+# Quick Tour
 
 ```python
 import numpy as np
@@ -16,7 +14,7 @@ import paddle.fluid.dygraph as D
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.modeling_ernie import ErnieModel
 
-D.guard().__enter__() # acticate paddle `dygrpah` mode
+D.guard().__enter__() # activate paddle `dygrpah` mode
 
 model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
@@ -28,16 +26,17 @@ print(pooled.numpy())                        # convert  results to numpy
 
 ```
 
-### Tutorials
+# Tutorials
 
 Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
 
 1. [Text classification](https://aistudio.baidu.com/aistudio/projectdetail/427482)
 2. [Cloze test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
-3. Knowledge Distillation
-4. ...
+3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
+4. [Ask Ernie](https://aistudio.baidu.com/aistudio/projectdetail/456443)
+5. ...
 
-### Setup
+# Setup
 
 ##### 1. install dependencies with:
 
@@ -88,7 +87,7 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 - [NLPCC2016-DBQA](https://ernie-github.cdn.bcebos.com/data-dbqa.tar.gz)
 
 
-### Finetune 
+# Finetune 
 
 - try eager execution with `dygraph model` :
 
@@ -143,11 +142,11 @@ other demo python script:
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
 
-### Distributed pretrain
+# Distributed pretrain
 
 see [here](./ernie/pretrain/README.md)
 
-### Citation
+# Citation
 
 please cite our [Arxiv paper](https://arxiv.org/abs/1907.12412):
 
