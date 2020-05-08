@@ -258,14 +258,15 @@ if __name__ == '__main__':
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
     parser = propeller.ArgumentParser('DAN model with Paddle')
-    parser.add_argument('--max_seqlen', type=int, default=256)
-    parser.add_argument('--data_dir', type=str, required=True)
-    parser.add_argument('--mask_rate', type=float, default=0.15)
-    parser.add_argument('--check', type=float, default=0.)
-    parser.add_argument('--warmup_steps', type=int, default=10000)
-    parser.add_argument('--max_steps', type=int, default=1000000)
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--from_pretrained', type=str, required=True)
+    parser.add_argument('--max_seqlen', type=int, default=256, help='max sequence length, documents from pretrain data will expand to this length')
+    parser.add_argument('--data_dir', type=str, required=True, help='protobuf pretrain data directory')
+    parser.add_argument('--mask_rate', type=float, default=0.15, help='probability of input token tobe masked')
+    parser.add_argument('--check', type=float, default=0., help='probability of debug info')
+    parser.add_argument('--warmup_steps', type=int, default=10000, help='warmups steps')
+    parser.add_argument('--max_steps', type=int, default=1000000, help='max pretrian steps')
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning_rate')
+    parser.add_argument('--from_pretrained', type=str, required=True, help='pretraind model dir')
+    parser.add_argument('--save_dir', type=str, default=None, help='model output_dir')
     parser.add_argument('--bsz', type=int, default=50)
 
 
@@ -286,7 +287,7 @@ if __name__ == '__main__':
 
     place = F.CUDAPlace(D.parallel.Env().dev_id)
     with D.guard(place):
-        model = ErnieModelForPretraining(json.loads(open(os.path.join(args.from_pretrained, 'ernie_config.json')).read()))
+        model = ErnieModelForPretraining.from_pretrained(args.from_pretrained)
         opt = AdamW(learning_rate=LinearDecay(args.lr, args.warmup_steps, args.max_steps), parameter_list=model.parameters(), weight_decay=0.01)
 
         ctx = D.parallel.prepare_context()
@@ -302,6 +303,8 @@ if __name__ == '__main__':
             model.clear_gradients()
             if step % 10 == 0:
                 log.debug('train loss %.5f scaled loss %.5f' % (loss.numpy(), scaled_loss.numpy()))
+            if step % 10000 == 0 and D.parallel.Env().dev_id == 0 and args.save_dir is not None:
+                F.save_dygraph(model.state_dict(), args.save_dir)
 
 
 
