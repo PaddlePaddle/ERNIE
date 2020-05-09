@@ -126,13 +126,13 @@ if __name__ == '__main__':
                     log.debug('acc %.5f' % np.concatenate(acc).mean())
         if args.save_dir is not None:
             F.save_dygraph(model.state_dict(), args.save_dir)
-        if args.inference_model_dir is not None:
-            src_placeholder = FD.to_variable(np.ones([1, 1], dtype=np.int64))
-            sent_placehodler = FD.to_variable(np.zeros([1, 1], dtype=np.int64))
-            model(src_placeholder, sent_placehodler)
-            _, static_model = FD.TracedLayer.trace(model, inputs=[src_placeholder, sent_placehodler])
-            log.debug(static_model)
-            static_model.save_inference_model(args.inference_model_dir)
+        #if args.inference_model_dir is not None:
+        #    src_placeholder = FD.to_variable(np.ones([1, 1], dtype=np.int64))
+        #    sent_placehodler = FD.to_variable(np.zeros([1, 1], dtype=np.int64))
+        #    model(src_placeholder, sent_placehodler)
+        #    _, static_model = FD.TracedLayer.trace(model, inputs=[src_placeholder, sent_placehodler])
+        #    log.debug(static_model)
+        #    static_model.save_inference_model(args.inference_model_dir)
 
 
 
