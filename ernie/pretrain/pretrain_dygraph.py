@@ -149,7 +149,7 @@ def apply_mask(sentence, seg_info, mask_rate, vocab_size, vocab):
 def make_pretrain_dataset(name, dir, vocab, args):
     gz_files = glob(dir)
     if not gz_files:
-        raise ValueError('train data not found in %s' % train_data_dir)
+        raise ValueError('train data not found in %s' % gz_files)
 
     log.info('read from %s' % '\n'.join(gz_files))
     max_input_seqlen = args.max_seqlen 

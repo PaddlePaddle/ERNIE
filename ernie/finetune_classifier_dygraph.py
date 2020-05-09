@@ -23,6 +23,7 @@ from functools import reduce, partial
 
 import numpy as np
 import logging
+import argparse
 
 import paddle
 import paddle.fluid as F
