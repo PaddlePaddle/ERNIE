@@ -169,7 +169,29 @@ see [here](./ernie/pretrain/README.md)
 If `--inference_model_dir` is passed to `finetune_classifier_dygraph.py`, 
 a deployable model will be generated at the end of finetuning and your model is ready to serve.
 
-For details about online inferece, see [here](./inference/README.md)
+For details about online inferece, see [C++ inference API](./inference/README.md),
+or you can start a multi-gpu inference server with a few lines of codes:
+
+```shell
+python -m propeller.tools.start_server -m /path/to/saved/inference_model  -p 8881
+```
+
+and call the server just like calling local function (python3 only):
+
+```python
+from propeller.service.client import InferenceClient
+from ernie.tokenizing_ernie import ErnieTokenizer
+
+client = InferenceClient('tcp://localhost:8881')
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+ids, sids = tokenizer.encode('hello world')
+ids = np.expand_dims(ids, 0)
+sids = np.expand_dims(sids, 0)
+result = client(ids, sids)
+```
+
+A pre-made `inference model` for ernie-1.0 can be downloaded at [here](https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz). 
+It can be used for feature-based finetuning or feature extraction.
 
 # Distillation
 
