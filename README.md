@@ -137,10 +137,15 @@ python3 -m paddle.distributed.launch \
 ```
 
 
-other demo python script:
+many other demo python scripts:
 
+1. [Sementic Analysis](./ernie/finetune_sementic_analysis_dygraph.py)
+1. [Pointwise Ranking](./ernie/finetune_classifier_dygraph.py)
 1. [Name Entity Recognition(NER)](./ernie/finetune_ner_dygraph.py)
 1. [Machine Reading Comprehension](./ernie/finetune_mrc_dygraph.py)
+1. Text generation...
+
+
 
 
 **recomended hyper parameters:**
