@@ -11,12 +11,11 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 	- Easy deployment.
 	- Learn NLP in Aistudio tutorials.
 	- Backward compatibility for old-styled checkpoint
-	- ![](.metas/dygraph_show.gif)
-- Mar.2020: Champion on 5 SemEval2020 sub tasks
-- Dec.2019: 1st place on GLUE leaderboard
+- Mar.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
+- Dec.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
 - Oct.2019: Introducing ERNIE-tiny
-- Jul.2019: Introducing ERNIE2.0 
-- Mar.2019: Introducing ERNIE1.0
+- Jul.2019: [Introducing ERNIE2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
+- Mar.2019: [Introducing ERNIE1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
 
 	
 # Table of contents
