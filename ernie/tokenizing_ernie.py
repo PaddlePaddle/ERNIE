@@ -117,14 +117,16 @@ class ErnieTokenizer(object):
         self.prefix = wordpiece_prefix
         self.sentencepiece_prefix = sentencepiece_prefix
         self.pad_id = self.vocab[pad_token]
-        self.cls_id = self.vocab[cls_token]
-        self.sep_id = self.vocab[sep_token]
-        self.unk_id = self.vocab[unk_token]
-        self.mask_id = self.vocab[mask_token]
+        self.cls_id = cls_token and self.vocab[cls_token]
+        self.sep_id = sep_token and self.vocab[sep_token]
+        self.unk_id = unk_token and self.vocab[unk_token]
+        self.mask_id = mask_token and self.vocab[mask_token]
         self.unk_token = unk_token
         special_tokens = {pad_token, cls_token, sep_token, unk_token, mask_token} | set(special_token_list)
         pat_str = ''
         for t in special_tokens:
+            if t is None:
+                continue
             pat_str += '(%s)|' % re.escape(t)
         pat_str += r'([a-zA-Z0-9]+|\S)'
         log.debug('regex: %s' % pat_str)
@@ -164,21 +166,21 @@ class ErnieTokenizer(object):
             len1_truncated, len2_truncated = min(half, seqlen - len1), max(half, seqlen - len1)
         return id1[: len1_truncated], id2[: len2_truncated]
 
-    def build_for_ernie(self, text_id, pair_id=None):
+    def build_for_ernie(self, text_id, pair_id=[]):
         """build sentence type id, add [CLS] [SEP]"""
-        text_id_type = np.zeros_like(text_id)
+        text_id_type = np.zeros_like(text_id, dtype=np.int64)
         ret_id = np.concatenate([[self.cls_id], text_id, [self.sep_id]], 0)
         ret_id_type = np.concatenate([[0], text_id_type, [0]], 0)
 
-        if pair_id is not None:
-            pair_id_type = np.ones_like(pair_id)
+        if len(pair_id):
+            pair_id_type = np.ones_like(pair_id, dtype=np.int64)
             ret_id = np.concatenate([ret_id, pair_id, [self.sep_id]], 0)
             ret_id_type = np.concatenate([ret_id_type, pair_id_type, [1]], 0)
         return ret_id, ret_id_type
 
     def encode(self, text, pair=None, truncate_to=None):
         text_id = np.array(self.convert_tokens_to_ids(self.tokenize(text)), dtype=np.int64)
-        text_id_type = np.zeros_like(text_id)
+        text_id_type = np.zeros_like(text_id, dtype=np.int64)
         if pair is not None:
             pair_id = np.array(self.convert_tokens_to_ids(self.tokenize(pair)), dtype=np.int64)
         else:

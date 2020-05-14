@@ -75,7 +75,7 @@ class AttentionLayer(D.Layer):
         self.o = _build_linear(d_model_v, d_model, append_name(name, 'output_fc'), initializer)
         self.dropout = lambda i: L.dropout(i, dropout_prob=cfg['attention_probs_dropout_prob'], dropout_implementation="upscale_in_train",) if self.training else i
 
-    def forward(self, queries, keys, values, attn_bias):
+    def forward(self, queries, keys, values, attn_bias, past_cache):
         assert len(queries.shape) == len(keys.shape) == len(values.shape) == 3
         #bsz, q_len, q_dim = queries.shape
         #bsz, k_len, k_dim = keys.shape
@@ -86,9 +86,18 @@ class AttentionLayer(D.Layer):
         k = self.k(keys)
         v = self.v(values)
 
+        cache = (k, v)
+        if past_cache is not None:
+            cached_k, cached_v = past_cache
+            cached_k.stop_gradient = True
+            cached_v.stop_gradient = True
+            k = L.concat([cached_k, k], 1)
+            v = L.concat([cached_v, v], 1)
+
         q = L.transpose(L.reshape(q, [0, 0, self.n_head, q.shape[-1] // self.n_head]), [0, 2, 1, 3]) #[batch, head, seq, dim]
         k = L.transpose(L.reshape(k, [0, 0, self.n_head, k.shape[-1] // self.n_head]), [0, 2, 1, 3]) #[batch, head, seq, dim]
         v = L.transpose(L.reshape(v, [0, 0, self.n_head, v.shape[-1] // self.n_head]), [0, 2, 1, 3]) #[batch, head, seq, dim]
+
 
         q = L.scale(q, scale=self.d_key ** -0.5)
         score = L.matmul(q, k, transpose_y=True)
@@ -102,7 +111,7 @@ class AttentionLayer(D.Layer):
         out = L.reshape(out, [0, 0, out.shape[2] * out.shape[3]])
 
         out = self.o(out)
-        return out
+        return out, cache
 
 
 class PositionwiseFeedForwardLayer(D.Layer):
@@ -137,8 +146,8 @@ class ErnieBlock(D.Layer):
         prob = cfg.get('intermediate_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
-    def forward(self, inputs, attn_bias=None):
-        attn_out = self.attn(inputs, inputs, inputs, attn_bias) #self attn
+    def forward(self, inputs, attn_bias=None, past_cache=None):
+        attn_out, cache = self.attn(inputs, inputs, inputs, attn_bias, past_cache=past_cache) #self attn
         attn_out = self.dropout(attn_out)
         hidden = attn_out + inputs 
         hidden = self.ln1(hidden) # dropout/ add/ norm
@@ -147,7 +156,7 @@ class ErnieBlock(D.Layer):
         ffn_out = self.dropout(ffn_out)
         hidden = ffn_out + hidden
         hidden = self.ln2(hidden)
-        return hidden
+        return hidden, cache
 
         
 class ErnieEncoderStack(D.Layer):
@@ -156,10 +165,22 @@ class ErnieEncoderStack(D.Layer):
         n_layers = cfg['num_hidden_layers']
         self.block = D.LayerList([ErnieBlock(cfg, append_name(name, 'layer_%d' % i)) for i in range(n_layers)])
 
-    def forward(self, inputs, attn_bias=None):
-        for b in self.block:
-            inputs = b(inputs, attn_bias)
-        return inputs
+    def forward(self, inputs, attn_bias=None, past_cache=None):
+        if past_cache is not None:
+            assert isinstance(past_cache, tuple), 'unknown type of `past_cache`, expect tuple or list. got %s' % repr(type(past_cache))
+            past_cache = list(zip(*past_cache))
+        else:
+            past_cache = [None] * len(self.block)
+        cache_list_k, cache_list_v, hidden_list = [], [], [inputs]
+
+        for b, p in zip(self.block, past_cache):
+            inputs, cache = b(inputs, attn_bias=attn_bias, past_cache=p)
+            cache_k, cache_v = cache
+            cache_list_k.append(cache_k)
+            cache_list_v.append(cache_v)
+            hidden_list.append(inputs)
+
+        return inputs, hidden_list, (cache_list_k, cache_list_v)
 
 
 class PretrainedModel(object):
@@ -223,6 +244,7 @@ class ErnieModel(D.Layer, PretrainedModel):
         d_pos = cfg['max_position_embeddings']
         d_sent = cfg.get("sent_type_vocab_size") or cfg['type_vocab_size']
         self.n_head = cfg['num_attention_heads']
+        self.return_additional_info = cfg.get('return_additional_info', False)
         initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
 
         self.ln = _build_ln(d_model, name=append_name(name, 'pre_encoder'))
@@ -233,7 +255,10 @@ class ErnieModel(D.Layer, PretrainedModel):
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
         self.encoder_stack = ErnieEncoderStack(cfg, append_name(name, 'encoder'))
-        self.pooler = _build_linear(cfg['hidden_size'], cfg['hidden_size'], append_name(name, 'pooled_fc'), initializer, act='tanh')
+        if cfg.get('has_pooler', True):
+            self.pooler = _build_linear(cfg['hidden_size'], cfg['hidden_size'], append_name(name, 'pooled_fc'), initializer, act='tanh')
+        else:
+            self.pooler = None
         self.train()
     
 
@@ -251,7 +276,7 @@ class ErnieModel(D.Layer, PretrainedModel):
         for l in self.sublayers():
             l.training = True
 
-    def forward(self, src_ids, sent_ids=None, pos_ids=None, input_mask=None, attn_bias=None):
+    def forward(self, src_ids, sent_ids=None, pos_ids=None, input_mask=None, attn_bias=None, past_cache=None, use_causal_mask=False):
         """
         Args:
             src_ids (`Variable` of shape `[batch_size, seq_len]`): 
@@ -263,8 +288,8 @@ class ErnieModel(D.Layer, PretrainedModel):
                 Indices of positions of each input sequence tokens in the position embeddings.
             input_mask(optional `Variable` of shape `[batch_size, seq_len]`): 
                 Mask to avoid performing attention on the padding token indices of the encoder input.
-            attn_bias(optional, `Variable` of shape `[batch_size, seq_len, seq_len]`): 
-                3D version of `input_mask`, if set, overrides `input_mask`.
+            attn_bias(optional, `Variable` of shape `[batch_size, seq_len, seq_len] or False`): 
+                3D version of `input_mask`, if set, overrides `input_mask`; if set not False, will not apply attention mask
         Returns:
             pooled (`Variable` of shape `[batch_size, hidden_size]`):
                 output logits of pooler classifier
@@ -273,6 +298,7 @@ class ErnieModel(D.Layer, PretrainedModel):
         """
         #d_batch, d_seqlen = src_ids.shape
         assert len(src_ids.shape) == 2, 'expect src_ids.shape = [batch, sequecen], got %s' % (repr(src_ids.shape))
+        assert attn_bias is not None if past_cache else True, 'if `past_cache` is specified; attn_bias should not be None'
         d_batch = L.shape(src_ids)[0]
         d_seqlen = L.shape(src_ids)[1]
         if pos_ids is None:
@@ -282,10 +308,18 @@ class ErnieModel(D.Layer, PretrainedModel):
             if input_mask is None:
                 input_mask = L.cast(src_ids != 0, 'float32')
             assert len(input_mask.shape) == 2
-            input_mask = L.unsqueeze(input_mask, axes=[1,3])
-            attn_bias = (1. - L.matmul(input_mask, input_mask, transpose_y=True)) * -10000.0
-            attn_bias = L.expand(attn_bias, [1, self.n_head, 1, 1]) # avoid broadcast =_=
-            attn_bias.stop_gradient = True
+            input_mask = L.unsqueeze(input_mask, axes=[-1])
+            attn_bias = L.matmul(input_mask, input_mask, transpose_y=True)
+            if use_causal_mask:
+                sequence = L.reshape(L.range(0, d_seqlen, 1, dtype='float32') + 1., [1, 1, -1, 1])
+                causal_mask = L.cast((L.matmul(sequence, 1. / sequence, transpose_y=True) >= 1.) , 'float32')
+                attn_bias *= causal_mask
+        else:
+            assert len(attn_bias.shape) == 3
+        attn_bias = (1. - attn_bias) * -10000.0
+        attn_bias = L.unsqueeze(attn_bias, [1])
+        attn_bias = L.expand(attn_bias, [1, self.n_head, 1, 1]) # avoid broadcast =_=
+        attn_bias.stop_gradient = True
             
         if sent_ids is None:
             sent_ids = L.zeros_like(src_ids)
@@ -297,10 +331,21 @@ class ErnieModel(D.Layer, PretrainedModel):
 
         embedded = self.dropout(self.ln(embedded))
 
-        encoded = self.encoder_stack(embedded, attn_bias)
-        pooled = self.pooler(encoded[:, 0, :])
+        encoded, hidden_list, cache_list = self.encoder_stack(embedded, attn_bias, past_cache=past_cache)
+        if self.pooler is not None:
+            pooled = self.pooler(encoded[:, 0, :])
+        else:
+            pooled = None
 
-        return pooled, encoded
+        additional_info = {
+            'hiddens': hidden_list,
+            'caches': cache_list,
+        }
+
+        if self.return_additional_info:
+            return pooled, encoded, additional_info
+        else:
+            return pooled, encoded
         
 
 class ErnieModelForSequenceClassification(ErnieModel):
@@ -322,7 +367,7 @@ class ErnieModelForSequenceClassification(ErnieModel):
         Args:
             labels (optional, `Variable` of shape [batch_size]): 
                 ground truth label id for each sentence
-        Retuns:
+        Returns:
             loss (`Variable` of shape []):
                 Cross entropy loss mean over batch
                 if labels not set, returns None
@@ -362,7 +407,7 @@ class ErnieModelForTokenClassification(ErnieModel):
         Args:
             labels (optional, `Variable` of shape [batch_size, seq_len]): 
                 ground truth label id for each token
-        Retuns:
+        Returns:
             loss (`Variable` of shape []):
                 Cross entropy loss mean over batch and time, ignore positions where label == -100
                 if labels not set, returns None
@@ -405,7 +450,7 @@ class ErnieModelForQuestionAnswering(ErnieModel):
                 token index of start of answer span in `context`
             end_pos (optional, `Variable` of shape [batch_size]): 
                 token index of end of answer span in `context`
-        Retuns:
+        Returns:
             loss (`Variable` of shape []):
                 Cross entropy loss mean over batch and time, ignore positions where label == -100
                 if labels not set, returns None
@@ -417,7 +462,7 @@ class ErnieModelForQuestionAnswering(ErnieModel):
 
         start_pos = kwargs.pop('start_pos', None)
         end_pos = kwargs.pop('end_pos', None)
-        pooled, encoded = super(ErnieModelForQuestionAnswering, self).forward(*args, **kwargs)
+        pooled, encoded, _ = super(ErnieModelForQuestionAnswering, self).forward(*args, **kwargs)
         encoded = self.dropout(encoded)
         encoded = self.classifier(encoded)
         start_logit, end_logits = L.unstack(encoded, axis=-1)
@@ -447,7 +492,7 @@ class NSPHead(D.Layer):
                 token index of start of answer span in `context`
             end_pos (optional, `Variable` of shape [batch_size]): 
                 token index of end of answer span in `context`
-        Retuns:
+        Returns:
             loss (`Variable` of shape []):
                 Cross entropy loss mean over batch and time, ignore positions where label == -100
                 if labels not set, returns None
@@ -495,7 +540,7 @@ class ErnieModelForPretraining(ErnieModel):
                 index of mask_id in `src_ids`, can obtain from `fluid.layers.where(src_ids==mask_id)`
             labels (optional, `Variable` of shape [n_mask]): 
                 labels for `mask language model` tasks, the original token indices in masked position in `src_ids`
-        Retuns:
+        Returns:
             loss (`Variable` of shape []):
                 total_loss of `next sentence prediction` and `masked language model`
             mlm_loss (`Variable` of shape []):
@@ -507,7 +552,7 @@ class ErnieModelForPretraining(ErnieModel):
         mlm_labels = kwargs.pop('labels')
         mlm_pos = kwargs.pop('mlm_pos')
         nsp_labels = kwargs.pop('nsp_labels')
-        pooled, encoded = super(ErnieModelForPretraining, self).forward(*args, **kwargs)
+        pooled, encoded, _ = super(ErnieModelForPretraining, self).forward(*args, **kwargs)
         if len(mlm_labels.shape) == 1:
             mlm_labels = L.reshape(mlm_labels, [-1, 1])
         if len(nsp_labels.shape) == 1:
