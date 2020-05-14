@@ -1,7 +1,7 @@
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
 ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, Reading Comprehension, Genration ...
 
-***Whats new***
+***What's new***
 
 - May.20.2020: Try ERNIE in "`dygraph`", with:
 
@@ -12,6 +12,12 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 	- Learn NLP in Aistudio tutorials.
 	- Backward compatibility for old-styled checkpoint
 	- ![](.metas/dygraph_show.gif)
+- Mar.2020: Champion on 5 SemEval2020 sub tasks
+- Dec.2019: 1st place on GLUE leaderboard
+- Oct.2019: Introducing ERNIE-tiny
+- Jul.2019: Introducing ERNIE2.0 
+- Mar.2019: Introducing ERNIE1.0
+
 	
 # Table of contents
 * [Tutorials](#tutorials)
