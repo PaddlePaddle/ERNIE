@@ -1,8 +1,17 @@
-**key features**
+ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
+ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, Reading Comprehension, Genration ...
 
-1. pretrain and finetune ERNIE with [PaddlePaddle v1.7](https://github.com/PaddlePaddle/Paddle/tree/release/1.7)
-1. supports eager execution with `paddle.fluid.dygraph`
-1. supports `distributed training`
+***Whats new***
+
+- May.20.2020: Try ERNIE in "`dygraph`", with:
+
+	- Pretrain and finetune ERNIE with [PaddlePaddle v1.7](https://github.com/PaddlePaddle/Paddle/tree/release/1.7).
+	- Eager execution with `paddle.fluid.dygraph`.
+	- Distributed training.
+	- Easy deployment.
+    - Learn NLP in Aistudio tutorials.
+	- Backward compatibility for old-styled checkpoint
+
 
 ![](.metas/dygraph_show.gif)
 
@@ -146,14 +155,35 @@ other demo python script:
 
 see [here](./ernie/pretrain/README.md)
 
+
+# online inference
+
+If `--inference_model_dir` is passed to `finetune_classifier_dygraph.py`, 
+a deployable model will be generated at the end of finetuning and your model is ready to serve.
+For details about online inferece, see [here](./inference/README.md)
+
+# Distilation
+
+Knowledge distillation is good way to compress and accelerate ERNIE. For details about distillation, see [here](./distill/README.md)
+
 # Citation
 
-please cite our [Arxiv paper](https://arxiv.org/abs/1907.12412):
+please cite [ERNIE 2.0](https://arxiv.org/abs/1907.12412):
 
 ```
 @article{SunERNIE,
   title={ERNIE 2.0: A Continual Pre-training Framework for Language Understanding},
   author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Tian, Hao and Wu, Hua and Wang, Haifeng},
+}
+```
+
+and [ERNIE-gen](https://arxiv.org/abs/2001.11314)
+
+```
+@article{Xiao2020ERNIE,
+  title={ERNIE-GEN: An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation},
+  author={Xiao, Dongling and Zhang, Han and Li, Yukun and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  year={2020},
 }
 ```
 
