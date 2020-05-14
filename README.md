@@ -50,9 +50,11 @@ print(pooled.numpy())                        # convert  results to numpy
 
 # Tutorials
 
-Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)(please apply for a GPU environment)!
+Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
+(please choose the latest version and apply for a GPU environment)
 
-1. [Text classification](https://aistudio.baidu.com/aistudio/projectdetail/427482)
+1. [Text classification walkthrough](https://aistudio.baidu.com/aistudio/projectdetail/266623)
+1. [Sementic analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
 2. [Cloze test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
 3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
 4. [Ask Ernie](https://aistudio.baidu.com/aistudio/projectdetail/456443)

@@ -184,7 +184,7 @@ class ErnieTokenizer(object):
         if pair is not None:
             pair_id = np.array(self.convert_tokens_to_ids(self.tokenize(pair)), dtype=np.int64)
         else:
-            pair_id = None
+            pair_id = []
         if truncate_to is not None:
             text_id, pair_id = self.truncate(text_id, [] if pair_id is None else pair_id, truncate_to)
 
