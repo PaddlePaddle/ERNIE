@@ -9,11 +9,19 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 	- Eager execution with `paddle.fluid.dygraph`.
 	- Distributed training.
 	- Easy deployment.
-    - Learn NLP in Aistudio tutorials.
+	- Learn NLP in Aistudio tutorials.
 	- Backward compatibility for old-styled checkpoint
-
-
-![](.metas/dygraph_show.gif)
+	- ![](.metas/dygraph_show.gif)
+	
+# Table of contents
+* [Tutorials](#tutorials)
+* [Setup](#setup)
+* [Finetune](#finetune)
+* [Distributed pretrain](#distributed-pretrain)
+* [Online inference](#online-inference)
+* [Distillation](#distillation)
+* [Citation](#citation)
+* [Contact us](#contact-us)
 
 # Quick Tour
 
@@ -37,7 +45,7 @@ print(pooled.numpy())                        # convert  results to numpy
 
 # Tutorials
 
-Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
+Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)(please apply for a GPU environment)!
 
 1. [Text classification](https://aistudio.baidu.com/aistudio/projectdetail/427482)
 2. [Cloze test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
@@ -156,15 +164,18 @@ other demo python script:
 see [here](./ernie/pretrain/README.md)
 
 
-# online inference
+# Online inference
 
 If `--inference_model_dir` is passed to `finetune_classifier_dygraph.py`, 
 a deployable model will be generated at the end of finetuning and your model is ready to serve.
+
 For details about online inferece, see [here](./inference/README.md)
 
-# Distilation
+# Distillation
 
-Knowledge distillation is good way to compress and accelerate ERNIE. For details about distillation, see [here](./distill/README.md)
+Knowledge distillation is good way to compress and accelerate ERNIE. 
+
+For details about distillation, see [here](./distill/README.md)
 
 # Citation
 
@@ -186,4 +197,9 @@ and [ERNIE-gen](https://arxiv.org/abs/2001.11314)
   year={2020},
 }
 ```
+# Contact us
+
+- [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
+- QQ discussion group: 760439550 (ERNIE discussion group).
+- [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
 
