@@ -36,6 +36,7 @@ import propeller.paddle as propeller
 log.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(log.handlers[0])
 logging.getLogger().setLevel(logging.DEBUG)
+log = logging.getLogger()
 
 
 #from model.bert import BertConfig, BertModelLayer
@@ -54,7 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_steps', type=int, required=True, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--warmup_proportion', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
-    parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
+    parser.add_argument('--eval', action='store_true')
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
     parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 
@@ -64,77 +65,92 @@ if __name__ == '__main__':
     tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained)
     #tokenizer = ErnieTinyTokenizer.from_pretrained(args.from_pretrained)
 
-    feature_column = propeller.data.FeatureColumns([
-        propeller.data.TextColumn('seg_a', unk_id=tokenizer.unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
-        propeller.data.LabelColumn('label'),
-    ])
-
-    def map_fn(seg_a, label):
-        seg_a, _ = tokenizer.truncate(seg_a, [], seqlen=args.max_seqlen)
-        sentence, segments = tokenizer.build_for_ernie(seg_a, [])
-        return sentence, segments, label
-
-
-    train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=True, repeat=False, use_gz=False) \
-                                   .map(map_fn) \
-                                   .padded_batch(args.bsz)
-
-    dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'), shuffle=False, repeat=False, use_gz=False) \
-                                   .map(map_fn) \
-                                   .padded_batch(args.bsz)
-
-
-    shapes = ([-1, args.max_seqlen], [-1, args.max_seqlen], [-1])
-    types = ('int64', 'int64', 'int64')
-
-    train_ds.data_shapes = shapes
-    train_ds.data_types = types
-    dev_ds.data_shapes = shapes
-    dev_ds.data_types = types
-
     place = F.CUDAPlace(0)
     with FD.guard(place):
         model = ErnieModelForSequenceClassification.from_pretrained(args.from_pretrained, num_labels=3, name='')
+        if not args.eval:
+            feature_column = propeller.data.FeatureColumns([
+                propeller.data.TextColumn('seg_a', unk_id=tokenizer.unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
+                propeller.data.LabelColumn('label'),
+            ])
 
-        opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
-        g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0) #experimental
-        for epoch in range(args.epoch):
-            for step, d in enumerate(tqdm(train_ds.start(place), desc='training')):
-                ids, sids, label = d
-                loss, _ = model(ids, sids, labels=label)
-                loss.backward()
-                if step % 10 == 0:
-                    log.debug('train loss %.5f lr %.3e' % (loss.numpy(), opt.current_step_lr()))
-                opt.minimize(loss, grad_clip=g_clip)
-                model.clear_gradients()
-                if step % 100 == 0:
-                    acc = []
-                    with FD.base._switch_tracer_mode_guard_(is_train=False):
-                        model.eval()
-                        for step, d in enumerate(tqdm(dev_ds.start(), desc='evaluating %d' % epoch)):
-                            ids, sids, label = d
-                            loss, logits = model(ids, sids, labels=label)
-                            #print('\n'.join(map(str, logits.numpy().tolist())))
-                            a = L.argmax(logits, -1) == label
-                            acc.append(a.numpy())
-                        model.train()
-                    log.debug('acc %.5f' % np.concatenate(acc).mean())
-        if args.save_dir is not None:
-            F.save_dygraph(model.state_dict(), args.save_dir)
-        if args.inference_model_dir is not None:
-            log.debug('saving inference model')
-            class InferemceModel(ErnieModelForSequenceClassification):
-                def forward(self, *args, **kwargs):
-                    _, logits = super(InferemceModel, self).forward(*args, **kwargs)
-                    return logits
-            model.__class__ = InferemceModel #dynamic change model type, to make sure forward output doesn't contain `None`
-            src_placeholder = FD.to_variable(np.ones([1, 1], dtype=np.int64))
-            sent_placehodler = FD.to_variable(np.zeros([1, 1], dtype=np.int64))
-            model(src_placeholder, sent_placehodler)
-            _, static_model = FD.TracedLayer.trace(model, inputs=[src_placeholder, sent_placehodler])
-            static_model.save_inference_model(args.inference_model_dir)
-            log.debug('done')
+            def map_fn(seg_a, label):
+                seg_a, _ = tokenizer.truncate(seg_a, [], seqlen=args.max_seqlen)
+                sentence, segments = tokenizer.build_for_ernie(seg_a, [])
+                return sentence, segments, label
 
 
+            train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=True, repeat=False, use_gz=False) \
+                                           .map(map_fn) \
+                                           .padded_batch(args.bsz)
+
+            dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'), shuffle=False, repeat=False, use_gz=False) \
+                                           .map(map_fn) \
+                                           .padded_batch(args.bsz)
+
+            shapes = ([-1, args.max_seqlen], [-1, args.max_seqlen], [-1])
+            types = ('int64', 'int64', 'int64')
+
+            train_ds.data_shapes = shapes
+            train_ds.data_types = types
+            dev_ds.data_shapes = shapes
+            dev_ds.data_types = types
+
+            opt = AdamW(learning_rate=LinearDecay(
+                args.lr, 
+                int(args.warmup_proportion * args.max_steps), args.max_steps), 
+                parameter_list=model.parameters(), 
+                weight_decay=args.wd)
+            g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0) #experimental
+            for epoch in range(args.epoch):
+                for step, d in enumerate(tqdm(train_ds.start(place), desc='training')):
+                    ids, sids, label = d
+                    loss, _ = model(ids, sids, labels=label)
+                    loss.backward()
+                    if step % 10 == 0:
+                        log.debug('train loss %.5f lr %.3e' % (loss.numpy(), opt.current_step_lr()))
+                    opt.minimize(loss, grad_clip=g_clip)
+                    model.clear_gradients()
+                    if step % 100 == 0:
+                        acc = []
+                        with FD.base._switch_tracer_mode_guard_(is_train=False):
+                            model.eval()
+                            for step, d in enumerate(tqdm(dev_ds.start(), desc='evaluating %d' % epoch)):
+                                ids, sids, label = d
+                                loss, logits = model(ids, sids, labels=label)
+                                #print('\n'.join(map(str, logits.numpy().tolist())))
+                                a = L.argmax(logits, -1) == label
+                                acc.append(a.numpy())
+                            model.train()
+                        log.debug('acc %.5f' % np.concatenate(acc).mean())
+            if args.save_dir is not None:
+                F.save_dygraph(model.state_dict(), args.save_dir)
+        else:
+            feature_column = propeller.data.FeatureColumns([
+                propeller.data.TextColumn('seg_a', unk_id=tokenizer.unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
+            ])
+
+            assert args.save_dir is not None
+            sd, _ = FD.load_dygraph(args.save_dir)
+            model.set_dict(sd)
+            model.eval()
+
+            def map_fn(seg_a):
+                seg_a, _ = tokenizer.truncate(seg_a, [], seqlen=args.max_seqlen)
+                sentence, segments = tokenizer.build_for_ernie(seg_a, [])
+                return sentence, segments
+
+            predict_ds = feature_column.build_dataset_from_stdin('predict') \
+                                           .map(map_fn) \
+                                           .padded_batch(args.bsz)
+            shapes = ([-1, args.max_seqlen], [-1, args.max_seqlen])
+            types = ('int64', 'int64')
+            predict_ds.data_shapes = shapes
+            predict_ds.data_types = types
+
+            for step, (ids, sids) in enumerate(predict_ds.start(place)):
+                _, logits = model(ids, sids)
+                pred = logits.numpy().argmax(-1)
+                print('\n'.join(map(str, pred.tolist())))
 
 
