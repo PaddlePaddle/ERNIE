@@ -1,7 +1,7 @@
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
 ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, Reading Comprehension, Genration ...
 
-# What's new
+# News
 
 - May.20.2020: Try ERNIE in "`dygraph`", with:
 
@@ -11,11 +11,12 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 	- Easy deployment.
 	- Learn NLP in Aistudio tutorials.
 	- Backward compatibility for old-styled checkpoint
-- Mar.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
-- Dec.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
-- Oct.2019: [Introducing ERNIE-tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)
-- Jul.2019: [Introducing ERNIE2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
-- Mar.2019: [Introducing ERNIE1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
+- 2020/4/30: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
+- 2020/3/27: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
+- 2019/12/26: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
+- 2019/11/6: [Introducing ERNIE-tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)
+- 2019/7/31: [Introducing ERNIE2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
+- 2019/3/16: [Introducing ERNIE1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
 
 	
 # Table of contents
