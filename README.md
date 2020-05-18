@@ -1,4 +1,6 @@
-![./.metas/ernie.png](./.metas/ernie.png)
+<p align="center">
+	<img align="center" width="600" height="300" src="./.metas/ernie-head-banner.gif">
+</p>
 
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
 ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, Reading Comprehension, Genration and so on.
