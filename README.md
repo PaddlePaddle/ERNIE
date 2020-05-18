@@ -63,16 +63,20 @@ Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/inde
 
 # Setup
 
-##### 1. install dependencies with:
+##### 1. install ernie
 
 ```script
-pip install -r requirement.txt
+pip install -i https://test.pypi.org/simple/ paddle-ernie==0.0.1
 ```
 
-##### 2.  put `$PWD`(root directory of this repo) into `$PYTHONPATH` with:
+or 
 
-```script
-export PYTHONPATH=$PWD:$PYTHONPATH
+```shell
+git clone -b dygraph https://github.com/PaddlePaddle/ERNIE.git --single-branch
+cd ERNIE
+pip install -r requirement.txt
+pip setup.py -e .
+
 ```
 
 ##### 3. download pretrained models
