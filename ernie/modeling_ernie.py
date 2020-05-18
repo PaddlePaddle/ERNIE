@@ -89,8 +89,6 @@ class AttentionLayer(D.Layer):
         cache = (k, v)
         if past_cache is not None:
             cached_k, cached_v = past_cache
-            cached_k.stop_gradient = True
-            cached_v.stop_gradient = True
             k = L.concat([cached_k, k], 1)
             v = L.concat([cached_v, v], 1)
 
@@ -315,7 +313,7 @@ class ErnieModel(D.Layer, PretrainedModel):
                 causal_mask = L.cast((L.matmul(sequence, 1. / sequence, transpose_y=True) >= 1.) , 'float32')
                 attn_bias *= causal_mask
         else:
-            assert len(attn_bias.shape) == 3
+            assert len(attn_bias.shape) == 3, 'expect attn_bias tobe rank 3, got %r' % attn_bias.shape
         attn_bias = (1. - attn_bias) * -10000.0
         attn_bias = L.unsqueeze(attn_bias, [1])
         attn_bias = L.expand(attn_bias, [1, self.n_head, 1, 1]) # avoid broadcast =_=
