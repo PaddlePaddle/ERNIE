@@ -1,17 +1,18 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-########################################################################
+#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
 #
-# Copyright (c) 2020 Baidu.com, Inc. All Rights Reserved
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# File: test_decode.py
-# Author: chenxuyi(chenxuyi@baidu.com)
-# Date: 2020/05/08 20:55:15
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-########################################################################
-"""
-    Comment.
-"""
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
@@ -23,6 +24,7 @@ import logging
 import json
 import os
 import numpy as np
+from copy import deepcopy
 
 import paddle.fluid as F
 import paddle.fluid.layers as L
@@ -36,68 +38,19 @@ from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.optimization import AdamW, LinearDecay
 
 from experimental.seq2seq.decode import beam_search_infilling
+from experimental.seq2seq.modeling_ernie_gen import ErnieModelForGeneration
 
 from propeller import log
 import propeller.paddle as propeller
-
-np.set_printoptions(edgeitems=10)
 
 logging.getLogger().handlers[0]=log.handlers[0]
 logging.getLogger().setLevel(logging.DEBUG)
 log = logging.getLogger() 
 
-class ErnieModelForGeneration(ErnieModel):
-    def __init__(self, cfg, name=None):
-        cfg['return_additional_info'] = True
-        cfg['has_pooler'] = False
-        super(ErnieModelForGeneration, self).__init__(cfg, name=name)
-        initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
-        d_model = cfg['hidden_size']
-        d_vocab = cfg['vocab_size']
-
-        self.mlm = _build_linear(d_model, d_model, append_name(name, 'mask_lm_trans_fc'), initializer, act=cfg['hidden_act'])
-        self.mlm_ln = _build_ln(d_model, name = append_name(name, 'mask_lm_trans'))
-        self.mlm_bias = L.create_parameter(
-                dtype='float32',
-                shape=[d_vocab], 
-                attr=F.ParamAttr(
-                    name=append_name(name, 'mask_lm_out_fc.b_0'), 
-                    initializer=F.initializer.Constant(value=0.0)
-                    ),
-                is_bias=True,
-            )
-
-    def forward(self, src_ids, *args, **kwargs):
-        tgt_labels = kwargs.pop('tgt_labels', None)
-        tgt_pos = kwargs.pop('tgt_pos', None)
-        encode_only = kwargs.pop('encode_only', False)
-        _, encoded, info = ErnieModel.forward(self, src_ids, *args, **kwargs)
-        #log.debug('hidden_-1 %r'% L.reduce_mean(info['hiddens'][0]).numpy())
-        #log.debug('hidden_0 %r'% L.reduce_mean(info['hiddens'][1]).numpy())
-        if encode_only:
-            return None, None, info
-        elif tgt_labels is None:
-            encoded = self.mlm(encoded)
-            encoded = self.mlm_ln(encoded)
-            logits = L.matmul(encoded, self.word_emb.weight, transpose_y=True) + self.mlm_bias
-            output_ids = L.argmax(logits, -1)
-            return output_ids, logits, info
-        else:
-            encoded_2d = L.gather_nd(encoded, tgt_pos)
-            #log.debug('input shape %s' % repr(src_ids.shape))
-            #log.debug(L.gather_nd(src_ids, tgt_pos).numpy())
-            encoded_2d = self.mlm(encoded_2d)
-            encoded_2d = self.mlm_ln(encoded_2d)
-            logits_2d = L.matmul(encoded_2d, self.word_emb.weight, transpose_y=True) + self.mlm_bias
-            if len(tgt_labels.shape) == 1:
-                tgt_labels = L.reshape(tgt_labels, [-1, 1])
-            loss = L.reduce_mean(L.softmax_with_cross_entropy(logits_2d, tgt_labels))
-            return loss, logits_2d, info
 
 @np.vectorize
 def rev_lookup(i):
     return rev_dict[i]
-
 
 def evaluate(model, datasets, step, args):
     did = D.parallel.Env().dev_id
@@ -116,16 +69,17 @@ def evaluate(model, datasets, step, args):
                     max_encode_len=args.max_encode_len, 
                     beam_width=args.beam_width)
             output_str = rev_lookup(output_ids.numpy())
-            for ostr in output_str.tolist():
+            for eid, ostr in zip(example_id.numpy().tolist(), output_str.tolist()):
                 if '[SEP]' in ostr:
                     ostr = ostr[: ostr.index('[SEP]')]
                 ostr = ' '.join(ostr)
-                print('%d\t%s' % (example_id.numpy(), ostr), file=outf)
+                print('%d\t%s' % (eid, ostr), file=outf)
 
     model.train()
 
 
 def seq2seq(model, tokenizer, args):
+    log.info('Training starts with args: %r' % args)
     attn_id = tokenizer.vocab['[ATTN]']
     def gen_mask(batch_ids, mask_type='bidi', query_len=None, pad_value=0):
         if query_len is None:
@@ -148,6 +102,16 @@ def seq2seq(model, tokenizer, args):
             mask = np.tile(np.expand_dims(mask, 1), [1, query_len, 1])
         return mask
 
+    def make_some_noice(ids):
+        if args.use_random_noice:
+            noice_ids = np.random.randint(1, len(tokenizer.vocab), size=ids.shape)
+        else:
+            noice_ids = np.ones_like(ids) * tokenizer.vocab['[NOISE]']
+        pos, = np.where(np.ones_like(ids))
+        np.random.shuffle(pos)
+        pos = pos[: int(args.noise_prob * len(pos))]
+        ids[pos,] = noice_ids[pos,]
+        return ids
 
     def map_fn(example_id, src_ids, tgt_ids):
         src_ids = src_ids[: args.max_encode_len]
@@ -160,14 +124,19 @@ def seq2seq(model, tokenizer, args):
         tgt_sids = np.ones_like(tgt_sids) * args.tgt_type_id
 
         attn_ids = np.ones_like(tgt_ids) * attn_id
+        if args.noise_prob > 0.:
+            tgt_labels = deepcopy(tgt_ids)
+            tgt_ids = make_some_noice(tgt_ids) #corrupted
+        else:
+            tgt_labels = tgt_ids
 
         return (example_id, src_ids, src_pids, src_sids,
                 tgt_ids, tgt_pids, tgt_sids,
-                attn_ids)
+                attn_ids, tgt_labels)
 
     def after_padding(example_id, src_ids, src_pids, src_sids,
                       tgt_ids, tgt_pids, tgt_sids,
-                      attn_ids):
+                      attn_ids, tgt_labels):
         '''
         attention mask:
         ***  src,  tgt, attn
@@ -222,15 +191,7 @@ def seq2seq(model, tokenizer, args):
         mask_attn_2_srctgtattn = np.concatenate([mask_20, mask_21, mask_22], 2)
 
 
-        tgt_labels = tgt_ids[np.where(tgt_ids != 0)]
-        #log.debug(src_ids)
-        #log.debug(src_pids)
-        #log.debug(src_sids)
-        #log.debug(tgt_ids)
-        #log.debug(tgt_pids)
-        #log.debug(tgt_sids)
-        #log.debug(attn_ids)
-
+        tgt_labels = tgt_labels[np.where(tgt_labels != 0)]
         return (example_id, src_ids, src_sids, src_pids,
                 tgt_ids, tgt_sids, tgt_pids,
                 attn_ids, 
@@ -280,6 +241,8 @@ def seq2seq(model, tokenizer, args):
         cached_k2, cached_v2 = info['caches']
         past_cache_k = [L.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)]
         past_cache_v = [L.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)]
+        if args.label_smooth > 0.:
+            tgt_labels = L.label_smooth(F.one_hot(tgt_labels, len(tokenizer.vocab)), epsilon=args.label_smooth)
         loss, _, __ = model(attn_ids, sent_ids=tgt_sids, pos_ids=tgt_pids, attn_bias=mask_attn_2_srctgtattn, 
                 past_cache=(past_cache_k, past_cache_v), 
                 tgt_labels=tgt_labels, 
@@ -296,8 +259,7 @@ def seq2seq(model, tokenizer, args):
             log.debug('[step %d]train loss %.5f, ppl %.5f, lr %.3e' % (step, loss, ppl, opt.current_step_lr()))
         if args.save_dir is not None and step % 1000 == 0 and D.parallel.Env().dev_id == 0:
             F.save_dygraph(model.state_dict(), args.save_dir)
-
-        if args.predict_output_dir is not None and (step + 1) % args.eval_steps == 0:
+        if args.predict_output_dir is not None and (step ) % args.eval_steps == 0:
             assert os.path.exists(args.predict_output_dir), 'predict_output_dir not found: %s' % args.predict_output_dir
             log.debug('doing predict on gpu %d...' % D.parallel.Env().dev_id)
             evaluate(model, dev_ds, step, args)
@@ -316,13 +278,16 @@ if __name__ == '__main__':
     parser.add_argument('--epoch', type=int, default=30, help='epoch')
     parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
     parser.add_argument('--max_steps', type=int, required=True, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
-    parser.add_argument('--eval_steps', type=int, default='10000000', help='evaluation frequency')
+    parser.add_argument('--eval_steps', type=int, default=5000, help='evaluation frequency')
     parser.add_argument('--max_encode_len', type=int, default=640)
     parser.add_argument('--max_decode_len', type=int, default=120)
     parser.add_argument('--tgt_type_id', type=int, default=3)
     parser.add_argument('--warmup_proportion', type=float, default=0.1)
     parser.add_argument('--beam_width', type=int, default=3)
+    parser.add_argument('--noise_prob', type=float, default=0.7, help='probability of token be repalced')
+    parser.add_argument('--use_random_noice', action='store_true', help='if set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`')
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
+    parser.add_argument('--label_smooth', type=float, default=0.1)
     parser.add_argument('--predict_output_dir', type=str, default=None, help='predict file output directory')
     parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
