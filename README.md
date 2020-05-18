@@ -1,7 +1,3 @@
-<p align="center">
-	<img align="center" width="600" height="300" src="./.metas/ernie-head-banner.gif">
-</p>
-
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
 ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, Reading Comprehension, Genration and so on.
 
@@ -123,7 +119,7 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 - try eager execution with `dygraph model` :
 
 ```script
-python3 ./ernie/finetune_classifier_dygraph.py \
+python3 ./demo/finetune_classifier_dygraph.py \
     --from_pretrained ernie_1.0 \
     --data_dir ./data/xnli 
 ```
@@ -139,7 +135,7 @@ demo:
 
 ```script
 python3 -m paddle.distributed.launch \
-./ernie/finetune_classifier_dygraph_distributed.py \
+./demo/finetune_classifier_dygraph_distributed.py \
     --data_dir data/mnli \
     --max_steps 10000 \
     --from_pretrained ernie2.0-en
@@ -148,10 +144,10 @@ python3 -m paddle.distributed.launch \
 
 many other demo python scripts:
 
-1. [Sementic Analysis](./ernie/finetune_sementic_analysis_dygraph.py)
-1. [Pointwise Ranking](./ernie/finetune_classifier_dygraph.py)
-1. [Name Entity Recognition(NER)](./ernie/finetune_ner_dygraph.py)
-1. [Machine Reading Comprehension](./ernie/finetune_mrc_dygraph.py)
+1. [Sementic Analysis](./demo/finetune_sementic_analysis_dygraph.py)
+1. [Pointwise Ranking](./demo/finetune_classifier_dygraph.py)
+1. [Name Entity Recognition(NER)](./demo/finetune_ner_dygraph.py)
+1. [Machine Reading Comprehension](./demo/finetune_mrc_dygraph.py)
 1. Text generation...
 
 
@@ -180,7 +176,7 @@ many other demo python scripts:
 
 # Distributed pretrain
 
-see [here](./ernie/pretrain/README.md)
+see [here](./demo/pretrain/README.md)
 
 
 # Online inference
