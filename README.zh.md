@@ -16,9 +16,9 @@ ERNIE 2.0 做为强大的预训练语义模型，可以适用于大部分NLP任�
 - 2020.4.30 发布[ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage)， 一种新型图神经网络模型，采用ERNIE做为aggreagtor. 由[PGL](https://github.com/PaddlePaddle/PGL)实现。
 - 2020.3.27 [在SemEval2020五项子任务上夺冠](https://www.jiqizhixin.com/articles/2020-03-27-8)。
 - 2019.12.26 [GLUE榜第一名](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)。
-- 2019.11.6 [发布ERNIE Tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)
-- 2019.7.7 [发布ERNIE 2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
-- 2019.3.16 [发布ERNIE 1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
+- 2019.11.6 发布[ERNIE Tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)。
+- 2019.7.7 发布[ERNIE 2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)。
+- 2019.3.16 发布[ERNIE 1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)。
 
 
 # 导航
@@ -183,7 +183,7 @@ python3 -m paddle.distributed.launch \
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
 
-# 预训练(ERNIE 1.0)
+# 预训练 (ERNIE 1.0)
 
 请见[这里](./demo/pretrain/README.md)
 
