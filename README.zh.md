@@ -7,7 +7,7 @@ ERNIE 2.0 做为强大的预训练语义模型，可以适用于大部分NLP任�
 # 新闻
 
 - 2020.5.2: 欢迎试用`动态图`实现的 ERNIE:
-    - 使用 ERNIE 进行 Pretrain 和 Finetune.
+    - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
     - 动态执行, 所见即所得。
     - 大规模分布式训练。
     - 易于部署。
