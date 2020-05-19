@@ -1,0 +1,47 @@
+=head1 NAME
+
+XML::DOM::Notation - An XML NOTATION in XML::DOM
+
+=head1 DESCRIPTION
+
+XML::DOM::Notation extends L<XML::DOM::Node>.
+
+This node represents a Notation, e.g.
+
+ <!NOTATION gs SYSTEM "GhostScript">
+
+ <!NOTATION name PUBLIC "pubId">
+
+ <!NOTATION name PUBLIC "pubId" "sysId">
+
+ <!NOTATION name SYSTEM "sysId">
+
+=head2 METHODS
+
+=over 4
+
+=item getName and setName (name)
+
+Returns (or sets) the Notation name, which is the first token after the 
+NOTATION keyword.
+
+=item getSysId and setSysId (sysId)
+
+Returns (or sets) the system ID, which is the token after the optional
+SYSTEM keyword.
+
+=item getPubId and setPubId (pubId)
+
+Returns (or sets) the public ID, which is the token after the optional
+PUBLIC keyword.
+
+=item getBase
+
+This is passed by XML::Parser in the Notation handler. 
+I don't know what it is yet.
+
+=item getNodeName
+
+Returns the same as getName.
+
+=back
