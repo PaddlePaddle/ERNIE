@@ -18,7 +18,7 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 	- Easy deployment.
 	- Learn NLP in Aistudio tutorials.
 	- Backward compatibility for old-styled checkpoint
-- May.20.2020: Release **ERNIE Gen**
+	- Release **ERNIE Gen: base/large/large-160G**
 - Apr.30.2020: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
 - Mar.27.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
 - Dec.26.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
