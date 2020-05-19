@@ -18,14 +18,14 @@
 
 关于算法的详细描述，请参见我们的论文：
 >[_**ERNIE-GEN:An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation**_](https://arxiv.org/abs/2001.11314)
-
+>
 >Dongling Xiao\*, Han Zhang\*, Yukun Li, Yu Sun, Hao Tian, Hua Wu, Haifeng Wang (\* : equal contribution)
-
+>
 >Preprint January 2020
-
+>
 >Accepted by **IJCAI-2020**
 
-
+![ERNIE-GEN](https://img.shields.io/badge/预训练-语言生成-green) ![Gigaword](https://img.shields.io/badge/生成式摘要-Gigaword-yellow) ![Gigaword](https://img.shields.io/badge/生成式摘要-CNN/Daily%20Mail-blue) ![SQuAD](https://img.shields.io/badge/问题生成-SQuAD-green) ![Personal-Chat](https://img.shields.io/badge/多轮对话-Personal%20Chat-yellowgreen) ![CoQA](https://img.shields.io/badge/多轮问答-CoQA-orange) 
 ---
 **ERNIE-GEN 是面向生成任务的预训练-微调框架**，首次在预训练阶段加入**span-by-span 生成**任务，让模型每次能够生成一个语义完整的片段。在预训练和微调中通过**填充式生成机制**和**噪声感知机制**来缓解曝光偏差问题。此外, ERNIE-GEN 采样**多片段-多粒度目标文本采样**策略, 增强源文本和目标文本的关联性，加强了编码器和解码器的交互。
 

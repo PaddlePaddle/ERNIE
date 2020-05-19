@@ -18,14 +18,14 @@ English | [简体中文](./README.zh.md)
 
 For technical description of the algorithm, please see our paper:
 >[_**ERNIE-GEN:An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation**_](https://arxiv.org/abs/2001.11314.pdf)
-
+>
 >Dongling Xiao\*, Han Zhang\*, Yukun Li, Yu Sun, Hao Tian, Hua Wu, Haifeng Wang (\* : equal contribution)
-
+>
 >Preprint January 2020
-
+>
 >Accepted by **IJCAI-2020**
 
-
+![ERNIE-GEN](https://img.shields.io/badge/Pretraining-Generation-green) ![Gigaword](https://img.shields.io/badge/Abstractive%20Summarization-Gigaword-yellow) ![Gigaword](https://img.shields.io/badge/Abstractive%20Summarization-CNN/Daily%20Mail-blue) ![SQuAD](https://img.shields.io/badge/Question%20Generation-SQuAD-green) ![Personal-Chat](https://img.shields.io/badge/Dialogue%20Response-Personal%20Chat-yellowgreen) ![CoQA](https://img.shields.io/badge/Generative%20Question%20Answering-CoQA-orange) 
 ---
 **[ERNIE-GEN](https://arxiv.org/abs/2001.11314.pdf) is a multi-flow language generation framework for both pre-training and fine-tuning.** We propose a novel **span-by-span generation** pre-training task to enable the model to **generate a semantically-complete span** at each step rather than a word, in light of the fact that entities, phrases in human writing are organized in a coherent manner. An **infilling generation mechanism** and a **noise-aware generation method** are incorporated into both pre-training and fine-tuning to alleviate **the problem of exposure bias**. In the pre-training phase, ERNIE-GEN adopts a **multi-granularity target fragments sampling** strategy to force decoder to rely more on the encoder representations other than the previous generated words to enhancing the correlation between encoder and decoder.
 
