@@ -37,7 +37,7 @@ from ernie.modeling_ernie import _build_linear, _build_ln, append_name
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.optimization import AdamW, LinearDecay
 
-from experimental.seq2seq.decode import beam_search_infilling
+from experimental.seq2seq.decode import beam_search_infilling, post_process
 from experimental.seq2seq.modeling_ernie_gen import ErnieModelForGeneration
 
 from propeller import log
@@ -72,7 +72,7 @@ def evaluate(model, datasets, step, args):
             for eid, ostr in zip(example_id.numpy().tolist(), output_str.tolist()):
                 if '[SEP]' in ostr:
                     ostr = ostr[: ostr.index('[SEP]')]
-                ostr = ' '.join(ostr)
+                ostr = ''.join(map(post_process, ostr))
                 print('%d\t%s' % (eid, ostr), file=outf)
 
     model.train()
@@ -259,7 +259,7 @@ def seq2seq(model, tokenizer, args):
             log.debug('[step %d]train loss %.5f, ppl %.5f, lr %.3e' % (step, loss, ppl, opt.current_step_lr()))
         if args.save_dir is not None and step % 1000 == 0 and D.parallel.Env().dev_id == 0:
             F.save_dygraph(model.state_dict(), args.save_dir)
-        if args.predict_output_dir is not None and (step ) % args.eval_steps == 0:
+        if args.predict_output_dir is not None and (step + 1) % args.eval_steps == 0:
             assert os.path.exists(args.predict_output_dir), 'predict_output_dir not found: %s' % args.predict_output_dir
             log.debug('doing predict on gpu %d...' % D.parallel.Env().dev_id)
             evaluate(model, dev_ds, step, args)
@@ -295,15 +295,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    sd = F.io.load_program_state(os.path.join(args.from_pretrained, 'params'))
-
     place = F.CUDAPlace(D.parallel.Env().dev_id)
     D.guard(place).__enter__()
 
-    cfg = json.loads(open(os.path.join(args.from_pretrained, 'ernie_config.json')).read())
-    ernie = ErnieModelForGeneration(cfg, name='')
-    sd['sent_embedding'] = ernie.state_dict()['sent_emb.weight']
-    ernie.set_dict(sd, use_structured_name=False)
+    ernie = ErnieModelForGeneration.from_pretrained(args.from_pretrained)
     tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained, mask_token=None)
     rev_dict = {v: k for k, v in tokenizer.vocab.items()}
     rev_dict[tokenizer.pad_id] = '' # replace [PAD]

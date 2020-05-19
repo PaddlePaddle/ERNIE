@@ -46,9 +46,6 @@ log = logging.getLogger()
 def rev_lookup(i):
     return rev_dict[i]
 
-def greedy_search(model, tokenizer, quesion, max_decode_len=100):
-    pass
-
 
 def gen_bias(encoder_inputs, decoder_inputs, step):
     decoder_bsz, decoder_seqlen = decoder_inputs.shape[:2]
@@ -124,7 +121,7 @@ def greedy_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_e
         gen_seq_len += (1 - has_stopped.astype(np.int64))
         output_ids.append(gen_ids.tolist())
         if has_stopped.all():
-            log.debug('exit because all done')
+            #log.debug('exit because all done')
             break
         #if step == 1: break
     output_ids = np.array(output_ids).transpose([1, 0])
@@ -245,7 +242,7 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
         ids = L.stack([pred_ids_flatten, attn_ids], 1)
 
         if state.finished.numpy().all():
-            log.debug('exit because all done')
+            #log.debug('exit because all done')
             break
         #if step == 1: break
 
@@ -255,6 +252,14 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
     final_ids = L.transpose(L.reshape(final_ids, [-1, d_batch * 1]), [1, 0])
     return final_ids
 
+
+def post_process(token):
+    if token.startswith('##'):
+        ret = token[2:]
+    else:
+        ret = ' ' + token
+    return ret
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('seq2seq model with ERNIE')
@@ -268,14 +273,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    sd = F.io.load_program_state(args.from_pretrained+'/params')
     place = F.CUDAPlace(D.parallel.Env().dev_id)
     D.guard(place).__enter__()
 
-    ernie = ErnieModelForGeneration(json.loads(open(args.from_pretrained + '/ernie_config.json').read()), name='')
-    #ernie = ErnieModelForGeneration.from_pretrained(args.from_pretrained, name='')
-    #sd = D.load_dygraph(args.save_dir)
-    ernie.set_dict(sd, use_structured_name=False)
+    ernie = ErnieModelForGeneration.from_pretrained(args.from_pretrained, name='')
     tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained, mask_token=None)
     rev_dict = {v: k for k, v in tokenizer.vocab.items()}
     rev_dict[tokenizer.pad_id] = '' # replace [PAD]
@@ -288,7 +289,7 @@ if __name__ == '__main__':
 
     bytes_vocab = {k.encode('utf8'): v for k, v in tokenizer.vocab.items()}
     feature_column = propeller.data.FeatureColumns([
-        propeller.data.TextColumn('seg_a', unk_id=tokenizer.unk_id, vocab_dict=bytes_vocab),
+        propeller.data.TextColumn('seg_a', unk_id=tokenizer.unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
     ])
     dataset = feature_column.build_dataset_from_stdin('predict').map(map_fn).padded_batch(args.bsz)
 
@@ -309,6 +310,10 @@ if __name__ == '__main__':
                 beam_width=args.beam_width)
 
         output_str = rev_lookup(result_ids.numpy())
-        output_str = '\n'.join([' '.join(ostr[:ostr.index('[SEP]')] if '[SEP]' in ostr else ostr) for ostr in output_str.tolist()])
-        print(output_str)
+        for ostr in output_str.tolist():
+            if '[SEP]' in ostr:
+                ostr = ostr[: ostr.index('[SEP]')]
+            
+            ostr = ''.join(map(post_process, ostr))
+            print(ostr)
 

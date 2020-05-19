@@ -66,7 +66,7 @@ Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/inde
 ##### 1. install ernie
 
 ```script
-pip install -i https://test.pypi.org/simple/ paddle-ernie==0.0.1
+pip install paddle-ernie==0.0.1.dev1
 ```
 
 or 
@@ -83,10 +83,12 @@ pip setup.py -e .
 
 | Model                                              | Description                                                  |
 | :------------------------------------------------- | :----------------------------------------------------------- |
-| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | ernie 1.0 base: L12H768A12|
-| [ERNIE tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | erine tiny: L3H1024A16|
+| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | ernie 1.0 base: L12H768A12  |
+| [ERNIE tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | erine tiny: L3H1024A16      |
 | [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | ernie 2.0 base: L12H768A12  |
-| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | ernie 2.0 large: L24H1024A16 |
+| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | ernie 2.0 large: L24H1024A16|
+| [ERNIE-gen base for English]()                                                                      | ernie-gen base: L12H768A12  |
+| [ERNIE-gen large for English]()                                                                     | ernie-gen large: L24H1024A16|
 
 ##### 4. download datasets
  
