@@ -1,0 +1,32 @@
+=head1 NAME
+
+XML::DOM::ProcessingInstruction - An XML processing instruction in XML::DOM
+
+=head1 DESCRIPTION
+
+XML::DOM::ProcessingInstruction extends L<XML::DOM::Node>.
+
+It represents a "processing instruction", used in XML as a way to keep 
+processor-specific information in the text of the document. An example:
+
+ <?PI processing instruction?>
+
+Here, "PI" is the target and "processing instruction" is the data.
+
+=head2 METHODS
+
+=over 4
+
+=item getTarget
+
+The target of this processing instruction. XML defines this
+as being the first token following the markup that begins the
+processing instruction.
+
+=item getData and setData (data)
+
+The content of this processing instruction. This is from the
+first non white space character after the target to the
+character immediately preceding the ?>.
+
+=back

@@ -20,6 +20,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
+import sys
 import json
 from functools import reduce
 import six
@@ -32,7 +33,7 @@ import paddle.fluid as F
 import paddle.fluid.layers as L
 
 from propeller import util
-from propeller.types import StopException, ProgramPair
+from propeller.types import StopException, ProgramPair, WarmStartSetting, TextoneWarmStartSetting
 from propeller.paddle.train import hooks
 from . import distribution
 
@@ -50,50 +51,65 @@ class RunState(object):
     """serializable Run state object"""
 
     @classmethod
+    def from_dict(cls, d):
+        d['step'] = 0
+        r = RunState()
+        r.__dict__ = d
+        return r
+
+    @classmethod
     def from_str(cls, s):
         """doc"""
         j = json.loads(s)
-        ret = RunState()
-        ret._gstep = j['global_step']
-        ret._time = j['time']
-        ret._step = 0
-        return ret
+        return cls.from_dict(j)
 
     def __init__(self):
         """doc"""
-        self._gstep = 0
-        self._step = 0
-        self._time = time()
+        self.__dict__ = {'gstep': 0, 'step': 0, 'time': time()}
 
     @property
     def gstep(self):
         """doc"""
-        return self._gstep
+        return self.__dict__.get(
+            'gstep',
+            self.__dict__.get('global_step'))  # backward compatibility
 
     @property
     def step(self):
         """doc"""
-        return self._step
+        return self.__dict__['step']
+
+    def __setitem__(self, k, v):
+        self.__dict__[k] = v
+
+    def __getitem__(self, k):
+        return self.__dict__.get(k, None)
 
     @property
     def time(self):
         """doc"""
-        return self._time
+        return self.__dict__['time']
+
+    def state_dict(self):
+        return self.__dict__
 
     def __repr__(self):
         """doc"""
-        return repr({'global_step': self._gstep, 'time': self._time})
+        return repr(self.state_dict())
 
     def serialize(self):
         """doc"""
-        return json.dumps({'global_step': self._gstep, 'time': self._time})
+        return json.dumps(self.state_dict())
 
     def next(self):
         """doc"""
+        newd = dict(
+            self.__dict__,
+            gstep=self.gstep + 1,
+            step=self.step + 1,
+            time=time())
         ret = RunState()
-        ret._gstep = self._gstep + 1
-        ret._step = self._step + 1
-        ret._time = time()
+        ret.__dict__ = newd
         return ret
 
 
@@ -107,11 +123,10 @@ class Saver(object):
                  save_prefix='model',
                  max_ckpt_to_keep=None):
         """doc"""
-        if exe is not None:
-            assert isinstance(
-                exe, F.Executor
-            ), 'expect normal executor to save, got executor of type %s' % repr(
-                type(exe))
+        assert isinstance(
+            exe, F.Executor
+        ), 'expect normal executor to save, got executor of type %s' % repr(
+            type(exe))
         self._exe = exe
         self._program = program
         self._save_dir = save_dir
@@ -133,6 +148,35 @@ class Saver(object):
         """doc"""
         return self.ckpt_list[-1] if len(self.ckpt_list) else None
 
+    def _save_program(self, dir):
+        F.io.save_persistables(self._exe, dir, self._program.train_program)
+
+    def _load_program(self, dir, predicate_fn=None):
+        if predicate_fn is None:
+
+            def _fn(v):
+                vpath = os.path.join(dir, v.name)
+                if F.io.is_persistable(v):
+                    if os.path.exists(vpath):
+                        return True
+                    else:
+                        log.warning('var %s not found in checkpoint, ignored' %
+                                    v.name)
+                return False
+
+            predicate_fn = _fn
+        try:
+            F.io.load_vars(
+                self._exe,
+                dir,
+                main_program=self._program.train_program,
+                predicate=predicate_fn)
+        except F.core.EnforceNotMet as e:
+            log.exception(e)
+            raise RuntimeError(
+                'can not load model from %s, is this a textone checkpoint?' %
+                dir)
+
     def save(self, state):
         """doc"""
         save_name = '%s_%d' % (self._save_prefix, state.gstep)
@@ -144,7 +188,7 @@ class Saver(object):
         except OSError:
             pass
         log.debug('saving step %d to %s' % (state.gstep, save_dir))
-        F.io.save_persistables(self._exe, tmp_dir, self._program)
+        self._save_program(tmp_dir)
         shutil.move(tmp_dir, save_dir)
         meta = state.serialize()
         open(os.path.join(save_dir, 'meta'), 'w').write(meta)
@@ -182,23 +226,34 @@ class Saver(object):
         state = RunState.from_str(open(meta_file).read())
         log.info('restore from ckpt %s, ckpt-status: %s' % (path, repr(state)))
 
-        def _fn(v):
-            vpath = os.path.join(path, v.name)
-            if F.io.is_persistable(v):
-                if os.path.exists(vpath):
-                    return True
-                else:
-                    log.warning('var %s not found in checkpoint, ignored' %
-                                v.name)
-            return False
-
-        F.io.load_vars(
-            self._exe, path, main_program=self._program, predicate=_fn)
+        self._load_program(path)
         return state
+
+
+class SaverV2(Saver):
+    def _save_program(self, dir):
+        save_path = os.path.join(dir, 'ckpt')
+        F.save(self._program.train_program, save_path)
+
+    def _load_program(self, dir, predicate_fn=None):
+        try:
+            save_path = os.path.join(dir, 'ckpt')
+            F.load(
+                self._program.train_program,
+                save_path, )
+        except F.core.EnforceNotMet as e:
+            log.exception(e)
+            raise RuntimeError(
+                'can not load model from %s, is this a textone checkpoint?' %
+                dir)
+
+
+TextoneTrainer = None
 
 
 class MonitoredExecutor(object):
     """An Executor wrapper handling the train loop"""
+    saver_class = SaverV2  # will change if textone enabled
 
     def __init__(
             self,
@@ -213,6 +268,8 @@ class MonitoredExecutor(object):
             raise ValueError('PE is no longer supported')
         if isinstance(executor, F.ParallelExecutor):
             raise ValueError('ParallelExecutor is deprecatd, use Executor')
+        if not isinstance(program, ProgramPair):
+            raise ValueError('Expect ProgramPair, got %r' % type(program))
         self._exe = executor
         self._hooks = run_hooks
         self._state = RunState()  # might be overwrite in freeze
@@ -244,32 +301,61 @@ class MonitoredExecutor(object):
 
         F.Executor(_get_one_place()).run(self._program.startup_program)
         # 2. restore param
+
+        self._saver = self.saver_class(
+            self._model_dir,
+            F.Executor(_get_one_place()),
+            program=self._program,
+            max_ckpt_to_keep=self._max_ckpt)
+
         if self._warm_start_setting is not None:
             if not os.path.exists(self._warm_start_setting.from_dir):
                 raise ValueError('warm start dir not exists: %s' %
                                  self._warm_start_setting.from_dir)
-            log.info("warm start from %s" % self._warm_start_setting.from_dir)
-            if self._warm_start_setting.predicate_fn is not None:
 
-                def _fn(v):
-                    ret = self._warm_start_setting.predicate_fn(v)
-                    if ret:
-                        log.info('warm start: %s' % v.name)
-                    return ret
+            if isinstance(self._warm_start_setting, WarmStartSetting):
+                log.info("warm start from %s" %
+                         self._warm_start_setting.from_dir)
+                log.info(self._saver)
+                if (not type(self._saver) is Saver) and (
+                        not type(self._saver) is SaverV2):
+                    raise ValueError(
+                        'try to warm start from standart dir, but textone enabled'
+                    )
+                if self._warm_start_setting.predicate_fn is not None:
 
-                F.io.load_vars(
-                    F.Executor(_get_one_place()),
-                    self._warm_start_setting.from_dir,
-                    main_program=self._program.train_program,
-                    predicate=_fn)
+                    def _fn(v):
+                        ret = self._warm_start_setting.predicate_fn(v)
+                        if ret:
+                            log.info('warm start: %s' % v.name)
+                        return ret
+
+                    try:
+                        F.io.load_vars(
+                            self._exe,
+                            self._warm_start_setting.from_dir,
+                            main_program=self._program.train_program,
+                            predicate=_fn)
+                    except F.core.EnforceNotMet as e:
+                        log.exception(e)
+                        raise RuntimeError(
+                            'can not load model from %s, is this a textone checkpoint?'
+                            % dir)
+                else:
+                    raise NotImplementedError()
+            elif isinstance(self._warm_start_setting, TextoneWarmStartSetting):
+                if not type(self._saver) is TextoneTrainer:
+                    raise ValueError(
+                        'try to warm start from textone pretrain dir, but textone not enabled'
+                    )
+                log.info("[texone] warm start from %s" %
+                         self._warm_start_setting.from_dir)
+                self._saver._load_pretrained(self._warm_start_setting.from_dir)
             else:
-                raise NotImplementedError()
+                raise ValueError(
+                    'expect _warm_start_setting to be TextoneWarmStartSetting of WarmStartSetting, got %s'
+                    % repr(self._warm_start_setting))
 
-        self._saver = Saver(
-            self._model_dir,
-            F.Executor(_get_one_place()),
-            program=self._program.train_program,
-            max_ckpt_to_keep=self._max_ckpt)
         if self._saver.last_ckpt is not None:
             self._state = self._saver.restore(ckpt)
 
@@ -318,9 +404,9 @@ class MonitoredExecutor(object):
         else:
             log.info('propeller runs in CPU mode')
 
-        log.debug('freezing program')
+        #log.debug('freezing program')
         self._freeze()
-        log.debug('done freezing')
+        #log.debug('done freezing')
         log.info('********** Start Loop ************')
         # TODO init
 

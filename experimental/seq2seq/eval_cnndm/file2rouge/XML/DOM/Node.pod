@@ -1,0 +1,451 @@
+=head1 NAME
+
+XML::DOM::Node - Super class of all nodes in XML::DOM
+
+=head1 DESCRIPTION
+
+XML::DOM::Node is the super class of all nodes in an XML::DOM document.
+This means that all nodes that subclass XML::DOM::Node also inherit all
+the methods that XML::DOM::Node implements.
+
+=head2 GLOBAL VARIABLES
+
+=over 4
+
+=item @NodeNames
+
+The variable @XML::DOM::Node::NodeNames maps the node type constants to strings.
+It is used by XML::DOM::Node::getNodeTypeName.
+
+=back
+
+=head2 METHODS
+
+=over 4
+
+=item getNodeType
+
+Return an integer indicating the node type. See XML::DOM constants.
+
+=item getNodeName
+
+Return a property or a hardcoded string, depending on the node type.
+Here are the corresponding functions or values:
+
+ Attr			getName
+ AttDef			getName
+ AttlistDecl		getName
+ CDATASection		"#cdata-section"
+ Comment		"#comment"
+ Document		"#document"
+ DocumentType		getNodeName
+ DocumentFragment	"#document-fragment"
+ Element		getTagName
+ ElementDecl		getName
+ EntityReference	getEntityName
+ Entity			getNotationName
+ Notation		getName
+ ProcessingInstruction	getTarget
+ Text			"#text"
+ XMLDecl		"#xml-declaration"
+
+B<Not In DOM Spec>: AttDef, AttlistDecl, ElementDecl and XMLDecl were added for
+completeness.
+
+=item getNodeValue and setNodeValue (value)
+
+Returns a string or undef, depending on the node type. This method is provided 
+for completeness. In other languages it saves the programmer an upcast.
+The value is either available thru some other method defined in the subclass, or
+else undef is returned. Here are the corresponding methods: 
+Attr::getValue, Text::getData, CDATASection::getData, Comment::getData, 
+ProcessingInstruction::getData.
+
+=item getParentNode and setParentNode (parentNode)
+
+The parent of this node. All nodes, except Document,
+DocumentFragment, and Attr may have a parent. However, if a
+node has just been created and not yet added to the tree, or
+if it has been removed from the tree, this is undef.
+
+=item getChildNodes
+
+A NodeList that contains all children of this node. If there
+are no children, this is a NodeList containing no nodes. The
+content of the returned NodeList is "live" in the sense that,
+for instance, changes to the children of the node object that
+it was created from are immediately reflected in the nodes
+returned by the NodeList accessors; it is not a static
+snapshot of the content of the node. This is true for every
+NodeList, including the ones returned by the
+getElementsByTagName method.
+
+NOTE: this implementation does not return a "live" NodeList for
+getElementsByTagName. See L<CAVEATS>.
+
+When this method is called in a list context, it returns a regular perl list
+containing the child nodes. Note that this list is not "live". E.g.
+
+ @list = $node->getChildNodes;	      # returns a perl list
+ $nodelist = $node->getChildNodes;    # returns a NodeList (object reference)
+ for my $kid ($node->getChildNodes)   # iterate over the children of $node
+
+=item getFirstChild
+
+The first child of this node. If there is no such node, this returns undef.
+
+=item getLastChild
+
+The last child of this node. If there is no such node, this returns undef.
+
+=item getPreviousSibling
+
+The node immediately preceding this node. If there is no such 
+node, this returns undef.
+
+=item getNextSibling
+
+The node immediately following this node. If there is no such node, this returns 
+undef.
+
+=item getAttributes
+
+A NamedNodeMap containing the attributes (Attr nodes) of this node 
+(if it is an Element) or undef otherwise.
+Note that adding/removing attributes from the returned object, also adds/removes
+attributes from the Element node that the NamedNodeMap came from.
+
+=item getOwnerDocument
+
+The Document object associated with this node. This is also
+the Document object used to create new nodes. When this node
+is a Document this is undef.
+
+=item insertBefore (newChild, refChild)
+
+Inserts the node newChild before the existing child node
+refChild. If refChild is undef, insert newChild at the end of
+the list of children.
+
+If newChild is a DocumentFragment object, all of its children
+are inserted, in the same order, before refChild. If the
+newChild is already in the tree, it is first removed.
+
+Return Value: The node being inserted.
+
+DOMExceptions:
+
+=over 4
+
+=item * HIERARCHY_REQUEST_ERR
+
+Raised if this node is of a type that does not allow children of the type of
+the newChild node, or if the node to insert is one of this node's ancestors.
+
+=item * WRONG_DOCUMENT_ERR
+
+Raised if newChild was created from a different document than the one that 
+created this node.
+
+=item * NO_MODIFICATION_ALLOWED_ERR
+
+Raised if this node is readonly.
+
+=item * NOT_FOUND_ERR
+
+Raised if refChild is not a child of this node.
+
+=back
+
+=item replaceChild (newChild, oldChild)
+
+Replaces the child node oldChild with newChild in the list of
+children, and returns the oldChild node. If the newChild is
+already in the tree, it is first removed.
+
+Return Value: The node replaced.
+
+DOMExceptions:
+
+=over 4
+
+=item * HIERARCHY_REQUEST_ERR
+
+Raised if this node is of a type that does not allow children of the type of
+the newChild node, or it the node to put in is one of this node's ancestors.
+
+=item * WRONG_DOCUMENT_ERR
+
+Raised if newChild was created from a different document than the one that 
+created this node.
+
+=item * NO_MODIFICATION_ALLOWED_ERR
+
+Raised if this node is readonly.
+
+=item * NOT_FOUND_ERR
+
+Raised if oldChild is not a child of this node.
+
+=back
+
+=item removeChild (oldChild)
+
+Removes the child node indicated by oldChild from the list of
+children, and returns it.
+
+Return Value: The node removed.
+
+DOMExceptions:
+
+=over 4
+
+=item * NO_MODIFICATION_ALLOWED_ERR
+
+Raised if this node is readonly.
+
+=item * NOT_FOUND_ERR
+
+Raised if oldChild is not a child of this node.
+
+=back
+
+=item appendChild (newChild)
+
+Adds the node newChild to the end of the list of children of
+this node. If the newChild is already in the tree, it is
+first removed. If it is a DocumentFragment object, the entire contents of 
+the document fragment are moved into the child list of this node
+
+Return Value: The node added.
+
+DOMExceptions:
+
+=over 4
+
+=item * HIERARCHY_REQUEST_ERR
+
+Raised if this node is of a type that does not allow children of the type of
+the newChild node, or if the node to append is one of this node's ancestors.
+
+=item * WRONG_DOCUMENT_ERR
+
+Raised if newChild was created from a different document than the one that 
+created this node.
+
+=item * NO_MODIFICATION_ALLOWED_ERR
+
+Raised if this node is readonly.
+
+=back
+
+=item hasChildNodes
+
+This is a convenience method to allow easy determination of
+whether a node has any children.
+
+Return Value: 1 if the node has any children, 0 otherwise.
+
+=item cloneNode (deep)
+
+Returns a duplicate of this node, i.e., serves as a generic
+copy constructor for nodes. The duplicate node has no parent
+(parentNode returns undef.).
+
+Cloning an Element copies all attributes and their values,
+including those generated by the XML processor to represent
+defaulted attributes, but this method does not copy any text
+it contains unless it is a deep clone, since the text is
+contained in a child Text node. Cloning any other type of
+node simply returns a copy of this node.
+
+Parameters: 
+ I<deep>   If true, recursively clone the subtree under the specified node.
+If false, clone only the node itself (and its attributes, if it is an Element).
+
+Return Value: The duplicate node.
+
+=item normalize
+
+Puts all Text nodes in the full depth of the sub-tree
+underneath this Element into a "normal" form where only
+markup (e.g., tags, comments, processing instructions, CDATA
+sections, and entity references) separates Text nodes, i.e.,
+there are no adjacent Text nodes. This can be used to ensure
+that the DOM view of a document is the same as if it were
+saved and re-loaded, and is useful when operations (such as
+XPointer lookups) that depend on a particular document tree
+structure are to be used.
+
+B<Not In DOM Spec>: In the DOM Spec this method is defined in the Element and 
+Document class interfaces only, but it doesn't hurt to have it here...
+
+=item getElementsByTagName (name [, recurse])
+
+Returns a NodeList of all descendant elements with a given
+tag name, in the order in which they would be encountered in
+a preorder traversal of the Element tree.
+
+Parameters:
+ I<name>  The name of the tag to match on. The special value "*" matches all tags.
+ I<recurse>  Whether it should return only direct child nodes (0) or any descendant that matches the tag name (1). This argument is optional and defaults to 1. It is not part of the DOM spec.
+
+Return Value: A list of matching Element nodes.
+
+NOTE: this implementation does not return a "live" NodeList for
+getElementsByTagName. See L<CAVEATS>.
+
+When this method is called in a list context, it returns a regular perl list
+containing the result nodes. E.g.
+
+ @list = $node->getElementsByTagName("tag");       # returns a perl list
+ $nodelist = $node->getElementsByTagName("tag");   # returns a NodeList (object ref.)
+ for my $elem ($node->getElementsByTagName("tag")) # iterate over the result nodes
+
+=back
+
+=head2 Additional methods not in the DOM Spec
+
+=over 4
+
+=item getNodeTypeName
+
+Return the string describing the node type. 
+E.g. returns "ELEMENT_NODE" if getNodeType returns ELEMENT_NODE.
+It uses @XML::DOM::Node::NodeNames.
+
+=item toString
+
+Returns the entire subtree as a string.
+
+=item printToFile (filename)
+
+Prints the entire subtree to the file with the specified filename.
+
+Croaks: if the file could not be opened for writing.
+
+=item printToFileHandle (handle)
+
+Prints the entire subtree to the file handle.
+E.g. to print to STDOUT:
+
+ $node->printToFileHandle (\*STDOUT);
+
+=item print (obj)
+
+Prints the entire subtree using the object's print method. E.g to print to a
+FileHandle object:
+
+ $f = new FileHandle ("file.out", "w");
+ $node->print ($f);
+
+=item getChildIndex (child)
+
+Returns the index of the child node in the list returned by getChildNodes.
+
+Return Value: the index or -1 if the node is not found.
+
+=item getChildAtIndex (index)
+
+Returns the child node at the specifed index or undef.
+
+=item addText (text)
+
+Appends the specified string to the last child if it is a Text node, or else 
+appends a new Text node (with the specified text.)
+
+Return Value: the last child if it was a Text node or else the new Text node.
+
+=item dispose
+
+Removes all circular references in this node and its descendants so the 
+objects can be claimed for garbage collection. The objects should not be used
+afterwards.
+
+=item setOwnerDocument (doc)
+
+Sets the ownerDocument property of this node and all its children (and 
+attributes etc.) to the specified document.
+This allows the user to cut and paste document subtrees between different
+XML::DOM::Documents. The node should be removed from the original document
+first, before calling setOwnerDocument.
+
+This method does nothing when called on a Document node.
+
+=item isAncestor (parent)
+
+Returns 1 if parent is an ancestor of this node or if it is this node itself.
+
+=item expandEntityRefs (str)
+
+Expands all the entity references in the string and returns the result.
+The entity references can be character references (e.g. "&#123;" or "&#x1fc2"),
+default entity references ("&quot;", "&gt;", "&lt;", "&apos;" and "&amp;") or
+entity references defined in Entity objects as part of the DocumentType of
+the owning Document. Character references are expanded into UTF-8.
+Parameter entity references (e.g. %ent;) are not expanded.
+
+=item to_sax ( %HANDLERS )
+
+E.g.
+
+ $node->to_sax (DocumentHandler => $my_handler, 
+		Handler => $handler2 );
+
+%HANDLERS may contain the following handlers:
+
+=over 4
+
+=item * DocumentHandler
+
+=item * DTDHandler
+
+=item * EntityResolver
+
+=item * Handler 
+
+Default handler when one of the above is not specified
+
+=back
+
+Each XML::DOM::Node generates the appropriate SAX callbacks (for the
+appropriate SAX handler.) Different SAX handlers can be plugged in to
+accomplish different things, e.g. L<XML::Checker> would check the node 
+(currently only Document and Element nodes are supported), L<XML::Handler::BuildDOM>
+would create a new DOM subtree (thereby, in essence, copying the Node)
+and in the near future, XML::Writer could print the node.
+All Perl SAX related work is still in flux, so this interface may change a 
+little.
+
+See PerlSAX for the description of the SAX interface.
+
+=item check ( [$checker] )
+
+See descriptions for check() in L<XML::DOM::Document> and L<XML::DOM::Element>.
+
+=item xql ( @XQL_OPTIONS )
+
+To use the xql method, you must first I<use> L<XML::XQL> and L<XML::XQL::DOM>.
+This method is basically a shortcut for:
+
+ $query = new XML::XQL::Query ( @XQL_OPTIONS );
+ return $query->solve ($node);
+
+If the first parameter in @XQL_OPTIONS is the XQL expression, you can leave off
+the 'Expr' keyword, so:
+
+ $node->xql ("doc//elem1[@attr]", @other_options);
+
+is identical to:
+
+ $node->xql (Expr => "doc//elem1[@attr]", @other_options);
+
+See L<XML::XQL::Query> for other available XQL_OPTIONS.
+See L<XML::XQL> and L<XML::XQL::Tutorial> for more info.
+
+=item isHidden ()
+
+Whether the node is hidden.
+See L<Hidden Nodes|XML::DOM/_Hidden_Nodes_> for details.
+
+=back

@@ -69,7 +69,6 @@ class Mean(Metrics):
     @property
     def tensor(self):
         """doc"""
-        self.t.persistable = True
         return self.t,
 
     def update(self, args):
@@ -96,13 +95,16 @@ class Acc(Mean):
 
     def __init__(self, label, pred):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
         self.eq = L.equal(pred, label)
         self.reset()
 
     @property
     def tensor(self):
         """doc"""
-        self.eq.persistable = True
         return self.eq,
 
 
@@ -111,6 +113,11 @@ class MSE(Mean):
 
     def __init__(self, label, pred):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
         diff = pred - label
         self.mse = diff * diff
         self.reset()
@@ -118,7 +125,6 @@ class MSE(Mean):
     @property
     def tensor(self):
         """doc"""
-        self.mse.persistable = True
         return self.mse,
 
 
@@ -127,21 +133,30 @@ class Cosine(Mean):
 
     def __init__(self, label, pred):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
         self.cos = L.cos_sim(label, pred)
         self.reset()
 
     @property
     def tensor(self):
         """doc"""
-        self.cos.persistable = True
         return self.cos,
 
 
-class Precision(Metrics):
+class MacroF1(Metrics):
     """doc"""
 
     def __init__(self, label, pred):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
         self.label = label
         self.pred = pred
         self.reset()
@@ -154,8 +169,48 @@ class Precision(Metrics):
     @property
     def tensor(self):
         """doc"""
-        self.label.persistable = True
-        self.pred.persistable = True
+        return self.label, self.pred
+
+    def update(self, args):
+        """doc"""
+        label, pred = args
+        label = label.reshape([-1]).astype(np.bool)
+        pred = pred.reshape([-1]).astype(np.bool)
+        if label.shape != pred.shape:
+            raise ValueError(
+                'Metrics precesion: input not match: label:%s pred:%s' %
+                (label, pred))
+        self.label_saver = np.concatenate([self.label_saver, label])
+        self.pred_saver = np.concatenate([self.pred_saver, pred])
+
+    def eval(self):
+        """doc"""
+        return sklearn.metrics.f1_score(
+            self.label_saver, self.pred_saver, average='macro')
+
+
+class Precision(Metrics):
+    """doc"""
+
+    def __init__(self, label, pred):
+        """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
+        self.label = label
+        self.pred = pred
+        self.reset()
+
+    def reset(self):
+        """doc"""
+        self.label_saver = np.array([], dtype=np.bool)
+        self.pred_saver = np.array([], dtype=np.bool)
+
+    @property
+    def tensor(self):
+        """doc"""
         return self.label, self.pred
 
     def update(self, args):
@@ -205,6 +260,11 @@ class Auc(Metrics):
 
     def __init__(self, label, pred):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
         self.pred = pred
         self.label = label
         self.reset()
@@ -217,8 +277,6 @@ class Auc(Metrics):
     @property
     def tensor(self):
         """doc"""
-        self.pred.persistable = True
-        self.label.persistable = True
         return [self.pred, self.label]
 
     def update(self, args):
@@ -277,6 +335,11 @@ class Mrr(Metrics):
 
     def __init__(self, qid, label, pred):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
         self.qid = qid
         self.label = label
         self.pred = pred
@@ -291,9 +354,6 @@ class Mrr(Metrics):
     @property
     def tensor(self):
         """doc"""
-        self.qid.persistable = True
-        self.label.persistable = True
-        self.pred.persistable = True
         return [self.qid, self.label, self.pred]
 
     def update(self, args):
@@ -405,9 +465,6 @@ class ChunkF1(Metrics):
     @property
     def tensor(self):
         """doc"""
-        self.pred.persistable = True
-        self.label.persistable = True
-        self.seqlen.persistable = True
         return [self.pred, self.label, self.seqlen]
 
     def update(self, args):
@@ -471,6 +528,11 @@ class PNRatio(Metrics):
 
     def __init__(self, qid, label, pred):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
         self.qid = qid
         self.label = label
         self.pred = pred
@@ -483,9 +545,6 @@ class PNRatio(Metrics):
     @property
     def tensor(self):
         """doc"""
-        self.qid.persistable = True
-        self.label.persistable = True
-        self.pred.persistable = True
         return [self.qid, self.label, self.pred]
 
     def update(self, args):
@@ -563,6 +622,11 @@ class PrecisionAtK(Metrics):
 
     def __init__(self, qid, label, pred, k=1):
         """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
         self.qid = qid
         self.label = label
         self.pred = pred
@@ -576,9 +640,6 @@ class PrecisionAtK(Metrics):
     @property
     def tensor(self):
         """doc"""
-        self.qid.persistable = True
-        self.label.persistable = True
-        self.pred.persistable = True
         return [self.qid, self.label, self.pred]
 
     def update(self, args):

@@ -70,6 +70,9 @@ class Dataset(DatasetBase):
                 raise e
 
         r = F.io.PyReader(
-            feed_list=self.placeholders(), capacity=50, iterable=True)
+            feed_list=self.placeholders(),
+            capacity=50,
+            iterable=True,
+            return_list=F.in_dygraph_mode())
         r.decorate_batch_generator(_gen, places=places)
         return r()

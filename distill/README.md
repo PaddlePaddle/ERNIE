@@ -2,8 +2,6 @@
     * [ERNIE数据蒸馏三步](#ernie数据蒸馏三步)
     * [数据增强](#数据增强)
 * [使用教程](#使用教程)
-   * [离线蒸馏](#离线蒸馏)
-   * [在线蒸馏](#在线蒸馏)
 * [效果验证](#效果验证)
     * [Case#1 用户提供“无标注数据”](#case1)
     * [Case#2 用户未提供“无标注数据”](#case2)
@@ -39,73 +37,11 @@
 
 # 使用教程
 
-我们采用上述3种增强策略制作了chnsenticorp的增强数据：增强后的数据为原训练数据的10倍(96000行)，可以从[这里](https://ernie.bj.bcebos.com/distill_data.tar.gz)下载。将下载的 `distill` 文件夹放入 `${TASK_DATA_PATH}` 后即可执行下面的脚本开始蒸馏。
+我们采用上述3种增强策略制作了chnsenticorp的增强数据：增强后的数据为原训练数据的10倍(96000行)，可以从[这里](https://ernie.bj.bcebos.com/distill_data.tar.gz)下载。即可执行下面的脚本开始蒸馏。
 
-### 离线蒸馏
-离线蒸馏指的是先通过训练好的ERNIE模型预测出无监督数据的label，然后student模型去学习这些label。只需执行
-```script
-sh ./distill/script/distill_chnsenticorp.sh
+```shell
+python ./distill/distill.py
 ```
-即可开始离线蒸馏。
-
-该脚本会进行前述的三步：1. 在任务数据上Fine-tune。 2. 加载Fine-tune好的模型对增强数据进行打分。 3.使用Student模型进行训练。脚本采用hard-label蒸馏，在第二步中将会直接预测出ERNIE标注的label。
-
-该脚本涉及两个python文件:`./example/finetune_classifier.py` 负责finetune以及预测teacher模型， `distill/distill_chnsentocorp.py` 负责student模型的训练。事先构造好的增强数据放在`${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug`
-
-在脚本的第二步中，使用 `--do_predict` 参数进入预测模式:
-```script
-cat ${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug/part.0 |python3 -u ./example/finetune_classifier.py \
-    --do_predict \
-    --data_dir ${TASK_DATA_PATH}/distill/chnsenticorp/teacher \
-    --warm_start_from ${MODEL_PATH}/params \
-    --vocab_file ${MODEL_PATH}/vocab.txt \
-    ...
-```
-脚本从标准输入获取明文输入，并将打分输出到标准输出。用这种方式对数据增强后的无监督训练预料进行标注。最终的标注结果放在 `prediction_output/part.0` 文件中。标注结果包含两列, 第一列为明文，第二列为标注label。
-
-在第三步开始student模型的训练：
-```script
-python3 ./distill/distill_chnsentocorp.py \
-    --data_dir ${TASK_DATA_PATH}/distill/chnsenticorp/student \
-    --vocab_file ${TASK_DATA_PATH}/distill/chnsenticorp/student/vocab.txt \
-    --unsupervise_data_dir ./prediction_output/ \
-    --max_seqlen 128 \
-    ...
-```
-
-训练流程与第一步相同，`--data_dir` 指定的监督数据，`--unsupervise_data_dir` 指定ERNIE标注数据。Student模型是一个简单的BOW模型，其定义位于`distill/distill_chnsentocorp.py`。用户只需改写其中的model部分即可实现定制蒸馏模型。
-
-如果用户已经拥有了无监督数据，则可以将无监督数据放入 `${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug` 即可。
-
-### 在线蒸馏
-考虑到在某些场景下，无监督数据过大导致预测过程十分耗时，或者ERNIE预测出的分布过大而无法预先存放在磁盘中。针对这种场景我们提出一种 **在线蒸馏** 方案。采用`propeller` 进行fine-tune并使用 `BestInferenceModelExporter` 后，`propeller` 会自动将指标最好的模型保存为paddle inference model格式，随后启动一个预测服务。Student模型在训练的同时，实时地访问这个服务来获得ERNIE的预测打分。只需执行
-```
-sh ./distill/script/distill_chnsenticorp_with_propeller_server.sh
-```
-即可完成上述流程。
-
-流程包含3步：1. finetune ERNIE模型。2. 取指标最好的ERNIE模型启动`propeller`服务。 3.在student模型的训练过程中访问服务获取teacher模型的标注。
-
-此流程涉及两个python文件: `example/finetune_classifier.py` 与 `distill/distill_chnsentocorp_with_propeller_server.py`  。其中第一步与离线蒸馏中的用法完全一样。
-第二步中使用
-```script
-python3 -m propeller.tools.start_server -p 8113 -m ${teacher_dir}/best/inference/ &
-```
-启动一个ernie预测服务
-
-第三步开始student模型的同步训练：
-```script
-python3 ./distill/distill_chnsentocorp_with_propeller_server.py \
-    --data_dir ${TASK_DATA_PATH}/distill/chnsenticorp/student \
-    --vocab_file ${TASK_DATA_PATH}/distill/chnsenticorp/student/vocab.txt \
-    --teacher_vocab_file ${MODEL_PATH}/vocab.txt \
-    --max_seqlen 128 \
-    --teacher_max_seqlen 128 \
-    --server_batch_size 64 \
-    --teacher_host tcp://localhost:8113 \
-    --num_coroutine 10
-```
-该脚本将`${TASK_DATA_PATH}/distill/chnsenticorp/student/unsup_train_aug` 目录下的增强数据进行切字并请求`propeller` 服务。`--num_coroutine` 指定了请求的并发数，`--teacher_host` 指定了服务的端口和IP，`--server_batch_size` 指定了请求的batch_size，在实际的请求中每个batch的数据会拆分成若干个 `--server_batch_size` 大小的数据去请求服务。
 
 # 效果验证
 我们将实际应用场景分类为两种：

@@ -51,10 +51,13 @@ def _get_dict_from_environ_or_json_or_file(args, env_name):
             s = open(s).read()
     if isinstance(s, six.string_types):
         try:
-            r = eval(s)
-        except SyntaxError as e:
-            raise ValueError('json parse error: %s \n>Got json: %s' %
-                             (repr(e), s))
+            r = json.loads(s)
+        except ValueError:
+            try:
+                r = eval(s)
+            except SyntaxError as e:
+                raise ValueError('json parse error: %s \n>Got json: %s' %
+                                 (repr(e), s))
         return r
     else:
         return s  #None
@@ -89,10 +92,11 @@ def parse_hparam(args=None):
         for hp in hparam_strs
     ]
     hparams = [HParams(**h) for h in hparams if h is not None]
-    if len(hparams) is None:
-        raise ValueError('hparam not found')
-    hparam = reduce(lambda x, y: x.join(y), hparams)
-    return hparam
+    if len(hparams) == 0:
+        return HParams()
+    else:
+        hparam = reduce(lambda x, y: x.join(y), hparams)
+        return hparam
 
 
 def flatten(s):

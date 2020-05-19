@@ -1,8 +1,8 @@
 # ERNIE fast inference (C++)
 
 ERNIE C++ fast inference API提供了一种更为高效的在线预测方案，可以直接联编译至生产环境以获取更好的性能。
-其实现基于[fluid inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/advanced_usage/deploy/inference/native_infer.html).
-**请确保您的 fluid inference 版本高于 1.6.3 以获得正确的预测结果。**
+其实现基于[fluid inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/advanced_guide/inference_deployment/inference/native_infer.html).
+**请确保您的 fluid inference 版本高于 1.7 以获得正确的预测结果。**
 本页面提供了一个ERNIE C++ fast inference 的 demo benchmark.
 
 ## 准备工作
@@ -22,7 +22,7 @@ ERNIE fast inference 需要输入 inference\_model 格式的模型，可以参�
 
 为了编译本 demo，c++ 编译器需要支持 C++11 标准。
 
-下载对应的 [fluid_inference库](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/advanced_usage/deploy/inference/build_and_install_lib_cn.html) , 根据使用的 paddle 的版本和配置状况 (是否使用 avx, mkl, 以及 cuda, cudnn 版本) 选择下载对应的版本并解压，会得到 `fluid_inference` 文件夹，将其放在与`inference.cc`同一级目录。
+下载对应的 [fluid_inference库](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/advanced_guide/inference_deployment/inference/build_and_install_lib_cn.html) , 根据使用的 paddle 的版本和配置状况 (是否使用 avx, mkl, 以及 cuda, cudnn 版本) 选择下载对应的版本并解压，会得到 `fluid_inference` 文件夹，将其放在与`inference.cc`同一级目录。
 
 用以下命令编译：
 ``` bash

@@ -89,7 +89,7 @@ def _build_net(model_fn, features, mode, params, run_config):
         if not (model_spec.loss.shape == () or model_spec.loss.shape == (1, )):
             raise ValueError('expect scarlar loss, got %s' %
                              repr(model_spec.loss.shape))
-        model_spec.loss.persistable = True
+        #model_spec.loss.persistable = True
     elif mode == RunMode.EVAL:
         if not isinstance(model_spec.metrics, dict):
             raise ValueError('model_spec.metrics should be dict, got %s' %
@@ -151,26 +151,24 @@ class Learner(object):
         train_program = F.Program()
         startup_prog = F.Program()
         with F.program_guard(train_program, startup_prog):
-            with F.unique_name.guard():
-                with collection.Collections() as collections:
-                    log.info('Building Train Graph...')
-                    fea = train_dataset.features()
-                    model_spec = _build_net(self.model_fn, fea, RunMode.TRAIN,
-                                            self.params, self.run_config)
-                    log.info('Building Train Graph: Done')
+            with collection.Collections() as collections:
+                log.info('Building Train Graph...')
+                fea = train_dataset.features()
+                model_spec = _build_net(self.model_fn, fea, RunMode.TRAIN,
+                                        self.params, self.run_config)
+                log.info('Building Train Graph: Done')
 
-                scalars = collections.get(collection.Key.SUMMARY_SCALAR)
-                histograms = collections.get(collection.Key.SUMMARY_HISTOGRAM)
-                skip_optimize_ops = collections.get(
-                    collection.Key.SKIP_OPTIMIZE)
-                skip_opt = set()
-                if skip_optimize_ops is not None:
-                    skip_opt |= set(skip_optimize_ops)
-                if scalars is not None:
-                    skip_opt |= {t for _, t in scalars}
-                if histograms is not None:
-                    skip_opt |= {t for _, t in histograms}
-                skip_opt = list(skip_opt)
+            scalars = collections.get(collection.Key.SUMMARY_SCALAR)
+            histograms = collections.get(collection.Key.SUMMARY_HISTOGRAM)
+            skip_optimize_ops = collections.get(collection.Key.SKIP_OPTIMIZE)
+            skip_opt = set()
+            if skip_optimize_ops is not None:
+                skip_opt |= set(skip_optimize_ops)
+            if scalars is not None:
+                skip_opt |= {t for _, t in scalars}
+            if histograms is not None:
+                skip_opt |= {t for _, t in histograms}
+            skip_opt = list(skip_opt)
         log.info(
             'Train with: \n> Run_config: %s\n> Params: %s\n> Train_model_spec: %s\n'
             % (repr(self.run_config), repr(self.params), repr(model_spec)))
@@ -188,13 +186,12 @@ class Learner(object):
         startup_prog = F.Program()
         with F.program_guard(program, startup_prog):
             #share var with Train net
-            with F.unique_name.guard():
-                log.info('Building Eval Graph')
-                fea = ds.features()
-                model_spec = _build_net(self.model_fn, fea, RunMode.EVAL,
-                                        self.params, self.run_config)
-                log.info('Done')
-        program = program.clone(for_test=True)
+            log.info('Building Eval Graph')
+            fea = ds.features()
+            model_spec = _build_net(self.model_fn, fea, RunMode.EVAL,
+                                    self.params, self.run_config)
+            log.info('Done')
+        #program = program.clone(for_test=True)
         log.info(
             'Eval with: \n> Run_config: %s\n> Params: %s\n> Train_model_spec: %s\n'
             % (repr(self.run_config), repr(self.params), repr(model_spec)))
@@ -207,14 +204,13 @@ class Learner(object):
         startup_prog = F.Program()
         with F.program_guard(program, startup_prog):
             #share var with Train net
-            with F.unique_name.guard():
-                log.info('Building Predict Graph')
-                fea = ds.features()
-                model_spec = _build_net(self.model_fn, fea, RunMode.PREDICT,
-                                        self.params, self.run_config)
-                log.info('Done')
+            log.info('Building Predict Graph')
+            fea = ds.features()
+            model_spec = _build_net(self.model_fn, fea, RunMode.PREDICT,
+                                    self.params, self.run_config)
+            log.info('Done')
 
-        program = program.clone(for_test=True)
+        #program = program.clone(for_test=True)
 
         log.info(
             'Predict with: \n> Run_config: %s\n> Params: %s\n> Train_model_spec: %s\n'
@@ -353,7 +349,8 @@ class Learner(object):
         mon_exe = MonitoredExecutor(
             executor,
             program,
-            run_config=pred_run_config, )
+            run_config=pred_run_config,
+            warm_start_setting=self.warm_start_setting, )
         mon_exe.init_or_restore_variables(ckpt
                                           if ckpt_path is None else ckpt_path)
         try:

@@ -112,35 +112,22 @@ bool ParseLine(const std::string &line,
   std::vector<std::string> fields;
   Split(line, ';', &fields);
 
-  if (fields.size() <= 2) return false;
 
   tensors->clear();
   tensors->reserve(4);
 
   int i = 0;
+  // src_ids
   paddle::PaddleTensor src_ids;
   ParseTensor<int64_t>(fields[i++], &src_ids);
-  src_ids.name = "eval_placeholder_0";
+  src_ids.name = "feed_0";
   tensors->push_back(src_ids);
 
   // sent_ids
   paddle::PaddleTensor sent_ids;
   ParseTensor<int64_t>(fields[i++], &sent_ids);
-  sent_ids.name = "eval_placeholder_1";
+  sent_ids.name = "feed_1";
   tensors->push_back(sent_ids);
-
-  // pos_ids
-  paddle::PaddleTensor pos_ids;
-  ParseTensor<int64_t>(fields[i++], &pos_ids);
-  pos_ids.name = "eval_placeholder_2";
-  tensors->push_back(pos_ids);
-
-
-  // input_mask
-  paddle::PaddleTensor input_mask;
-  ParseTensor<float>(fields[i++], &input_mask);
-  input_mask.name = "eval_placeholder_3";
-  tensors->push_back(input_mask);
 
   return true;
 }

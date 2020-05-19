@@ -22,7 +22,7 @@ import logging
 import six
 from time import time
 
-__version__ = '0.1'
+__version__ = '0.2'
 
 log = logging.getLogger(__name__)
 stream_hdl = logging.StreamHandler(stream=sys.stderr)
