@@ -3,6 +3,7 @@
 R_DIR=`dirname $0`; MYDIR=`cd $R_DIR;pwd`
 export FLAGS_eager_delete_tensor_gb=0.0
 export FLAGS_sync_nccl_allreduce=1
+export PYTHONPATH=./ernie:${PYTHONPATH:-}
 
 if [[ -f ./model_conf ]];then
     source ./model_conf
@@ -16,7 +17,7 @@ for i in {1..5};do
 
   timestamp=`date "+%Y-%m-%d-%H-%M-%S"`
 
-  python -u run_classifier.py                                                      \
+  python -u ./ernie/run_classifier.py                                                      \
        --for_cn False                                                              \
        --ernie_config_path script/en_glue/ernie_large/ernie_config.json            \
        --validation_steps 1000000000000                                            \

@@ -1,0 +1,9 @@
+nltk==3.4
+numpy==1.14.5
+pyzmq==18.0.2
+scikit-learn==0.20.3
+scipy==1.2.1
+six==1.11.0
+sklearn==0.0
+sentencepiece==0.1.8
+paddlepaddle-gpu==1.6.3.post107

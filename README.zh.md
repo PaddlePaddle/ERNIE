@@ -1,23 +1,31 @@
 [English](./README.md) | 简体中文
 
+**
+欢迎试用*动态图*实现的ERNIE，请checkout 分支:`dygraph`
+**
+
 ## ERNIE 2.0: A Continual Pre-training Framework for Language Understanding
 
 
-  * [Pre-Training 任务](#pre-training-任务)
-     * [Word-aware Tasks](#word-aware-tasks)
-        * [Knowledge Masking Task](#knowledge-masking-task)
-        * [Capitalization Prediction Task](#capitalization-prediction-task)
-        * [Token-Document Relation Prediction Task](#token-document-relation-prediction-task)
-     * [Structure-aware Tasks](#structure-aware-tasks)
-        * [Sentence Reordering Task](#sentence-reordering-task)
-        * [Sentence Distance Task](#sentence-distance-task)
-     * [Semantic-aware Tasks](#semantic-aware-tasks)
-        * [Discourse Relation Task](#discourse-relation-task)
-        * [IR Relevance Task](#ir-relevance-task)
-  * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
-  * [对比 ERNIE 1.0 和 ERNIE 2.0](#对比-ernie-10-和-ernie-20)
-  * [中文效果验证](#中文效果验证)
-  * [英文效果验证](#英文效果验证)
+ * [Pre-Training 任务](#pre-training-任务)
+    * [Word-aware Tasks](#word-aware-tasks)
+       * [Knowledge Masking Task](#knowledge-masking-task)
+       * [Capitalization Prediction Task](#capitalization-prediction-task)
+       * [Token-Document Relation Prediction Task](#token-document-relation-prediction-task)
+    * [Structure-aware Tasks](#structure-aware-tasks)
+       * [Sentence Reordering Task](#sentence-reordering-task)
+       * [Sentence Distance Task](#sentence-distance-task)
+    * [Semantic-aware Tasks](#semantic-aware-tasks)
+       * [Discourse Relation Task](#discourse-relation-task)
+       * [IR Relevance Task](#ir-relevance-task)
+ * [ERNIE 1.0: <strong>E</strong>nhanced <strong>R</strong>epresentation through k<strong>N</strong>owledge <strong>I</strong>nt<strong>E</strong>gration](#ernie-10-enhanced-representation-through-knowledge-integration)
+ * [对比 ERNIE 1.0 和 ERNIE 2.0](#对比-ernie-10-和-ernie-20)
+ * [效果验证](#效果验证)
+    * [中文效果验证](#中文效果验证)
+    * [英文效果验证](#英文效果验证)
+ * [ERNIE tiny](#ernie-tiny)
+ * [技术交流](#技术交流)
+ * [使用](#使用)
 
 
 ![ernie2.0_paper](.metas/ernie2.0_paper.png)
@@ -105,26 +113,16 @@
 | **Semantic-aware**  | ✅ Next Sentence Prediction | ✅ Discourse Relation                                         | ✅ Discourse Relation <br> ✅ IR Relevance  |
 
 
-## 开源记录
-- 2019-07-30 发布 ERNIE 2.0
-- 2019-04-10 更新: update ERNIE_stable-1.0.1.tar.gz, 将模型参数、配置 ernie_config.json、vocab.txt 打包发布
-- 2019-03-18 更新: update ERNIE_stable.tgz
-- 2019-03-15 发布 ERNIE 1.0
 
-## 技术交流
+## 效果验证
 
-- [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
-- ERNIE QQ 群: 760439550 (ERNIE discussion group).
-- [论坛](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
-
-
-## 中文效果验证
+### 中文效果验证
 
 我们在 9 个任务上验证 ERNIE 2.0 中文模型的效果。这些任务包括：自然语言推断任务 XNLI；阅读理解任务 DRCD、DuReader、CMRC2018；命名实体识别任务 MSRA-NER (SIGHAN2006)；情感分析任务 ChnSentiCorp；语义相似度任务 BQ Corpus、LCQMC；问答任务 NLPCC2016-DBQA 。任务的详情和效果会在如下章节中介绍。
 
 
 
-### 自然语言推断任务
+#### 自然语言推断任务
 
 <table>
   <tbody>
@@ -189,7 +187,7 @@
 XNLI 是由 Facebook 和纽约大学的研究者联合构建的自然语言推断数据集，包括 15 种语言的数据。我们用其中的中文数据来评估模型的语言理解能力。[链接: https://github.com/facebookresearch/XNLI]
 ```
 
-### 阅读理解任务
+#### 阅读理解任务
 
 <table>
   <tbody>
@@ -318,9 +316,7 @@ CMRC2018 是中文信息学会举办的评测，评测的任务是抽取类阅�
 DRCD 是台达研究院发布的繁体中文阅读理解数据集，目标是从篇章中抽取出连续片段作为答案。我们在实验时先将其转换成简体中文。[链接: https://github.com/DRCKnowledgeTeam/DRCD]
 ```
 
-
-
-### 命名实体识别任务
+#### 命名实体识别任务
 
 <table>
   <tbody>
@@ -371,15 +367,13 @@ DRCD 是台达研究院发布的繁体中文阅读理解数据集，目标是从
   </tbody>
 </table>
 
- - **MSRA-NER(SIGHAN2006)**
+ - **MSRA-NER (SIGHAN2006)**
 
 ```text
-MSRA-NER(SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文本中具有特定意义的实体，包括人名、地名、机构名。
+MSRA-NER (SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文本中具有特定意义的实体，包括人名、地名、机构名。
 ```
 
-
-
-### 情感分析任务
+#### 情感分析任务
 
 <table>
   <tbody>
@@ -436,9 +430,7 @@ MSRA-NER(SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文�
 ChnSentiCorp 是一个中文情感分析数据集，包含酒店、笔记本电脑和书籍的网购评论。
 ```
 
-
-
-### 问答任务
+#### 问答任务
 
 <table>
   <tbody>
@@ -512,9 +504,7 @@ ChnSentiCorp 是一个中文情感分析数据集，包含酒店、笔记本电�
 NLPCC2016-DBQA 是由国际自然语言处理和中文计算会议 NLPCC 于 2016 年举办的评测任务，其目标是从候选中找到合适的文档作为问题的答案。[链接: http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf]
 ```
 
-
-
-### 语义相似度
+#### 语义相似度
 
 <table>
   <tbody>
@@ -597,14 +587,13 @@ BQ Corpus 是在自然语言处理国际顶会 EMNLP 2018 发布的语义匹配�
 
 
 
-##  英文效果验证
+###  英文效果验证
 
 ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址为  https://gluebenchmark.com/ ，该评测涵盖了不同类型任务的 10 个数据集，其中包含 11 个测试集，涉及到 Accuracy, F1-score, Spearman Corr,. Pearson Corr,. Matthew Corr., 5 类指标。GLUE 排行榜使用每个数据集的平均分作为总体得分，并以此为依据将不同算法进行排名。
 
 
 
-
-### GLUE - 验证集结果
+#### GLUE - 验证集结果
 
 | <strong>数据集</strong> | <strong>CoLA</strong> | <strong>SST-2</strong> | <strong>MRPC</strong> | <strong>STS-B</strong> | <strong>QQP</strong>  | <strong>MNLI-m</strong> | <strong>QNLI</strong> | <strong>RTE</strong>  |
 | ----------- | ---- | ----- | ---- | ----- | ---- | ---- | ---- | ---- |
@@ -617,7 +606,7 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 
 
 
-### GLUE - 测试集结果
+#### GLUE - 测试集结果
 
 | <strong>数据集</strong> | - | <strong>CoLA</strong> | <strong>SST-2</strong> | <strong>MRPC</strong> | <strong>STS-B</strong> | <strong>QQP</strong>  | <strong>MNLI-m</strong> | <strong>MNLI-mm</strong> | <strong>QNLI</strong> | <strong>RTE</strong>  | <strong>WNLI</strong> |<strong>AX</strong>|
 | ----------- | ----- | ---- | ----- | ---- | ----- | ---- | ------ | ------- | ---- | ---- | ---- | ---- |
@@ -631,6 +620,42 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 由于 XLNet 暂未公布 GLUE 测试集上的单模型结果，所以我们只与 BERT 进行单模型比较。上表为ERNIE 2.0 单模型在 GLUE 测试集的表现结果。
 
 
+### ERNIE tiny
+
+为了提升ERNIE模型在实际工业应用中的落地能力，我们推出ERNIE-tiny模型。 
+
+![ernie_tiny](.metas/ernie_tiny.png)
+
+ERNIE-tiny作为小型化ERNIE，采用了以下4点技术，保证了在实际真实数据中将近4.3倍的预测提速。
+
+1. 浅：12层的ERNIE Base模型直接压缩为3层，线性提速4倍，但效果也会有较大幅度的下降；
+
+1. 胖：模型变浅带来的损失可通过hidden size的增大来弥补。由于fluid inference框架对于通用矩阵运算（gemm）的最后一维（hidden size）参数的不同取值会有深度的优化，因为将hidden size从768提升至1024并不会带来速度线性的增加；
+
+1. 短：ERNIE Tiny是首个开源的中文subword粒度的预训练模型。这里的短是指通过subword粒度替换字（char）粒度，能够明显地缩短输入文本的长度，而输入文本长度是和预测速度有线性相关。统计表明，在XNLI dev集上采用subword字典切分出来的序列长度比字表平均缩短40%；
+
+1. 萃：为了进一步提升模型的效果，ERNIE Tiny扮演学生角色，利用模型蒸馏的方式在Transformer层和Prediction层去学习教师模型ERNIE模型对应层的分布或输出，这种方式能够缩近ERNIE Tiny和ERNIE的效果差异。
+
+
+#### Benchmark
+
+ERNIE Tiny轻量级模型在公开数据集的效果如下所示，任务均值相对于ERNIE Base只下降了2.37%，但相对于“SOTA Before BERT”提升了8%。在延迟测试中，ERNIE Tiny能够带来4.3倍的速度提升
+（测试环境为：GPU P4，Paddle Inference C++ API，XNLI Dev集，最大maxlen=128，测试结果10次均值）
+
+|model|XNLI(acc)|LCQCM(acc)|CHNSENTICORP(acc)|NLPCC-DBQA(mrr/f1)|Average|Latency
+|--|--|--|--|--|--|--|
+|SOTA-before-ERNIE|68.3|83.4|92.2|72.01/-|78.98|-|
+|ERNIE2.0-base|79.7|87.9|95.5|95.7/85.3|89.70|633ms(1x)|
+|ERNIE-tiny-subword|75.1|86.1|95.2|92.9/78.6|87.33|146ms(4.3x)|
+
+
+## 技术交流
+
+- [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
+- ERNIE QQ 群: 760439550 (ERNIE discussion group).
+- [论坛](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
+
+
 ## 使用
   * [PaddlePaddle 安装](#paddlepaddle安装)
   * [模型&amp;数据](#模型数据)
@@ -640,28 +665,37 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
         * [英文数据](#英文数据)
   * [Fine-tuning 任务](#fine-tuning-任务)
      * [运行参数配置](#运行参数配置)
+     * [多进程训练与fp16混合精度](#多进程训练与fp16混合精度)
      * [单句和句对分类任务](#单句和句对分类任务)
         * [单句分类任务](#单句分类任务)
         * [句对分类任务](#句对分类任务)
      * [序列标注任务](#序列标注任务)
         * [实体识别](#实体识别)
      * [阅读理解任务](#阅读理解任务-1)
+     * [ERNIE tiny](#tune-ernie-tiny)
+  * [利用Propeller进行二次开发](#利用propeller进行二次开发)
   * [预训练 (ERNIE 1.0)](#预训练-ernie-10)
      * [数据预处理](#数据预处理)
      * [开始训练](#开始训练)
+  * [向量服务器](#向量服务器)
+  * [蒸馏](#蒸馏)
+  * [上线](#上线)
+       * [生成inference_model](#生成inference_model)
+       * [在线预测](#在线预测)
   * [FAQ](#faq)
      * [FAQ1: 如何获取输入句子/词经过 ERNIE 编码后的 Embedding 表示?](#faq1-如何获取输入句子词经过-ernie-编码后的-embedding-表示)
      * [FAQ2: 如何利用 Fine-tuning 得到的模型对新数据进行批量预测？](#faq2-如何利用-fine-tuning-得到的模型对新数据进行批量预测)
      * [FAQ3: 运行脚本中的batch size指的是单卡分配的数据量还是多卡的总数据量？](#faq3-运行脚本中的batch-size指的是单卡分配的数据量还是多卡的总数据量)
      * [FAQ4: Can not find library: libcudnn.so. Please try to add the lib path to LD_LIBRARY_PATH.](#faq4-can-not-find-library-libcudnnso-please-try-to-add-the-lib-path-to-ld_library_path)
      * [FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.](#faq5-can-not-find-library-libncclso-please-try-to-add-the-lib-path-to-ld_library_path)
+     * [FQA6: 运行报错`ModuleNotFoundError: No module named 'propeller'`](#faq6)
 
 
 ## PaddlePaddle安装
 
-本项目依赖于 Paddle Fluid 1.5，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
+本项目依赖于 Paddle 1.6，* 由于Paddle 1.6版本相比之前版本有较大API改动，使用Paddle 1.6以前版本运行本代码库会导致序列标注等任务报错 *，请参考[安装指南](http://www.paddlepaddle.org/#quick-start)进行安装。
 
-**【重要】安装后，需要及时的将 CUDA、cuDNN、NCCL2 等动态库路径加入到环境变量 LD_LIBRARY_PATH 之中，否则训练过程中会报相关的库错误。具体的安装细节请查阅[这里](http://en.paddlepaddle.org/documentation/docs/zh/1.5/beginners_guide/quick_start_cn.html)**
+**【重要】安装后，需要及时的将 CUDA、cuDNN、NCCL2 等动态库路径加入到环境变量 LD_LIBRARY_PATH 之中，否则训练过程中会报相关的库错误。具体的paddlepaddle配置细节请查阅[这里](http://en.paddlepaddle.org/documentation/docs/zh/1.5/beginners_guide/quick_start_cn.html)**
 
 如果您想了解更多的 Paddle 的相关信息，例如针对实际问题建模、搭建自己网络等，这里有更多的来自官方的文档供您参考：
 
@@ -671,6 +705,11 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 > - [训练神经网络](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/user_guides/howto/training/index_cn.html)：介绍如何使用 Fluid 进行单机训练、多机训练、以及保存和载入模型变量
 > - [模型评估与调试](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/user_guides/howto/evaluation_and_debugging/index_cn.html)：介绍在 Fluid 下进行模型评估和调试的方法
 
+ERNIE的其他依赖列在`requirements.txt`文件中，使用以下命令安装
+
+```script
+pip install -r requirements.txt
+```
 
 ## 模型&数据
 
@@ -683,6 +722,7 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 | [ERNIE 1.0 中文 Base 模型(max_len=512)](https://ernie.bj.bcebos.com/ERNIE_1.0_max-len-512.tar.gz) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 | [ERNIE 2.0 英文 Base 模型](https://ernie.bj.bcebos.com/ERNIE_Base_en_stable-2.0.0.tar.gz) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
 | [ERNIE 2.0 英文 Large 模型](https://ernie.bj.bcebos.com/ERNIE_Large_en_stable-2.0.0.tar.gz) | 包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json|
+| [ERNIE tiny 中文模型](https://ernie.bj.bcebos.com/ernie_tiny.tar.gz)|包含预训练模型参数、词典 vocab.txt、模型配置 ernie_config.json 以及切词词表|
 
 
 
@@ -720,8 +760,8 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 | MRPC   | 16 / 32 (base) | 2 |
 | WNLI | 8 | 1 |
 | XNLI | 65536 (tokens) | 8 |
-| CMRC2018 | 64 | 8 (large) / 4(base) |
-| DRCD | 64 | 8 (large) / 4(base) |
+| CMRC2018 | 64 | 8 (large) / 4 (base) |
+| DRCD | 64 | 8 (large) / 4 (base) |
 | MSRA-NER(SIGHAN 2006) | 16 | 1 |
 | ChnSentiCorp | 24 | 1 |
 | LCQMC | 32 | 1 |
@@ -731,6 +771,12 @@ ERNIE 2.0 的英文效果验证在 GLUE 上进行。GLUE 评测的官方地址�
 \* *MNLI 和 QNLI 的任务中，使用了 32 GB 显存的 V100。除此之外的显卡皆为22 GB 的 P40。*
 
 
+### 多进程训练与fp16混合精度
+
+使用`finetune_launch.py`脚本来启动多进程训练 。多进程训练可以提升充分利用多核CPU/多卡GPU 的能力来加速finetune过程。
+`finetune_launch.py` 需要放在原来finetune脚本前面, 同时指定每个节点的进程数`--nproc_per_node`, 以及每个节点上的gpu卡号`--selected_gpus`, 一般数量与进程数, `CUDA_VISIBLE_DEVICES`相同且从0开始编号 (参考`script/zh_task/ernie_base/run_xnli.sh`)
+
+只需在训练脚本中加入`--use_fp16 true`即可启用fp16混合精度训练（确保您的硬件支持Tensor Core技术）。ERNIE会将计算Op转换成fp16精度，同时仍然使用fp32精度存储参数。ERNIE使用动态loss scale来避免梯度消失。在XNLI任务上可以观察到大约60%加速。
 
 ### 单句和句对分类任务
 
@@ -877,11 +923,69 @@ text_a  label
  ```
 
 
+### ERNIE tiny <a name="tune-ernie-tiny"></a>
+
+ERNIE tiny 模型采用了subword粒度输入，需要在数据前处理中加入切词(segmentation)并使用[sentence piece](https://github.com/google/sentencepiece)进行tokenization. 
+segmentation 以及 tokenization 需要使用的模型包含在了 ERNIE tiny 的[预训练模型文件](#预训练模型下载)中，分别是 `./subword/dict.wordseg.pickle` 和 `./subword/spm_cased_simp_sampled.model`.
+
+目前`./example/`下的代码针对 ERNIE tiny 的前处理进行了适配只需在脚本中通过 `--sentence_piece_model` 引入tokenization 模型，再通过 `--word_dict` 引入 segmentation 模型之后即可进行 ERNIE tiny 的 Fine-tune。
+对于命名实体识别类型的任务，为了跟输入标注对齐，ERNIE tiny 仍然采用中文单字粒度进行作为输入。因此使用 `./example/finetune_ner.py` 时只需要打开 `--use_sentence_piece_vocab` 即可。
+具体的使用方法可以参考[下节](#利用propeller进行二次开发).
+
+## 利用Propeller进行二次开发
+
+[Propeller](./propeller/README.md) 是基于PaddlePaddle构建的一键式训练API，对于具备一定机器学习应用经验的开发者可以使用Propeller获得定制化开发体验。
+您可以通过`export PYTHONPATH=./:$PYTHONPATH`的方式引入Propeller.
+Propeller基础教程可以参考`./example/propeller_xnli_demo.ipynb`. 
+您只需定义好自己的模型以及 Dataset， 剩下的工作，如多卡并行，模型存储等等，都交给Propeller来处理吧。
+./example/ 里放了使用Propeller进行分类任务、排序任务和命名实体识别任务的finetune流程，可以作为您修改的模板。
+
+模板中使用的demo数据可以从[这里](https://ernie.bj.bcebos.com/propeller_demo_data.tar.gz)下载，解压完成后放到 ${TASK_DATA_PATH} 中。
+以分类任务为例，用下面脚本即可启动finetune，在训练的过程中框架会自动把准确率最好的模型保存在 `./output/best/inference` 下面。利用 infernce\_model 进行在线预测的方案请参考: [在线预测](#在线预测)
+
+```script
+python3 ./example/finetune_classifier.py \
+    --data_dir ${TASK_DATA_PATH}/chnsenticorp/  \
+    --warm_start_from ${MODEL_PATH}/params \
+    --vocab_file ${MODEL_PATH}/vocab.txt \
+    --max_seqlen 128 \
+    --run_config '{
+        "model_dir": "output",
+        "max_steps": '$((10 * 9600 / 32))',
+        "save_steps": 100,
+        "log_steps": 10,
+        "max_ckpt": 1,
+        "skip_steps": 0,
+        "eval_steps": 100
+    }' \
+    --hparam ${MODEL_PATH}/ernie_config.json \
+    --hparam '{ # model definition
+        "sent_type_vocab_size": None,    # default term in official config
+        "use_task_id": False,
+        "task_id": 0,
+        }' \
+    --hparam '{ # learn
+      "warmup_proportion":  0.1,
+      "weight_decay": 0.01,
+      "use_fp16": 0,
+      "learning_rate": 0.00005,
+      "num_label": 2,
+      "batch_size": 32
+    }'
+```
+
+finetune完成后，在上述脚本中加入--do_predict 参数后即可启动开始预测：
+
+```script
+cat input_file | python3 ./example/finetune_classifier.py --do_predict ... > output_score
+```
+
+
 ## 预训练 (ERNIE 1.0)
 
 ### 数据预处理
 
-基于百科类、资讯类、论坛对话类数据构造具有上下文关系的句子对数据，利用百度内部词法分析工具对句对数据进行字、词、实体等不同粒度的切分，然后基于 [`tokenization.py`](tokenization.py) 中的 CharTokenizer 对切分后的数据进行 token 化处理，得到明文的 token 序列及切分边界，然后将明文数据根据词典 [`config/vocab.txt`](config/vocab.txt) 映射为 id 数据，在训练过程中，根据切分边界对连续的 token 进行随机 mask 操作；
+基于百科类、资讯类、论坛对话类数据构造具有上下文关系的句子对数据，利用百度内部词法分析工具对句对数据进行字、词、实体等不同粒度的切分，然后基于 [`tokenization.py`](./ernie/tokenization.py) 中的 CharTokenizer 对切分后的数据进行 token 化处理，得到明文的 token 序列及切分边界，然后将明文数据根据词典 [`config/vocab.txt`](config/vocab.txt) 映射为 id 数据，在训练过程中，根据切分边界对连续的 token 进行随机 mask 操作；
 
 我们给出了 id 化后的部分训练数据：[`data/demo_train_set.gz`](./data/demo_train_set.gz)、和测试数据：[`data/demo_valid_set.gz`](./data/demo_valid_set.gz)，每行数据为1个训练样本，示例如下:
 
@@ -911,11 +1015,75 @@ epoch: 1, progress: 1/1, step: 50, loss: 10.360563, ppl: 16398.287109, next_sent
 
 如果用自定义的真实数据进行训练，请参照[`script/zh_task/pretrain.sh`](./script/zh_task/pretrain.sh)脚本对参数做相应修改。
 
+## 向量服务器
+
+经过预训练的 ERNIE 模型能够直接用于文本语义表示。模型预测的句子 embedding 可以很方便地应用于语义近邻搜索(ANN)， 或者下游任务feature-based finetune 任务中。为了更方便地将 ERNIE 用作特征抽取器，我们提供了一个ERNIE server来完成这项工作。
+ERNIE server 依赖propeller，
+您可以通过`export PYTHONPATH=./:$PYTHONPATH`的方式引入Propeller.
+请从 [这里](https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz) 下载中文 ERNIE1.0-base 模型的 inference\_model, 随后您可以通过下面的指令启动ERNIE server服务
+
+```script
+python3 ernie/service/encoder_server.py -m ./ernie1.0_base_inference_model/ -p 8888 -v --encode_layer pooler
+```
+
+通过 `--encode_layer` 可以指定特征抽取的位置，`pooler` 代表选取 ERNIE pooler fc 的输出作为特征。
+
+您可以通过下面的方式请求ERNIE server服务，目前客户端支持python3调用：
+```python
+from ernie.service.client import ErnieClient
+client = ErnieClient('./config/vocab.txt', host='localhost', port=8888)
+ret = client(['谁有狂三这张高清的', '英雄联盟什么英雄最好']) # 单句输入
+# output:
+# array([[-1.        , -1.        ,  0.9937699 , ..., -0.99991065,
+#        -0.9999997 , -0.9999985 ],
+#       [-1.        , -1.        , -0.05038145, ..., -0.9912302 ,
+#        -0.9999436 , -0.9739356 ]], dtype=float32)
+ret = client(['谁有狂三这张高清的', '这张高清图，谁有'], ['英雄联盟什么英雄最好', '英雄联盟最好英雄是什么']) # 句对输入
+# output:
+# array([[-1.        , -0.99528974, -0.99174845, ..., -0.9781673 ,
+#        -1.        , -1.        ],
+#       [-1.        , -1.        , -0.8699475 , ..., -0.997155  ,
+#        -1.        , -0.99999994]], dtype=float32)
+```
+
+## 蒸馏
+
+ERNIE提供了通过数据蒸馏从而达到模型压缩、加速的开发套件，具体开发流程请参考 <a href="./distill/README.md">这里</a>
+
+## 上线
+
+完成finetune之后只需几步操作即可生成inference\_model, PaddlePaddle可以在生产环境中加载生成的预测模型并进行高效地预测。
+
+### 生成inference\_model
+运行`infer_classifyer.py`  脚本时通过指定 `--save_inference_model_path` 便可生成 inference_model 到指定位置。 
+
+如果您采用 `propeller` 完成finetune，则 `BestInferenceExporter` 会在finetune过程中根据预测指标，挑最好的模型生成 inference_model .
+
+### 在线预测
+随后您可以使用[ERNIE fast inference C++ API](./inference/README.md)将模型的前向预测代码联编到您的生产环境中。或者您可以使用我们为您构建好的python预测引擎来完成一个简单的服务。执行如下指令，便可以开启一个propeller server：
+
+```script
+python -m propeller.tools.start_server -m /path/to/saved/model -p 8888
+```
+
+您可以在python脚本很方便地调用propeller server:
+```python
+from propeller.service.client import InferenceClient
+client = InferenceClient('tcp://localhost:8888')
+sentence_id = np.array([[[20], [1560], [1175], [8], [42]]], dtype=np.int64)
+position_id = np.array([[[0], [1], [2], [3], [4]]], dtype=np.int64)
+token_type_id = np.array([[[0], [0], [0], [1], [1]]], dtype=np.int64)
+input_mask = np.array([[1., 1., 1., 1., 1.]], dtype=np.float32)
+result = client(sentence_id, token_type_id, position_id, input_mask)
+```
+`client`的请求参数类型是numpy array,对应了save_inference_model时指定的输入tensor. 如果是使用`infer_classifyer.py` 生成的inference_model则请求参数有四个：(sentence_id, position_id, token_type_id, input_mask)。 如果是`propeller` 生成的inference_model, client的请求参数对应您`eval_dataset` 的元素类型。目前`InferenceClient`只支持在python3环境下使用。
+
+
 ## FAQ
 
 ### FAQ1: 如何获取输入句子/词经过 ERNIE 编码后的 Embedding 表示?
 
-可以通过 ernie_encoder.py 抽取出输入句子的 Embedding 表示和句子中每个 token 的 Embedding 表示，数据格式和 [Fine-tuning 任务](#fine-tuning-任务) 一节中介绍的各种类型 Fine-tuning 任务的训练数据格式一致；以获取 LCQMC dev 数据集中的句子 Embedding 和 token embedding 为例，示例脚本如下:
+可以通过 `ernie_encoder.py` 抽取出输入句子的 Embedding 表示和句子中每个 token 的 Embedding 表示，数据格式和 [Fine-tuning 任务](#fine-tuning-任务) 一节中介绍的各种类型 Fine-tuning 任务的训练数据格式一致；以获取 LCQMC dev 数据集中的句子 Embedding 和 token embedding 为例，示例脚本如下:
 
 ```
 export FLAGS_sync_nccl_allreduce=1
@@ -940,17 +1108,14 @@ python -u ernie_encoder.py \
 我们以分类任务为例，给出了分类任务进行批量预测的脚本, 使用示例如下:
 
 ```
-python -u predict_classifier.py \
-       --use_cuda true \
-       --batch_size 32 \
-       --vocab_path ${MODEL_PATH}/vocab.txt \
-       --init_checkpoint "./checkpoints/step_100" \
-       --do_lower_case true \
-       --max_seq_len 128 \
-       --ernie_config_path ${MODEL_PATH}/ernie_config.json \
-       --do_predict true \
-       --predict_set ${TASK_DATA_PATH}/lcqmc/test.tsv \
-       --num_labels 2
+python -u infer_classifyer.py \
+    --ernie_config_path ${MODEL_PATH}/ernie_config.json \
+    --init_checkpoint "./checkpoints/step_100" \
+    --save_inference_model_path ./saved_model \
+    --predict_set  ${TASK_DATA_PATH}/xnli/test.tsv \
+    --vocab_path ${MODEL_PATH}/vocab.txt \
+    --num_labels 3 
+
 ```
 
 实际使用时，需要通过 `init_checkpoint` 指定预测用的模型，通过 `predict_set` 指定待预测的数据文件，通过 `num_labels` 配置分类的类别数目;
@@ -958,11 +1123,9 @@ python -u predict_classifier.py \
 **Note**: predict_set 的数据格式是由 text_a、text_b(可选) 组成的 1 列 / 2 列 tsv 文件。
 
 
-
 ### FAQ3: 运行脚本中的batch size指的是单卡分配的数据量还是多卡的总数据量？
 
 单独一张显卡分配到的数据量。
-
 
 
 ### FAQ4: Can not find library: libcudnn.so. Please try to add the lib path to LD_LIBRARY_PATH.
@@ -970,7 +1133,14 @@ python -u predict_classifier.py \
 在 LD_LIBRARY_PATH 中添加 cudnn 库的路径，如 `export LD_LIBRARY_PATH=/home/work/cudnn/cudnn_v[your cudnn version]/cuda/lib64`
 
 
-
 ### FAQ5: Can not find library: libnccl.so. Please try to add the lib path to LD_LIBRARY_PATH.
 
 需要先下载 [NCCL](https://developer.nvidia.com/nccl/nccl-download)，然后在 LD_LIBRARY_PATH 中添加 NCCL 库的路径，如`export LD_LIBRARY_PATH=/home/work/nccl/lib`
+
+### FAQ6: 运行报错`ModuleNotFoundError: No module named 'propeller'`<a name="faq6"></a>
+
+您可以通过`export PYTHONPATH=./:$PYTHONPATH`的方式引入Propeller.
+
+### FAQ7：显存不足报错: Cannot malloc XXX MB GPU memory. 
+
+您可以通过减小batch_size, 减小max_seq_len, 设置FLAGS_eager_delete_tensor_gb=0.0来减小网络对显存的需求
