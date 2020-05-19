@@ -3,7 +3,7 @@ English|[简体中文](./README.zh.md)
 **Remind!! The original develop branch has been moved to [classic](https://github.com/PaddlePaddle/ERNIE/tree/classic) branch. We recommend using ERNIE in "`dygraph`".**
 
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
-ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, Reading Comprehension, Genration and so on.
+ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, machine reading comprehension, text genration and so on.
 
 # News
 
