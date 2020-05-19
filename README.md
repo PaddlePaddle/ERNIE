@@ -1,42 +1,39 @@
-English|[简体中文](./README.zh.md)
+[English](./README.md)|简体中文
 
 ![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone.png)
 
+**提醒: ERNIE老版本代码已经迁移至[repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)，欢迎使用我们全新升级的基于动静结合的新版ERNIE套件进行开发。**
 
-**Remind!! The original develop branch has been moved to [classic](https://github.com/PaddlePaddle/ERNIE/tree/classic) branch. We recommend using ERNIE in "`dygraph`".**
+ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，该框架将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读理解、智能问答等16个公开数据集上全面显著超越世界领先技术，在国际权威的通用语言理解评估基准GLUE上，得分首次突破90分，获得全球第一。在今年3月落下帷幕的全球最大语义评测SemEval 2020上，ERNIE摘得5项世界冠军， 该技术也被全球顶级科技商业杂志《麻省理工科技评论》官方网站报道，相关创新成果也被国际顶级学术会议AAAI、IJCAI收录。ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
 
-ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
-ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, machine reading comprehension, text genration and so on.
+# 新闻
 
-# News
+- 2020.5.20: 欢迎试用`动态图`实现的 ERNIE:
+    - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
+    - 动态执行, 所见即所得。
+    - 大规模分布式训练。
+    - 易于部署。
+    - 通过Aistudio 教程快速入门NLP。
+    - 向后兼容老版 checkpoint。
+    - 发布ERNIE Gen base/large模型，ERNIE能力扩展至文本生成任务。
+- 2020.4.30 发布[ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage)， 一种新型图神经网络模型，采用ERNIE做为aggreagtor. 由[PGL](https://github.com/PaddlePaddle/PGL)实现。
+- 2020.3.27 [在SemEval2020五项子任务上夺冠](https://www.jiqizhixin.com/articles/2020-03-27-8)。
+- 2019.12.26 [GLUE榜第一名](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)。
+- 2019.11.6 发布[ERNIE Tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)。
+- 2019.7.7 发布[ERNIE 2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)。
+- 2019.3.16 发布[ERNIE 1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)。
 
-- May.20.2020: Try ERNIE in "`dygraph`", with:
 
-	- Pretrain and finetune ERNIE with [PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8).
-	- Eager execution with `paddle.fluid.dygraph`.
-	- Distributed training.
-	- Easy deployment.
-	- Learn NLP in Aistudio tutorials.
-	- Backward compatibility for old-styled checkpoint
-- May.20.2020: Release **ERNIE Gen**
-- Apr.30.2020: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
-- Mar.27.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
-- Dec.26.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
-- Nov.6.2019: [Introducing ERNIE-tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)
-- Jul.7.2019: [Introducing ERNIE2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
-- Mar.16.2019: [Introducing ERNIE1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
+# 导航
 
-	
-# Table of contents
-* [Tutorials](#tutorials)
-* [Setup](#setup)
-* [Fine-tuning](#fine-tuning)
-* [Pre-training with ERNIE 1.0](#pre-training-with-ernie-10)
-* [Online inference](#online-inference)
-* [Distillation](#distillation)
+* [教程](#教程)
+* [安装](#安装)
+* [Fine-tuning任务](#fine-tuning-任务)
+* [预训练(ERNIE 1.0)](#预训练-ernie-10)
+* [在线预测](#在线预测)
+* [蒸馏](#蒸馏)
 
-# Quick Tour
-
+# 快速上手
 ```python
 import numpy as np
 import paddle.fluid.dygraph as D
@@ -55,26 +52,27 @@ print(pooled.numpy())                        # convert  results to numpy
 
 ```
 
-# Tutorials
+# 教程
 
-Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
-(please choose the latest version and apply for a GPU environment)
+手边没有GPU？欢迎在[AIStudio](https://aistudio.baidu.com/aistudio/index)中直接试用 ERNIE. 
+(请选择最新版本的教程并申请GPU运行环境)
 
-1. [ERNIE for beginners](https://aistudio.baidu.com/aistudio/projectdetail/266623)
-1. [Sementic Analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
-2. [Cloze Test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
-3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
-4. [Ask Ernie](https://aistudio.baidu.com/aistudio/projectdetail/456443)
+1. [从0开始学ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/266623)
+1. [情感识别](https://aistudio.baidu.com/aistudio/projectdetail/427482)
+2. [完形填空](https://aistudio.baidu.com/aistudio/projectdetail/433491)
+3. [知识蒸馏](https://aistudio.baidu.com/aistudio/projectdetail/439460)
+4. [万事不决问ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/456443)
 
-# Setup
+# 安装
 
-##### 1. install ernie
+##### 1. 安装 ERNIE
+
 
 ```script
 pip install paddle-ernie==0.0.1.dev1
 ```
 
-or 
+或者
 
 ```shell
 git clone -b dygraph https://github.com/PaddlePaddle/ERNIE.git --single-branch
@@ -84,24 +82,26 @@ pip setup.py -e .
 
 ```
 
-##### 3. download pretrained models (optional)
+##### 3. 下载预训练模型（可选）
+
 
 | Model                                              | Description                                                  |
 | :------------------------------------------------- | :----------------------------------------------------------- |
-| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | L12H768A12  |
-| [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | L3H1024A16  |
-| [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | L12H768A12  |
-| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | L24H1024A16 |
-| [ERNIE Gen base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |
-| [ERNIE Gen Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 |
+| [ERNIE 1.0 Base 中文](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | L12H768A12  |
+| [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                 | L3H1024A16      |
+| [ERNIE 2.0 Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | base: L12H768A12  |
+| [ERNIE 2.0 Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | large: L24H1024A16|
+| [ERNIE Gen base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |
+| [ERNIE Gen Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 |
 
-##### 4. download datasets
- 
-**English Datasets**
+##### 4. 下载数据集
 
-Download the [GLUE datasets](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) 
 
-the `--data_dir` option in the following section assumes a directory tree like this:
+**英文数据集**
+
+运行[此](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e)脚本，下载[GLUE datasets](https://gluebenchmark.com/tasks).
+
+请将数据目录整理成以下格式，方便在后续 demo 教程中使用（通过`--data_dir`参数将数据路径传入训练脚本）；
 
 ```shell
 data/xnli
@@ -113,37 +113,38 @@ data/xnli
     └── 1
 ```
 
-see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI task.
+[示例](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz)数据（MNLI任务测试、训练集合）。
 
-**Chinese Datasets**
 
-| Datasets|Description|
+**中文数据**
+
+| 数据集|描述|
 |:--------|:----------|
-| [XNLI](https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz)                 |XNLI is a natural language inference dataset in 15 languages. It was jointly built by Facebook and New York University. We use Chinese data of XNLI to evaluate language understanding ability of our model. [url](https://github.com/facebookresearch/XNLI)|
-| [ChnSentiCorp](https://ernie-github.cdn.bcebos.com/data-chnsenticorp.tar.gz) |ChnSentiCorp is a sentiment analysis dataset consisting of reviews on online shopping of hotels, notebooks and books.|
-| [MSRA-NER](https://ernie-github.cdn.bcebos.com/data-msra_ner.tar.gz)         |MSRA-NER (SIGHAN2006) dataset is released by MSRA for recognizing the names of people, locations and organizations in text.|
-| [NLPCC2016-DBQA](https://ernie-github.cdn.bcebos.com/data-dbqa.tar.gz)       |NLPCC2016-DBQA is a sub-task of NLPCC-ICCPOL 2016 Shared Task which is hosted by NLPCC(Natural Language Processing and Chinese Computing), this task targets on selecting documents from the candidates to answer the questions. [url: http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf]|
-|[CMRC2018](https://ernie-github.cdn.bcebos.com/data-cmrc2018.tar.gz)|CMRC2018 is a evaluation of Chinese extractive reading comprehension hosted by Chinese Information Processing Society of China (CIPS-CL). [url](https://github.com/ymcui/cmrc2018)|
+| [XNLI](https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz)                 |XNLI 是由 Facebook 和纽约大学的研究者联合构建的自然语言推断数据集，包括 15 种语言的数据。我们用其中的中文数据来评估模型的语言理解能力。[链接](https://github.com/facebookresearch/XNLI)|
+| [ChnSentiCorp](https://ernie-github.cdn.bcebos.com/data-chnsenticorp.tar.gz) |ChnSentiCorp 是一个中文情感分析数据集，包含酒店、笔记本电脑和书籍的网购评论。|
+| [MSRA-NER](https://ernie-github.cdn.bcebos.com/data-msra_ner.tar.gz)         |MSRA-NER (SIGHAN2006) 数据集由微软亚研院发布，其目标是识别文本中具有特定意义的实体，包括人名、地名、机构名。|
+| [NLPCC2016-DBQA](https://ernie-github.cdn.bcebos.com/data-dbqa.tar.gz)       |NLPCC2016-DBQA 是由国际自然语言处理和中文计算会议 NLPCC 于 2016 年举办的评测任务，其目标是从候选中找到合适的文档作为问题的答案。[链接](http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf)|
+|[CMRC2018](https://ernie-github.cdn.bcebos.com/data-cmrc2018.tar.gz)|CMRC2018 是中文信息学会举办的评测，评测的任务是抽取类阅读理解。[链接](https://github.com/ymcui/cmrc2018)
 
 
-# Fine-tuning
+# Fine-tuning 任务
 
-- try eager execution with `dygraph model` :
+- 使用 `动态图` 模型进行finetune:
 
 ```script
 python3 ./demo/finetune_classifier_dygraph.py \
     --from_pretrained ernie_1.0 \
-    --data_dir ./data/xnli 
+    --data_dir ./data/xnli
 ```
 
-- Distributed finetune
+- 分布式 finetune
 
-`paddle.distributed.launch` is a process manager, we use it to launch python processes on each avalible GPU devices:
+`paddle.distributed.launch` 是一个进程管理器，我们采用它在每一张GPU上启动一个python进程，并配置相应的环境变量以进行分布式训练:
 
-when in distributed training, `max_steps` is used as stopping criteria rather than `epoch` to prevent dead block.
-also notice than we shard the train data according to device id to prevent over fitting.
+当采用分布式训练时，我们采用`max_steps`做为终止条件而非`epoch`, 这样处理是为了避免进程间死锁。
+另外值得注意的是训练集需要在不同的进程间进行切分；以避免所有进程训练同一份数据造成的过拟合。
 
-demo: 
+示例脚本（请确保你有两张以上GPU卡）:
 
 ```script
 python3 -m paddle.distributed.launch \
@@ -154,23 +155,22 @@ python3 -m paddle.distributed.launch \
 ```
 
 
-many other demo python scripts:
+更多示例脚本:
 
-1. [Sentiment Analysis](./demo/finetune_sentiment_analysis_dygraph.py)
-1. [Semantic Similarity](./demo/finetune_classifier_dygraph.py)
-1. [Name Entity Recognition(NER)](./demo/finetune_ner_dygraph.py)
-1. [Machine Reading Comprehension](./demo/finetune_mrc_dygraph.py)
-1. [Text generation](./experimental/seq2seq/README.md)
-
-
+1. [情感分析](./demo/finetune_sentiment_analysis_dygraph.py)
+1. [语义匹配](./demo/finetune_classifier_dygraph.py)
+1. [命名实体识别(NER)](./demo/finetune_ner_dygraph.py)
+1. [机器阅读理解](./demo/finetune_mrc_dygraph.py)
+1. [文本摘要生成](./experimental/seq2seq/README.md)
 
 
-**recomended hyper parameters:**
+**推荐超参数设置：**
 
-|tasks|batch size|learning rate|
+|任务|batch size|learning rate|
 |--|--|--|
 | CoLA         | 32 / 64 (base)  | 3e-5                     |
-| SST-2        | 64 / 256 (base) | 2e-5                     |
+| SST-2       
+ | 64 / 256 (base) | 2e-5                     |
 | STS-B        | 128             | 5e-5                     |
 | QQP          | 256             | 3e-5(base)/5e-5(large)   |
 | MNLI         | 256 / 512 (base)| 3e-5                     |
@@ -186,24 +186,22 @@ many other demo python scripts:
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
 
-# Pretraining with ERNIE 1.0
+# 预训练 (ERNIE 1.0)
 
-see [here](./demo/pretrain/README.md)
+请见[这里](./demo/pretrain/README.md)
 
+# 在线预测
 
-# Online inference
+如果`finetune_classifier_dygraph.py`中指定了`--inference_model_dir`参数，funetune脚本会将你的模型序列化并产出可以直接部署线上预测的`inference_model`.
 
-If `--inference_model_dir` is passed to `finetune_classifier_dygraph.py`, 
-a deployable model will be generated at the end of finetuning and your model is ready to serve.
-
-For details about online inferece, see [C++ inference API](./inference/README.md),
-or you can start a multi-gpu inference server with a few lines of codes:
+关于生产环境中使用线上预测代码的实现细节，请见[C++ inference API](./inference/README.md).
+或者你可以使用`propeller`启动一个多GPU预测服务(需要GPU环境)，只需执行：
 
 ```shell
 python -m propeller.tools.start_server -m /path/to/saved/inference_model  -p 8881
 ```
 
-and call the server just like calling local function (python3 only):
+即可启动预测服务；随后在Python端采用如下命令访问该服务(仅限 python3):
 
 ```python
 from propeller.service.client import InferenceClient
@@ -217,19 +215,21 @@ sids = np.expand_dims(sids, 0)
 result = client(ids, sids)
 ```
 
-A pre-made `inference model` for ernie-1.0 can be downloaded at [here](https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz). 
-It can be used for feature-based finetuning or feature extraction.
+你也可从[此处]((https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz).)下载一个预先制作好的ernie-1.0 base模型的 `inference_model`.
+该模型没有经过finetune，一般可以用做上层模型结构的 feature-base finetune或者做为一个文本特征抽取器。
+因为该模行由老版API 产出，在进行客户端请求时需要在输入tensor后面追加一个维度：
 
-# Distillation
+```python3
+ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
+```
 
-Knowledge distillation is good way to compress and accelerate ERNIE. 
+# 蒸馏
 
-For details about distillation, see [here](./distill/README.md)
+知识蒸馏是进行ERNIE模型压缩、加速的有效方式；关于知识蒸馏的实现细节请参见[这里](./distill/README.md)。
 
-### Citation
+### 引用
 
-please cite [ERNIE 2.0](https://arxiv.org/abs/1907.12412):
-
+[ERNIE 2.0](https://arxiv.org/abs/1907.12412)
 ```
 @article{SunERNIE,
   title={ERNIE 2.0: A Continual Pre-training Framework for Language Understanding},
@@ -237,7 +237,7 @@ please cite [ERNIE 2.0](https://arxiv.org/abs/1907.12412):
 }
 ```
 
-and [ERNIE Gen](https://arxiv.org/abs/2001.11314)
+[ERNIE Gen](https://arxiv.org/abs/2001.11314)
 
 ```
 @article{Xiao2020ERNIE,
@@ -247,11 +247,11 @@ and [ERNIE Gen](https://arxiv.org/abs/2001.11314)
 }
 ```
 
-For full reproduction of paper results, please checkout to `repro` branch of this repo.
+若希望复现 paper 中的所有实验，请切换至本repo的`repro`分支。
 
-### Communication
+### 讨论组
 
 - [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
-- QQ discussion group: 760439550 (ERNIE discussion group).
+- QQ 群: 760439550 (ERNIE discussion group).
 - [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
 
