@@ -1,5 +1,8 @@
 English|[简体中文](./README.zh.md)
 
+![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone.png)
+
+
 **Remind!! The original develop branch has been moved to [classic](https://github.com/PaddlePaddle/ERNIE/tree/classic) branch. We recommend using ERNIE in "`dygraph`".**
 
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
