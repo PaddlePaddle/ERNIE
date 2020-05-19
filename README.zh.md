@@ -1,20 +1,19 @@
 [English](./README.md)|简体中文
 
-**提醒！！！ERNIE老版本已经迁移到classic分支，如需要可点击[Link](https://github.com/PaddlePaddle/ERNIE/tree/classic)，推荐使用基于动态图ERNIE代码进行开发**
+**提醒: ERNIE原版本已经迁移到[repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)，目前推荐使用基于动态图ERNIE代码进行开发。**
 
-ERNIE 2.0 是基于持续学习的语义理解预训练框架，使用多任务学习增量式构建预训练任务。
-ERNIE 2.0 中，新构建的预训练任务类型可以无缝的加入训练框架，持续的进行语义理解学习。 通过新增的实体预测、句子因果关系判断、文章句子结构重建等语义任务，ERNIE 2.0 语义理解预训练模型从训练数据中获取了词法、句法、语义等多个维度的自然语言信息，极大地增强了通用语义表示能力。
-ERNIE 2.0 做为强大的预训练语义模型，可以适用于大部分NLP任务，如：文本分类、文本排序、命名实体识别、机器阅读理解、文本生成、情感分析等。
+百度开创性提出基于知识增强的持续学习语义理解框架ERNIE，将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读理解、智能问答等16个公开数据集上全面显著超越世界领先技术，在国际权威的通用语言理解评估基准GLUE上，得分首次突破90分，获得全球第一。在今年3月落下帷幕的全球最大语义评测SemEval 2020上，ERNIE摘得5项世界冠军， 该技术也被全球顶级科技商业杂志《麻省理工科技评论》官方网站报道，相关创新成果也被国际顶级学术会议AAAI、IJCAI收录。ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
 
 # 新闻
 
-- 2020.5.2: 欢迎试用`动态图`实现的 ERNIE:
+- 2020.5.20: 欢迎试用`动态图`实现的 ERNIE:
     - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
     - 动态执行, 所见即所得。
     - 大规模分布式训练。
     - 易于部署。
     - 通过Aistudio 教程快速入门NLP。
-    - 向后兼容老版 checkpoint
+    - 向后兼容老版 checkpoint。
+    - 发布ERNIE Gen base/large模型，ERNIE能力扩展至文本生成任务。
 - 2020.4.30 发布[ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage)， 一种新型图神经网络模型，采用ERNIE做为aggreagtor. 由[PGL](https://github.com/PaddlePaddle/PGL)实现。
 - 2020.3.27 [在SemEval2020五项子任务上夺冠](https://www.jiqizhixin.com/articles/2020-03-27-8)。
 - 2019.12.26 [GLUE榜第一名](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)。
