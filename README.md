@@ -15,7 +15,7 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
     - 易于部署。
     - 通过Aistudio 教程快速入门NLP。
     - 向后兼容老版 checkpoint。
-    - 发布ERNIE Gen base/large模型，ERNIE能力扩展至文本生成任务。
+    - 发布[ERNIE Gen](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen) base/large/arge-160G模型，ERNIE能力扩展至文本生成任务。
 - 2020.4.30 发布[ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage)， 一种新型图神经网络模型，采用ERNIE做为aggreagtor. 由[PGL](https://github.com/PaddlePaddle/PGL)实现。
 - 2020.3.27 [在SemEval2020五项子任务上夺冠](https://www.jiqizhixin.com/articles/2020-03-27-8)。
 - 2019.12.26 [GLUE榜第一名](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)。
