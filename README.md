@@ -7,12 +7,13 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 
 - May.20.2020: Try ERNIE in "`dygraph`", with:
 
-	- Pretrain and finetune ERNIE with [PaddlePaddle v1.7](https://github.com/PaddlePaddle/Paddle/tree/release/1.7).
+	- Pretrain and finetune ERNIE with [PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8).
 	- Eager execution with `paddle.fluid.dygraph`.
 	- Distributed training.
 	- Easy deployment.
 	- Learn NLP in Aistudio tutorials.
 	- Backward compatibility for old-styled checkpoint
+- May.20.2020: Release **ERNIE Gen**
 - Apr.30.2020: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
 - Mar.27.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
 - Dec.26.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
