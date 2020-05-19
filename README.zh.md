@@ -26,7 +26,7 @@ ERNIE 2.0 做为强大的预训练语义模型，可以适用于大部分NLP任�
 * [教程](#教程)
 * [安装](#安装)
 * [Finetune](#finetune)
-* [分布式 pretrain](#分布式 pretrain)
+* [分布式 pretrain](#分布式-pretrain)
 * [在线预测](#在线预测)
 * [蒸馏](#蒸馏)
 
@@ -88,8 +88,8 @@ pip setup.py -e .
 | [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                 | L3H1024A16      |
 | [ERNIE 2.0 Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | base: L12H768A12  |
 | [ERNIE 2.0 Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | large: L24H1024A16|
-| [ERNIE Gen base 英文]()                                                                      | base: L12H768A12  |
-| [ERNIE Gen large 英文]()                                                                     | large: L24H1024A16|
+| [ERNIE Gen base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |
+| [ERNIE Gen Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 |
 
 ##### 4. 下载数据集
 
@@ -244,6 +244,8 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
   year={2020},
 }
 ```
+
+若希望复现 paper 中的所有实验，请切换至本repo的`repro`分支。
 
 ### 讨论组
 

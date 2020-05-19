@@ -86,8 +86,8 @@ pip setup.py -e .
 | [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | L3H1024A16  |
 | [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | L12H768A12  |
 | [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | L24H1024A16 |
-| [ERNIE Gen base for English]()                                                                      | L12H768A12  |
-| [ERNIE Gen large for English]()                                                                     | L24H1024A16 |
+| [ERNIE Gen base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |
+| [ERNIE Gen Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 |
 
 ##### 4. download datasets
  
@@ -240,7 +240,10 @@ and [ERNIE Gen](https://arxiv.org/abs/2001.11314)
   year={2020},
 }
 ```
-### Contact us
+
+For full reproduction of paper results, please checkout to `repro` branch of this repo.
+
+### Communication
 
 - [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
 - QQ discussion group: 760439550 (ERNIE discussion group).
