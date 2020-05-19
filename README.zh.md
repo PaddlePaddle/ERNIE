@@ -1,6 +1,6 @@
 [English](./README.md)|简体中文
 
-**提醒：原始的develop分支已经被转移至[classic](https://github.com/PaddlePaddle/ERNIE/tree/classic) 分支上，推荐使用基于动态图ERNIE代码代码进行开发**
+**提醒：原始的基于静态图develop分支已经被转移至[classic](https://github.com/PaddlePaddle/ERNIE/tree/classic) 分支上，推荐使用基于动态图ERNIE代码进行开发**
 
 ERNIE 2.0 是基于持续学习的语义理解预训练框架，使用多任务学习增量式构建预训练任务。
 ERNIE 2.0 中，新构建的预训练任务类型可以无缝的加入训练框架，持续的进行语义理解学习。 通过新增的实体预测、句子因果关系判断、文章句子结构重建等语义任务，ERNIE 2.0 语义理解预训练模型从训练数据中获取了词法、句法、语义等多个维度的自然语言信息，极大地增强了通用语义表示能力。
