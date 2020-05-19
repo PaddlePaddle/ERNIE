@@ -1,0 +1,182 @@
+=head1 NAME
+
+XML::DOM::DocumentType - An XML document type (DTD) in XML::DOM
+
+=head1 DESCRIPTION
+
+XML::DOM::DocumentType extends L<XML::DOM::Node>.
+
+Each Document has a doctype attribute whose value is either null or a
+DocumentType object. The DocumentType interface in the DOM Level 1 Core
+provides an interface to the list of entities that are defined for the
+document, and little else because the effect of namespaces and the
+various XML scheme efforts on DTD representation are not clearly
+understood as of this writing. 
+The DOM Level 1 doesn't support editing DocumentType nodes.
+
+B<Not In DOM Spec>: This implementation has added a lot of extra 
+functionality to the DOM Level 1 interface. 
+To allow editing of the DocumentType nodes, see XML::DOM::ignoreReadOnly.
+
+=head2 METHODS
+
+=over 4
+
+=item getName
+
+Returns the name of the DTD, i.e. the name immediately following the
+DOCTYPE keyword.
+
+=item getEntities
+
+A NamedNodeMap containing the general entities, both external
+and internal, declared in the DTD. Duplicates are discarded.
+For example in:
+
+ <!DOCTYPE ex SYSTEM "ex.dtd" [
+  <!ENTITY foo "foo">
+  <!ENTITY bar "bar">
+  <!ENTITY % baz "baz">
+ ]>
+ <ex/>
+
+the interface provides access to foo and bar but not baz.
+Every node in this map also implements the Entity interface.
+
+The DOM Level 1 does not support editing entities, therefore
+entities cannot be altered in any way.
+
+B<Not In DOM Spec>: See XML::DOM::ignoreReadOnly to edit the DocumentType etc.
+
+=item getNotations
+
+A NamedNodeMap containing the notations declared in the DTD.
+Duplicates are discarded. Every node in this map also
+implements the Notation interface.
+
+The DOM Level 1 does not support editing notations, therefore
+notations cannot be altered in any way.
+
+B<Not In DOM Spec>: See XML::DOM::ignoreReadOnly to edit the DocumentType etc.
+
+=head2 Additional methods not in the DOM Spec
+
+=item Creating and setting the DocumentType
+
+A new DocumentType can be created with:
+
+	$doctype = $doc->createDocumentType ($name, $sysId, $pubId, $internal);
+
+To set (or replace) the DocumentType for a particular document, use:
+
+	$doc->setDocType ($doctype);
+
+=item getSysId and setSysId (sysId)
+
+Returns or sets the system id.
+
+=item getPubId and setPubId (pudId)
+
+Returns or sets the public id.
+
+=item setName (name)
+
+Sets the name of the DTD, i.e. the name immediately following the
+DOCTYPE keyword. Note that this should always be the same as the element
+tag name of the root element.
+
+=item getAttlistDecl (elemName)
+
+Returns the AttlistDecl for the Element with the specified name, or undef.
+
+=item getElementDecl (elemName)
+
+Returns the ElementDecl for the Element with the specified name, or undef.
+
+=item getEntity (entityName)
+
+Returns the Entity with the specified name, or undef.
+
+=item addAttlistDecl (elemName)
+
+Adds a new AttDecl node with the specified elemName if one doesn't exist yet.
+Returns the AttlistDecl (new or existing) node.
+
+=item addElementDecl (elemName, model)
+
+Adds a new ElementDecl node with the specified elemName and model if one doesn't 
+exist yet.
+Returns the AttlistDecl (new or existing) node. The model is ignored if one
+already existed.
+
+=item addEntity (notationName, value, sysId, pubId, ndata, parameter)
+
+Adds a new Entity node. Don't use createEntity and appendChild, because it should
+be added to the internal NamedNodeMap containing the entities.
+
+Parameters:
+ I<notationName> the entity name.
+ I<value>        the entity value.
+ I<sysId>        the system id (if any.)
+ I<pubId>        the public id (if any.)
+ I<ndata>        the NDATA declaration (if any, for general unparsed entities.)
+ I<parameter>	 whether it is a parameter entity (%ent;) or not (&ent;).
+
+SysId, pubId and ndata may be undefined.
+
+DOMExceptions:
+
+=over 4
+
+=item * INVALID_CHARACTER_ERR
+
+Raised if the notationName does not conform to the XML spec.
+
+=back
+
+=item addNotation (name, base, sysId, pubId)
+
+Adds a new Notation object. 
+
+Parameters:
+ I<name>   the notation name.
+ I<base>   the base to be used for resolving a relative URI.
+ I<sysId>  the system id.
+ I<pubId>  the public id.
+
+Base, sysId, and pubId may all be undefined.
+(These parameters are passed by the XML::Parser Notation handler.)
+
+DOMExceptions:
+
+=over 4
+
+=item * INVALID_CHARACTER_ERR
+
+Raised if the notationName does not conform to the XML spec.
+
+=back
+
+=item addAttDef (elemName, attrName, type, default, fixed)
+
+Adds a new attribute definition. It will add the AttDef node to the AttlistDecl
+if it exists. If an AttDef with the specified attrName already exists for the
+given elemName, this function only generates a warning.
+
+See XML::DOM::AttDef::new for the other parameters.
+
+=item getDefaultAttrValue (elem, attr)
+
+Returns the default attribute value as a string or undef, if none is available.
+
+Parameters:
+ I<elem>    The element tagName.
+ I<attr>    The attribute name.
+
+=item expandEntity (entity [, parameter])
+
+Expands the specified entity or parameter entity (if parameter=1) and returns
+its value as a string, or undef if the entity does not exist.
+(The entity name should not contain the '%', '&' or ';' delimiters.)
+
+=back
