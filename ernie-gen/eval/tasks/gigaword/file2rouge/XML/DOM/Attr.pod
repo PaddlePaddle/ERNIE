@@ -1,0 +1,67 @@
+=head1 NAME
+
+XML::DOM::Attr - An XML attribute in XML::DOM
+
+=head1 DESCRIPTION
+
+XML::DOM::Attr extends L<XML::DOM::Node>.
+
+The Attr nodes built by the XML::DOM::Parser always have one child node
+which is a Text node containing the expanded string value (i.e. EntityReferences
+are always expanded.) EntityReferences may be added when modifying or creating
+a new Document.
+
+The Attr interface represents an attribute in an Element object.
+Typically the allowable values for the attribute are defined in a
+document type definition.
+
+Attr objects inherit the Node interface, but since they are not
+actually child nodes of the element they describe, the DOM does not
+consider them part of the document tree. Thus, the Node attributes
+parentNode, previousSibling, and nextSibling have a undef value for Attr
+objects. The DOM takes the view that attributes are properties of
+elements rather than having a separate identity from the elements they
+are associated with; this should make it more efficient to implement
+such features as default attributes associated with all elements of a
+given type. Furthermore, Attr nodes may not be immediate children of a
+DocumentFragment. However, they can be associated with Element nodes
+contained within a DocumentFragment. In short, users and implementors
+of the DOM need to be aware that Attr nodes have some things in common
+with other objects inheriting the Node interface, but they also are
+quite distinct.
+
+The attribute's effective value is determined as follows: if this
+attribute has been explicitly assigned any value, that value is the
+attribute's effective value; otherwise, if there is a declaration for
+this attribute, and that declaration includes a default value, then
+that default value is the attribute's effective value; otherwise, the
+attribute does not exist on this element in the structure model until
+it has been explicitly added. Note that the nodeValue attribute on the
+Attr instance can also be used to retrieve the string version of the
+attribute's value(s).
+
+In XML, where the value of an attribute can contain entity references,
+the child nodes of the Attr node provide a representation in which
+entity references are not expanded. These child nodes may be either
+Text or EntityReference nodes. Because the attribute type may be
+unknown, there are no tokenized attribute values.
+
+=head2 METHODS
+
+=over 4
+
+=item getValue
+
+On retrieval, the value of the attribute is returned as a string. 
+Character and general entity references are replaced with their values.
+
+=item setValue (str)
+
+DOM Spec: On setting, this creates a Text node with the unparsed contents of the 
+string.
+
+=item getName
+
+Returns the name of this attribute.
+
+=back
