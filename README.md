@@ -1,3 +1,5 @@
+English|[简体中文](./README.zh.md)
+
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
 ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, Reading Comprehension, Genration and so on.
 
@@ -11,12 +13,12 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 	- Easy deployment.
 	- Learn NLP in Aistudio tutorials.
 	- Backward compatibility for old-styled checkpoint
-- 2020/4/30: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
-- 2020/3/27: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
-- 2019/12/26: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
-- 2019/11/6: [Introducing ERNIE-tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)
-- 2019/7/31: [Introducing ERNIE2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
-- 2019/3/16: [Introducing ERNIE1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
+- Apr.30.2020: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
+- Mar.27.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
+- Dec.26.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
+- Nov.6.2019: [Introducing ERNIE-tiny](https://www.jiqizhixin.com/articles/2019-11-06-9)
+- Jul.7.2019: [Introducing ERNIE2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
+- Mar.16.2019: [Introducing ERNIE1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
 
 	
 # Table of contents
@@ -26,8 +28,6 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 * [Distributed pretrain](#distributed-pretrain)
 * [Online inference](#online-inference)
 * [Distillation](#distillation)
-* [Citation](#citation)
-* [Contact us](#contact-us)
 
 # Quick Tour
 
@@ -54,12 +54,11 @@ print(pooled.numpy())                        # convert  results to numpy
 Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
 (please choose the latest version and apply for a GPU environment)
 
-1. [Text classification walkthrough](https://aistudio.baidu.com/aistudio/projectdetail/266623)
-1. [Sementic analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
-2. [Cloze test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
+1. [ERNIE for beginners](https://aistudio.baidu.com/aistudio/projectdetail/266623)
+1. [Sementic Analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
+2. [Cloze Test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
 3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
 4. [Ask Ernie](https://aistudio.baidu.com/aistudio/projectdetail/456443)
-5. ...
 
 # Setup
 
@@ -79,16 +78,16 @@ pip setup.py -e .
 
 ```
 
-##### 3. download pretrained models
+##### 3. download pretrained models (optional)
 
 | Model                                              | Description                                                  |
 | :------------------------------------------------- | :----------------------------------------------------------- |
-| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | ernie 1.0 base: L12H768A12  |
-| [ERNIE tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | erine tiny: L3H1024A16      |
-| [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | ernie 2.0 base: L12H768A12  |
-| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | ernie 2.0 large: L24H1024A16|
-| [ERNIE-gen base for English]()                                                                      | ernie-gen base: L12H768A12  |
-| [ERNIE-gen large for English]()                                                                     | ernie-gen large: L24H1024A16|
+| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | L12H768A12  |
+| [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | L3H1024A16  |
+| [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | L12H768A12  |
+| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | L24H1024A16 |
+| [ERNIE Gen base for English]()                                                                      | L12H768A12  |
+| [ERNIE Gen large for English]()                                                                     | L24H1024A16 |
 
 ##### 4. download datasets
  
@@ -114,10 +113,11 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 
 | Datasets|Description|
 |:--------|:----------|
-| [XNLI](https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz)                 |XNLI is a natural language inference dataset in 15 languages. It was jointly built by Facebook and New York University. We use Chinese data of XNLI to evaluate language understanding ability of our model. [url: https://github.com/facebookresearch/XNLI]|
+| [XNLI](https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz)                 |XNLI is a natural language inference dataset in 15 languages. It was jointly built by Facebook and New York University. We use Chinese data of XNLI to evaluate language understanding ability of our model. [url](https://github.com/facebookresearch/XNLI)|
 | [ChnSentiCorp](https://ernie-github.cdn.bcebos.com/data-chnsenticorp.tar.gz) |ChnSentiCorp is a sentiment analysis dataset consisting of reviews on online shopping of hotels, notebooks and books.|
 | [MSRA-NER](https://ernie-github.cdn.bcebos.com/data-msra_ner.tar.gz)         |MSRA-NER (SIGHAN2006) dataset is released by MSRA for recognizing the names of people, locations and organizations in text.|
 | [NLPCC2016-DBQA](https://ernie-github.cdn.bcebos.com/data-dbqa.tar.gz)       |NLPCC2016-DBQA is a sub-task of NLPCC-ICCPOL 2016 Shared Task which is hosted by NLPCC(Natural Language Processing and Chinese Computing), this task targets on selecting documents from the candidates to answer the questions. [url: http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf]|
+|[CMRC2018](https://ernie-github.cdn.bcebos.com/data-cmrc2018.tar.gz)|CMRC2018 is a evaluation of Chinese extractive reading comprehension hosted by Chinese Information Processing Society of China (CIPS-CL). [url](https://github.com/ymcui/cmrc2018)|
 
 
 # Finetune 
@@ -150,8 +150,8 @@ python3 -m paddle.distributed.launch \
 
 many other demo python scripts:
 
-1. [Sementic Analysis](./demo/finetune_sementic_analysis_dygraph.py)
-1. [Pointwise Ranking](./demo/finetune_classifier_dygraph.py)
+1. [Sentiment Analysis](./demo/finetune_sentiment_analysis_dygraph.py)
+1. [Semantic Similarity](./demo/finetune_classifier_dygraph.py)
 1. [Name Entity Recognition(NER)](./demo/finetune_ner_dygraph.py)
 1. [Machine Reading Comprehension](./demo/finetune_mrc_dygraph.py)
 1. [Text generation](./experimental/seq2seq/README.md)
@@ -220,7 +220,7 @@ Knowledge distillation is good way to compress and accelerate ERNIE.
 
 For details about distillation, see [here](./distill/README.md)
 
-# Citation
+### Citation
 
 please cite [ERNIE 2.0](https://arxiv.org/abs/1907.12412):
 
@@ -231,7 +231,7 @@ please cite [ERNIE 2.0](https://arxiv.org/abs/1907.12412):
 }
 ```
 
-and [ERNIE-gen](https://arxiv.org/abs/2001.11314)
+and [ERNIE Gen](https://arxiv.org/abs/2001.11314)
 
 ```
 @article{Xiao2020ERNIE,
@@ -240,7 +240,7 @@ and [ERNIE-gen](https://arxiv.org/abs/2001.11314)
   year={2020},
 }
 ```
-# Contact us
+### Contact us
 
 - [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
 - QQ discussion group: 760439550 (ERNIE discussion group).
