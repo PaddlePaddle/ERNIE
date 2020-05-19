@@ -24,8 +24,8 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 # Table of contents
 * [Tutorials](#tutorials)
 * [Setup](#setup)
-* [Finetune](#finetune)
-* [Distributed pretrain](#distributed-pretrain)
+* [Fine-tuning](#fine-tuning)
+* [Pre-training with ERNIE 1.0](#pre-training-with-ernie-10)
 * [Online inference](#online-inference)
 * [Distillation](#distillation)
 
@@ -120,7 +120,7 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 |[CMRC2018](https://ernie-github.cdn.bcebos.com/data-cmrc2018.tar.gz)|CMRC2018 is a evaluation of Chinese extractive reading comprehension hosted by Chinese Information Processing Society of China (CIPS-CL). [url](https://github.com/ymcui/cmrc2018)|
 
 
-# Finetune 
+# Fine-tuning
 
 - try eager execution with `dygraph model` :
 
@@ -180,7 +180,7 @@ many other demo python scripts:
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
 
-# Distributed pretrain
+# Pretraining with ERNIE 1.0
 
 see [here](./demo/pretrain/README.md)
 

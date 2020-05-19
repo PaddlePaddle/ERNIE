@@ -25,8 +25,8 @@ ERNIE 2.0 做为强大的预训练语义模型，可以适用于大部分NLP任�
 
 * [教程](#教程)
 * [安装](#安装)
-* [Finetune](#finetune)
-* [分布式 pretrain](#分布式-pretrain)
+* [Fine-tuning任务](#fine-tuning-任务)
+* [预训练(ERNIE 1.0)](#预训练-ernie-10)
 * [在线预测](#在线预测)
 * [蒸馏](#蒸馏)
 
@@ -124,7 +124,7 @@ data/xnli
 |[CMRC2018](https://ernie-github.cdn.bcebos.com/data-cmrc2018.tar.gz)|CMRC2018 是中文信息学会举办的评测，评测的任务是抽取类阅读理解。[链接](https://github.com/ymcui/cmrc2018)
 
 
-# Finetune
+# Fine-tuning 任务
 
 - 使用 `动态图` 模型进行finetune:
 
@@ -183,10 +183,9 @@ python3 -m paddle.distributed.launch \
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
 
-# 分布式 pretrain
+# 预训练(ERNIE 1.0)
 
 请见[这里](./demo/pretrain/README.md)
-
 
 # 在线预测
 
