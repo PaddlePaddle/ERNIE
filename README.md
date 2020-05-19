@@ -154,7 +154,7 @@ many other demo python scripts:
 1. [Pointwise Ranking](./demo/finetune_classifier_dygraph.py)
 1. [Name Entity Recognition(NER)](./demo/finetune_ner_dygraph.py)
 1. [Machine Reading Comprehension](./demo/finetune_mrc_dygraph.py)
-1. Text generation...
+1. [Text generation](./experimental/seq2seq/README.md)
 
 
 

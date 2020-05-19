@@ -19,8 +19,6 @@ python3 -m paddle.distributed.launch \
     --use_random_noice \
     --noise_prob 0.7 \
     --predict_output_dir ./pred \
-    --eval_bsz 2 \
-    --bsz 2 \
     --max_steps $((287113*30/64))
 ```
 
