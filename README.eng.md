@@ -10,15 +10,23 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 
 # News
 
-- May.20.2020: Try ERNIE in "`dygraph`", with:
+- May.20.2020:
 
-	- Pretrain and finetune ERNIE with [PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8).
-	- Eager execution with `paddle.fluid.dygraph`.
-	- Distributed training.
-	- Easy deployment.
-	- Learn NLP in Aistudio tutorials.
-	- Backward compatibility for old-styled checkpoint
-	- Release **[ERNIE-GEN](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen)**, a state-of-the-art pre-trained model for generation tasks: base/large/large-160G
+    - Try ERNIE in "`dygraph`", with:
+    	- Pretrain and finetune ERNIE with [PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8).
+    	- Eager execution with `paddle.fluid.dygraph`.
+    	- Distributed training.
+    	- Easy deployment.
+    	- Learn NLP in Aistudio tutorials.
+    	- Backward compatibility for old-styled checkpoint
+    
+    - [`ERNIE-GEN`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen) is **avaliable** now! ([link here](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen))
+    	- the **state-of-the-art** pre-trained model for generation tasks, accepted by `IJCAI-2020`.
+        	- A novel **span-by-span generation pre-training task**.
+        	- An **infilling generation** echanism and a **noise-aware generation** method.
+        	- Implemented by a carefully designed **Multi-Flow Attention** architecture.
+    	- You are able to `download` all models including `base/large/large-160G`.
+  
 - Apr.30.2020: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
 - Mar.27.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
 - Dec.26.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
@@ -60,7 +68,7 @@ print(pooled.numpy())                        # convert  results to numpy
 Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
 (please choose the latest version and apply for a GPU environment)
 
-1. [ERNIE for beginners](https://aistudio.baidu.com/aistudio/projectdetail/266623)
+1. ERNIE for beginners
 1. [Sementic Analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
 2. [Cloze Test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
 3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
