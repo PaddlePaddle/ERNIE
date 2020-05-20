@@ -9,14 +9,21 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 # 新闻
 
-- 2020.5.20: 欢迎试用`动态图`实现的 ERNIE:
-    - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
-    - 动态执行, 所见即所得。
-    - 大规模分布式训练。
-    - 易于部署。
-    - 通过Aistudio 教程快速入门NLP。
-    - 向后兼容老版 checkpoint。
-    - 发布目前效果最佳的生成预训练模型 **[ERNIE-GEN](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen)** base/large/large-160G 版本，ERNIE能力扩展至文本生成任务。
+- 2020.5.20:     
+    - 欢迎试用`动态图`实现的 ERNIE:
+        - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
+        - 动态执行, 所见即所得。
+        - 大规模分布式训练。
+        - 易于部署。
+        - 通过Aistudio 教程快速入门NLP。
+        - 向后兼容老版 checkpoint。
+    -  `ERNIE-GEN` 模型正式开源! ([点击进入](ernie-gen))
+        - 最强文本生成预训练模型正式开源，相关工作已被 `IJCAI-2020` 收录。
+            - 首次把 ERNIE 预训练技术能力扩展至文本生成领域，在多个典型任务上取得最佳。
+            - 您现在即可下载论文报告的所有模型（包含 [`base/large/large-160G`](ernie-gen/README.zh.md#预训练模型)）。
+        - 首次在预训练阶段加入span-by-span 生成任务，让模型每次能够生成一个语义完整的片段。
+        - 提出填充式生成机制和噪声感知机制来缓解曝光偏差问题。
+        - 精巧的 Mulit-Flow Attention 实现框架。
 - 2020.4.30 发布[ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage)， 一种新型图神经网络模型，采用ERNIE做为aggreagtor. 由[PGL](https://github.com/PaddlePaddle/PGL)实现。
 - 2020.3.27 [在SemEval2020五项子任务上夺冠](https://www.jiqizhixin.com/articles/2020-03-27-8)。
 - 2019.12.26 [GLUE榜第一名](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)。
