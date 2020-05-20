@@ -2,9 +2,10 @@
 
 ![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone.png)
 
+ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，该框架将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读理解、智能问答等16个公开数据集上全面显著超越世界领先技术，在国际权威的通用语言理解评估基准GLUE上，得分首次突破90分，获得全球第一。在今年3月落下帷幕的全球最大语义评测SemEval 2020上，ERNIE摘得5项世界冠军， 该技术也被全球顶级科技商业杂志《麻省理工科技评论》官方网站报道，相关创新成果也被国际顶级学术会议AAAI、IJCAI收录。ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
+
 **提醒: ERNIE老版本代码已经迁移至[repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)，欢迎使用我们全新升级的基于动静结合的新版ERNIE套件进行开发。另外，也欢迎上[EasyDL](https://ai.baidu.com/easydl/pro)体验更丰富的功能（如ERNIE 2.0、ERNIE 2.1、ERNIE领域模型等）。**
 
-ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，该框架将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读理解、智能问答等16个公开数据集上全面显著超越世界领先技术，在国际权威的通用语言理解评估基准GLUE上，得分首次突破90分，获得全球第一。在今年3月落下帷幕的全球最大语义评测SemEval 2020上，ERNIE摘得5项世界冠军， 该技术也被全球顶级科技商业杂志《麻省理工科技评论》官方网站报道，相关创新成果也被国际顶级学术会议AAAI、IJCAI收录。ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
 
 # 新闻
 
@@ -28,7 +29,7 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 * [教程](#教程)
 * [安装](#安装)
-* [Fine-tuning任务](#fine-tuning-任务)
+* [支持的NLP任务](#支持的nlp任务)
 * [预训练(ERNIE 1.0)](#预训练-ernie-10)
 * [在线预测](#在线预测)
 * [蒸馏](#蒸馏)
@@ -127,7 +128,7 @@ data/xnli
 |[CMRC2018](https://ernie-github.cdn.bcebos.com/data-cmrc2018.tar.gz)|CMRC2018 是中文信息学会举办的评测，评测的任务是抽取类阅读理解。[链接](https://github.com/ymcui/cmrc2018)
 
 
-# Fine-tuning 任务
+# 支持的NLP任务
 
 - 使用 `动态图` 模型进行finetune:
 
@@ -250,7 +251,7 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
 若希望复现 paper 中的所有实验，请切换至本repo的`repro`分支。
 
 ### 讨论组
-
+- [ERNIE官方主页](https://www.paddlepaddle.org.cn/ernie)
 - [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
 - QQ 群: 760439550 (ERNIE discussion group).
 - [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
