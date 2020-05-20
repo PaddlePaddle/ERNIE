@@ -65,7 +65,7 @@ print(pooled.numpy())                        # convert  results to numpy
 手边没有GPU？欢迎在[AIStudio](https://aistudio.baidu.com/aistudio/index)中直接试用 ERNIE. 
 (请选择最新版本的教程并申请GPU运行环境)
 
-1. 从0开始学ERNIE
+1. [从0开始学ERNIE](https://aistudio.baidu.com/studio/edu/group/quick/join/314947)
 1. [情感识别](https://aistudio.baidu.com/aistudio/projectdetail/427482)
 2. [完形填空](https://aistudio.baidu.com/aistudio/projectdetail/433491)
 3. [知识蒸馏](https://aistudio.baidu.com/aistudio/projectdetail/439460)

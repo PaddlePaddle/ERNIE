@@ -68,7 +68,7 @@ print(pooled.numpy())                        # convert  results to numpy
 Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/index)!
 (please choose the latest version and apply for a GPU environment)
 
-1. ERNIE for beginners
+1. [ERNIE for beginners](https://aistudio.baidu.com/studio/edu/group/quick/join/314947)
 1. [Sementic Analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
 2. [Cloze Test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
 3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
