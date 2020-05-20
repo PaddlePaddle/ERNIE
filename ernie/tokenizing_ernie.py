@@ -79,6 +79,8 @@ class ErnieTokenizer(object):
         'ernie-2.0-en': bce + 'model-ernie2.0-en.1.tar.gz',
         'ernie-2.0-large-en':  bce + 'model-ernie2.0-large-en.1.tar.gz',
         'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz',
+        'ernie-gen-base-en': bce + 'model-ernie-gen-base-en.1.tar.gz',
+        'ernie-gen-large-en': bce + 'model-ernie-gen-large-en.1.tar.gz',
     }
     @classmethod
     def from_pretrained(cls, pretrain_dir_or_url, force_download=False, **kwargs):
