@@ -17,10 +17,10 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
         - 易于部署。
         - 通过Aistudio 教程快速入门NLP。
         - 向后兼容老版 checkpoint。
-    -  `ERNIE-GEN` 模型正式开源! ([点击进入](ernie-gen))
+    -  `ERNIE-GEN` 模型正式开源! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen))
         - 最强文本生成预训练模型正式开源，相关工作已被 `IJCAI-2020` 收录。
             - 首次把 ERNIE 预训练技术能力扩展至文本生成领域，在多个典型任务上取得最佳。
-            - 您现在即可下载论文报告的所有模型（包含 [`base/large/large-160G`](ernie-gen/README.zh.md#预训练模型)）。
+            - 您现在即可下载论文报告的所有模型（包含 [`base/large/large-160G`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen/README.zh.md#预训练模型)）。
         - 首次在预训练阶段加入span-by-span 生成任务，让模型每次能够生成一个语义完整的片段。
         - 提出填充式生成机制和噪声感知机制来缓解曝光偏差问题。
         - 精巧的 Mulit-Flow Attention 实现框架。
