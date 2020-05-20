@@ -1,6 +1,0 @@
-nltk==3.4
-numpy==1.14.5
-scipy==1.2.1
-six==1.11.0
-paddlepaddle-gpu==1.7.2.post107
-pyrouge==0.1.3
