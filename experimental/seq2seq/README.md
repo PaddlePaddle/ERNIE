@@ -1,13 +1,13 @@
-# ERNIE Gen
+# ERNIE-GEN
 
 [ERNIE-GEN](https://arxiv.org/pdf/2001.11314.pdf) is a multi-flow language generation framework for both pre-training and fine-tuning.
 Only finetune strategy is illustrated in this section.
 
 ## Finetune
 
-We use Abstractive Summarization task CNN/DailyMail to illustate usage of ERNIE Gen, you can download preprocessed finetune data from [here](https://ernie-github.cdn.bcebos.com/data-cnndm.tar.gz)
+We use Abstractive Summarization task CNN/DailyMail to illustate usage of ERNIE-GEN, you can download preprocessed finetune data from [here](https://ernie-github.cdn.bcebos.com/data-cnndm.tar.gz)
 
-To starts finetuning ERNIE Gen, run:
+To starts finetuning ERNIE-GEN, run:
 
 ```script
 python3 -m paddle.distributed.launch \

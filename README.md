@@ -235,23 +235,36 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
 
 知识蒸馏是进行ERNIE模型压缩、加速的有效方式；关于知识蒸馏的实现细节请参见[这里](./distill/README.md)。
 
-### 引用
+# 文献引用
 
-[ERNIE 2.0](https://arxiv.org/abs/1907.12412)
+### ERNIE 1.0
 ```
-@article{SunERNIE,
-  title={ERNIE 2.0: A Continual Pre-training Framework for Language Understanding},
-  author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Tian, Hao and Wu, Hua and Wang, Haifeng},
+@article{sun2019ernie,
+  title={Ernie: Enhanced representation through knowledge integration},
+  author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Chen, Xuyi and Zhang, Han and Tian, Xin and Zhu, Danxiang and Tian, Hao and Wu, Hua},
+  journal={arXiv preprint arXiv:1904.09223},
+  year={2019}
 }
 ```
 
-[ERNIE Gen](https://arxiv.org/abs/2001.11314)
+### ERNIE 2.0
+```
+@article{sun2019ernie20,
+  title={ERNIE 2.0: A Continual Pre-training Framework for Language Understanding},
+  author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:1907.12412},
+  year={2019} 
+}
+```
+
+### ERNIE-GEN
 
 ```
-@article{Xiao2020ERNIE,
+@article{xiao2020ernie-gen,
   title={ERNIE-GEN: An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation},
   author={Xiao, Dongling and Zhang, Han and Li, Yukun and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
-  year={2020},
+  journal={arXiv preprint arXiv:2001.11314},
+  year={2020}
 }
 ```
 
