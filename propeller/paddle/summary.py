@@ -27,7 +27,6 @@ def scalar(name, tensor):
     """scalar summary"""
     if not isinstance(tensor, F.framework.Variable):
         raise ValueError('expect paddle Variable, got %s' % repr(tensor))
-    tensor.persistable = True
     default_collection().add(Key.SUMMARY_SCALAR, (name, tensor))
 
 
@@ -35,5 +34,4 @@ def histogram(name, tensor):
     """histogram summary"""
     if not isinstance(tensor, F.framework.Variable):
         raise ValueError('expect paddle Variable, got %s' % repr(tensor))
-    tensor.persistable = True
     default_collection().add(Key.SUMMARY_HISTOGRAM, (name, tensor))

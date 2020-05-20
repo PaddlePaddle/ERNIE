@@ -19,9 +19,34 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import six
+import logging
+
+log = logging.getLogger(__name__)
+
+
+def enable_textone():
+    try:
+        import textone
+    except ImportError:
+        log.fatal('enable textone failed: textone not found!')
+        raise
+    global textone_enabled
+    log.info('textone enabled')
+    from propeller.paddle.train.monitored_executor import MonitoredExecutor, TextoneTrainer
+    if TextoneTrainer is None:
+        raise RuntimeError('enable textone failed: textone not found!')
+    MonitoredExecutor.saver_class = TextoneTrainer
+
+
 from propeller.types import *
 from propeller.util import ArgumentParser, parse_hparam, parse_runconfig, parse_file
 
 from propeller.paddle import data
 from propeller.paddle import train
 from propeller.paddle.train import *
+
+import paddle
+paddle_version = [int(i) for i in paddle.__version__.split('.')]
+if paddle_version[1] < 7:
+    raise RuntimeError('propeller 0.2 requires paddle 1.7+, got %s' %
+                       paddle.__version__)

@@ -1,0 +1,87 @@
+=head1 NAME
+
+XML::DOM::CharacterData - Common interface for Text, CDATASections and Comments
+
+=head1 DESCRIPTION
+
+XML::DOM::CharacterData extends L<XML::DOM::Node>
+
+The CharacterData interface extends Node with a set of attributes and
+methods for accessing character data in the DOM. For clarity this set
+is defined here rather than on each object that uses these attributes
+and methods. No DOM objects correspond directly to CharacterData,
+though Text, Comment and CDATASection do inherit the interface from it. 
+All offsets in this interface start from 0.
+
+=head2 METHODS
+
+=over 4
+
+=item getData and setData (data)
+
+The character data of the node that implements this
+interface. The DOM implementation may not put arbitrary
+limits on the amount of data that may be stored in a
+CharacterData node. However, implementation limits may mean
+that the entirety of a node's data may not fit into a single
+DOMString. In such cases, the user may call substringData to
+retrieve the data in appropriately sized pieces.
+
+=item getLength
+
+The number of characters that are available through data and
+the substringData method below. This may have the value zero,
+i.e., CharacterData nodes may be empty.
+
+=item substringData (offset, count)
+
+Extracts a range of data from the node.
+
+Parameters:
+ I<offset>  Start offset of substring to extract.
+ I<count>   The number of characters to extract.
+
+Return Value: The specified substring. If the sum of offset and count
+exceeds the length, then all characters to the end of
+the data are returned.
+
+=item appendData (str)
+
+Appends the string to the end of the character data of the
+node. Upon success, data provides access to the concatenation
+of data and the DOMString specified.
+
+=item insertData (offset, arg)
+
+Inserts a string at the specified character offset.
+
+Parameters:
+ I<offset>  The character offset at which to insert.
+ I<arg>     The DOMString to insert.
+
+=item deleteData (offset, count)
+
+Removes a range of characters from the node. 
+Upon success, data and length reflect the change.
+If the sum of offset and count exceeds length then all characters 
+from offset to the end of the data are deleted.
+
+Parameters: 
+ I<offset>  The offset from which to remove characters. 
+ I<count>   The number of characters to delete. 
+
+=item replaceData (offset, count, arg)
+
+Replaces the characters starting at the specified character
+offset with the specified string.
+
+Parameters:
+ I<offset>  The offset from which to start replacing.
+ I<count>   The number of characters to replace. 
+ I<arg>     The DOMString with which the range must be replaced.
+
+If the sum of offset and count exceeds length, then all characters to the end of
+the data are replaced (i.e., the effect is the same as a remove method call with 
+the same range, followed by an append method invocation).
+
+=back
