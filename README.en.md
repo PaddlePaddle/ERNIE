@@ -105,7 +105,8 @@ pip setup.py -e .
 | [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | L12H768A12  |ernie-2.0-en|
 | [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | L24H1024A16 |ernie-2.0-large-en|
 | [ERNIE Gen base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |ernie-gen-base-en|
-| [ERNIE Gen Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 + 160G pretrain corpus | ernie-gen-large-en |
+| [ERNIE Gen Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 | ernie-gen-large-en |
+| [ERNIE Gen Large 160G for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 160G pretrain corpus | ernie-gen-large-160g-en |
 
 ##### 4. download datasets
  
