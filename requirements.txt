@@ -1,6 +1,5 @@
-numpy==1.14.5
+numpy
 pyzmq==18.0.2
 six==1.11.0
 sklearn==0.0
 sentencepiece==0.1.8
-paddlepaddle-gpu==1.7.1.post107

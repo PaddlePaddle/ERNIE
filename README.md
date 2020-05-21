@@ -73,11 +73,15 @@ print(pooled.numpy())                        # convert  results to numpy
 
 # 安装
 
-##### 1. 安装 ERNIE
+##### 1. 安装 PaddlePaddle
+
+本项目依赖PaddlePaddle 1.7.0+， 请参考[这里](https://www.paddlepaddle.org.cn/install/quick)安装 PaddlePaddle。
+
+##### 2. 安装 ERNIE
 
 
 ```script
-pip install paddle-ernie==0.0.1.dev1
+pip install paddle-ernie
 ```
 
 或者
@@ -85,7 +89,7 @@ pip install paddle-ernie==0.0.1.dev1
 ```shell
 git clone -b dygraph https://github.com/PaddlePaddle/ERNIE.git --single-branch
 cd ERNIE
-pip install -r requirement.txt
+pip install -r requirements.txt
 pip setup.py -e .
 
 ```
