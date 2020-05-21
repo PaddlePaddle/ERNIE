@@ -64,10 +64,11 @@ def evaluate(model, datasets, step, args):
             output_ids = beam_search_infilling(model, src_ids, src_sids,
                     eos_id=tokenizer.sep_id,
                     sos_id=tokenizer.cls_id,
-                    attn_id=tokenizer.vocab['[ATTN]'],
+                    attn_id=tokenizer.vocab[args.attn_token],
                     max_decode_len=args.max_decode_len, 
                     max_encode_len=args.max_encode_len, 
-                    beam_width=args.beam_width)
+                    beam_width=args.beam_width,
+                    tgt_type_id=args.tgt_type_id,)
             output_str = rev_lookup(output_ids.numpy())
             for eid, ostr in zip(example_id.numpy().tolist(), output_str.tolist()):
                 if '[SEP]' in ostr:
@@ -80,7 +81,7 @@ def evaluate(model, datasets, step, args):
 
 def seq2seq(model, tokenizer, args):
     log.info('Training starts with args: %r' % args)
-    attn_id = tokenizer.vocab['[ATTN]']
+    attn_id = tokenizer.vocab[args.attn_token]
     def gen_mask(batch_ids, mask_type='bidi', query_len=None, pad_value=0):
         if query_len is None:
             query_len = batch_ids.shape[1]
@@ -224,11 +225,12 @@ def seq2seq(model, tokenizer, args):
     dev_ds.data_shapes = shapes
     dev_ds.data_types = types
 
+    vocab_size, _ = model.word_emb.weight.shape
     ctx = D.parallel.prepare_context()
     model = D.parallel.DataParallel(model, ctx)
     opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
     g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0)
-    attn_id = tokenizer.vocab['[ATTN]']
+    attn_id = tokenizer.vocab[args.attn_token]
     for step, data in enumerate(train_ds.start(place)):
         (example_id, src_ids, src_sids, src_pids,
          tgt_ids, tgt_sids, tgt_pids,
@@ -242,7 +244,7 @@ def seq2seq(model, tokenizer, args):
         past_cache_k = [L.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)]
         past_cache_v = [L.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)]
         if args.label_smooth > 0.:
-            tgt_labels = L.label_smooth(F.one_hot(tgt_labels, len(tokenizer.vocab)), epsilon=args.label_smooth)
+            tgt_labels = L.label_smooth(F.one_hot(tgt_labels, vocab_size), epsilon=args.label_smooth)
         loss, _, __ = model(attn_ids, sent_ids=tgt_sids, pos_ids=tgt_pids, attn_bias=mask_attn_2_srctgtattn, 
                 past_cache=(past_cache_k, past_cache_v), 
                 tgt_labels=tgt_labels, 
@@ -283,12 +285,13 @@ if __name__ == '__main__':
     parser.add_argument('--max_decode_len', type=int, default=120)
     parser.add_argument('--tgt_type_id', type=int, default=3)
     parser.add_argument('--warmup_proportion', type=float, default=0.1)
-    parser.add_argument('--beam_width', type=int, default=3)
+    parser.add_argument('--beam_width', type=int, default=5)
     parser.add_argument('--noise_prob', type=float, default=0.7, help='probability of token be repalced')
     parser.add_argument('--use_random_noice', action='store_true', help='if set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`')
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
     parser.add_argument('--label_smooth', type=float, default=0.1)
     parser.add_argument('--predict_output_dir', type=str, default=None, help='predict file output directory')
+    parser.add_argument('--attn_token', type=str, default='[ATTN]', help='if [ATTN] not in vocab, you can specified [MAKK] as attn-token')
     parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
     parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
