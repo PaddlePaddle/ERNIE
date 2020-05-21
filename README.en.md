@@ -98,14 +98,14 @@ pip setup.py -e .
 
 ##### 3. download pretrained models (optional)
 
-| Model                                              | Description                                                  |
-| :------------------------------------------------- | :----------------------------------------------------------- |
-| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | L12H768A12  |
-| [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | L3H1024A16  |
-| [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | L12H768A12  |
-| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | L24H1024A16 |
-| [ERNIE Gen base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |
-| [ERNIE Gen Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 |
+| Model                                              | Description                                                  |abbreviation|
+| :------------------------------------------------- | :----------------------------------------------------------- |:-----------|
+| [ERNIE 1.0 Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | L12H768A12  |ernie-1.0|
+| [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                         | L3H1024A16  |ernie-tiny|
+| [ERNIE 2.0 Base for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | L12H768A12  |ernie-2.0-en|
+| [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | L24H1024A16 |ernie-2.0-large-en|
+| [ERNIE Gen base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |ernie-gen-base-en|
+| [ERNIE Gen Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 + 160G pretrain corpus | ernie-gen-large-en |
 
 ##### 4. download datasets
  
@@ -143,26 +143,31 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 - try eager execution with `dygraph model` :
 
 ```script
-python3 ./demo/finetune_classifier_dygraph.py \
-    --from_pretrained ernie_1.0 \
-    --data_dir ./data/xnli 
+python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
+       --from_pretrained ernie-1.0 \
+       --data_dir ./data/xnli  
 ```
 
 - Distributed finetune
 
 `paddle.distributed.launch` is a process manager, we use it to launch python processes on each avalible GPU devices:
 
-when in distributed training, `max_steps` is used as stopping criteria rather than `epoch` to prevent dead block.
-also notice than we shard the train data according to device id to prevent over fitting.
+When in distributed training, `max_steps` is used as stopping criteria rather than `epoch` to prevent dead block.
+You could calculate `max_steps` with `EPOCH * NUM_TRAIN_EXAMPLES / TOTAL_BATCH`.
+Also notice than we shard the train data according to device id to prevent over fitting.
 
 demo: 
+(make sure you have more than 2 GPUs, 
+online model download can not work in `paddle.distributed.launch`, 
+you need to run single card finetuning first to get pretrained model, or donwload and extract one manualy from [here](#section-pretrained-models)): 
+
 
 ```script
 python3 -m paddle.distributed.launch \
 ./demo/finetune_classifier_dygraph_distributed.py \
     --data_dir data/mnli \
     --max_steps 10000 \
-    --from_pretrained ernie2.0-en
+    --from_pretrained ernie-2.0-en
 ```
 
 

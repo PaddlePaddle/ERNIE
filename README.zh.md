@@ -94,17 +94,18 @@ pip setup.py -e .
 
 ```
 
-##### 3. 下载预训练模型（可选）
+##### 3. 下载预训练模型（可选）<a name="section-pretrained-models"></a>
 
 
-| Model                                              | Description                                                  |
-| :------------------------------------------------- | :----------------------------------------------------------- |
-| [ERNIE 1.0 Base 中文](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | L12H768A12  |
-| [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                 | L3H1024A16      |
-| [ERNIE 2.0 Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | base: L12H768A12  |
-| [ERNIE 2.0 Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | large: L24H1024A16|
-| [ERNIE Gen base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |
-| [ERNIE Gen Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 |
+| Model                                              | 细节参数                                                                  |下载简写|
+| :------------------------------------------------- |:------------------------------------------------------------------------- |:-------|
+| [ERNIE 1.0 Base 中文](https://ernie-github.cdn.bcebos.com/model-ernie1.0.1.tar.gz)           | Layer:12, Hidden:768, Heads:12  |ernie-1.0|
+| [ERNIE Tiny](https://ernie-github.cdn.bcebos.com/model-ernie_tiny.1.tar.gz)                  | Layer:3, Hdden:1024, Heads:16   |ernie-tiny|
+| [ERNIE 2.0 Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-en.1.tar.gz)        | Layer:12, Hidden:768, Heads:12  |ernie-2.0-en|
+| [ERNIE 2.0 Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | Layer:24, Hidden:1024, Heads16  |ernie-2.0-large-en|
+| [ERNIE Gen base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | Layer:12, Hidden:768, Heads:12  |ernie-gen-base-en|
+| [ERNIE Gen Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 |ernie-gen-large-en|
+| [ERNIE Gen Large 160G英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 额外160G 预训练语料 | ernie-gen-large-en |
 
 ##### 4. 下载数据集
 
@@ -144,9 +145,9 @@ data/xnli
 - 使用 `动态图` 模型进行finetune:
 
 ```script
-python3 ./demo/finetune_classifier_dygraph.py \
-    --from_pretrained ernie_1.0 \
-    --data_dir ./data/xnli
+python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
+       --from_pretrained ernie-1.0 \
+       --data_dir ./data/xnli  
 ```
 
 - 分布式 finetune
@@ -154,9 +155,11 @@ python3 ./demo/finetune_classifier_dygraph.py \
 `paddle.distributed.launch` 是一个进程管理器，我们采用它在每一张GPU上启动一个python进程，并配置相应的环境变量以进行分布式训练:
 
 当采用分布式训练时，我们采用`max_steps`做为终止条件而非`epoch`, 这样处理是为了避免进程间死锁。
+你可以通过`EPOCH * NUM_TRAIN_EXAMPLES / TOTAL_BATCH`的方式计算出所需执行的`max_steps`.
 另外值得注意的是训练集需要在不同的进程间进行切分；以避免所有进程训练同一份数据造成的过拟合。
 
-示例脚本（请确保你有两张以上GPU卡）:
+示例脚本（请确保你有两张以上GPU卡, 在线模型下载功能在`paddle.distributed.launch`下无法工作，
+你可能需要一个先通过单卡finetune方式下载预训练模型，或者根据[这里](#section-pretrained-models)手动下载并解压预训练模型）:
 
 ```script
 python3 -m paddle.distributed.launch \
@@ -227,7 +230,7 @@ sids = np.expand_dims(sids, 0)
 result = client(ids, sids)
 ```
 
-你也可从[此处]((https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz).)下载一个预先制作好的ernie-1.0 base模型的 `inference_model`.
+你也可从[此处]((https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz.)下载一个预先制作好的ernie-1.0 base模型的 `inference_model`.
 该模型没有经过finetune，一般可以用做上层模型结构的 feature-base finetune或者做为一个文本特征抽取器。
 因为该模行由老版API 产出，在进行客户端请求时需要在输入tensor后面追加一个维度：
 
