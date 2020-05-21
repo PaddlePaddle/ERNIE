@@ -1,4 +1,4 @@
-English|[简体中文](./README.md)
+English|[简体中文](./README.zh.md)
 
 ![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone.png)
 
