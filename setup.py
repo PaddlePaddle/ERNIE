@@ -22,16 +22,15 @@ with open("README.md", "r", encoding='utf-8') as fh:
 
 setuptools.setup(
     name="paddle-ernie", # Replace with your own username
-    version="0.0.1dev1",
+    version="0.0.2dev1",
     author="Baidu Ernie Team",
     author_email="ernieernie.team@gmail.com",
     description="A pretrained NLP model for every NLP tasks",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/PaddlePaddle/ERNIE/tree/dygraph",
+    url="https://github.com/PaddlePaddle/ERNIE/",
     packages=['ernie'],
     install_requires=[
-        'paddlepaddle-gpu>=1.7.1',
         'requests',
         'tqdm',
         ],

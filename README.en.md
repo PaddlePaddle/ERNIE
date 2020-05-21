@@ -1,4 +1,4 @@
-English|[简体中文](./README.md)
+English|[简体中文](./README.zh.md)
 
 ![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone.png)
 
@@ -76,10 +76,14 @@ Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/inde
 
 # Setup
 
-##### 1. install ernie
+##### 1. install PaddlePaddle
+
+This repo requires PaddlePaddle 1.7.0+, please see [here](https://www.paddlepaddle.org.cn/install/quick) for installaton instruction.
+
+##### 2. install ernie
 
 ```script
-pip install paddle-ernie==0.0.1.dev1
+pip install paddle-ernie
 ```
 
 or 
@@ -87,7 +91,7 @@ or
 ```shell
 git clone -b dygraph https://github.com/PaddlePaddle/ERNIE.git --single-branch
 cd ERNIE
-pip install -r requirement.txt
+pip install -r requirements.txt
 pip setup.py -e .
 
 ```

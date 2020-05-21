@@ -194,7 +194,7 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step):
 
 
 @D.no_grad
-def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_encode_len=640, max_decode_len=100, beam_width=5,):
+def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_encode_len=640, max_decode_len=100, beam_width=5, tgt_type_id=3):
     model.eval()
     #log.debug(q_ids.numpy().tolist())
     _, __, info = model(q_ids, q_sids)
@@ -228,7 +228,7 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
         bias = gen_bias(q_ids, ids, step)
         pos_ids = D.to_variable(np.tile(np.array([[step, step + 1]], dtype=np.int64), [d_batch * beam_width, 1]))
         pos_ids += seqlen
-        _, logits, info = model(ids, L.ones_like(ids) * 3, pos_ids=pos_ids, attn_bias=bias, past_cache=past_cache)
+        _, logits, info = model(ids, L.ones_like(ids) * tgt_type_id, pos_ids=pos_ids, attn_bias=bias, past_cache=past_cache)
 
         past_cached_k, past_cached_v = past_cache
         cached_k, cached_v = info['caches']
@@ -307,7 +307,8 @@ if __name__ == '__main__':
                 attn_id=tokenizer.vocab['[ATTN]'],
                 max_decode_len=args.max_decode_len, 
                 max_encode_len=args.max_encode_len, 
-                beam_width=args.beam_width)
+                beam_width=args.beam_width,
+                tgt_type_id=args.tgt_type_id)
 
         output_str = rev_lookup(result_ids.numpy())
         for ostr in output_str.tolist():
