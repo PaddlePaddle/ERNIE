@@ -29,7 +29,7 @@ import paddle.fluid.dygraph as D
 import paddle.fluid as F
 import paddle.fluid.layers as L
 
-from ernie.file_utils import _fetch_from_remote
+from ernie.file_utils import _fetch_from_remote, add_docstring
 
 log = logging.getLogger(__name__)
 
@@ -288,6 +288,11 @@ class ErnieModel(D.Layer, PretrainedModel):
                 Mask to avoid performing attention on the padding token indices of the encoder input.
             attn_bias(optional, `Variable` of shape `[batch_size, seq_len, seq_len] or False`): 
                 3D version of `input_mask`, if set, overrides `input_mask`; if set not False, will not apply attention mask
+            past_cache(optional, tuple of two lists: cached key and cached value,
+                each is a list of `Variable`s of shape `[batch_size, seq_len, hidden_size]`):
+                cached key/value tensor that will be concated to generated key/value when performing self attention. 
+                if set, `attn_bias` should not be None.
+
         Returns:
             pooled (`Variable` of shape `[batch_size, hidden_size]`):
                 output logits of pooler classifier
@@ -360,6 +365,7 @@ class ErnieModelForSequenceClassification(ErnieModel):
         prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
+    @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
         """
         Args:
@@ -400,6 +406,7 @@ class ErnieModelForTokenClassification(ErnieModel):
         prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
+    @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
         """
         Args:
@@ -441,6 +448,7 @@ class ErnieModelForQuestionAnswering(ErnieModel):
         prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
+    @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
         """
         Args:
@@ -460,7 +468,7 @@ class ErnieModelForQuestionAnswering(ErnieModel):
 
         start_pos = kwargs.pop('start_pos', None)
         end_pos = kwargs.pop('end_pos', None)
-        pooled, encoded, _ = super(ErnieModelForQuestionAnswering, self).forward(*args, **kwargs)
+        pooled, encoded = super(ErnieModelForQuestionAnswering, self).forward(*args, **kwargs)
         encoded = self.dropout(encoded)
         encoded = self.classifier(encoded)
         start_logit, end_logits = L.unstack(encoded, axis=-1)
@@ -529,6 +537,7 @@ class ErnieModelForPretraining(ErnieModel):
                 is_bias=True,
             )
 
+    @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
         """
         Args:
@@ -550,7 +559,7 @@ class ErnieModelForPretraining(ErnieModel):
         mlm_labels = kwargs.pop('labels')
         mlm_pos = kwargs.pop('mlm_pos')
         nsp_labels = kwargs.pop('nsp_labels')
-        pooled, encoded, _ = super(ErnieModelForPretraining, self).forward(*args, **kwargs)
+        pooled, encoded = super(ErnieModelForPretraining, self).forward(*args, **kwargs)
         if len(mlm_labels.shape) == 1:
             mlm_labels = L.reshape(mlm_labels, [-1, 1])
         if len(nsp_labels.shape) == 1:
