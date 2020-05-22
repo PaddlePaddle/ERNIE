@@ -87,7 +87,7 @@ pip install paddle-ernie
 或者
 
 ```shell
-git clone -b dygraph https://github.com/PaddlePaddle/ERNIE.git --single-branch
+git clone https://github.com/PaddlePaddle/ERNIE.git --depth 1
 cd ERNIE
 pip install -r requirements.txt
 pip setup.py -e .
