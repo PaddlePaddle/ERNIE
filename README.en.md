@@ -92,8 +92,7 @@ or
 git clone https://github.com/PaddlePaddle/ERNIE.git --depth 1
 cd ERNIE
 pip install -r requirements.txt
-pip setup.py -e .
-
+pip install -e .
 ```
 
 ##### 3. download pretrained models (optional)
