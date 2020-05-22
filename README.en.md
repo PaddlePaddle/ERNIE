@@ -1,6 +1,6 @@
 English|[简体中文](./README.zh.md)
 
-![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone.png)
+![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone_en.png)
 
 
 **Remind： This repo has been refactored, for paper re-production or backward compatibility; plase checkout to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro)**
