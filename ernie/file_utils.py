@@ -41,3 +41,10 @@ def _fetch_from_remote(url, force_download=False):
     log.debug('%s cached in %s' % (url, cached_dir))
     return cached_dir
 
+
+def add_docstring(doc):
+    def func(f):
+        f.__doc__ += ('\n======other docs from supper class ======\n%s' % doc)
+        return f
+    return func
+

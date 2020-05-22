@@ -44,8 +44,8 @@ from ernie.modeling_ernie import ErnieModel, ErnieModelForQuestionAnswering
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
 from ernie.optimization import AdamW, LinearDecay
 
-from ernie.mrc import mrc_reader
-from ernie.mrc import mrc_metrics
+from demo.mrc import mrc_reader
+from demo.mrc import mrc_metrics
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(log.handlers[0])

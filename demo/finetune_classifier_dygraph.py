@@ -51,11 +51,13 @@ if __name__ == '__main__':
     parser.add_argument('--bsz', type=int, default=32, help='batchsize')
     parser.add_argument('--epoch', type=int, default=3, help='epoch')
     parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
-    parser.add_argument('--max_steps', type=int, required=True, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
-    parser.add_argument('--warmup_proportion', type=float, default=0.1)
+    parser.add_argument('--use_lr_decay', action='store_true', help='if set, learning rate will decay to zero at `max_steps`')
+    parser.add_argument('--warmup_proportion', type=float, default=0.1, help='if use_lr_decay is set, '
+            'learning rate will raise to `lr` at `warmup_proportion` * `max_steps` and decay to 0. at `max_steps`')
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
     parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
+    parser.add_argument('--max_steps', type=int, default=None, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 
 
@@ -102,7 +104,11 @@ if __name__ == '__main__':
     with FD.guard(place):
         model = ErnieModelForSequenceClassification.from_pretrained(args.from_pretrained, num_labels=3, name='')
 
-        opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
+        if args.use_lr_decay:
+            opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
+        else:
+            opt = AdamW(args.lr, parameter_list=model.parameters(), weight_decay=args.wd)
+
         g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0) #experimental
         for epoch in range(args.epoch):
             for step, d in enumerate(tqdm(train_ds.start(place), desc='training')):
@@ -117,7 +123,7 @@ if __name__ == '__main__':
                     acc = []
                     with FD.base._switch_tracer_mode_guard_(is_train=False):
                         model.eval()
-                        for step, d in enumerate(tqdm(dev_ds.start(), desc='evaluating %d' % epoch)):
+                        for step, d in enumerate(tqdm(dev_ds.start(place), desc='evaluating %d' % epoch)):
                             ids, sids, label = d
                             loss, logits = model(ids, sids, labels=label)
                             #print('\n'.join(map(str, logits.numpy().tolist())))
