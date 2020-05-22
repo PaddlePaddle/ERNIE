@@ -68,6 +68,7 @@ def evaluate(model, datasets, step, args):
                     max_decode_len=args.max_decode_len, 
                     max_encode_len=args.max_encode_len, 
                     beam_width=args.beam_width,
+                    length_penalty=args.length_penalty,
                     tgt_type_id=args.tgt_type_id,)
             output_str = rev_lookup(output_ids.numpy())
             for eid, ostr in zip(example_id.numpy().tolist(), output_str.tolist()):
@@ -290,6 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_random_noice', action='store_true', help='if set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`')
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
     parser.add_argument('--label_smooth', type=float, default=0.1)
+    parser.add_argument('--length_penalty', type=float, default=1.0)
     parser.add_argument('--predict_output_dir', type=str, default=None, help='predict file output directory')
     parser.add_argument('--attn_token', type=str, default='[ATTN]', help='if [ATTN] not in vocab, you can specified [MAKK] as attn-token')
     parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')

@@ -81,7 +81,7 @@ def gen_bias(encoder_inputs, decoder_inputs, step):
 
 
 @D.no_grad
-def greedy_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_encode_len=640, max_decode_len=100):
+def greedy_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_encode_len=640, max_decode_len=100, tgt_type_id=3):
     model.eval()
     #log.debug(q_ids.numpy().tolist())
     _, logits, info = model(q_ids, q_sids)
@@ -104,7 +104,7 @@ def greedy_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_e
         bias = gen_bias(q_ids, ids, step)
         pos_ids = D.to_variable(np.tile(np.array([[step, step + 1]], dtype=np.int64), [d_batch, 1]))
         pos_ids += seqlen
-        _, logits, info = model(ids, L.ones_like(ids) * 3, pos_ids=pos_ids, attn_bias=bias, past_cache=past_cache)
+        _, logits, info = model(ids, L.ones_like(ids) * tgt_type_id, pos_ids=pos_ids, attn_bias=bias, past_cache=past_cache)
         gen_ids = L.argmax(logits, -1)
 
         past_cached_k, past_cached_v = past_cache
@@ -143,13 +143,12 @@ def mask_prob(p, onehot_eos, finished):
     return p
 
 
-def hyp_score(log_probs, length):
-    factor=1.
-    lp = L.pow((5.+L.cast(length, 'float32')) / 6., factor)
+def hyp_score(log_probs, length, length_penalty):
+    lp = L.pow((5.+L.cast(length, 'float32')) / 6., length_penalty)
     return log_probs / lp
 
 
-def beam_search_step(state, logits, eos_id, beam_width, is_first_step):
+def beam_search_step(state, logits, eos_id, beam_width, is_first_step, length_penalty):
     """logits.shape == [B*W, V]"""
     _, vocab_size = logits.shape
 
@@ -166,7 +165,7 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step):
 
     allprobs = L.reshape(allprobs, [-1, beam_width * vocab_size])
     alllen = L.reshape(alllen, [-1, beam_width * vocab_size])
-    allscore = hyp_score(allprobs, alllen)
+    allscore = hyp_score(allprobs, alllen, length_penalty)
     if is_first_step:
         allscore = L.reshape(allscore, [bsz, beam_width, -1])[:,0,:] # first step only consiter beam 0
     scores, idx = L.topk(allscore, k=beam_width) #[B, W]
@@ -194,7 +193,7 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step):
 
 
 @D.no_grad
-def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_encode_len=640, max_decode_len=100, beam_width=5, tgt_type_id=3):
+def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_encode_len=640, max_decode_len=100, beam_width=5, tgt_type_id=3, length_penalty=1.0):
     model.eval()
     #log.debug(q_ids.numpy().tolist())
     _, __, info = model(q_ids, q_sids)
@@ -236,7 +235,11 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
         cached_v = [L.concat([pv, v[:, :1, :]], 1) for pv, v in zip(past_cached_v, cached_v)]
         past_cache = (cached_k, cached_v)
         
-        output, state = beam_search_step(state, logits[:, 1], eos_id=eos_id, beam_width=beam_width, is_first_step=(step==0))
+        output, state = beam_search_step(state, logits[:, 1], 
+                eos_id=eos_id, 
+                beam_width=beam_width, 
+                is_first_step=(step==0), 
+                length_penalty=length_penalty)
         outputs.append(output)
         pred_ids_flatten = L.reshape(output.predicted_ids, [d_batch * beam_width])
         ids = L.stack([pred_ids_flatten, attn_ids], 1)
@@ -300,7 +303,8 @@ if __name__ == '__main__':
         #       attn_id=tokenizer.vocab['[ATTN]'],
         #    max_decode_len=args.max_decode_len, 
         #    max_encode_len=args.max_encode_len, 
-        #    beam_width=args.beam_width)
+        #    beam_width=args.beam_width,
+        #    tgt_type_id=args.tgt_type_id)
         result_ids = beam_search_infilling(ernie, D.to_variable(encoder_ids), D.to_variable(encoder_sids), 
                 eos_id=tokenizer.sep_id,
                 sos_id=tokenizer.cls_id,
@@ -308,6 +312,7 @@ if __name__ == '__main__':
                 max_decode_len=args.max_decode_len, 
                 max_encode_len=args.max_encode_len, 
                 beam_width=args.beam_width,
+                length_penalty=args.length_penalty,
                 tgt_type_id=args.tgt_type_id)
 
         output_str = rev_lookup(result_ids.numpy())
