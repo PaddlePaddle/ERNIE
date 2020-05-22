@@ -84,7 +84,7 @@ def train(model, train_dataset, dev_dataset, dev_examples, dev_features, tokeniz
 
     max_steps = len(train_features) * args.epoch // args.bsz
     opt = AdamW(learning_rate=args.lr, parameter_list=model.parameters(), weight_decay=args.wd)
-    g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0) #experimental
+    g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
 
     train_dataset = train_dataset \
             .repeat() \

@@ -230,7 +230,7 @@ def seq2seq(model, tokenizer, args):
     ctx = D.parallel.prepare_context()
     model = D.parallel.DataParallel(model, ctx)
     opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
-    g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0)
+    g_clip = F.clip.GradientClipByGlobalNorm(1.0)
     attn_id = tokenizer.vocab[args.attn_token]
     for step, data in enumerate(train_ds.start(place)):
         (example_id, src_ids, src_sids, src_pids,
@@ -268,6 +268,7 @@ def seq2seq(model, tokenizer, args):
             evaluate(model, dev_ds, step, args)
         if step > args.max_steps:
             break
+    evaluate(model, dev_ds, step, args)
 
     if args.save_dir is not None:
         F.save_dygraph(model.state_dict(), args.save_dir)
