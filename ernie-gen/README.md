@@ -177,7 +177,7 @@ Finally, we also compared with a concurrent work [ProphetNet](https://arxiv.org/
 | :-------------------------------------------------------- | :----------------------------: | :----------------------: |:----------------------: |
 | Data split                                                     | - | <strong>Original</strong> |<strong>Reversed dev-test</strong>|
 | **ProphetNet** _large_ (16G) |           16G / 340M           |     25.01 / 26.83 / 52.57       |26.72 / **27.64** / **53.79** |
-| **ERNIE-GEN** _large_ (16G) |           16G / 340M           |        **25.40** / **26.92** / **52.84**       |**26.95** / 27.57 / **53.77**|
+| **ERNIE-GEN** _large_ (16G) |           16G / 340M           |        **25.40** / **26.92** / **52.84**       |**26.95** / 27.57 / 53.77|
 
 ## Usage
 
