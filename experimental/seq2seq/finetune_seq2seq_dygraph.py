@@ -229,8 +229,8 @@ def seq2seq(model, tokenizer, args):
     vocab_size, _ = model.word_emb.weight.shape
     ctx = D.parallel.prepare_context()
     model = D.parallel.DataParallel(model, ctx)
-    opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)
+    opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd, grad_clip=g_clip)
     attn_id = tokenizer.vocab[args.attn_token]
     for step, data in enumerate(train_ds.start(place)):
         (example_id, src_ids, src_sids, src_pids,
@@ -254,7 +254,7 @@ def seq2seq(model, tokenizer, args):
         scaled_loss = model.scale_loss(loss)
         scaled_loss.backward()
         model.apply_collective_grads()
-        opt.minimize(scaled_loss, grad_clip=g_clip)
+        opt.minimize(scaled_loss)
         model.clear_gradients()
         if step % 10 == 0:
             loss = loss.numpy()
@@ -262,7 +262,7 @@ def seq2seq(model, tokenizer, args):
             log.debug('[step %d]train loss %.5f, ppl %.5f, lr %.3e' % (step, loss, ppl, opt.current_step_lr()))
         if args.save_dir is not None and step % 1000 == 0 and D.parallel.Env().dev_id == 0:
             F.save_dygraph(model.state_dict(), args.save_dir)
-        if args.predict_output_dir is not None and (step + 1) % args.eval_steps == 0:
+        if args.predict_output_dir is not None and step > args.skip_eval_steps and step % args.eval_steps == 0:
             assert os.path.exists(args.predict_output_dir), 'predict_output_dir not found: %s' % args.predict_output_dir
             log.debug('doing predict on gpu %d...' % D.parallel.Env().dev_id)
             evaluate(model, dev_ds, step, args)
@@ -283,6 +283,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
     parser.add_argument('--max_steps', type=int, required=True, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--eval_steps', type=int, default=5000, help='evaluation frequency')
+    parser.add_argument('--skip_eval_steps', type=int, default=1, help='skip evaluate for first n step')
     parser.add_argument('--max_encode_len', type=int, default=640)
     parser.add_argument('--max_decode_len', type=int, default=120)
     parser.add_argument('--tgt_type_id', type=int, default=3)

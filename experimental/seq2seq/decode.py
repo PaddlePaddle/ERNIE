@@ -19,6 +19,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import sys
+import re
 import argparse
 import logging
 import json
@@ -254,15 +255,19 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
     final_ids = L.gather_tree(final_ids, final_parent_ids)[:,:,0] #pick best beam
     final_ids = L.transpose(L.reshape(final_ids, [-1, d_batch * 1]), [1, 0])
     return final_ids
-
+    
+en_patten = re.compile(r'[a-zA-Z0-9]*')
 
 def post_process(token):
     if token.startswith('##'):
         ret = token[2:]
     else:
-        ret = ' ' + token
+        if en_patten.match(token):
+            ret = ' ' + token
+        else:
+            ret = token
     return ret
-    
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('seq2seq model with ERNIE')
@@ -272,6 +277,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_decode_len', type=int, default=120)
     parser.add_argument('--tgt_type_id', type=int, default=3)
     parser.add_argument('--beam_width', type=int, default=3)
+    parser.add_argument('--attn_token', type=str, default='[ATTN]', help='if [ATTN] not in vocab, you can specified [MAKK] as attn-token')
+    parser.add_argument('--length_penalty', type=float, default=1.0)
     parser.add_argument('--save_dir', type=str, required=True, help='model dir to be loaded')
 
     args = parser.parse_args()
@@ -284,6 +291,9 @@ if __name__ == '__main__':
     rev_dict = {v: k for k, v in tokenizer.vocab.items()}
     rev_dict[tokenizer.pad_id] = '' # replace [PAD]
     rev_dict[tokenizer.unk_id] = '' # replace [PAD]
+
+    sd, _ = D.load_dygraph(args.save_dir)
+    ernie.set_dict(sd)
 
     def map_fn(src_ids):
         src_ids = src_ids[: args.max_encode_len]
@@ -300,7 +310,7 @@ if __name__ == '__main__':
         #result_ids = greedy_search_infilling(ernie, D.to_variable(encoder_ids), D.to_variable(encoder_sids), 
         #       eos_id=tokenizer.sep_id,
         #       sos_id=tokenizer.cls_id,
-        #       attn_id=tokenizer.vocab['[ATTN]'],
+        #       attn_id=tokenizer.vocab[args.attn_id],
         #    max_decode_len=args.max_decode_len, 
         #    max_encode_len=args.max_encode_len, 
         #    beam_width=args.beam_width,
@@ -308,7 +318,7 @@ if __name__ == '__main__':
         result_ids = beam_search_infilling(ernie, D.to_variable(encoder_ids), D.to_variable(encoder_sids), 
                 eos_id=tokenizer.sep_id,
                 sos_id=tokenizer.cls_id,
-                attn_id=tokenizer.vocab['[ATTN]'],
+                attn_id=tokenizer.vocab[args.attn_token],
                 max_decode_len=args.max_decode_len, 
                 max_encode_len=args.max_encode_len, 
                 beam_width=args.beam_width,
@@ -321,5 +331,6 @@ if __name__ == '__main__':
                 ostr = ostr[: ostr.index('[SEP]')]
             
             ostr = ''.join(map(post_process, ostr))
+            ostr = ostr.strip()
             print(ostr)
 
