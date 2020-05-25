@@ -154,14 +154,15 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step, length_pe
     _, vocab_size = logits.shape
 
     bsz, beam_width = state.log_probs.shape
-    onehot_eos = L.cast(F.one_hot(L.ones([bsz * beam_width], 'int64') * eos_id, vocab_size), 'int64') #[1, V]
+    onehot_eos = L.cast(F.one_hot(L.ones([1], 'int64') * eos_id, vocab_size), 'int64') #[1, V]
 
     probs = L.log(L.softmax(logits)) #[B*W, V]
     probs = mask_prob(probs, onehot_eos, state.finished) #[B*W, V]
     allprobs = L.reshape(state.log_probs, [-1, 1]) + probs #[B*W, V]
 
-    length_to_add = 1 - L.reshape(state.finished, [-1, 1]) #[B*W,1]
-    length_to_add = L.cast((length_to_add + 1 - onehot_eos) != 0, 'int64') #[B*W,V]
+    not_finished = 1 - L.reshape(state.finished, [-1, 1]) #[B*W,1]
+    not_eos = 1 - onehot_eos
+    length_to_add = not_finished * not_eos   #[B*W,V]
     alllen = L.reshape(state.lengths, [-1, 1]) + length_to_add
 
     allprobs = L.reshape(allprobs, [-1, beam_width * vocab_size])
@@ -184,6 +185,7 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step, length_pe
     #log.debug(next_finished.numpy())
 
     next_finished += L.cast(next_word_id==eos_id, 'int64')
+    next_finished = L.cast(next_finished > 0, 'int64')
 
     #log.debug(next_word_id.numpy())
     #log.debug(next_beam_id.numpy())
@@ -205,6 +207,12 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
             lengths=L.zeros([d_batch, beam_width], 'int64'), 
             finished=L.zeros([d_batch, beam_width], 'int64'))
     outputs = []
+
+    def reorder_(t, parent_id):
+        """reorder cache according to parent beam id"""
+        gather_idx = L.where(parent_id!=-1)[:, 0] * beam_width + L.reshape(parent_id, [-1]) 
+        t = L.gather(t, gather_idx) 
+        return t
 
     def tile_(t, times):
         _shapes = list(t.shape[1:])
@@ -230,11 +238,6 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
         pos_ids += seqlen
         _, logits, info = model(ids, L.ones_like(ids) * tgt_type_id, pos_ids=pos_ids, attn_bias=bias, past_cache=past_cache)
 
-        past_cached_k, past_cached_v = past_cache
-        cached_k, cached_v = info['caches']
-        cached_k = [L.concat([pk, k[:, :1, :]], 1) for pk, k in zip(past_cached_k, cached_k)] # concat cached 
-        cached_v = [L.concat([pv, v[:, :1, :]], 1) for pv, v in zip(past_cached_v, cached_v)]
-        past_cache = (cached_k, cached_v)
         
         output, state = beam_search_step(state, logits[:, 1], 
                 eos_id=eos_id, 
@@ -242,6 +245,14 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
                 is_first_step=(step==0), 
                 length_penalty=length_penalty)
         outputs.append(output)
+
+        past_cached_k, past_cached_v = past_cache
+        cached_k, cached_v = info['caches']
+        cached_k = [reorder_(L.concat([pk, k[:, :1, :]], 1), output.beam_parent_ids) for pk, k in zip(past_cached_k, cached_k)] # concat cached 
+        cached_v = [reorder_(L.concat([pv, v[:, :1, :]], 1), output.beam_parent_ids) for pv, v in zip(past_cached_v, cached_v)]
+        past_cache = (cached_k, cached_v)
+
+
         pred_ids_flatten = L.reshape(output.predicted_ids, [d_batch * beam_width])
         ids = L.stack([pred_ids_flatten, attn_ids], 1)
 
@@ -276,7 +287,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_encode_len', type=int, default=640)
     parser.add_argument('--max_decode_len', type=int, default=120)
     parser.add_argument('--tgt_type_id', type=int, default=3)
-    parser.add_argument('--beam_width', type=int, default=3)
+    parser.add_argument('--beam_width', type=int, default=5)
     parser.add_argument('--attn_token', type=str, default='[ATTN]', help='if [ATTN] not in vocab, you can specified [MAKK] as attn-token')
     parser.add_argument('--length_penalty', type=float, default=1.0)
     parser.add_argument('--save_dir', type=str, required=True, help='model dir to be loaded')
@@ -300,7 +311,6 @@ if __name__ == '__main__':
         src_ids, src_sids = tokenizer.build_for_ernie(src_ids)
         return (src_ids, src_sids)
 
-    bytes_vocab = {k.encode('utf8'): v for k, v in tokenizer.vocab.items()}
     feature_column = propeller.data.FeatureColumns([
         propeller.data.TextColumn('seg_a', unk_id=tokenizer.unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
     ])

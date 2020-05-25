@@ -279,7 +279,6 @@ if __name__ == '__main__':
     parser.add_argument('--from_pretrained', type=str, required=True, help='pretrained model directory or tag')
     parser.add_argument('--bsz', type=int, default=8, help='batchsize')
     parser.add_argument('--eval_bsz', type=int, default=20, help='batchsize')
-    parser.add_argument('--epoch', type=int, default=30, help='epoch')
     parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
     parser.add_argument('--max_steps', type=int, required=True, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--eval_steps', type=int, default=5000, help='evaluation frequency')
@@ -297,6 +296,7 @@ if __name__ == '__main__':
     parser.add_argument('--predict_output_dir', type=str, default=None, help='predict file output directory')
     parser.add_argument('--attn_token', type=str, default='[ATTN]', help='if [ATTN] not in vocab, you can specified [MAKK] as attn-token')
     parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
+    parser.add_argument('--init_checkpoint', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
     parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 
@@ -310,5 +310,10 @@ if __name__ == '__main__':
     rev_dict = {v: k for k, v in tokenizer.vocab.items()}
     rev_dict[tokenizer.pad_id] = '' # replace [PAD]
     rev_dict[tokenizer.unk_id] = '' # replace [PAD]
+
+    if args.init_checkpoint is not None:
+        log.info('loading checkpoint from %s' % args.init_checkpoint)
+        sd, _ = D.load_dygraph(args.init_checkpoint)
+        ernie.set_dict(sd)
 
     seq2seq(ernie, tokenizer, args)
