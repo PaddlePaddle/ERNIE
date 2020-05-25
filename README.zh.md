@@ -70,6 +70,7 @@ print(pooled.numpy())                        # convert  results to numpy
 2. [完形填空](https://aistudio.baidu.com/aistudio/projectdetail/433491)
 3. [知识蒸馏](https://aistudio.baidu.com/aistudio/projectdetail/439460)
 4. [万事不决问ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/456443)
+5. [加载并读取老式checkpoint](https://aistudio.baidu.com/aistudio/projectdetail/493415)
 
 # 安装
 
