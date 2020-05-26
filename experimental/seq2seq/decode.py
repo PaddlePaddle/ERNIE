@@ -267,7 +267,7 @@ def beam_search_infilling(model, q_ids, q_sids, sos_id, eos_id, attn_id, max_enc
     final_ids = L.transpose(L.reshape(final_ids, [-1, d_batch * 1]), [1, 0])
     return final_ids
     
-en_patten = re.compile(r'[a-zA-Z0-9]*')
+en_patten = re.compile(r'^[a-zA-Z0-9]*$')
 
 def post_process(token):
     if token.startswith('##'):
