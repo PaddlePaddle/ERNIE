@@ -5,7 +5,6 @@
 * [效果验证](#效果验证)
     * [Case#1 用户提供“无标注数据”](#case1)
     * [Case#2 用户未提供“无标注数据”](#case2)
-* [FAQ](#faq)
 
 # ERNIE Slim 数据蒸馏
 在ERNIE强大的语义理解能力背后，是需要同样强大的算力才能支撑起如此大规模模型的训练和预测。很多工业应用场景对性能要求较高，若不能有效压缩则无法实际应用。
@@ -37,7 +36,7 @@
 
 # 使用教程
 
-我们采用上述3种增强策略制作了chnsenticorp的增强数据：增强后的数据为原训练数据的10倍(96000行)，可以从[这里](https://ernie.bj.bcebos.com/distill_data.tar.gz)下载。即可执行下面的脚本开始蒸馏。
+我们采用上述3种增强策略制作了chnsenticorp的增强数据：增强后的数据为原训练数据的10倍(96000行)，可以从[这里](https://ernie-github.cdn.bcebos.com/data-chnsenticorp-distill.tar.gz)下载。即可执行下面的脚本开始蒸馏。
 
 ```shell
 python ./distill/distill.py
@@ -64,8 +63,3 @@ python ./distill/distill.py
 |非ERNIE基线（LSTM）|91.2%|
 |**+ 数据蒸馏**|93.9%|
 
-# FAQ
-
-### FQA1: 预测同时蒸馏报错：`Client call failed`
-
-终端打印的错误是client的日志，server端的日志在前面。一般来说可能是server显存超限导致。这种时候需要在student模型finetune的脚本中使用`--server_batch_size ` 显示控制请求服务的batch大小。

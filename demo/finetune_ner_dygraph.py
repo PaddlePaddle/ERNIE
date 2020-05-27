@@ -26,7 +26,6 @@ from functools import reduce, partial
 import numpy as np
 import multiprocessing
 import pickle
-import jieba
 import logging
 
 from sklearn.metrics import f1_score
