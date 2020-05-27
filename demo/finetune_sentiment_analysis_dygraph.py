@@ -95,12 +95,14 @@ if __name__ == '__main__':
             dev_ds.data_shapes = shapes
             dev_ds.data_types = types
 
+            g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
             opt = AdamW(learning_rate=LinearDecay(
                 args.lr, 
                 int(args.warmup_proportion * args.max_steps), args.max_steps), 
                 parameter_list=model.parameters(), 
-                weight_decay=args.wd)
-            g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
+                weight_decay=args.wd,
+                grad_clip=g_clip)
+
             for epoch in range(args.epoch):
                 for step, d in enumerate(tqdm(train_ds.start(place), desc='training')):
                     ids, sids, label = d
@@ -108,7 +110,7 @@ if __name__ == '__main__':
                     loss.backward()
                     if step % 10 == 0:
                         log.debug('train loss %.5f lr %.3e' % (loss.numpy(), opt.current_step_lr()))
-                    opt.minimize(loss, grad_clip=g_clip)
+                    opt.minimize(loss)
                     model.clear_gradients()
                     if step % 100 == 0:
                         acc = []
