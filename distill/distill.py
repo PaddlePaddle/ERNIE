@@ -219,21 +219,21 @@ for epoch in range(EPOCH):
         loss = loss_ce + loss_kd
         loss.backward()
         if step % 10 == 0:
-            print('[step %03d] train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
+            print('[step %03d] distill train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
         opt.minimize(loss)
         model.clear_gradients()
     f1 = evaluate_student(model, dev_ds)
-    print('f1 %.5f' % f1)
+    print('student f1 %.5f' % f1)
 
 # 最后再加一轮hard label训练巩固结果
 for step, (ids_student, ids, sids, label) in enumerate(train_ds.start(place)):
     loss, _ = model(ids_student, labels=label)
     loss.backward()
     if step % 10 == 0:
-        print('[step %03d] 监督 train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
+        print('[step %03d] train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
     opt.minimize(loss)
     model.clear_gradients()
 
 f1 = evaluate_student(model, dev_ds)
-print('f1 %.5f' % f1)
+print('final f1 %.5f' % f1)
 
