@@ -210,27 +210,30 @@ g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
 opt = AdamW(learning_rate=LR, parameter_list=model.parameters(), weight_decay=0.01, grad_clip=g_clip)
 model.train()
 for epoch in range(EPOCH):
-    for step, (ids_student, ids, sids, _ ) in enumerate(train_ds.start(place)):
+    for step, (ids_student, ids, sids, label) in enumerate(train_ds.start(place)):
         _, logits_t = teacher_model(ids, sids) # teacher 模型输出logits
         logits_t.stop_gradient=True
         _, logits_s = model(ids_student) # student 模型输出logits
-        loss = KL(logits_s, logits_t)    # 由KL divergence度量两个分布的距离
+        loss_ce, _ = model(ids_student, labels=label)
+        loss_kd = KL(logits_s, logits_t)    # 由KL divergence度量两个分布的距离
+        loss = loss_ce + loss_kd
         loss.backward()
         if step % 10 == 0:
-            print('[step %03d] 无监督 train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
+            print('[step %03d] train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
         opt.minimize(loss)
         model.clear_gradients()
     f1 = evaluate_student(model, dev_ds)
     print('f1 %.5f' % f1)
 
-    for step, (ids_student, ids, sids, label) in enumerate(train_ds.start(place)):
-        loss, _ = model(ids_student, labels=label)
-        loss.backward()
-        if step % 10 == 0:
-            print('[step %03d] 监督 train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
-        opt.minimize(loss)
-        model.clear_gradients()
+# 最后再加一轮hard label训练巩固结果
+for step, (ids_student, ids, sids, label) in enumerate(train_ds.start(place)):
+    loss, _ = model(ids_student, labels=label)
+    loss.backward()
+    if step % 10 == 0:
+        print('[step %03d] 监督 train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
+    opt.minimize(loss)
+    model.clear_gradients()
 
-    f1 = evaluate_student(model, dev_ds)
-    print('f1 %.5f' % f1)
+f1 = evaluate_student(model, dev_ds)
+print('f1 %.5f' % f1)
 
