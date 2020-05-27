@@ -69,10 +69,11 @@ Don't have GPU? try ERNIE in [AIStudio](https://aistudio.baidu.com/aistudio/inde
 (please choose the latest version and apply for a GPU environment)
 
 1. [ERNIE for beginners](https://aistudio.baidu.com/studio/edu/group/quick/join/314947)
-1. [Sementic Analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
-2. [Cloze Test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
-3. [Knowledge Distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
-4. [Ask Ernie](https://aistudio.baidu.com/aistudio/projectdetail/456443)
+1. [Sementic analysis](https://aistudio.baidu.com/aistudio/projectdetail/427482)
+2. [Cloze test](https://aistudio.baidu.com/aistudio/projectdetail/433491)
+3. [Knowledge distillation](https://aistudio.baidu.com/aistudio/projectdetail/439460)
+4. [Ask ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/456443)
+5. [Loading old-styled checkpoint](https://aistudio.baidu.com/aistudio/projectdetail/493415)
 
 # Setup
 

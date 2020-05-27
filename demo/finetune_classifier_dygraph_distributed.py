@@ -33,7 +33,6 @@ from propeller import log
 import propeller.paddle as propeller
 
 log.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(log.handlers[0])
 logging.getLogger().setLevel(logging.DEBUG)
 
 
@@ -102,15 +101,22 @@ if __name__ == '__main__':
         model = ErnieModelForSequenceClassification.from_pretrained(args.from_pretrained, num_labels=3, name='')
         model = FD.parallel.DataParallel(model, ctx)
 
-        opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
-        g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0) #experimental
+        g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
+        opt = AdamW(learning_rate=LinearDecay(
+                    args.lr, 
+                    int(args.warmup_proportion * args.max_steps), 
+                    args.max_steps), 
+                parameter_list=model.parameters(), 
+                weight_decay=args.wd, 
+                grad_clip=g_clip)
+
         for step, d in enumerate(tqdm(train_ds.start(place), desc='training')):
             ids, sids, label = d
             loss, _ = model(ids, sids, labels=label)
             scaled_loss = model.scale_loss(loss)
             scaled_loss.backward()
             model.apply_collective_grads()
-            opt.minimize(scaled_loss, grad_clip=g_clip)
+            opt.minimize(scaled_loss)
             model.clear_gradients()
             if step % 10 == 0:
                 log.debug('train loss %.5f, lr %.e3' % (loss.numpy(), opt.current_step_lr()))

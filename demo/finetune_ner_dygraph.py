@@ -39,7 +39,6 @@ from propeller import log
 import propeller.paddle as propeller
 
 log.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(log.handlers[0])
 logging.getLogger().setLevel(logging.DEBUG)
 
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification, ErnieModelForTokenClassification
@@ -127,13 +126,14 @@ if __name__ == '__main__':
     test_ds.data_shapes = shapes
     test_ds.data_types = types
 
-    with FD.guard():
+    place = F.CUDAPlace(0)
+    with FD.guard(place):
         model = ErnieModelForTokenClassification.from_pretrained(args.from_pretrained, num_labels=7, name='')
 
         opt = AdamW(learning_rate=LinearDecay(args.lr, args.warmup_steps, args.max_steps), parameter_list=model.parameters(), weight_decay=0.01)
         #opt = F.optimizer.AdamOptimizer(learning_rate=LinearDecay(args.lr, args.warmup_steps, args.max_steps), parameter_list=model.parameters())
         for epoch in range(args.epoch):
-            for step, (ids, sids, aligned_label, label, orig_pos) in enumerate(tqdm(train_ds.start())):
+            for step, (ids, sids, aligned_label, label, orig_pos) in enumerate(tqdm(train_ds.start(place))):
                 loss, _ = model(ids, sids, labels=aligned_label)
                 loss.backward()
                 if step % 10 == 0 :
@@ -144,7 +144,7 @@ if __name__ == '__main__':
                     all_pred, all_label = [], []
                     with FD.base._switch_tracer_mode_guard_(is_train=False):
                         model.eval()
-                        for step, (ids, sids, aligned_label, label, orig_pos) in enumerate(tqdm(dev_ds.start())):
+                        for step, (ids, sids, aligned_label, label, orig_pos) in enumerate(tqdm(dev_ds.start(place))):
                             loss, logits = model(ids, sids, labels=aligned_label)
                             #print('\n'.join(map(str, logits.numpy().tolist())))
 

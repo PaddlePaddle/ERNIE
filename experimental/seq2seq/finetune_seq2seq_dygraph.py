@@ -68,6 +68,7 @@ def evaluate(model, datasets, step, args):
                     max_decode_len=args.max_decode_len, 
                     max_encode_len=args.max_encode_len, 
                     beam_width=args.beam_width,
+                    length_penalty=args.length_penalty,
                     tgt_type_id=args.tgt_type_id,)
             output_str = rev_lookup(output_ids.numpy())
             for eid, ostr in zip(example_id.numpy().tolist(), output_str.tolist()):
@@ -228,8 +229,8 @@ def seq2seq(model, tokenizer, args):
     vocab_size, _ = model.word_emb.weight.shape
     ctx = D.parallel.prepare_context()
     model = D.parallel.DataParallel(model, ctx)
-    opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd)
-    g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0)
+    g_clip = F.clip.GradientClipByGlobalNorm(1.0)
+    opt = AdamW(learning_rate=LinearDecay(args.lr, int(args.warmup_proportion * args.max_steps), args.max_steps), parameter_list=model.parameters(), weight_decay=args.wd, grad_clip=g_clip)
     attn_id = tokenizer.vocab[args.attn_token]
     for step, data in enumerate(train_ds.start(place)):
         (example_id, src_ids, src_sids, src_pids,
@@ -253,7 +254,7 @@ def seq2seq(model, tokenizer, args):
         scaled_loss = model.scale_loss(loss)
         scaled_loss.backward()
         model.apply_collective_grads()
-        opt.minimize(scaled_loss, grad_clip=g_clip)
+        opt.minimize(scaled_loss)
         model.clear_gradients()
         if step % 10 == 0:
             loss = loss.numpy()
@@ -261,12 +262,13 @@ def seq2seq(model, tokenizer, args):
             log.debug('[step %d]train loss %.5f, ppl %.5f, lr %.3e' % (step, loss, ppl, opt.current_step_lr()))
         if args.save_dir is not None and step % 1000 == 0 and D.parallel.Env().dev_id == 0:
             F.save_dygraph(model.state_dict(), args.save_dir)
-        if args.predict_output_dir is not None and (step + 1) % args.eval_steps == 0:
+        if args.predict_output_dir is not None and step > args.skip_eval_steps and step % args.eval_steps == 0:
             assert os.path.exists(args.predict_output_dir), 'predict_output_dir not found: %s' % args.predict_output_dir
             log.debug('doing predict on gpu %d...' % D.parallel.Env().dev_id)
             evaluate(model, dev_ds, step, args)
         if step > args.max_steps:
             break
+    evaluate(model, dev_ds, step, args)
 
     if args.save_dir is not None:
         F.save_dygraph(model.state_dict(), args.save_dir)
@@ -277,10 +279,10 @@ if __name__ == '__main__':
     parser.add_argument('--from_pretrained', type=str, required=True, help='pretrained model directory or tag')
     parser.add_argument('--bsz', type=int, default=8, help='batchsize')
     parser.add_argument('--eval_bsz', type=int, default=20, help='batchsize')
-    parser.add_argument('--epoch', type=int, default=30, help='epoch')
     parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
     parser.add_argument('--max_steps', type=int, required=True, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--eval_steps', type=int, default=5000, help='evaluation frequency')
+    parser.add_argument('--skip_eval_steps', type=int, default=1, help='skip evaluate for first n step')
     parser.add_argument('--max_encode_len', type=int, default=640)
     parser.add_argument('--max_decode_len', type=int, default=120)
     parser.add_argument('--tgt_type_id', type=int, default=3)
@@ -290,9 +292,11 @@ if __name__ == '__main__':
     parser.add_argument('--use_random_noice', action='store_true', help='if set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`')
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
     parser.add_argument('--label_smooth', type=float, default=0.1)
+    parser.add_argument('--length_penalty', type=float, default=1.0)
     parser.add_argument('--predict_output_dir', type=str, default=None, help='predict file output directory')
     parser.add_argument('--attn_token', type=str, default='[ATTN]', help='if [ATTN] not in vocab, you can specified [MAKK] as attn-token')
     parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
+    parser.add_argument('--init_checkpoint', type=str, default=None)
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
     parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 
@@ -306,5 +310,10 @@ if __name__ == '__main__':
     rev_dict = {v: k for k, v in tokenizer.vocab.items()}
     rev_dict[tokenizer.pad_id] = '' # replace [PAD]
     rev_dict[tokenizer.unk_id] = '' # replace [PAD]
+
+    if args.init_checkpoint is not None:
+        log.info('loading checkpoint from %s' % args.init_checkpoint)
+        sd, _ = D.load_dygraph(args.init_checkpoint)
+        ernie.set_dict(sd)
 
     seq2seq(ernie, tokenizer, args)

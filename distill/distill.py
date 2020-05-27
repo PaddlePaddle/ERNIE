@@ -100,7 +100,7 @@ teacher_model = ErnieModelForSequenceClassification.from_pretrained('ernie-1.0',
 teacher_model.train()
 if not os.path.exists('./teacher_model.pdparams'):
     opt = AdamW(learning_rate=LinearDecay(LR, 9600*EPOCH*0.1/BATCH, 9600*EPOCH/BATCH), parameter_list=teacher_model.parameters(), weight_decay=0.01)
-    g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0)
+    g_clip = F.clip.GradientClipByGlobalNorm(1.0)
     for epoch in range(EPOCH):
         for step, (ids_student, ids, sids, labels) in enumerate(train_ds.start(place)):
             loss, logits = teacher_model(ids, labels=labels)
@@ -200,7 +200,7 @@ def KL(pred, target):
 teacher_model.eval()
 model = BOW()
 opt = AdamW(learning_rate=LR, parameter_list=model.parameters(), weight_decay=0.01)
-g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0) #experimental
+g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
 model.train()
 for epoch in range(EPOCH):
     for step, (ids_student, ids, sids, _ ) in enumerate(train_ds.start(place)):

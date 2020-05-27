@@ -48,7 +48,6 @@ from propeller.paddle.data import Dataset
 from propeller import log
 
 log.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(log.handlers[0])
 logging.getLogger().setLevel(logging.DEBUG)
 
 if six.PY3:

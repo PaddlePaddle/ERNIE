@@ -34,7 +34,6 @@ from propeller import log
 import propeller.paddle as propeller
 
 log.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(log.handlers[0])
 logging.getLogger().setLevel(logging.DEBUG)
 log = logging.getLogger()
 
@@ -101,7 +100,7 @@ if __name__ == '__main__':
                 int(args.warmup_proportion * args.max_steps), args.max_steps), 
                 parameter_list=model.parameters(), 
                 weight_decay=args.wd)
-            g_clip = F.dygraph_grad_clip.GradClipByGlobalNorm(1.0) #experimental
+            g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
             for epoch in range(args.epoch):
                 for step, d in enumerate(tqdm(train_ds.start(place), desc='training')):
                     ids, sids, label = d
