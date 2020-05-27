@@ -82,8 +82,8 @@ def train(model, train_dataset, dev_dataset, dev_examples, dev_features, tokeniz
     model = D.parallel.DataParallel(model, ctx)
 
     max_steps = len(train_features) * args.epoch // args.bsz
-    opt = AdamW(learning_rate=args.lr, parameter_list=model.parameters(), weight_decay=args.wd)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
+    opt = AdamW(learning_rate=args.lr, parameter_list=model.parameters(), weight_decay=args.wd, grad_clip=g_clip)
 
     train_dataset = train_dataset \
             .repeat() \
@@ -97,7 +97,7 @@ def train(model, train_dataset, dev_dataset, dev_examples, dev_features, tokeniz
         scaled_loss = model.scale_loss(loss)
         scaled_loss.backward()
         model.apply_collective_grads()
-        opt.minimize(scaled_loss, grad_clip=g_clip)
+        opt.minimize(scaled_loss)
         model.clear_gradients()
         if D.parallel.Env().dev_id == 0 and step % 10 == 0:
             log.debug('[step %d] train loss %.5f lr %.3e' % (step, loss.numpy(), opt.current_step_lr()))
