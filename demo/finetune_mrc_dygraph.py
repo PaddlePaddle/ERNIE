@@ -48,7 +48,6 @@ from demo.mrc import mrc_reader
 from demo.mrc import mrc_metrics
 
 log.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(log.handlers[0])
 logging.getLogger().setLevel(logging.DEBUG)
 
 

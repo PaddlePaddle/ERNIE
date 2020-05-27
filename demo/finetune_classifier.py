@@ -43,7 +43,6 @@ import propeller.paddle as propeller
 
 
 log.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(log.handlers[0])
 logging.getLogger().setLevel(logging.DEBUG)
 
 def model_fn(features, mode, params, run_config):
