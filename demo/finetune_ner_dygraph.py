@@ -133,7 +133,7 @@ if __name__ == '__main__':
         #opt = F.optimizer.AdamOptimizer(learning_rate=LinearDecay(args.lr, args.warmup_steps, args.max_steps), parameter_list=model.parameters())
         for epoch in range(args.epoch):
             for step, (ids, sids, aligned_label, label, orig_pos) in enumerate(tqdm(train_ds.start(place))):
-                loss, _ = model(ids, sids, labels=aligned_label)
+                loss, logits = model(ids, sids, labels=aligned_label)
                 loss.backward()
                 if step % 10 == 0 :
                     log.debug('train loss %.5f' % loss.numpy())
