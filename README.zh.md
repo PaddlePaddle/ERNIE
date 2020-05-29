@@ -71,6 +71,7 @@ print(pooled.numpy())                        # convert  results to numpy
 3. [知识蒸馏](https://aistudio.baidu.com/aistudio/projectdetail/439460)
 4. [万事不决问ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/456443)
 5. [加载并读取老式checkpoint](https://aistudio.baidu.com/aistudio/projectdetail/493415)
+6. [ERNIE作诗](https://aistudio.baidu.com/aistudio/projectdetail/502844)
 
 # 安装
 
@@ -231,7 +232,7 @@ sids = np.expand_dims(sids, 0)
 result = client(ids, sids)
 ```
 
-你也可从[此处](https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz.)下载一个预先制作好的ernie-1.0 base模型的 `inference_model`.
+你也可从[此处](https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz)下载一个预先制作好的ernie-1.0 base模型的 `inference_model`.
 该模型没有经过finetune，一般可以用做上层模型结构的 feature-base finetune或者做为一个文本特征抽取器。
 因为该模行由老版API 产出，在进行客户端请求时需要在输入tensor后面追加一个维度：
 
