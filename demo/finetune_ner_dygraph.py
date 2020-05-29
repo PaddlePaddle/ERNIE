@@ -137,8 +137,8 @@ if __name__ == '__main__':
 
     @FD.no_grad
     def evaluate(model, dataset):
-        all_pred, all_label = [], []
         model.eval()
+        chunkf1 = propeller.metrics.ChunkF1(None, None, None, len(feature_map))
         for step, (ids, sids, aligned_label, label, orig_pos) in enumerate(tqdm(dataset.start(place))):
             loss, logits = model(ids, sids)
             #print('\n'.join(map(str, logits.numpy().tolist())))
@@ -158,10 +158,10 @@ if __name__ == '__main__':
                     merged_preds = np.pad(merged_preds, [0, len(la) - len(merged_preds)], mode='constant', constant_values=7)
                 else:
                     assert len(la) == len(merged_preds), 'expect label == prediction, got %d vs %d' % (la.shape, merged_preds.shape)
-                all_label.append(la)
-                all_pred.append(merged_preds)
+                chunkf1.update((merged_preds, la, np.array(len(la))))
+        #f1 = f1_score(np.concatenate(all_label), np.concatenate(all_pred), average='macro')
+        f1 = chunkf1.eval()
         model.train()
-        f1 = f1_score(np.concatenate(all_label), np.concatenate(all_pred), average='macro')
         return f1
     with FD.guard(place):
         model = ErnieModelForTokenClassification.from_pretrained(args.from_pretrained, num_labels=len(feature_map), name='', has_pooler=False)
