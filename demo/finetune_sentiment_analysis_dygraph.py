@@ -116,7 +116,7 @@ if __name__ == '__main__':
                         acc = []
                         with FD.base._switch_tracer_mode_guard_(is_train=False):
                             model.eval()
-                            for step, d in enumerate(tqdm(dev_ds.start(), desc='evaluating %d' % epoch)):
+                            for step, d in enumerate(tqdm(dev_ds.start(place), desc='evaluating %d' % epoch)):
                                 ids, sids, label = d
                                 loss, logits = model(ids, sids, labels=label)
                                 #print('\n'.join(map(str, logits.numpy().tolist())))
