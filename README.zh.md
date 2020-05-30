@@ -51,6 +51,7 @@ from ernie.modeling_ernie import ErnieModel
 D.guard().__enter__() # activate paddle `dygrpah` mode
 
 model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
+model.eval()
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
 ids, _ = tokenizer.encode('hello world')
@@ -177,7 +178,7 @@ python3 -m paddle.distributed.launch \
 1. [情感分析](./demo/finetune_sentiment_analysis_dygraph.py)
 1. [语义匹配](./demo/finetune_classifier_dygraph.py)
 1. [命名实体识别(NER)](./demo/finetune_ner_dygraph.py)
-1. [机器阅读理解](./demo/finetune_mrc_dygraph.py)
+1. [机器阅读理解](./demo/finetune_mrc_dygraph.py) (需要多卡环境运行；参见上面"分布式 finetune"一节)
 1. [文本摘要生成](./experimental/seq2seq/README.md)
 
 
@@ -186,8 +187,7 @@ python3 -m paddle.distributed.launch \
 |任务|batch size|learning rate|
 |--|--|--|
 | CoLA         | 32 / 64 (base)  | 3e-5                     |
-| SST-2       
- | 64 / 256 (base) | 2e-5                     |
+| SST-2        | 64 / 256 (base) | 2e-5                     |
 | STS-B        | 128             | 5e-5                     |
 | QQP          | 256             | 3e-5(base)/5e-5(large)   |
 | MNLI         | 256 / 512 (base)| 3e-5                     |

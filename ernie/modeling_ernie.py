@@ -407,7 +407,7 @@ class ErnieModelForTokenClassification(ErnieModel):
         self.dropout = lambda i: L.dropout(i, dropout_prob=prob, dropout_implementation="upscale_in_train",) if self.training else i
 
     @add_docstring(ErnieModel.forward.__doc__)
-    def forward(self, *args, **kwargs):
+    def forward(self, *args, ignore_index=-100, labels=None, loss_weights=None, **kwargs, ):
         """
         Args:
             labels (optional, `Variable` of shape [batch_size, seq_len]): 
@@ -420,7 +420,6 @@ class ErnieModelForTokenClassification(ErnieModel):
                 output logits of classifier
         """
 
-        labels = kwargs.pop('labels', None)
         pooled, encoded = super(ErnieModelForTokenClassification, self).forward(*args, **kwargs)
         hidden = self.dropout(encoded) # maybe not?
         logits = self.classifier(hidden)
@@ -428,7 +427,9 @@ class ErnieModelForTokenClassification(ErnieModel):
         if labels is not None:
             if len(labels.shape) == 2:
                 labels = L.unsqueeze(labels, axes=[-1])
-            loss = L.softmax_with_cross_entropy(logits, labels)
+            loss = L.softmax_with_cross_entropy(logits, labels, ignore_index=ignore_index)
+            if loss_weights is not None:
+                loss = L.squeeze(loss, [-1]) * loss_weights
             loss = L.reduce_mean(loss)
         else:
             loss = None
