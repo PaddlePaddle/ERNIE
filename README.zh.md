@@ -186,8 +186,7 @@ python3 -m paddle.distributed.launch \
 |任务|batch size|learning rate|
 |--|--|--|
 | CoLA         | 32 / 64 (base)  | 3e-5                     |
-| SST-2       
- | 64 / 256 (base) | 2e-5                     |
+| SST-2        | 64 / 256 (base) | 2e-5                     |
 | STS-B        | 128             | 5e-5                     |
 | QQP          | 256             | 3e-5(base)/5e-5(large)   |
 | MNLI         | 256 / 512 (base)| 3e-5                     |
