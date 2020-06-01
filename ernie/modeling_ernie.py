@@ -257,8 +257,11 @@ class ErnieModel(D.Layer, PretrainedModel):
             self.pooler = _build_linear(cfg['hidden_size'], cfg['hidden_size'], append_name(name, 'pooled_fc'), initializer, act='tanh')
         else:
             self.pooler = None
-        self.train()
-    
+
+        if cfg.get('eval', True):
+            self.eval()
+        else:
+            self.train()
 
     def eval(self):
         if F.in_dygraph_mode():
