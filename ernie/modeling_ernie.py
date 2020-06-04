@@ -298,6 +298,8 @@ class ErnieModel(D.Layer, PretrainedModel):
                 output logits of pooler classifier
             encoded(`Variable` of shape `[batch_size, seq_len, hidden_size]`):
                 output logits of transformer stack
+            info (Dictionary):
+                addtional middle level info, inclues: all hidden stats, k/v caches.
         """
         #d_batch, d_seqlen = src_ids.shape
         assert len(src_ids.shape) == 2, 'expect src_ids.shape = [batch, sequecen], got %s' % (repr(src_ids.shape))
@@ -551,7 +553,7 @@ class ErnieModelForPretraining(ErnieModel):
             nsp_labels (optional, `Variable` of shape [batch_size]): 
                 labels for `next sentence prediction` tasks
             mlm_pos (optional, `Variable` of shape [n_mask, 2]): 
-                index of mask_id in `src_ids`, can obtain from `fluid.layers.where(src_ids==mask_id)`
+                index of mask_id in `src_ids`, can be obtained from `fluid.layers.where(src_ids==mask_id)`
             labels (optional, `Variable` of shape [n_mask]): 
                 labels for `mask language model` tasks, the original token indices in masked position in `src_ids`
         Returns:
@@ -581,4 +583,78 @@ class ErnieModelForPretraining(ErnieModel):
         mlm_loss = L.reduce_mean(L.softmax_with_cross_entropy(logits_2d, mlm_labels))
         total_loss = mlm_loss + nsp_loss
         return total_loss, mlm_loss, nsp_loss
+
+
+class ErnieModelForGeneration(ErnieModel):
+    """
+    Ernie Model for sequence to sequence generation.
+    """
+    resource_map = {
+        'ernie-gen-base-en': ErnieModel.bce + 'model-ernie-gen-base-en.1.tar.gz',
+        'ernie-gen-large-en': ErnieModel.bce + 'model-ernie-gen-large-en.1.tar.gz',
+        'ernie-gen-large-160g-en': ErnieModel.bce + 'model-ernie-gen-large-160g-en.1.tar.gz',
+        'ernie-1.0': ErnieModel.bce + 'model-ernie1.0.1.tar.gz',
+    }
+    def __init__(self, cfg, name=None):
+        cfg['return_additional_info'] = True
+        cfg['has_pooler'] = False
+        super(ErnieModelForGeneration, self).__init__(cfg, name=name)
+        initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
+        d_model = cfg['hidden_size']
+        d_vocab = cfg['vocab_size']
+
+        self.mlm = _build_linear(d_model, d_model, append_name(name, 'mask_lm_trans_fc'), initializer, act=cfg['hidden_act'])
+        self.mlm_ln = _build_ln(d_model, name = append_name(name, 'mask_lm_trans'))
+        self.mlm_bias = L.create_parameter(
+                dtype='float32',
+                shape=[d_vocab], 
+                attr=F.ParamAttr(
+                    name=append_name(name, 'mask_lm_out_fc.b_0'), 
+                    initializer=F.initializer.Constant(value=0.0)
+                    ),
+                is_bias=True,
+            )
+
+    @add_docstring(ErnieModel.forward.__doc__)
+    def forward(self, *args, **kwargs):
+        """
+        Args
+            tgt_labels(`Variable` of shape [batch_size, seqlen] or [batch, seqlen, vocab_size]):
+                ground trouth target sequence id (hard label) or distribution (soft label)
+            tgt_pos(`Variable` of shape [n_targets, 2]):
+                index of tgt_labels in `src_ids`, can be obtained from `fluid.layers.where(src_ids==mask_id)`
+            encoder_only(Bool):
+                if set, will not return loss, logits_2d
+        Returns:
+            loss(`Variable` of shape []):
+                cross entropy loss mean over every target label. if `encode_only`, returns None.
+            logits(`Variable` of shape [n_targets, vocab_size]):
+                logits for every targets. if `encode_only`, returns None.
+            info(Dictionary): see `ErnieModel`
+        """
+        tgt_labels = kwargs.pop('tgt_labels', None)
+        tgt_pos = kwargs.pop('tgt_pos', None)
+        encode_only = kwargs.pop('encode_only', False)
+        _, encoded, info = ErnieModel.forward(self, *args, **kwargs)
+        if encode_only:
+            return None, None, info
+        elif tgt_labels is None or tgt_pos is None:
+            encoded = self.mlm(encoded)
+            encoded = self.mlm_ln(encoded)
+            logits = L.matmul(encoded, self.word_emb.weight, transpose_y=True) + self.mlm_bias
+            output_ids = L.argmax(logits, -1)
+            return output_ids, logits, info
+        else:
+            encoded_2d = L.gather_nd(encoded, tgt_pos)
+            encoded_2d = self.mlm(encoded_2d)
+            encoded_2d = self.mlm_ln(encoded_2d)
+            logits_2d = L.matmul(encoded_2d, self.word_emb.weight, transpose_y=True) + self.mlm_bias
+            if len(tgt_labels.shape) == 1:
+                tgt_labels = L.reshape(tgt_labels, [-1, 1])
+            
+            loss = L.reduce_mean(
+                    L.softmax_with_cross_entropy(logits_2d, tgt_labels, soft_label=(tgt_labels.shape[-1] != 1))
+                    )
+            return loss, logits_2d, info
+
 

@@ -30,11 +30,10 @@ import paddle.fluid as F
 import paddle.fluid.layers as L
 import paddle.fluid.dygraph as D
 
-from ernie.modeling_ernie import ErnieModel, ErnieModelForPretraining
+from ernie.modeling_ernie import ErnieModel, ErnieModelForPretraining, ErnieModelForGeneration
 from ernie.modeling_ernie import _build_linear, _build_ln, append_name
 from ernie.tokenizing_ernie import ErnieTokenizer
 
-from experimental.seq2seq.modeling_ernie_gen import ErnieModelForGeneration
 
 from propeller import log
 import propeller.paddle as propeller

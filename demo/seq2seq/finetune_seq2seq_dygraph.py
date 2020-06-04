@@ -32,13 +32,12 @@ import paddle.fluid.dygraph as D
 
 from tqdm import tqdm
 
-from ernie.modeling_ernie import ErnieModel, ErnieModelForPretraining
+from ernie.modeling_ernie import ErnieModel, ErnieModelForPretraining, ErnieModelForGeneration
 from ernie.modeling_ernie import _build_linear, _build_ln, append_name
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.optimization import AdamW, LinearDecay
 
 from experimental.seq2seq.decode import beam_search_infilling, post_process
-from experimental.seq2seq.modeling_ernie_gen import ErnieModelForGeneration
 
 from propeller import log
 import propeller.paddle as propeller
