@@ -179,7 +179,7 @@ python3 -m paddle.distributed.launch \
 1. [语义匹配](./demo/finetune_classifier_dygraph.py)
 1. [命名实体识别(NER)](./demo/finetune_ner_dygraph.py)
 1. [机器阅读理解](./demo/finetune_mrc_dygraph.py) (需要多卡环境运行；参见上面"分布式 finetune"一节)
-1. [文本摘要生成](./experimental/seq2seq/README.md)
+1. [文本摘要生成](./demo/seq2seq/README.md)
 
 
 **推荐超参数设置：**
