@@ -80,7 +80,7 @@ print(pooled.numpy())                        # convert  results to numpy
 
 本项目依赖PaddlePaddle 1.7.0+， 请参考[这里](https://www.paddlepaddle.org.cn/install/quick)安装 PaddlePaddle。
 
-##### 2. 安装 ERNIE
+##### 2. 安装 ERNIE 套件
 
 
 ```script
@@ -94,7 +94,10 @@ git clone https://github.com/PaddlePaddle/ERNIE.git --depth 1
 cd ERNIE
 pip install -r requirements.txt
 pip install -e .
-
+```
+`propeller`是辅助模型训练的高级框架，包含NLP常用的前、后处理流程。你可以通过将本repo根目录放入`PYTHONPATH`的方式导入`propeller`:
+```shell
+export PYTHONPATH=$PWD:$PYTHONPATH
 ```
 
 ##### 3. 下载预训练模型（可选）<a name="section-pretrained-models"></a>
@@ -179,7 +182,7 @@ python3 -m paddle.distributed.launch \
 1. [语义匹配](./demo/finetune_classifier_dygraph.py)
 1. [命名实体识别(NER)](./demo/finetune_ner_dygraph.py)
 1. [机器阅读理解](./demo/finetune_mrc_dygraph.py) (需要多卡环境运行；参见上面"分布式 finetune"一节)
-1. [文本摘要生成](./experimental/seq2seq/README.md)
+1. [文本摘要生成](./demo/seq2seq/README.md)
 
 
 **推荐超参数设置：**

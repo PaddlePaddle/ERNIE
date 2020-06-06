@@ -12,7 +12,7 @@ To starts finetuning ERNIE-GEN, run:
 ```script
 python3 -m paddle.distributed.launch \
     --log_dir ./log  \
-    ./ernie_d/experimental/finetune_seq2seq_dygraph.py \
+    ./demo/seq2seq/finetune_seq2seq_dygraph.py \
     --from_pretrained ernie-gen-base-en \
     --data_dir ./data/cnndm \
     --save_dir ./model_cnndm \
@@ -52,7 +52,7 @@ To run beam serach decode after you got a finetuned model. try:
 
 ```shell
 
-cat one_column_source_text| python3 ernie_d/experimental/seq2seq/decode.py \
+cat one_column_source_text| python3 demo/seq2seq/decode.py \
     --from_pretrained ./ernie_gen_large \
     --save_dir ./model_cnndm \
     --bsz 8

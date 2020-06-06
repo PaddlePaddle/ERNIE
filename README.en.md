@@ -179,7 +179,7 @@ many other demo python scripts:
 1. [Semantic Similarity](./demo/finetune_classifier_dygraph.py)
 1. [Name Entity Recognition(NER)](./demo/finetune_ner_dygraph.py)
 1. [Machine Reading Comprehension](./demo/finetune_mrc_dygraph.py)
-1. [Text generation](./experimental/seq2seq/README.md)
+1. [Text generation](./demo/seq2seq/README.md)
 
 
 
