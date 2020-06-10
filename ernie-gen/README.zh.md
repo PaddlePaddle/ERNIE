@@ -43,11 +43,11 @@
 
 ## 预训练模型
 
-我们发布了 **ERNIE-GEN _base_** 模型和 **ERNIE-GEN _large_** 模型。 预训练数据使用英文维基百科和 BookCorpus，总共16GB。此外，我们还发布了基于 160GB 语料预训练的**ERNIE-GEN _large_** 模型，此份语料也被用于 [RoBERTa](https://arxiv.org/abs/1907.11692) 和 [BART](https://arxiv.org/abs/1910.13461) 的预训练。
+我们发布了 **ERNIE-GEN _base_** 模型和 **ERNIE-GEN _large_** 模型。 预训练数据使用英文维基百科和 BookCorpus，总共16GB。此外，我们还发布了基于 430GB 语料(数据描述见[ERNIE-GEN Appendix A.1](https://arxiv.org/abs/2001.11314))预训练的**ERNIE-GEN _large_** 模型。
 
 - [**ERNIE-GEN _base_**](https://ernie.bj.bcebos.com/ernie_gen_base.tgz) (_lowercased | 12-layer, 768-hidden, 12-heads, 110M parameters_)
 - [**ERNIE-GEN _large_**](https://ernie.bj.bcebos.com/ernie_gen_large.tgz) (_lowercased | 24-layer, 1024-hidden, 16-heads, 340M parameters_)
-- [**ERNIE-GEN _large with 160G_**](https://ernie.bj.bcebos.com/ernie_gen_large_160g.tgz) (_lowercased | 24-layer, 1024-hidden, 16-heads, 340M parameters_)
+- [**ERNIE-GEN _large with 430G_**](https://ernie.bj.bcebos.com/ernie_gen_large_430g.tgz) (_lowercased | 24-layer, 1024-hidden, 16-heads, 340M parameters_)
 
 
 ## 微调任务
@@ -65,7 +65,7 @@
 | UniLM                 |           16G / 340M             |          34.21           |          15.28           |          31.54           |
 | **ENRIE-GEN** _base_  |           16G / 110M             |          33.75           |          15.23           |          31.35           |
 | **ERNIE-GEN** _large_ |           16G / 340M             |        35.05         |        16.10         |        32.50         |
-| **ERNIE-GEN** _large_ (160G) |           160G / 340M           |        **35.51**         |        **16.79**         |        **33.23**         |
+| **ERNIE-GEN** _large_ (430G) |           430G / 340M           |        **35.51**         |        **16.79**         |        **33.23**         |
 
 在 Gigaword 上的效果:
 
@@ -78,7 +78,7 @@
 | PEGASUS (_HugeNews_)  |          3.8T / 568M           |          39.12           |          19.86           |          36.24           |
 | **ENRIE-GEN** _base_  |           16G / 110M           |          38.83           |          20.04           |          36.20           |
 | **ERNIE-GEN** _large_ |           16G / 340M           |        39.25         |        20.25         |        36.53         |
-| **ERNIE-GEN** _large_ (160G) |           160G / 340M           |        **39.46**         |        **20.34**         |        **36.74**         |
+| **ERNIE-GEN** _large_ (430G) |           430G / 340M           |        **39.46**         |        **20.34**         |        **36.74**         |
 
 我们按照 UniLM 的方式处理了数据，下载链接 [Gigaword](https://ernie.bj.bcebos.com/gigaword.tgz)。
 
@@ -97,7 +97,7 @@
 | PEGASUS (_HugeNews_)  |  3.8T / 568M  |          44.17           |          21.47           |          41.11           |
 | **ENRIE-GEN** _base_  |  16G / 110M   |          42.30           |          19.92           |          39.68           |
 | **ENRIE-GEN** _large_ |  16G / 340M   |          44.02           |          21.17           |          41.26           |
-| **ENRIE-GEN** _large_ (160G) |  160G / 340M   |        **44.31**         |          21.35           |        **41.60**         |
+| **ENRIE-GEN** _large_ (430G) |  430G / 340M   |        **44.31**         |          21.35           |        **41.60**         |
 
 我们按照 UniLM 的方式处理了数据，下载链接 [CNN/Daily Mail](https://ernie.bj.bcebos.com/cnndm.tgz)。
 
@@ -114,7 +114,7 @@
 | **ENRIE-GEN** _base_ (beam size=1) |          22.28           |          25.13           |          50.38           |
 | **ERNIE-GEN** _large_ (beam size=1) |        24.03         |        26.31         |        52.36         |
 | **ERNIE-GEN** _large_ (beam size=5) |        25.40         |        **26.92**         |        52.84         |
-| **ERNIE-GEN** _large_ (beam size=5) + (160G) |        **25.41**         |        26.77         |        **52.91**         |
+| **ERNIE-GEN** _large_ (beam size=5) + (430G) |        **25.41**         |        26.77         |        **52.91**         |
 
 按照 [[Zhao et al., 2018]](https://www.aclweb.org/anthology/D18-1424/) 反向使用验证集和测试集，效果如下:
 
@@ -125,7 +125,7 @@
 | **ENRIE-GEN** _base_ (beam size=1) |          23.52           |          25.61           |          51.45           |
 | **ERNIE-GEN** _large_ (beam size=1) |        25.57         |        26.89         |        53.31         |
 | **ERNIE-GEN** _large_ (beam size=5) |        26.95         |        **27.57**         |        53.77         |
-| **ERNIE-GEN** _large_ (beam size=5) + (160G) |        **27.05**         |        27.43         |        **53.83**         |
+| **ERNIE-GEN** _large_ (beam size=5) + (430G) |        **27.05**         |        27.43         |        **53.83**         |
 
 *_我们增加了将 beam size 扩大到 5 的结果。_
 
@@ -159,23 +159,6 @@
 
 我们对原始的 CoQA 数据集进行了处理，下载链接 [CoQA](https://ernie.bj.bcebos.com/coqa.tgz)。
 
-此外，我们与同期的工作 [ProphetNet](https://arxiv.org/abs/2001.04063) 在 Gigaword，CNN/Daily Mail 和 SQuAD 三个数据集上进行了对比:
-
-- _**生成式摘要**_
-
-| 模型 / 任务                                               | <strong>数据量 / 参数量</strong> | <strong>Gigaword</strong> |<strong>CNN/Daily Mail</strong>|
-| :-------------------------------------------------------- | :------------------------------: | :----------------------: | :----------------------: |
-| Metric                                                     | - | <strong>Rouge-1 / Rouge-2 / Rouge-L</strong> |<strong>Rouge-1 / Rouge-2 / Rouge-L</strong>|
-| ProphetNet _large_ (160G) |           160G / 340M           |     **39.51** / **20.42** / 36.69       |44.20 / 21.17 / 41.30|
-| **ERNIE-GEN** _large_ (160G) |           160G / 340M           |        39.46 / 20.34 / **36.74**         |**44.31** / **21.35** / **41.60**|
-
-- _**问题生成**_
-
-| 模型                                                      | <strong>数据量 / 参数量</strong> | <strong>BLEU-4 / METEOR / Rouge-L</strong> |<strong>BLEU-4 / METEOR / Rouge-L</strong>|
-| :-------------------------------------------------------- | :------------------------------: | :----------------------: |:----------------------: |
-| Data split                                                     | - | <strong>Original</strong> |<strong>Reversed dev-test</strong>|
-| ProphetNet** _large_ (16G) |           16G / 340M           |     25.01 / 26.83 / 52.57       |26.72 / **27.64** / **53.79** |
-| **ERNIE-GEN** _large_ (16G) |           16G / 340M           |        **25.40** / **26.92** / **52.84**       |**26.95** / 27.57 / **53.77**|
 
 ## 使用说明
 
@@ -189,7 +172,7 @@ pip install -r requirements.txt
 ### 运行微调
 在运行 ERNIE-GEN 前，需要将 CUDA 、cuDNN 、NCCL2 的动态库路径添加到 LD_LIBRARY_PATH 。 我们把下游任务的参数配置文件放到了 `config/` ，可以简单地通过配置文件运行。 例如，您可以通过下面的指令在 Gigaword 数据集上微调 ERNIE-GEN base 模型:
 ```script
-MODEL="base"      # base or large or large_160g
+MODEL="base"      # base or large or large_430g
 TASK="gigaword"   # cnndm, coqa, gigaword, squad_qg or persona-chat
 sh run_seq2seq.sh ./configs/${MODEL}/${TASK}_conf
 ```

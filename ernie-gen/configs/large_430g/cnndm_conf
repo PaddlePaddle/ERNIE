@@ -1,7 +1,7 @@
 #load model
-vocab_path="ernie_gen_large_160g/vocab.txt"
-config_path="ernie_gen_large_160g/ernie_config.json"
-init_model="ernie_gen_large_160g/params"
+vocab_path="ernie_gen_large_430g/vocab.txt"
+config_path="ernie_gen_large_430g/ernie_config.json"
+init_model="ernie_gen_large_430g/params"
 
 #input
 max_src_len=640
