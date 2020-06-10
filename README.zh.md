@@ -111,7 +111,7 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 | [ERNIE 2.0 Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | Layer:24, Hidden:1024, Heads16  |ernie-2.0-large-en|
 | [ERNIE Gen Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | Layer:12, Hidden:768, Heads:12  |ernie-gen-base-en|
 | [ERNIE Gen Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 |ernie-gen-large-en|
-| [ERNIE Gen Large 430G英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 额外430G 预训练语料 | ernie-gen-large-430g-en |
+| [ERNIE Gen Large 430G英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-430g-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 额外430G 预训练语料 | ernie-gen-large-430g-en |
 
 ##### 4. 下载数据集
 
