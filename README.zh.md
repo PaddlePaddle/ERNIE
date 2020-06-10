@@ -20,7 +20,7 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
     -  `ERNIE-GEN` 模型正式开源! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen))
         - 最强文本生成预训练模型正式开源，相关工作已被 `IJCAI-2020` 收录。
             - 首次把 ERNIE 预训练技术能力扩展至文本生成领域，在多个典型任务上取得最佳。
-            - 您现在即可下载论文报告的所有模型（包含 [`base/large/large-160G`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen/README.zh.md#预训练模型)）。
+            - 您现在即可下载论文报告的所有模型（包含 [`base/large/large-430G`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen/README.zh.md#预训练模型)）。
         - 首次在预训练阶段加入span-by-span 生成任务，让模型每次能够生成一个语义完整的片段。
         - 提出填充式生成机制和噪声感知机制来缓解曝光偏差问题。
         - 精巧的 Mulit-Flow Attention 实现框架。
@@ -111,7 +111,7 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 | [ERNIE 2.0 Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | Layer:24, Hidden:1024, Heads16  |ernie-2.0-large-en|
 | [ERNIE Gen Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | Layer:12, Hidden:768, Heads:12  |ernie-gen-base-en|
 | [ERNIE Gen Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 |ernie-gen-large-en|
-| [ERNIE Gen Large 160G英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 额外160G 预训练语料 | ernie-gen-large-160g-en |
+| [ERNIE Gen Large 430G英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 额外430G 预训练语料 | ernie-gen-large-430g-en |
 
 ##### 4. 下载数据集
 
