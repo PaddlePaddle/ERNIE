@@ -25,7 +25,7 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
         	- A novel **span-by-span generation pre-training task**.
         	- An **infilling generation** echanism and a **noise-aware generation** method.
         	- Implemented by a carefully designed **Multi-Flow Attention** architecture.
-    	- You are able to `download` all models including `base/large/large-160G`.
+    	- You are able to `download` all models including `base/large/large-430G`.
   
 - Apr.30.2020: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
 - Mar.27.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
@@ -107,7 +107,7 @@ pip install -e .
 | [ERNIE 2.0 Large for English](https://ernie-github.cdn.bcebos.com/model-ernie2.0-large-en.1.tar.gz) | L24H1024A16 |ernie-2.0-large-en|
 | [ERNIE Gen base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | L12H768A12  |ernie-gen-base-en|
 | [ERNIE Gen Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| L24H1024A16 | ernie-gen-large-en |
-| [ERNIE Gen Large 160G for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 160G pretrain corpus | ernie-gen-large-160g-en |
+| [ERNIE Gen Large 430G for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 430G pretrain corpus | ernie-gen-large-430g-en |
 
 ##### 4. download datasets
  
