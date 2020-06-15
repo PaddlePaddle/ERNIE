@@ -45,7 +45,6 @@ from ernie.optimization import AdamW, LinearDecay
 import propeller.paddle as propeller
 from propeller.paddle.data import Dataset
 
-#import jieba
 from propeller import log
 
 log.setLevel(logging.DEBUG)

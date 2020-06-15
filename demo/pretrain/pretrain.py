@@ -44,7 +44,6 @@ from ernie.optimization import optimization
 import propeller.paddle as propeller
 from propeller.paddle.data import Dataset
 
-#import jieba
 from propeller import log
 
 log.setLevel(logging.DEBUG)
