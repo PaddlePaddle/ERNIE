@@ -28,7 +28,7 @@ example:
 make pretrain data with:
 
 ```script
-python3 ernie/pretrain/make_pretrain_data.py input_file output_file.gz  --vocab ./pretrained/vocab.txt
+python3 ./demo/pretrain/make_pretrain_data.py input_file  output_file.gz --vocab /path/to/ernie1.0/vocab.txt
 ```
 
 2. run distributed pretrain
@@ -36,9 +36,9 @@ python3 ernie/pretrain/make_pretrain_data.py input_file output_file.gz  --vocab 
 ```sript
 
 python3 -m paddle.distributed.launch \
-./ernie/pretrain/pretrain_dygraph.py \
-    --data_dir data/* \
-    --from_pretrained ./ernie_1.0_pretrain_dir/ 
+./demo/pretrain/pretrain_dygraph.py \
+    --data_dir "data/*.gz" \
+    --from_pretrained /path/to/ernie1.0_pretrain_dir/
 
 ```
 

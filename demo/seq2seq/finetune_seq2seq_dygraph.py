@@ -37,7 +37,7 @@ from ernie.modeling_ernie import _build_linear, _build_ln, append_name
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.optimization import AdamW, LinearDecay
 
-from experimental.seq2seq.decode import beam_search_infilling, post_process
+from demo.seq2seq.decode import beam_search_infilling, post_process
 
 from propeller import log
 import propeller.paddle as propeller
@@ -295,7 +295,7 @@ if __name__ == '__main__':
     parser.add_argument('--predict_output_dir', type=str, default=None, help='predict file output directory')
     parser.add_argument('--attn_token', type=str, default='[ATTN]', help='if [ATTN] not in vocab, you can specified [MAKK] as attn-token')
     parser.add_argument('--inference_model_dir', type=str, default=None, help='inference model output directory')
-    parser.add_argument('--init_checkpoint', type=str, default=None)
+    parser.add_argument('--init_checkpoint', type=str, default=None, help='checkpoint to warm start from')
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
     parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 

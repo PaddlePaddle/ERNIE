@@ -124,7 +124,7 @@ if __name__ == '__main__':
     log.setLevel(logging.DEBUG)
 
 
-    from tokenizing_ernie import _wordpiece
+    from ernie.tokenizing_ernie import _wordpiece
     pat = re.compile(r'([a-zA-Z0-9]+|\S)')
 
     vocab = {j.strip().split(b'\t')[0].decode('utf8'): i for i, j in enumerate(open(args.vocab, 'rb'))}
