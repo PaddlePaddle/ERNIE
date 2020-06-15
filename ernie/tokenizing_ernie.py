@@ -226,10 +226,10 @@ class ErnieTinyTokenizer(ErnieTokenizer):
         self.window_size = 5
         self.sp_model.Load(sp_model_path)
         from LAC import LAC
-        self.lac = LAC()
+        self.lac = LAC(mode='seg')
 
     def cut(self, sentence):
-        return self.lac.lexer(sentence)
+        return self.lac.run(sentence)
 
     def tokenize(self, text):
         if len(text) == 0:
