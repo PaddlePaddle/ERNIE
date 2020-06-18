@@ -25,7 +25,6 @@ from functools import reduce, partial
 import numpy as np
 import multiprocessing
 import tempfile
-import jieba
 import re
 
 import paddle

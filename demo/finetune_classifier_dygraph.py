@@ -58,6 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default=None, help='model output directory')
     parser.add_argument('--max_steps', type=int, default=None, help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
+    parser.add_argument('--init_checkpoint', type=str, default=None, help='checkpoint to warm start from')
 
 
     args = parser.parse_args()
@@ -102,6 +103,11 @@ if __name__ == '__main__':
     place = F.CUDAPlace(0)
     with FD.guard(place):
         model = ErnieModelForSequenceClassification.from_pretrained(args.from_pretrained, num_labels=3, name='')
+
+        if args.init_checkpoint is not None:
+            log.info('loading checkpoint from %s' % args.init_checkpoint)
+            sd, _ = FD.load_dygraph(args.init_checkpoint)
+            model.set_dict(sd)
 
         g_clip = F.clip.GradientClipByGlobalNorm(1.0) #experimental
         if args.use_lr_decay:

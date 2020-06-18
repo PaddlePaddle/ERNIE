@@ -222,14 +222,14 @@ class ErnieTinyTokenizer(ErnieTokenizer):
     def __init__(self, vocab, sp_model_path, **kwargs):
         super(ErnieTinyTokenizer, self).__init__(vocab, **kwargs)
         import sentencepiece as spm
+        import jieba as jb
         self.sp_model = spm.SentencePieceProcessor()
         self.window_size = 5
         self.sp_model.Load(sp_model_path)
-        from LAC import LAC
-        self.lac = LAC()
+        self.jb = jb
 
     def cut(self, sentence):
-        return self.lac.lexer(sentence)
+        return self.jb.cut(sentence)
 
     def tokenize(self, text):
         if len(text) == 0:

@@ -1,7 +1,6 @@
 import sys
 import argparse
 import struct
-#import jieba
 import random as r
 import re
 import gzip
