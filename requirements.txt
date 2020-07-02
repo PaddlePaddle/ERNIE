@@ -4,3 +4,4 @@ six==1.11.0
 sklearn==0.0
 sentencepiece==0.1.8
 jieba==0.39
+visualdl>=2.0.0b7
