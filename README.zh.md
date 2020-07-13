@@ -6,6 +6,7 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 **提醒: ERNIE老版本代码已经迁移至[repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)，欢迎使用我们全新升级的基于动静结合的新版ERNIE套件进行开发。另外，也欢迎上[EasyDL](https://ai.baidu.com/easydl/pro)体验更丰富的功能（如ERNIE 2.0、ERNIE 2.1、ERNIE领域模型等）。**
 
+[【了解更多】](https://wenxin.baidu.com/)
 
 # 新闻
 
