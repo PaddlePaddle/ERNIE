@@ -8,6 +8,8 @@ English|[简体中文](./README.zh.md)
 ERNIE 2.0 is a continual pre-training framework for language understanding in which pre-training tasks can be incrementally built and learned through multi-task learning.
 ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification, Ranking, NER, machine reading comprehension, text genration and so on.
 
+[\[more information\]](https://wenxin.baidu.com/)
+
 # News
 
 - May.20.2020:
