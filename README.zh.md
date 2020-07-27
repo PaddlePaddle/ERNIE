@@ -287,5 +287,6 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
 - [ERNIE官方主页](https://www.paddlepaddle.org.cn/ernie)
 - [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
 - QQ 群: 760439550 (ERNIE discussion group).
+- QQ 2群: 958422639 (ERNIE discussion group-v2).
 - [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
 
