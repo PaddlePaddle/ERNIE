@@ -96,7 +96,7 @@ class ErnieTokenizer(object):
         vocab_path = pretrain_dir / 'vocab.txt'
         if not vocab_path.exists():
             raise ValueError('no vocab file in pretrain dir: %s' % pretrain_dir)
-        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(vocab_path.open().readlines())}
+        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(vocab_path.open(encoding='utf8').readlines())}
         t = cls(vocab_dict, **kwargs)
         return t
 
@@ -214,7 +214,7 @@ class ErnieTinyTokenizer(ErnieTokenizer):
 
         if not vocab_path.exists():
             raise ValueError('no vocab file in pretrain dir: %s' % pretrain_dir)
-        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(vocab_path.open().readlines())}
+        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(vocab_path.open(encoding='utf8').readlines())}
 
         t = cls(vocab_dict, sp_model_path, **kwargs)
         return t
