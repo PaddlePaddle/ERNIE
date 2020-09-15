@@ -24,6 +24,11 @@ import json
 import logging
 import logging
 from functools import partial
+import six
+if six.PY2:
+    from pathlib2 import Path
+else:
+    from pathlib import Path
 
 import paddle.fluid.dygraph as D
 import paddle.fluid as F
@@ -191,7 +196,7 @@ class PretrainedModel(object):
     }
     @classmethod
     def from_pretrained(cls, pretrain_dir_or_url, force_download=False, **kwargs):
-        if pretrain_dir_or_url in cls.resource_map:
+        if not Path(pretrain_dir_or_url).exists() and pretrain_dir_or_url in cls.resource_map:
             url = cls.resource_map[pretrain_dir_or_url]
             log.info('get pretrain dir from %s' % url)
             pretrain_dir = _fetch_from_remote(url, force_download)
@@ -199,16 +204,16 @@ class PretrainedModel(object):
             log.info('pretrain dir %s not in %s, read from local' % (pretrain_dir_or_url, repr(cls.resource_map)))
             pretrain_dir = pretrain_dir_or_url
 
-        if not os.path.exists(pretrain_dir):
+        if not pretrain_dir.exists():
             raise ValueError('pretrain dir not found: %s' % pretrain_dir)
-        param_path = os.path.join(pretrain_dir, 'params')
-        state_dict_path = os.path.join(pretrain_dir, 'saved_weights')
-        config_path = os.path.join(pretrain_dir, 'ernie_config.json')
+        param_path = pretrain_dir /'params'
+        state_dict_path = pretrain_dir / 'saved_weights'
+        config_path = pretrain_dir / 'ernie_config.json'
 
-        if not os.path.exists(config_path):
+        if not config_path.exists():
             raise ValueError('config path not found: %s' % config_path)
         name_prefix=kwargs.pop('name', None)
-        cfg_dict = dict(json.loads(open(config_path).read()), **kwargs)
+        cfg_dict = dict(json.loads(config_path.open().read()), **kwargs)
         model = cls(cfg_dict, name=name_prefix)
         
         log.info('loading pretrained model from %s' % pretrain_dir)
@@ -217,8 +222,8 @@ class PretrainedModel(object):
         #    raise NotImplementedError()
         #    log.debug('load pretrained weight from program state')
         #    F.io.load_program_state(param_path) #buggy in dygraph.gurad, push paddle to fix
-        if os.path.exists(state_dict_path + '.pdparams'):
-            m, _ = D.load_dygraph(state_dict_path)
+        if state_dict_path.with_suffix('.pdparams').exists():
+            m, _ = D.load_dygraph(state_dict_path.as_posix())
             for k, v in model.state_dict().items():
                 if k not in m:
                     log.warn('param:%s not set in pretrained model, skip' % k)

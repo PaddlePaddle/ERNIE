@@ -125,7 +125,7 @@ class LabelColumn(Column):
             ids = int(raw)
         else:
             ids = self.vocab[raw]
-        return ids
+        return np.array(ids, dtype=np.int64)
 
 
 class TextColumn(Column):

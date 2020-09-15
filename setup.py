@@ -22,7 +22,7 @@ with open("README.md", "r", encoding='utf-8') as fh:
 
 setuptools.setup(
     name="paddle-ernie", # Replace with your own username
-    version="0.0.4dev1",
+    version="0.0.5dev1",
     author="Baidu Ernie Team",
     author_email="ernieernie.team@gmail.com",
     description="A pretrained NLP model for every NLP tasks",
@@ -33,6 +33,7 @@ setuptools.setup(
     install_requires=[
         'requests',
         'tqdm',
+        'pathlib2',
         ],
     classifiers=[
         'Intended Audience :: Developers',

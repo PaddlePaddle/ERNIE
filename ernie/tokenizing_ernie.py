@@ -91,12 +91,12 @@ class ErnieTokenizer(object):
         else:
             log.info('pretrain dir %s not in %s, read from local' % (pretrain_dir_or_url, repr(cls.resource_map)))
             pretrain_dir = pretrain_dir_or_url
-        if not os.path.exists(pretrain_dir):
+        if not pretrain_dir.exists():
             raise ValueError('pretrain dir not found: %s' % pretrain_dir)
-        vocab_path = os.path.join(pretrain_dir, 'vocab.txt')
-        if not os.path.exists(vocab_path):
+        vocab_path = pretrain_dir / 'vocab.txt'
+        if not vocab_path.exists():
             raise ValueError('no vocab file in pretrain dir: %s' % pretrain_dir)
-        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(open(vocab_path).readlines())}
+        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(vocab_path.open(encoding='utf8').readlines())}
         t = cls(vocab_dict, **kwargs)
         return t
 
@@ -207,14 +207,14 @@ class ErnieTinyTokenizer(ErnieTokenizer):
         else:
             log.info('pretrain dir %s not in %s, read from local' % (pretrain_dir_or_url, repr(cls.resource_map)))
             pretrain_dir = pretrain_dir_or_url
-        if not os.path.exists(pretrain_dir):
+        if not pretrain_dir.exists():
             raise ValueError('pretrain dir not found: %s' % pretrain_dir)
-        vocab_path = os.path.join(pretrain_dir, 'vocab.txt')
-        sp_model_path = os.path.join(pretrain_dir, 'subword/spm_cased_simp_sampled.model')
+        vocab_path = pretrain_dir / 'vocab.txt'
+        sp_model_path = pretrain_dir / 'subword/spm_cased_simp_sampled.model'
 
-        if not os.path.exists(vocab_path):
+        if not vocab_path.exists():
             raise ValueError('no vocab file in pretrain dir: %s' % pretrain_dir)
-        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(open(vocab_path).readlines())}
+        vocab_dict = {j.strip().split('\t')[0]: i for i, j in enumerate(vocab_path.open(encoding='utf8').readlines())}
 
         t = cls(vocab_dict, sp_model_path, **kwargs)
         return t
