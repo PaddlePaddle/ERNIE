@@ -134,10 +134,10 @@ class Learner(object):
         if run_config.model_dir is None:
             raise ValueError('model_dir should specified in run_config')
 
-        if issubclass(model_class_or_model_fn, Model):
-            _model_fn = _build_model_fn(model_class_or_model_fn)
-        elif inspect.isfunction(model_class_or_model_fn):
+        if inspect.isfunction(model_class_or_model_fn):
             _model_fn = model_class_or_model_fn
+        elif issubclass(model_class_or_model_fn, Model):
+            _model_fn = _build_model_fn(model_class_or_model_fn)
         else:
             raise ValueError('unknown model %s' % model_class_or_model_fn)
 
