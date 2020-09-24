@@ -11,6 +11,11 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 [\[more information\]](https://wenxin.baidu.com/)
 
 # News
+- Sept.24.2020: 
+    - [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) is **avaliable** now!
+        - A **knowledge-enhanced** joint representations for vision-language tasks.
+            - Constructing three **Scene Graph Prediction** tasks utilizing structured knowledge.
+	    - The state-of-the-art performance on 5 downstream tasks, 1st place on [VCR leaderboad](https://visualcommonsense.com/leaderboard/).
 
 - May.20.2020:
 
@@ -206,6 +211,7 @@ many other demo python scripts:
 | ChnSentiCorp | 24              | 5e-5(base)/1e-5(large)   |
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
+| VCR           | 64             | 2e-5(base)/2e-5(large)   |
 
 # Pretraining with ERNIE 1.0
 
@@ -278,6 +284,17 @@ For details about distillation, see [here](./distill/README.md)
   journal={arXiv preprint arXiv:2001.11314},
   year={2020}
 }
+```
+
+### ERNIE-ViL
+```
+@article{yu2020ernie,
+  title={ERNIE-ViL: Knowledge Enhanced Vision-Language Representations Through Scene Graph},
+  author={Yu, Fei and Tang, Jiji and Yin, Weichong and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2006.16934},
+  year={2020}
+}
+
 ```
 
 For full reproduction of paper results, please checkout to `repro` branch of this repo.

@@ -10,6 +10,13 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 # 新闻
 
+- 2020.9.24: 
+   - `ERNIE-ViL` 模型正式开源! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil))
+       - 面向视觉-语言知识增强的预训练框架，首次在视觉-语言预训练引入结构化的知识。
+           - 利用场景图中的知识，构建了物体、属性和关系预测任务，精细刻画模态间细粒度语义对齐。
+       - 五项视觉-语言下游任务取得最好效果，[视觉常识推理榜单](https://visualcommonsense.com/)取得第一。
+       
+        
 - 2020.5.20:     
     - 欢迎试用`动态图`实现的 ERNIE:
         - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
@@ -206,6 +213,7 @@ python3 -m paddle.distributed.launch \
 | ChnSentiCorp | 24              | 5e-5(base)/1e-5(large)   |
 | LCQMC        | 32              | 2e-5(base)/5e-6(large)   |
 | NLPCC2016-DBQA| 64             | 2e-5(base)/1e-5(large)   |
+| VCR           | 64             | 2e-5(base)/2e-5(large)   |
 
 # 预训练 (ERNIE 1.0)
 
@@ -279,6 +287,18 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
   journal={arXiv preprint arXiv:2001.11314},
   year={2020}
 }
+```
+
+### ERNIE-ViL
+
+```
+@article{yu2020ernie,
+  title={ERNIE-ViL: Knowledge Enhanced Vision-Language Representations Through Scene Graph},
+  author={Yu, Fei and Tang, Jiji and Yin, Weichong and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2006.16934},
+  year={2020}
+}
+
 ```
 
 若希望复现 paper 中的所有实验，请切换至本repo的`repro`分支。
