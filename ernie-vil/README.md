@@ -59,7 +59,7 @@ _Code and pre-trained models related to VCR task are made public now, and those 
 
 ### VCR
    * datasets
-      * The training, validation and testing data of VCR task are provided by [**VCR Website**](https://openaccess.thecvf.com/content_CVPR_2019/papers/Zellers_From_Recognition_to_Cognition_Visual_Commonsense_Reasoning_CVPR_2019_paper.pdf).
+      * The training, validation and testing data of VCR task are provided by [**VCR Website**](https://visualcommonsense.com/download/).
       * Organization of visual features is modified from [**ViLBERT**](https://github.com/jiasenlu/vilbert_beta), we directly use the data from it. Data can be downloaded [here](https://github.com/jiasenlu/vilbert_beta/tree/master/data).
       * Put all downloaded files under diretory "data/vcr".
       
