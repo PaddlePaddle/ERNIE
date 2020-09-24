@@ -1,0 +1,12 @@
+output_model_path="output_vcr"
+lr_scheduler="manual_warmup_decay"
+decay_steps="13308;19962"
+lr_decay_ratio=0.1
+num_train_steps=26640
+SAVE_STEPS=6660
+WARMUP_STEPS=6654
+BATCH_SIZE=64
+VALID_STEPS=20000
+LR_RATE=2e-5
+WEIGHT_DECAY=0.01
+MAX_LEN=80
