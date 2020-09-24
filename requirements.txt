@@ -6,3 +6,5 @@ scipy==1.2.1
 six==1.11.0
 sklearn==0.0
 sentencepiece==0.1.8
+python-opencv=3.2.0.8
+paddlepaddle-gpu==1.6.3.post107
