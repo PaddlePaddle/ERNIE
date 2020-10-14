@@ -301,6 +301,7 @@ For full reproduction of paper results, please checkout to `repro` branch of thi
 
 ### Communication
 
+- [ERNIE homepage](https://wenxin.baidu.com/)
 - [Github Issues](https://github.com/PaddlePaddle/ERNIE/issues): bug reports, feature requests, install issues, usage issues, etc.
 - QQ discussion group: 760439550 (ERNIE discussion group).
 - QQ discussion group: 958422639 (ERNIE discussion group-v2).
