@@ -20,7 +20,7 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 - May.20.2020:
 
     - Try ERNIE in "`dygraph`", with:
-    	- Pretrain and finetune ERNIE with [PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8).
+    	- Pretrain and finetune ERNIE with [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc).
     	- Eager execution with `paddle.fluid.dygraph`.
     	- Distributed training.
     	- Easy deployment.
