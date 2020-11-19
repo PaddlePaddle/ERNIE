@@ -101,4 +101,5 @@ class InferenceClient(InferenceBaseClient):
             if r is None:
                 raise RuntimeError('Client call failed')
         return [np.concatenate(col, 0) for col in zip(*rets)]
+
     #yapf: enable

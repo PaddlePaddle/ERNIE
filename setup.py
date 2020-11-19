@@ -19,10 +19,9 @@ from io import open
 with open("README.md", "r", encoding='utf-8') as fh:
     long_description = fh.read()
 
-
 setuptools.setup(
-    name="paddle-ernie", # Replace with your own username
-    version="0.0.5dev1",
+    name="paddle-ernie",  # Replace with your own username
+    version="0.1.0dev1",
     author="Baidu Ernie Team",
     author_email="ernieernie.team@gmail.com",
     description="A pretrained NLP model for every NLP tasks",
@@ -34,7 +33,7 @@ setuptools.setup(
         'requests',
         'tqdm',
         'pathlib2',
-        ],
+    ],
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
@@ -43,5 +42,4 @@ setuptools.setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
-    ],
-)
+    ], )

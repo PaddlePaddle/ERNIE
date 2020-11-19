@@ -1,0 +1,17 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: https://github.com/PaddlePaddle/mirrors-yapf.git
+    rev: 0d79c0c469bab64f7229c9aca2b1186ef47f0e37
+    hooks:
+    -   id: yapf
+        files: (.*\.(py|bzl)|BUILD|.*\.BUILD|WORKSPACE)$
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 5bf6c09bfa1297d3692cadd621ef95f1284e33c0
+    hooks:
+    -   id: check-added-large-files
+    -   id: check-merge-conflict
+    -   id: check-symlinks
+    -   id: detect-private-key
+        files: (?!.*third_party)^.*$ | (?!.*book)^.*$
+    -   id: end-of-file-fixer

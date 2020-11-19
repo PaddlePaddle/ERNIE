@@ -26,27 +26,16 @@ from collections import namedtuple
 
 log = logging.getLogger(__name__)
 
+Example = namedtuple('Example', [
+    'qas_id', 'question_text', 'doc_tokens', 'orig_answer_text',
+    'start_position', 'end_position'
+])
 
-Example = namedtuple('Example',
-    ['qas_id', 
-     'question_text', 
-     'doc_tokens', 
-     'orig_answer_text',
-     'start_position', 
-     'end_position'])
-
-Feature = namedtuple("Feature", 
-        ["unique_id", 
-         "example_index", 
-         "doc_span_index",
-         "tokens", 
-         "token_to_orig_map",
-         "token_is_max_context",
-         "token_ids", 
-         "position_ids", 
-         "text_type_ids",
-         "start_position", 
-         "end_position"])
+Feature = namedtuple("Feature", [
+    "unique_id", "example_index", "doc_span_index", "tokens",
+    "token_to_orig_map", "token_is_max_context", "token_ids", "position_ids",
+    "text_type_ids", "start_position", "end_position"
+])
 
 
 def _tokenize_chinese_chars(text):
@@ -113,7 +102,8 @@ def _check_is_max_context(doc_spans, cur_span_index, position):
     return cur_span_index == best_span_index
 
 
-def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer, orig_answer_text):
+def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer,
+                         orig_answer_text):
     """improve answer span"""
     tok_answer_text = " ".join(tokenizer.tokenize(orig_answer_text))
 
@@ -140,7 +130,7 @@ def read_files(input_file, is_training):
                     start_pos = None
                     end_pos = None
                     orig_answer_text = None
-            
+
                     if is_training:
                         if len(qa["answers"]) != 1:
                             raise ValueError(
@@ -151,17 +141,20 @@ def read_files(input_file, is_training):
                         orig_answer_text = answer["text"]
                         answer_offset = answer["answer_start"]
                         answer_length = len(orig_answer_text)
-                        doc_tokens = [paragraph_text[:answer_offset],
-                            paragraph_text[answer_offset: answer_offset + answer_length],
-                            paragraph_text[answer_offset + answer_length:]]
+                        doc_tokens = [
+                            paragraph_text[:answer_offset], paragraph_text[
+                                answer_offset:answer_offset + answer_length],
+                            paragraph_text[answer_offset + answer_length:]
+                        ]
 
                         start_pos = 1
                         end_pos = 1
 
-                        actual_text = " ".join(doc_tokens[start_pos:(end_pos + 1)])
+                        actual_text = " ".join(doc_tokens[start_pos:(end_pos +
+                                                                     1)])
                         if actual_text.find(orig_answer_text) == -1:
                             log.info("Could not find answer: '%s' vs. '%s'",
-                                    actual_text, orig_answer_text)
+                                     actual_text, orig_answer_text)
                             continue
                     else:
                         doc_tokens = _tokenize_chinese_chars(paragraph_text)
@@ -177,7 +170,13 @@ def read_files(input_file, is_training):
 
     return examples
 
-def convert_example_to_features(examples, max_seq_length, tokenizer, is_training, doc_stride=128, max_query_length=64):
+
+def convert_example_to_features(examples,
+                                max_seq_length,
+                                tokenizer,
+                                is_training,
+                                doc_stride=128,
+                                max_query_length=64):
     """convert example to feature"""
     features = []
     unique_id = 1000000000
@@ -185,7 +184,7 @@ def convert_example_to_features(examples, max_seq_length, tokenizer, is_training
     for (example_index, example) in enumerate(examples):
         query_tokens = tokenizer.tokenize(example.question_text)
         if len(query_tokens) > max_query_length:
-            query_tokens = query_tokens[0: max_query_length]
+            query_tokens = query_tokens[0:max_query_length]
         tok_to_orig_index = []
         orig_to_tok_index = []
         all_doc_tokens = []
@@ -202,7 +201,8 @@ def convert_example_to_features(examples, max_seq_length, tokenizer, is_training
         if is_training:
             tok_start_position = orig_to_tok_index[example.start_position]
             if example.end_position < len(example.doc_tokens) - 1:
-                tok_end_position = orig_to_tok_index[example.end_position + 1] - 1
+                tok_end_position = orig_to_tok_index[example.end_position +
+                                                     1] - 1
             else:
                 tok_end_position = len(all_doc_tokens) - 1
             (tok_start_position, tok_end_position) = _improve_answer_span(
@@ -297,4 +297,3 @@ if __name__ == "__main__":
     features = convert_example_to_features(examples, 512, tokenizer, True)
     log.debug(len(examples))
     log.debug(len(features))
-

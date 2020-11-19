@@ -26,7 +26,7 @@ import collections
 from distutils import dir_util
 import pickle
 
-#from utils import print_arguments 
+#from utils import print_arguments
 import paddle.fluid as F
 from paddle.fluid.proto import framework_pb2
 

@@ -10,14 +10,14 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 # 新闻
 
-- 2020.9.24: 
+- 2020.9.24:
    - `ERNIE-ViL` 模型正式开源! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil))
        - 面向视觉-语言知识增强的预训练框架，首次在视觉-语言预训练引入结构化的知识。
            - 利用场景图中的知识，构建了物体、属性和关系预测任务，精细刻画模态间细粒度语义对齐。
        - 五项视觉-语言下游任务取得最好效果，[视觉常识推理榜单](https://visualcommonsense.com/)取得第一。
-       
-        
-- 2020.5.20:     
+
+
+- 2020.5.20:
     - 欢迎试用`动态图`实现的 ERNIE:
         - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
         - 动态执行, 所见即所得。
@@ -71,7 +71,7 @@ print(pooled.numpy())                        # convert  results to numpy
 
 # 教程
 
-手边没有GPU？欢迎在[AIStudio](https://aistudio.baidu.com/aistudio/index)中直接试用 ERNIE. 
+手边没有GPU？欢迎在[AIStudio](https://aistudio.baidu.com/aistudio/index)中直接试用 ERNIE.
 (请选择最新版本的教程并申请GPU运行环境)
 
 1. [从0开始学ERNIE](https://aistudio.baidu.com/studio/edu/group/quick/join/314947)
@@ -161,7 +161,7 @@ data/xnli
 ```script
 python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
        --from_pretrained ernie-1.0 \
-       --data_dir ./data/xnli  
+       --data_dir ./data/xnli
 ```
 
 - 分布式 finetune
@@ -274,7 +274,7 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
   title={ERNIE 2.0: A Continual Pre-training Framework for Language Understanding},
   author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Tian, Hao and Wu, Hua and Wang, Haifeng},
   journal={arXiv preprint arXiv:1907.12412},
-  year={2019} 
+  year={2019}
 }
 ```
 
@@ -309,4 +309,3 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
 - QQ 群: 760439550 (ERNIE discussion group).
 - QQ 2群: 958422639 (ERNIE discussion group-v2).
 - [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
-

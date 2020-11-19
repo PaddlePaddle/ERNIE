@@ -28,6 +28,7 @@ import paddle.fluid.dygraph as D
 
 log = logging.getLogger(__name__)
 
+
 def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
     """ Applies linear warmup of learning rate from 0 and decay to 0."""
     with F.default_main_program()._lr_schedule_guard():
@@ -39,7 +40,7 @@ def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
             name="scheduled_learning_rate")
 
         global_step = L.learning_rate_scheduler._decay_step_counter()
-        
+
         warmup_lr = learning_rate * (global_step / warmup_steps)
 
         poly_decay_lr = L.learning_rate_scheduler.polynomial_decay(
@@ -48,7 +49,7 @@ def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
             end_learning_rate=0.0,
             power=1.0,
             cycle=False)
-#
+        #
         decayed_lr = L.elementwise_min(warmup_lr, poly_decay_lr)
         L.assign(decayed_lr, lr)
         return lr
@@ -103,16 +104,17 @@ def optimization(loss,
         log.debug('using Adam')
 
         optimizer = F.optimizer.Adam(learning_rate=scheduled_lr)
-        optimizer._learning_rate_map[F.default_main_program(
-        )] = scheduled_lr
+        optimizer._learning_rate_map[F.default_main_program()] = scheduled_lr
 
     if use_fp16:
         log.info('AMP activated')
-        optimizer = F.contrib.mixed_precision.decorate(optimizer, 
-            amp_lists=F.contrib.mixed_precision.AutoMixedPrecisionLists(custom_black_varnames={"loss"}, custom_black_list={'layer_norm', 'arg_max', 'argmax'}),
+        optimizer = F.contrib.mixed_precision.decorate(
+            optimizer,
+            amp_lists=F.contrib.mixed_precision.AutoMixedPrecisionLists(
+                custom_black_varnames={"loss"},
+                custom_black_list={'layer_norm', 'arg_max', 'argmax'}),
             init_loss_scaling=init_loss_scaling,
-            use_dynamic_loss_scaling=True,
-        )
+            use_dynamic_loss_scaling=True, )
         loss_scaling = optimizer.get_loss_scaling()
     else:
         loss_scaling = None
@@ -143,9 +145,12 @@ def optimization(loss,
 
 class AdamW(F.optimizer.AdamOptimizer):
     """AdamW object for dygraph"""
+
     def __init__(self, *args, **kwargs):
-        weight_decay = kwargs.pop('weight_decay', None) 
-        var_name_to_exclude = kwargs.pop('var_name_to_exclude', '.*layer_norm_scale|.*layer_norm_bias|.*b_0')
+        weight_decay = kwargs.pop('weight_decay', None)
+        var_name_to_exclude = kwargs.pop(
+            'var_name_to_exclude',
+            '.*layer_norm_scale|.*layer_norm_bias|.*b_0')
         super(AdamW, self).__init__(*args, **kwargs)
         self.wd = weight_decay
         self.pat = re.compile(var_name_to_exclude)
@@ -200,4 +205,3 @@ class LinearDecay(D.learning_rate_scheduler.LearningRateDecay):
                     ((1 - tmp_step_num / tmp_decay_steps) ** self.power) + self.end_learning_rate
 
         return decayed_lr
-

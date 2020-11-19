@@ -119,7 +119,7 @@ class Learner(object):
                 3. backword           (loss) => None
                 4. loss               (predictoin) => (loss)
                 5. metrics (optional) (prediction) => (dict of propeller.Metrics)
-                
+
             2. a model_fn takes following args:
                 1. features
                 2. param
@@ -252,7 +252,7 @@ class Learner(object):
             warm_start_setting=self.warm_start_setting)
 
         distribution.init_distribuition_env(
-            train_program)  #only initialize distribute training with 
+            train_program)  #only initialize distribute training with
         mon_exe.init_or_restore_variables()
         if distribution.status.is_master:
             mon_exe._hooks.append(
@@ -319,15 +319,15 @@ class Learner(object):
                 split_batch=True):
         """
         Perform predictoin
-        will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode 
+        will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode
 
         Args:
             infer_dataset (propeller.data.Dataset): should not `shuffle` or `repeat`
-            steps (int): steps to predict, if None is specifed, 
+            steps (int): steps to predict, if None is specifed,
                 will stop when `StopException` is raised in `infer_dataset`
-            ckpt_path (None|str): Path of a specific checkpoint to predict. 
-                If None, the latest checkpoint in model_dir is used. 
-                If there are no checkpoints in model_dir, 
+            ckpt_path (None|str): Path of a specific checkpoint to predict.
+                If None, the latest checkpoint in model_dir is used.
+                If there are no checkpoints in model_dir,
                 prediction is run with newly initialized Variables instead of ones restored from checkpoint.
             ckpt (int): deprecated args
             split_batch (bool): if True, prediction of each example in a batch is returned.
@@ -382,8 +382,8 @@ def train_and_eval(_placeholder=None,
                    eval_hooks=[],
                    exporters=[]):
     """
-    Perform train and evaluate procesure. 
-    will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode 
+    Perform train and evaluate procesure.
+    will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode
 
     Args:
         model_class_or_model_fn(callable|propeller.train.Model): `model_class_or_model_fn` be specified in 2 ways:
@@ -394,7 +394,7 @@ def train_and_eval(_placeholder=None,
         params: any python object, will pass to your `model_fn` or `propeller.train.Model`
         run_config (propeller.RunConfig): run_config.max_steps should not be None.
         train_dataset (propeller.paddle.data.Dataset): training will stop if global_step > run_config.max_steps.
-        eval_dataset (propeller.paddle.data.Dataset|dict): Optional, if Dict of propeller.data.Dataset were specified, 
+        eval_dataset (propeller.paddle.data.Dataset|dict): Optional, if Dict of propeller.data.Dataset were specified,
             will perform evluatation on every evaluation sets and report results.
         warm_start_setting (propeller.WarmStartSetting): Optional. warm start variable will overwrite model variable.
         train_hooks (list of propeller.paddle.train.RunHook): Optional.

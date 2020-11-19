@@ -21,11 +21,12 @@ import paddle.fluid as F
 import paddle.fluid.layers as L
 
 from propeller.data.functional import Dataset as DatasetBase
+from paddle.io import IterableDataset as PDataset
 
 log = logging.getLogger(__name__)
 
 
-class Dataset(DatasetBase):
+class Dataset(DatasetBase, PDataset):
     """Pyreader based Dataset"""
 
     def placeholders(self):

@@ -4,7 +4,7 @@ only **mask word** strategy from [Ernie1.0](https://arxiv.org/pdf/1904.09223.pdf
 
 1. make pretrain data
 
-we use documents from multiple datasource (e.g. Wikipedia) to pretrain. 
+we use documents from multiple datasource (e.g. Wikipedia) to pretrain.
 input text should be segmented with space (even in chinese, this segmentation is used for *mask word*).
 each line corresonds to a *sentence*.
 empty line indicates end of document.
@@ -41,4 +41,3 @@ python3 -m paddle.distributed.launch \
     --from_pretrained /path/to/ernie1.0_pretrain_dir/
 
 ```
-

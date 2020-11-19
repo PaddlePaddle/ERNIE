@@ -17,7 +17,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
-
 import sys
 import re
 import six
@@ -29,7 +28,8 @@ import nltk
 import unicodedata
 from collections import namedtuple
 
-RawResult = namedtuple("RawResult", ["unique_id", "start_logits", "end_logits"])
+RawResult = namedtuple("RawResult",
+                       ["unique_id", "start_logits", "end_logits"])
 
 log = logging.getLogger(__name__)
 
@@ -340,7 +340,7 @@ def _get_final_text(pred_text, orig_text, tokenizer):
 
 
 def make_results(vocab, all_examples, all_features, all_results, n_best_size,
-            max_answer_length, do_lower_case):
+                 max_answer_length, do_lower_case):
     """Write final predictions to the json file and log-odds of null if needed."""
     tokenizer = _BasicTokenizer(do_lower_case)
     example_index_to_features = collections.defaultdict(list)
@@ -384,7 +384,8 @@ def make_results(vocab, all_examples, all_features, all_results, n_best_size,
                         continue
                     if end_index not in feature.token_to_orig_map:
                         continue
-                    if not feature.token_is_max_context.get(start_index, False):
+                    if not feature.token_is_max_context.get(start_index,
+                                                            False):
                         continue
                     if end_index < start_index:
                         continue
@@ -414,8 +415,8 @@ def make_results(vocab, all_examples, all_features, all_results, n_best_size,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1
-                                                              )]
+                tok_tokens = feature.tokens[pred.start_index:(pred.end_index +
+                                                              1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
                 orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end +
@@ -483,9 +484,11 @@ def mixed_segmentation(in_str, rm_punc=False):
     in_str = in_str.lower().strip()
     segs_out = []
     temp_str = ""
-    sp_char = ['-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', 
-               '，', '。', '：', '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', 
-               '「', '」', '（', '）', '－', '～', '『', '』']
+    sp_char = [
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
+        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
+        '）', '－', '～', '『', '』'
+    ]
     for char in in_str:
         if rm_punc and char in sp_char:
             continue
@@ -510,9 +513,11 @@ def mixed_segmentation(in_str, rm_punc=False):
 def remove_punctuation(in_str):
     """remove punctuation"""
     in_str = in_str.lower().strip()
-    sp_char = ['-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', 
-               '，', '。', '：', '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', 
-               '「', '」', '（', '）', '－', '～', '『', '』']
+    sp_char = [
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
+        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
+        '）', '－', '～', '『', '』'
+    ]
     out_segs = []
     for char in in_str:
         if char in sp_char:
@@ -525,7 +530,7 @@ def remove_punctuation(in_str):
 # find longest common string
 def find_lcs(s1, s2):
     """find_lcs"""
-    m = [[0 for i in range(len(s2)+1)] for j in range(len(s1)+1)]
+    m = [[0 for i in range(len(s2) + 1)] for j in range(len(s1) + 1)]
     mmax = 0
     p = 0
     for i in range(len(s1)):
@@ -535,7 +540,7 @@ def find_lcs(s1, s2):
                 if m[i + 1][j + 1] > mmax:
                     mmax = m[i + 1][j + 1]
                     p = i + 1
-    return s1[p - mmax: p], mmax
+    return s1[p - mmax:p], mmax
 
 
 def calc_f1_score(answers, prediction):
@@ -548,9 +553,9 @@ def calc_f1_score(answers, prediction):
         if lcs_len == 0:
             f1_scores.append(0)
             continue
-        precision     = 1.0 * lcs_len / len(prediction_segs)
-        recall         = 1.0 * lcs_len / len(ans_segs)
-        f1             = (2 * precision * recall) / (precision + recall)
+        precision = 1.0 * lcs_len / len(prediction_segs)
+        recall = 1.0 * lcs_len / len(ans_segs)
+        f1 = (2 * precision * recall) / (precision + recall)
         f1_scores.append(f1)
     return max(f1_scores)
 
@@ -578,20 +583,20 @@ def evaluate(ground_truth_file, prediction_file):
             context_text = instance['context'].strip()
             for qas in instance['qas']:
                 total_count += 1
-                query_id    = qas['id'].strip()
-                query_text  = qas['question'].strip()
-                answers     = [ans["text"] for ans in qas["answers"]]
+                query_id = qas['id'].strip()
+                query_text = qas['question'].strip()
+                answers = [ans["text"] for ans in qas["answers"]]
 
                 if query_id not in prediction_file:
-                    sys.stderr.write('Unanswered question: {}\n'.format(query_id))
+                    sys.stderr.write('Unanswered question: {}\n'.format(
+                        query_id))
                     skip_count += 1
                     continue
 
-                prediction     = prediction_file[query_id]
+                prediction = prediction_file[query_id]
                 f1 += calc_f1_score(answers, prediction)
                 em += calc_em_score(answers, prediction)
 
     f1_score = f1 / total_count
     em_score = em / total_count
     return [f1_score, em_score, total_count, skip_count]
-

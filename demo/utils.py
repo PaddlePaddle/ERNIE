@@ -17,15 +17,16 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import sys
+import argparse
+import logging
 import paddle
-paddle_version = [i for i in paddle.__version__.split('.')]
-if paddle_version[0] not in {'2', '0'}:
-    raise RuntimeError('paddle-ernie 0.1.0 requires paddle 2.0+, got %s' %
-                       paddle.__version__)
 
-from ernie.modeling_ernie import ErnieModel
-from ernie.modeling_ernie import (
-    ErnieModelForSequenceClassification, ErnieModelForTokenClassification,
-    ErnieModelForQuestionAnswering, ErnieModelForPretraining)
 
-from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
+class UnpackDataLoader(paddle.io.DataLoader):
+    def __init__(self, *args, **kwargs):
+        super(UnpackDataLoader, self).__init__(*args, batch_size=1, **kwargs)
+
+    def __iter__(self):
+        return ([yy[0] for yy in y]
+                for y in super(UnpackDataLoader, self).__iter__())

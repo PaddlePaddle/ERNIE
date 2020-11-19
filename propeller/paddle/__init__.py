@@ -46,7 +46,7 @@ from propeller.paddle import train
 from propeller.paddle.train import *
 
 import paddle
-paddle_version = [int(i) for i in paddle.__version__.split('.')]
-if paddle_version[1] < 7:
-    raise RuntimeError('propeller 0.2 requires paddle 1.7+, got %s' %
+paddle_version = [i for i in paddle.__version__.split('.')]
+if paddle_version[0] == '1':
+    raise RuntimeError('propeller 0.3 requires paddle 2.0+, got %s' %
                        paddle.__version__)

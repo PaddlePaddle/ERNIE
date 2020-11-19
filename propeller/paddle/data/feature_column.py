@@ -286,8 +286,7 @@ class FeatureColumns(object):
             if len(raw_file) != 0:
                 log.debug('try making gz')
                 pool = multiprocessing.Pool(
-                        initializer=_init_worker,
-                        initargs=(self._columns, )) 
+                    initializer=_init_worker, initargs=(self._columns, ))
                 args = [(os.path.join(raw_dir, f), os.path.join(gz_dir, f),
                          b'\t') for f in raw_file]
                 pool.map(_worker_entrence, args)
