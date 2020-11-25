@@ -382,7 +382,7 @@ class ErnieModel(nn.Layer, PretrainedModel):
             ) == 3, 'expect attn_bias tobe rank 3, got %r' % attn_bias.shape
         attn_bias = (1. - attn_bias) * -10000.0
         attn_bias = attn_bias.unsqueeze(1).tile(
-            [1, self.n_head, 1, 1]).detach()  # avoid broadcast =_=
+            [1, self.n_head, 1, 1])  # avoid broadcast =_=
 
         if sent_ids is None:
             sent_ids = P.zeros_like(src_ids)
@@ -428,7 +428,7 @@ class ErnieModelForSequenceClassification(ErnieModel):
         prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = nn.Dropout(p=prob)
 
-    #@add_docstring(ErnieModel.forward.__doc__)
+    @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
         """
         Args:

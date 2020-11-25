@@ -19,11 +19,12 @@ import logging
 import json
 from random import random
 from functools import reduce, partial
+from visualdl import LogWriter
 
 import numpy as np
 import logging
 import argparse
-
+from pathlib import Path
 import paddle as P
 
 from propeller import log
@@ -36,13 +37,13 @@ logging.getLogger().setLevel(logging.DEBUG)
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
 from ernie.optimization import AdamW, LinearDecay
-from demo.utils import UnpackDataLoader
+from demo.utils import UnpackDataLoader, create_if_not_exists
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('classify model with ERNIE')
     parser.add_argument(
         '--from_pretrained',
-        type=str,
+        type=Path,
         required=True,
         help='pretrained model directory or tag')
     parser.add_argument(
@@ -71,11 +72,11 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
     parser.add_argument(
         '--inference_model_dir',
-        type=str,
+        type=Path,
         default=None,
         help='inference model output directory')
     parser.add_argument(
-        '--save_dir', type=str, default=None, help='model output directory')
+        '--save_dir', type=Path, default=None, help='model output directory')
     parser.add_argument(
         '--max_steps',
         type=int,
@@ -91,6 +92,11 @@ if __name__ == '__main__':
         type=str,
         default=None,
         help='checkpoint to warm start from')
+    parser.add_argument(
+        '--use_amp',
+        action='store_true',
+        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+    )
 
     args = parser.parse_args()
 
@@ -164,51 +170,74 @@ if __name__ == '__main__':
             parameter_list=model.parameters(),
             weight_decay=args.wd,
             grad_clip=g_clip)
-
-    for epoch in range(args.epoch):
-        for step, (
-                ids, sids, label
-        ) in enumerate(UnpackDataLoader(
-                train_ds, places=P.CUDAPlace(0))):
-            loss, _ = model(ids, sids, labels=label)
-            loss.backward()
-            if step % 10 == 0:
-                log.debug('train loss %.5f lr %.3e' %
-                          (loss.numpy(), opt.current_step_lr()))
-            opt.minimize(loss)
-            model.clear_gradients()
-            if step % 100 == 0:
-                acc = []
-                with P.no_grad():
-                    model.eval()
-                    for step, d in enumerate(
-                            UnpackDataLoader(
-                                dev_ds, places=P.CUDAPlace(0))):
-                        ids, sids, label = d
-                        loss, logits = model(ids, sids, labels=label)
-                        #print('\n'.join(map(str, logits.numpy().tolist())))
-                        a = (logits.argmax(-1) == label)
-                        acc.append(a.numpy())
-                    model.train()
-                log.debug('acc %.5f' % np.concatenate(acc).mean())
+    scaler = P.amp.GradScaler(enable=args.use_amp)
+    with LogWriter(logdir=str(create_if_not_exists(args.save_dir /
+                                                   'vdl'))) as log_writer:
+        with P.amp.auto_cast(enable=args.use_amp):
+            for epoch in range(args.epoch):
+                for step, (ids, sids, label) in enumerate(
+                        UnpackDataLoader(
+                            train_ds, places=P.CUDAPlace(0))):
+                    loss, _ = model(ids, sids, labels=label)
+                    loss = scaler.scale(loss)
+                    loss.backward()
+                    if step % 10 == 0:
+                        _lr = opt.current_step_lr()
+                        if args.use_amp:
+                            _l = (loss / scaler._scale).numpy()
+                            msg = 'train loss %.5f lr %.3e scaling %.3e' % (
+                                _l, _lr, scaler._scale.numpy())
+                        else:
+                            _l = loss.numpy()
+                            msg = 'train loss %.5f lr %.3e' % (_l, _lr)
+                        log.debug(msg)
+                        log_writer.add_scalar('loss', _l, step=step)
+                        log_writer.add_scalar('lr', _lr, step=step)
+                    scaler.minimize(opt, loss)
+                    model.clear_gradients()
+                    if step % 100 == 0:
+                        acc = []
+                        with P.no_grad():
+                            model.eval()
+                            for step, d in enumerate(
+                                    UnpackDataLoader(
+                                        dev_ds, places=P.CUDAPlace(0))):
+                                ids, sids, label = d
+                                loss, logits = model(ids, sids, labels=label)
+                                #print('\n'.join(map(str, logits.numpy().tolist())))
+                                a = (logits.argmax(-1) == label)
+                                acc.append(a.numpy())
+                            model.train()
+                        acc = np.concatenate(acc).mean()
+                        log_writer.add_scalar('eval/acc', acc, step=step)
+                        log.debug('acc %.5f' % acc)
+                        if args.save_dir is not None:
+                            P.save(model.state_dict(),
+                                   args.save_dir / 'ckpt.bin')
     if args.save_dir is not None:
-        P.save(model.state_dict(), args.save_dir)
+        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
     if args.inference_model_dir is not None:
-        log.debug('saving inference model')
 
-        class InferemceModel(ErnieModelForSequenceClassification):
-            @P.jit.to_static(input_spec=[
-                P.static.InputSpec(
-                    shape=[None, None], name='ids'), P.static.InputSpec(
-                        shape=[None, None], name='sids')
-            ])
+        class InferenceModel(ErnieModelForSequenceClassification):
             def forward(self, ids, sids):
-                _, logits = super(InferemceModel, self).forward(ids, sids)
+                _, logits = super(InferenceModel, self).forward(ids, sids)
                 return logits
 
-        model.__class__ = InferemceModel  #dynamic change model type, to make sure forward output doesn't contain `None`
+        model.__class__ = InferenceModel
+        log.debug('saving inference model')
         src_placeholder = P.zeros([2, 2], dtype='int64')
         sent_placehodler = P.zeros([2, 2], dtype='int64')
-        model(src_placeholder, sent_placehodler)
-        P.jit.save(model, args.inference_model_dir)
+        _, static = P.jit.TracedLayer.trace(
+            model, inputs=[src_placeholder, sent_placehodler])
+        static.save_inference_model(str(args.inference_model_dir))
+
+        #class InferenceModel(ErnieModelForSequenceClassification):
+        #    @P.jit.to_static
+        #    def forward(self, ids, sids):
+        #        _, logits =  super(InferenceModel, self).forward(ids, sids, labels=None)
+        #        return logits
+        #model.__class__ = InferenceModel
+        #src_placeholder = P.zeros([2, 2], dtype='int64')
+        #sent_placehodler = P.zeros([2, 2], dtype='int64')
+        #P.jit.save(model, args.inference_model_dir, input_var=[src_placeholder, sent_placehodler])
         log.debug('done')

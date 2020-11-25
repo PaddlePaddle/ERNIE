@@ -30,3 +30,11 @@ class UnpackDataLoader(paddle.io.DataLoader):
     def __iter__(self):
         return ([yy[0] for yy in y]
                 for y in super(UnpackDataLoader, self).__iter__())
+
+
+def create_if_not_exists(dir):
+    try:
+        dir.mkdir(parents=True)
+    except FileExistsError:
+        pass
+    return dir
