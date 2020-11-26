@@ -36,8 +36,8 @@ logging.getLogger().setLevel(logging.DEBUG)
 #from model.bert import BertConfig, BertModelLayer
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
-from ernie.optimization import AdamW, LinearDecay
-from demo.utils import UnpackDataLoader, create_if_not_exists
+#from ernie.optimization import AdamW, LinearDecay
+from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('classify model with ERNIE')
@@ -138,14 +138,6 @@ if __name__ == '__main__':
                                    .map(map_fn) \
                                    .padded_batch(args.bsz, (0, 0, 0))
 
-    shapes = ([-1, args.max_seqlen], [-1, args.max_seqlen], [-1])
-    types = ('int64', 'int64', 'int64')
-
-    train_ds.data_shapes = shapes
-    train_ds.data_types = types
-    dev_ds.data_shapes = shapes
-    dev_ds.data_types = types
-
     place = P.CUDAPlace(0)
     model = ErnieModelForSequenceClassification.from_pretrained(
         args.from_pretrained, num_labels=3, name='')
@@ -156,19 +148,26 @@ if __name__ == '__main__':
         model.set_state_dict(sd)
 
     g_clip = P.nn.ClipGradByGlobalNorm(1.0)  #experimental
+    param_name_to_exclue_from_weight_decay = re.compile(
+        r'.*layer_norm_scale|.*layer_norm_bias|.*b_0')
     if args.use_lr_decay:
-        opt = AdamW(
-            learning_rate=LinearDecay(args.lr,
-                                      int(args.warmup_proportion *
-                                          args.max_steps), args.max_steps),
-            parameter_list=model.parameters(),
+        lr_scheduler = P.optimizer.lr.LambdaDecay(
+            args.lr,
+            get_warmup_and_linear_decay(
+                args.max_steps, int(args.warmup_proportion * args.max_steps)))
+        opt = P.optimizer.AdamW(
+            lr_scheduler,
+            parameters=model.parameters(),
             weight_decay=args.wd,
+            apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
             grad_clip=g_clip)
     else:
-        opt = AdamW(
+        lr_scheduler = None
+        opt = P.optimizer.Adam(
             args.lr,
-            parameter_list=model.parameters(),
+            parameters=model.parameters(),
             weight_decay=args.wd,
+            apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
             grad_clip=g_clip)
     scaler = P.amp.GradScaler(enable=args.use_amp)
     with LogWriter(logdir=str(create_if_not_exists(args.save_dir /
@@ -182,19 +181,21 @@ if __name__ == '__main__':
                     loss = scaler.scale(loss)
                     loss.backward()
                     if step % 10 == 0:
-                        _lr = opt.current_step_lr()
+                        _lr = lr_scheduler.get_lr()
                         if args.use_amp:
                             _l = (loss / scaler._scale).numpy()
-                            msg = 'train loss %.5f lr %.3e scaling %.3e' % (
-                                _l, _lr, scaler._scale.numpy())
+                            msg = '[step-%d] train loss %.5f lr %.3e scaling %.3e' % (
+                                step, _l, _lr, scaler._scale.numpy())
                         else:
                             _l = loss.numpy()
-                            msg = 'train loss %.5f lr %.3e' % (_l, _lr)
+                            msg = '[step-%d] train loss %.5f lr %.3e' % (
+                                step, _l, _lr)
                         log.debug(msg)
                         log_writer.add_scalar('loss', _l, step=step)
                         log_writer.add_scalar('lr', _lr, step=step)
                     scaler.minimize(opt, loss)
                     model.clear_gradients()
+                    lr_scheduler and lr_scheduler.step()
                     if step % 100 == 0:
                         acc = []
                         with P.no_grad():

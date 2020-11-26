@@ -38,3 +38,7 @@ def create_if_not_exists(dir):
     except FileExistsError:
         pass
     return dir
+
+
+def get_warmup_and_linear_decay(max_steps, warmup_steps):
+    return lambda step: min(step / warmup_steps, 1. - (step - warmup_steps) / (max_steps - warmup_steps))

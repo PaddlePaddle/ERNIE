@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import os
-import re
 import time
 import logging
 import json
+import re
 from random import random
 from functools import reduce, partial
 
@@ -32,8 +32,8 @@ import propeller.paddle as propeller
 #from model.bert import BertConfig, BertModelLayer
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
-from ernie.optimization import AdamW, LinearDecay
-from demo.utils import UnpackDataLoader, create_if_not_exists
+#from ernie.optimization import AdamW, LinearDecay
+from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
@@ -76,6 +76,13 @@ if __name__ == '__main__':
         default=None,
         help='checkpoint to warm start from')
     parser.add_argument(
+        '--max_bsz',
+        type=str,
+        default=32,
+        help='maximum batch size for each rank, if bsz > max_bsz, '
+        'will performe gradient accumulate')
+
+    parser.add_argument(
         '--use_amp',
         action='store_true',
         help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
@@ -111,25 +118,32 @@ if __name__ == '__main__':
         sentence, segments = tokenizer.build_for_ernie(seg_a, seg_b)
         return sentence, segments, label
 
+    assert args.bsz % env.nranks == 0,  \
+        'assume batch_size %d to be equally split on nranks %d' % (args.bsz, env.nranks)
+    bsz_per_rank = args.bsz // env.nranks
+    assert bsz_per_rank > args.max_bsz or bsz_per_rank % args.max_bsz == 0,  \
+        'cannot do gradient accumulate, bsz:%d, max_bsz:%d nranks:%d' % (args.bsz, args.max_bsz, env.nrank)
+    args.bsz = min(bsz_per_rank, args.max_bsz)
+    acc_steps = bsz_per_rank // args.max_bsz
+    if acc_steps > 1:
+        log.info('doing gradient accumulate, acc_steps:%d, actual_bsz:%d' %
+                 (acc_steps, args.bsz))
 
-    train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=False, repeat=True, use_gz=False) \
+    train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'),
+                                                shuffle=False, repeat=True, use_gz=False) \
                                    .map(map_fn) \
                                    .padded_batch(args.bsz, (0, 0, 0))
     train_ds = train_ds.shard(env.nranks, env.dev_id)
-    log.debug('shard %d/%d' % (env.nranks, env.dev_id))
-    #train_ds = train_ds.shuffle(10000)
+    log.debug('sharding %d/%d' % (env.nranks, env.dev_id))
+    train_ds = train_ds.shuffle(10000)
 
-    dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'), shuffle=False, repeat=False, use_gz=False) \
+    dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'),
+                                            shuffle=False, repeat=False, use_gz=False) \
                                    .map(map_fn) \
                                    .padded_batch(args.bsz, (0, 0, 0))
 
     shapes = ([-1, args.max_seqlen], [-1, args.max_seqlen], [-1])
     types = ('int64', 'int64', 'int64')
-
-    train_ds.data_shapes = shapes
-    train_ds.data_types = types
-    dev_ds.data_shapes = shapes
-    dev_ds.data_types = types
 
     place = P.CUDAPlace(env.dev_id)
     P.distributed.init_parallel_env()
@@ -145,46 +159,59 @@ if __name__ == '__main__':
     model = P.DataParallel(model)
 
     g_clip = P.nn.ClipGradByGlobalNorm(1.0)  #experimental
-    opt = AdamW(
-        learning_rate=LinearDecay(args.lr,
-                                  int(args.warmup_proportion * args.max_steps),
-                                  args.max_steps),
-        parameter_list=model.parameters(),
+    param_name_to_exclue_from_weight_decay = re.compile(
+        r'.*layer_norm_scale|.*layer_norm_bias|.*b_0')
+
+    lr_scheduler = P.optimizer.lr.LambdaDecay(
+        args.lr,
+        get_warmup_and_linear_decay(
+            args.max_steps, int(args.warmup_proportion * args.max_steps)))
+    opt = P.optimizer.AdamW(
+        learning_rate=lr_scheduler,
+        parameters=model.parameters(),
+        apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
         weight_decay=args.wd,
         grad_clip=g_clip)
     scaler = P.amp.GradScaler(enable=args.use_amp)
+    inner_step, step = 0, 0
     create_if_not_exists(args.save_dir)
     #with LogWriter(logdir=str(create_if_not_exists(args.save_dir / 'vdl-%d' % env.dev_id))) as log_writer:
-    for step, (ids, sids, label) in enumerate(
-            UnpackDataLoader(
-                train_ds, places=P.CUDAPlace(env.dev_id))):
+
+    for ids, sids, label in UnpackDataLoader(
+            train_ds, places=P.CUDAPlace(env.dev_id)):
+        inner_step += 1
         loss, _ = model(ids, sids, labels=label)
-        scaled_loss = model.scale_loss(loss)
-        scaled_loss.backward()
-        model.apply_collective_grads()
-        opt.minimize(scaled_loss)
+        loss /= acc_steps
+        loss.backward()
+        if inner_step % acc_steps != 0:
+            continue  # do grad average
+        lr_scheduler.step()
+        opt.step()
+        step += 1
         model.clear_gradients()
+
+        # do logging
         if step % 10 == 0:
-            _lr = opt.current_step_lr()
+            _lr = lr_scheduler.get_lr()
             if args.use_amp:
                 _l = (loss / scaler._scale).numpy()
-                msg = 'train loss %.5f lr %.3e scaling %.3e' % (
-                    _l, _lr, scaler._scale.numpy())
+                msg = '[rank-%d][step-%d] train loss %.5f lr %.3e scaling %.3e' % (
+                    env.dev_id, step, _l, _lr, scaler._scale.numpy())
             else:
                 _l = loss.numpy()
-                msg = 'train loss %.5f lr %.3e' % (_l, _lr)
+                msg = '[rank-%d][step-%d] train loss %.5f lr %.3e' % (
+                    env.dev_id, step, _l, _lr)
             log.debug(msg)
             #log_writer.add_scalar('loss', _l, step=step)
             #log_writer.add_scalar('lr', _lr, step=step)
 
+        # do saving
         if step % 100 == 0 and env.dev_id == 0:
             acc = []
             with P.no_grad():
                 model.eval()
-                for step, d in enumerate(
-                        UnpackDataLoader(
-                            dev_ds,
-                            places=P.CUDAPlace(env.dev_id), )):
+                for d in UnpackDataLoader(
+                        dev_ds, places=P.CUDAPlace(env.dev_id)):
                     ids, sids, label = d
                     loss, logits = model(ids, sids, labels=label)
                     a = (logits.argmax(-1) == label)
@@ -195,8 +222,10 @@ if __name__ == '__main__':
             log.debug('acc %.5f' % acc)
             if args.save_dir is not None:
                 P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+        # exit 
         if step > args.max_steps:
             break
 
-    if args.save_dir is not None and env.dev_id:
-        P.save(model.state_dict(), args.save_dir / 'ckpt/bin')
+    if args.save_dir is not None and env.dev_id == 0:
+        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+    log.debug('done')
