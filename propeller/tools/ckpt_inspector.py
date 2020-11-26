@@ -26,7 +26,7 @@ import collections
 from distutils import dir_util
 import pickle
 
-#from utils import print_arguments
+#from utils import print_arguments 
 import paddle.fluid as F
 from paddle.fluid.proto import framework_pb2
 
@@ -82,6 +82,38 @@ def parse(filename):
         return arr
 
 
+def serialize(arr, filename):
+    with open(filename, 'wb') as f:
+        write = lambda fmt, data: f.write(struct.pack(fmt, data))
+        write('I', 0)
+        write('Q', 0)
+        write('I', 0)
+        proto = framework_pb2.VarType.TensorDesc()
+        if arr.dtype == np.float32:
+            proto.data_type = framework_pb2.VarType.FP32
+            dtype = 'f'
+        elif arr.dtype == np.int64:
+            proto.data_type = framework_pb2.VarType.INT64
+            dtype = 'q'
+        elif arr.dtype == np.int32:
+            proto.data_type = framework_pb2.VarType.INT32
+            dtype = 'i'
+        elif arr.dtype == np.int8:
+            proto.data_type = framework_pb2.VarType.INT8
+            dtype = 'B'
+        elif arr.dtype == np.float16:
+            proto.data_type = framework_pb2.VarType.FP16
+            dtype = 'H'
+        else:
+            raise RuntimeError('Unknown dtype %s' % proto.data_type)
+        proto.dims.extend(arr.shape)
+        proto_data = proto.SerializeToString()
+        write('i', len(proto_data))
+        f.write(proto_data)
+        data = struct.pack('%d%s' % (arr.size, dtype), *arr.flatten().tolist())
+        f.write(data)
+
+
 def show(arr):
     print(repr(arr))
 
@@ -111,7 +143,11 @@ if __name__ == '__main__':
     parser.add_argument('file_or_dir', type=str)
     parser.add_argument('-t', "--to", type=str, default=None)
     parser.add_argument('-v', "--verbose", action='store_true')
+    parser.add_argument('--print_items', type=int, default=None)
     args = parser.parse_args()
+
+    if args.print_items is not None:
+        np.set_printoptions(edgeitems=args.print_items)
 
     files = list_dir(args.file_or_dir)
     parsed_arr = map(parse, files)

@@ -172,3 +172,21 @@ def init_distribuition_env(program):
                  (repr(dis_config)))
         if status.is_master:
             sleep(30)
+
+
+def allgather(X):
+    if status.mode == DistributionMode.LOCAL:
+        return X
+    Xs = []
+    for i in range(status.num_replica):
+        copy_X = X * 1
+        copy_X.stop_gradient = True
+        #L.Print(copy_X)
+        copy_X = L.collective._broadcast(copy_X, i, True)
+        if i != status.replica_id:
+            copy_X.stop_gradient = True
+        else:
+            copy_X.stop_gradient = False
+        Xs.append(copy_X)
+    Xs = L.concat(Xs, 0)
+    return Xs

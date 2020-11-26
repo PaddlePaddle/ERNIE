@@ -83,6 +83,6 @@ class Model(object):
             predictions (Tensor): result of  `self.forward`
             label (Tensor): depends on your Dataset.output_shapes
         Returns:
-            (dict): k-v map like: {"metrics_name": propeller.Metrics }
+            (dict): k-v map like: {"metrics_name": propeller.Metrics } 
         """
         return {}

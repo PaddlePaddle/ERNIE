@@ -29,6 +29,7 @@ from time import time
 import paddle.fluid as F
 import paddle.fluid.layers as L
 
+from propeller.data.functional import unflatten
 from propeller.types import RunMode, StopException, SummaryRecord, StopException
 from propeller.types import ModelSpec, InferenceSpec, ProgramPair, RunConfig
 from propeller.paddle import summary, collection
@@ -48,11 +49,11 @@ __all__ = ['train_and_eval', 'Learner']
 def _get_summary_writer(path):
     summary_writer = None
     try:
-        from visualdl import LogWriter
+        from tensorboardX import SummaryWriter
         if distribution.status.is_master:
-            summary_writer = LogWriter(os.path.join(path))
+            summary_writer = SummaryWriter(os.path.join(path))
     except ImportError:
-        log.warning('VisualDL not installed, will not log to VisualDL')
+        log.warning('tensorboardX not installed, will not log to tensorboard')
     return summary_writer
 
 
@@ -65,31 +66,30 @@ def _log_eval_result(name, eval_result, swriter, state):
     log.debug(eval_result)
     printable = []
     for n, val in six.iteritems(eval_result):
-        assert val.shape == (), 'metrics eval use float'
-        printable.append('{}\t{}'.format(n, val))
+        #assert val.shape == (), 'metrics eval use float'
+        printable.append('{}:{}'.format(n, val))
         if swriter is not None:
             swriter.add_scalar(n, val, state.gstep)
-            log.debug('write to VisualDL %s' % swriter.logdir)
+            log.debug('write to tensorboard %s' % swriter.logdir)
 
-    if len(printable):
-        log.info('*** eval res: %10s ***' % name)
-        for p in printable:
-            log.info(p)
-        log.info('******************************')
+    if printable:
+        log.info('[Eval:%s]:' % name + '\t'.join(printable))
 
 
 def _build_net(model_fn, features, mode, params, run_config):
     model_spec = model_fn(
         features=features, mode=mode, params=params, run_config=run_config)
 
-    if mode == RunMode.TRAIN:
+    if mode == RunMode.TRAIN or mode == RunMode.EVAL:
         if not isinstance(model_spec.loss, F.framework.Variable):
             raise ValueError('model_spec.metrics should be Variable, got %s' %
                              repr(model_spec.loss))
         if not (model_spec.loss.shape == () or model_spec.loss.shape == (1, )):
             raise ValueError('expect scarlar loss, got %s' %
                              repr(model_spec.loss.shape))
-        #model_spec.loss.persistable = True
+
+    if mode == RunMode.TRAIN:
+        pass
     elif mode == RunMode.EVAL:
         if not isinstance(model_spec.metrics, dict):
             raise ValueError('model_spec.metrics should be dict, got %s' %
@@ -119,7 +119,7 @@ class Learner(object):
                 3. backword           (loss) => None
                 4. loss               (predictoin) => (loss)
                 5. metrics (optional) (prediction) => (dict of propeller.Metrics)
-
+                
             2. a model_fn takes following args:
                 1. features
                 2. param
@@ -134,10 +134,10 @@ class Learner(object):
         if run_config.model_dir is None:
             raise ValueError('model_dir should specified in run_config')
 
-        if inspect.isfunction(model_class_or_model_fn):
-            _model_fn = model_class_or_model_fn
-        elif issubclass(model_class_or_model_fn, Model):
+        if issubclass(model_class_or_model_fn, Model):
             _model_fn = _build_model_fn(model_class_or_model_fn)
+        elif inspect.isfunction(model_class_or_model_fn):
+            _model_fn = model_class_or_model_fn
         else:
             raise ValueError('unknown model %s' % model_class_or_model_fn)
 
@@ -154,6 +154,7 @@ class Learner(object):
             with collection.Collections() as collections:
                 log.info('Building Train Graph...')
                 fea = train_dataset.features()
+                fea = unflatten(fea, train_dataset.data_schema)
                 model_spec = _build_net(self.model_fn, fea, RunMode.TRAIN,
                                         self.params, self.run_config)
                 log.info('Building Train Graph: Done')
@@ -188,10 +189,22 @@ class Learner(object):
             #share var with Train net
             log.info('Building Eval Graph')
             fea = ds.features()
+            fea = unflatten(fea, ds.data_schema)
             model_spec = _build_net(self.model_fn, fea, RunMode.EVAL,
                                     self.params, self.run_config)
             log.info('Done')
         #program = program.clone(for_test=True)
+        # program check
+        optimizer_ops = {'sgd', 'adam', 'adagrad'}
+        for op in program.global_block().ops:
+            if op.type == 'dropout':
+                op._set_attr('is_test', True)
+            if op.type == 'batch_norm':
+                op._set_attr('is_test', True)
+            if op.type in optimizer_ops:
+                raise RuntimeError('Found optimizer op in eval graph, op: %s' %
+                                   repr(op))
+
         log.info(
             'Eval with: \n> Run_config: %s\n> Params: %s\n> Train_model_spec: %s\n'
             % (repr(self.run_config), repr(self.params), repr(model_spec)))
@@ -206,10 +219,20 @@ class Learner(object):
             #share var with Train net
             log.info('Building Predict Graph')
             fea = ds.features()
+            fea = unflatten(fea, ds.data_schema)
             model_spec = _build_net(self.model_fn, fea, RunMode.PREDICT,
                                     self.params, self.run_config)
             log.info('Done')
 
+        optimizer_ops = {'sgd', 'adam', 'adagrad'}
+        for op in program.global_block().ops:
+            if op.type == 'dropout':
+                op._set_attr('is_test', True)
+            if op.type == 'batch_norm':
+                op._set_attr('is_test', True)
+            if op.type in optimizer_ops:
+                raise RuntimeError('Found optimizer op in eval graph, op: %s' %
+                                   repr(op))
         #program = program.clone(for_test=True)
 
         log.info(
@@ -235,6 +258,7 @@ class Learner(object):
                 summary_writer=_get_summary_writer(
                     os.path.join(self.run_config.model_dir, 'train_history')),
                 per_step=self.run_config.log_steps,
+                prefix=self.run_config.log_prefix or 'training',
                 skip_step=self.run_config.skip_steps),
         ]
         if model_spec.train_hooks is not None:
@@ -252,14 +276,14 @@ class Learner(object):
             warm_start_setting=self.warm_start_setting)
 
         distribution.init_distribuition_env(
-            train_program)  #only initialize distribute training with
+            train_program)  #only initialize distribute training with 
         mon_exe.init_or_restore_variables()
         if distribution.status.is_master:
             mon_exe._hooks.append(
                 hooks.CheckpointSaverHook(
                     mon_exe._saver,
                     per_step=mon_exe._save_steps,
-                    skip_step=mon_exe._skip_steps))
+                    skip_step=mon_exe._skip_steps, ))
 
         try:
             with mon_exe:
@@ -292,13 +316,17 @@ class Learner(object):
         mon_exe = MonitoredExecutor(
             eval_executor,
             program,
+            loss=model_spec.loss,
             run_config=self.run_config,
-            run_hooks=eval_run_hooks)
+            run_hooks=eval_run_hooks,
+            warm_start_setting=self.warm_start_setting)
+        distribution.init_distribuition_env(
+            program)  #only initialize distribute training with 
         mon_exe.init_or_restore_variables()
 
         try:
             with mon_exe:
-                for data in eval_dataset.start(places=[single_card_place]):
+                for data in eval_dataset.start():
                     mon_exe.run(feed=data)
         except (StopException, F.core.EOFException) as e:
             pass
@@ -309,7 +337,7 @@ class Learner(object):
             os.path.join(self.run_config.model_dir, 'eval_history'))
         _log_eval_result('eval', eval_result, summary_writer, mon_exe.state)
 
-        return mon_exe.result
+        return eval_result
 
     def predict(self,
                 predict_dataset,
@@ -319,15 +347,15 @@ class Learner(object):
                 split_batch=True):
         """
         Perform predictoin
-        will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode
+        will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode 
 
         Args:
             infer_dataset (propeller.data.Dataset): should not `shuffle` or `repeat`
-            steps (int): steps to predict, if None is specifed,
+            steps (int): steps to predict, if None is specifed, 
                 will stop when `StopException` is raised in `infer_dataset`
-            ckpt_path (None|str): Path of a specific checkpoint to predict.
-                If None, the latest checkpoint in model_dir is used.
-                If there are no checkpoints in model_dir,
+            ckpt_path (None|str): Path of a specific checkpoint to predict. 
+                If None, the latest checkpoint in model_dir is used. 
+                If there are no checkpoints in model_dir, 
                 prediction is run with newly initialized Variables instead of ones restored from checkpoint.
             ckpt (int): deprecated args
             split_batch (bool): if True, prediction of each example in a batch is returned.
@@ -351,8 +379,12 @@ class Learner(object):
             program,
             run_config=pred_run_config,
             warm_start_setting=self.warm_start_setting, )
-        mon_exe.init_or_restore_variables(ckpt
-                                          if ckpt_path is None else ckpt_path)
+        mon_exe.init_or_restore_variables(ckpt)
+        if ckpt_path is not None:
+            if not os.path.exists(ckpt_path):
+                raise RuntimeError('ckpt path not found: %s' % ckpt_path)
+            log.info('Loading ckpt path for prediction: %s' % ckpt_path)
+            mon_exe._saver._load_program(ckpt_path)
         try:
             with mon_exe:
                 log.info('Runining predict from dir: %s' % repr(mon_exe.state))
@@ -382,8 +414,8 @@ def train_and_eval(_placeholder=None,
                    eval_hooks=[],
                    exporters=[]):
     """
-    Perform train and evaluate procesure.
-    will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode
+    Perform train and evaluate procesure. 
+    will call `model_fn` and initiate user-specifed model in `propeller.RunMode.PREDICT` mode 
 
     Args:
         model_class_or_model_fn(callable|propeller.train.Model): `model_class_or_model_fn` be specified in 2 ways:
@@ -394,7 +426,7 @@ def train_and_eval(_placeholder=None,
         params: any python object, will pass to your `model_fn` or `propeller.train.Model`
         run_config (propeller.RunConfig): run_config.max_steps should not be None.
         train_dataset (propeller.paddle.data.Dataset): training will stop if global_step > run_config.max_steps.
-        eval_dataset (propeller.paddle.data.Dataset|dict): Optional, if Dict of propeller.data.Dataset were specified,
+        eval_dataset (propeller.paddle.data.Dataset|dict): Optional, if Dict of propeller.data.Dataset were specified, 
             will perform evluatation on every evaluation sets and report results.
         warm_start_setting (propeller.WarmStartSetting): Optional. warm start variable will overwrite model variable.
         train_hooks (list of propeller.paddle.train.RunHook): Optional.
@@ -452,7 +484,7 @@ def train_and_eval(_placeholder=None,
 
         def after_run(self, _, state):
             """doc"""
-            if state.step > run_config.skip_steps and state.gstep % run_config.eval_steps == 0:
+            if state.gstep > run_config.skip_steps and state.gstep % run_config.eval_steps == 0:
                 eval_results = {}
                 for name, ds in six.iteritems(eval_dataset):
                     ehooks = [
@@ -481,15 +513,21 @@ def train_and_eval(_placeholder=None,
                     eval_results[name] = eval_res
                     _log_eval_result(name, eval_res,
                                      self.summary_writers[name], state)
-                for exporter in exporters:
-                    exporter.export(eval_executor, self.program,
-                                    self.model_spec, eval_results, state)
+
+                if distribution.status.is_master:
+                    for exporter in exporters:
+                        exporter.export(eval_executor, self.program,
+                                        self.model_spec, eval_results, state)
             else:
                 eval_results = {}
             return eval_results
 
-    if distribution.status.is_master:
-        train_hooks.append(_EvalHookOnTrainLoop())
+        def after_train(self, _, __):
+            for _, w in six.iteritems(self.summary_writers):
+                if w:
+                    w.close()
+
+    train_hooks.append(_EvalHookOnTrainLoop())
     res = est.train(train_dataset, train_hooks=train_hooks)
     return res
 
@@ -497,7 +535,14 @@ def train_and_eval(_placeholder=None,
 def _build_model_fn(model_class):
     def _model_fn(features, mode, params, run_config):
         if mode != RunMode.PREDICT:
-            fea, label = features[:-1], features[-1]
+            if isinstance(features, list) or isinstance(features, tuple):
+                fea, label = features[:-1], features[-1]
+            elif isinstance(features, dict):
+                label = {"labels": features["labels"]}
+                del features["labels"]
+                fea = features
+            else:
+                raise TypeError
         else:
             fea = features
 

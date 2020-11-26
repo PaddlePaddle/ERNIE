@@ -21,6 +21,7 @@ import paddle.fluid as F
 import paddle.fluid.layers as L
 
 from propeller.data.functional import Dataset as DatasetBase
+from propeller.data.functional import flatten
 from paddle.io import IterableDataset as PDataset
 
 log = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ class Dataset(DatasetBase, PDataset):
         def _gen():
             try:
                 for idx, i in enumerate(self.generator()):
+                    i, _ = flatten(i)
                     yield i
             except Exception as e:
                 log.exception(e)

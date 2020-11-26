@@ -25,6 +25,8 @@ import paddle.fluid as F
 import paddle.fluid.layers as L
 import sklearn.metrics
 
+from propeller.paddle.train import distribution  #import allgather, status, DistributionMode
+
 log = logging.getLogger(__name__)
 
 __all__ = [
@@ -33,17 +35,33 @@ __all__ = [
 ]
 
 
+def _allgather_2dim(*args):
+    log.info('distribution.status.mode : {}'.format(distribution.status.mode))
+    if distribution.status.mode == distribution.DistributionMode.LOCAL:
+        return args
+
+    if distribution.status.num_replica == 1:
+        return args
+
+    for a in args:
+        if len(a.shape) > 2:
+            log.warn(
+                'Metrics:%s have shape %s, cannot not be allgathered, will return to single card evaluation'
+                % (a, a.shape))
+        else:
+            pass
+            #log.debug('broadcast %s' % a)
+    ret = [distribution.allgather(a) if len(a.shape) <= 2 else a for a in args]
+    return ret
+
+
 class Metrics(object):
     """Metrics base class"""
 
     def __init__(self):
         """doc"""
         self.saver = []
-
-    @property
-    def tensor(self):
-        """doc"""
-        pass
+        self.tensor = None
 
     def update(self, *args):
         """doc"""
@@ -59,7 +77,7 @@ class Mean(Metrics):
 
     def __init__(self, t):
         """doc"""
-        self.t = t
+        self.t = _allgather_2dim(t)
         self.reset()
 
     def reset(self):
@@ -69,7 +87,7 @@ class Mean(Metrics):
     @property
     def tensor(self):
         """doc"""
-        return self.t,
+        return self.t
 
     def update(self, args):
         """doc"""
@@ -79,6 +97,7 @@ class Mean(Metrics):
 
     def eval(self):
         """doc"""
+        log.debug(self.saver.shape)
         return self.saver.mean()
 
 
@@ -99,13 +118,13 @@ class Acc(Mean):
             raise ValueError(
                 'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
                 % (repr(label), repr(pred)))
-        self.eq = L.equal(pred, label)
+        self.eq = _allgather_2dim(L.cast(L.equal(pred, label), 'int64'))
         self.reset()
 
     @property
     def tensor(self):
         """doc"""
-        return self.eq,
+        return self.eq
 
 
 class MSE(Mean):
@@ -169,7 +188,7 @@ class MacroF1(Metrics):
     @property
     def tensor(self):
         """doc"""
-        return self.label, self.pred
+        return [self.label, self.pred]
 
     def update(self, args):
         """doc"""
@@ -202,20 +221,16 @@ class Precision(Metrics):
         self.label = label
         self.pred = pred
         self.reset()
+        self.tensor = _allgather_2dim(self.pred, self.label)
 
     def reset(self):
         """doc"""
         self.label_saver = np.array([], dtype=np.bool)
         self.pred_saver = np.array([], dtype=np.bool)
 
-    @property
-    def tensor(self):
-        """doc"""
-        return self.label, self.pred
-
     def update(self, args):
         """doc"""
-        label, pred = args
+        pred, label = args
         label = label.reshape([-1]).astype(np.bool)
         pred = pred.reshape([-1]).astype(np.bool)
         if label.shape != pred.shape:
@@ -255,6 +270,81 @@ class F1(Precision):
         return 2 * precision * recall / (precision + recall + 1.e-6)
 
 
+class MicroF1(Precision):
+    """doc"""
+
+    def update(self, args):
+        """doc"""
+        label, pred = args
+        label = label.reshape([-1])
+        pred = pred.reshape([-1])
+        if label.shape != pred.shape:
+            raise ValueError('Metrics f1: input not match: label:%s pred:%s' %
+                             (label, pred))
+        self.label_saver = np.concatenate([self.label_saver, label])
+        self.pred_saver = np.concatenate([self.pred_saver, pred])
+
+    def eval(self):
+        """doc"""
+        return sklearn.metrics.f1_score(
+            self.label_saver, self.pred_saver, average='micro')
+
+
+class MacroF1(Precision):
+    def eval(self):
+        """doc"""
+        return sklearn.metrics.f1_score(
+            self.label_saver, self.pred_saver, average='macro')
+
+
+class MCC(Precision):
+    """mathew corelation coefitient"""
+
+    def eval(self):
+        """doc"""
+        return sklearn.metrics.matthews_corrcoef(self.label_saver,
+                                                 self.pred_saver)
+
+
+class PCC(Metrics):
+    """pearson corelation coefitient"""
+
+    def __init__(self, label, pred):
+        """doc"""
+        if label.shape != pred.shape:
+            raise ValueError(
+                'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
+                % (repr(label), repr(pred)))
+
+        from scipy.stats import pearsonr
+        self.pearsonr = pearsonr
+        self.label = label
+        self.pred = pred
+        self.tensor = _allgather_2dim(self.pred, self.label)
+        self.reset()
+
+    def reset(self):
+        """doc"""
+        self.label_saver = np.array([], dtype=np.float)
+        self.pred_saver = np.array([], dtype=np.float)
+
+    def update(self, args):
+        """doc"""
+        pred, label = args
+        label = label.reshape([-1]).astype(np.float)
+        pred = pred.reshape([-1]).astype(np.float)
+        if label.shape != pred.shape:
+            raise ValueError('input not match: label:%s pred:%s' %
+                             (label, pred))
+        self.label_saver = np.concatenate([self.label_saver, label])
+        self.pred_saver = np.concatenate([self.pred_saver, pred])
+
+    def eval(self):
+        """doc"""
+        p, _ = self.pearsonr(self.label_saver, self.pred_saver)
+        return p
+
+
 class Auc(Metrics):
     """doc"""
 
@@ -267,17 +357,13 @@ class Auc(Metrics):
 
         self.pred = pred
         self.label = label
+        self.tensor = _allgather_2dim(self.pred, self.label)
         self.reset()
 
     def reset(self):
         """doc"""
         self.pred_saver = np.array([], dtype=np.float32)
         self.label_saver = np.array([], dtype=np.bool)
-
-    @property
-    def tensor(self):
-        """doc"""
-        return [self.pred, self.label]
 
     def update(self, args):
         """doc"""
@@ -289,10 +375,35 @@ class Auc(Metrics):
 
     def eval(self):
         """doc"""
+        log.debug(self.pred_saver.shape)
         fpr, tpr, thresholds = sklearn.metrics.roc_curve(
             self.label_saver.astype(np.int64), self.pred_saver)
         auc = sklearn.metrics.auc(fpr, tpr)
         return auc
+
+
+class BestAcc(Auc):
+    """doc"""
+
+    def eval(self):
+        """doc"""
+        thres = np.unique(self.pred_saver)
+        best_thre = -1
+        best_acc = -1
+
+        num = 10000
+        gap = len(thres) // num
+        if gap > 0:
+            thres = thres[::gap]
+
+        for thre in thres:
+            acc = 1. * np.sum(
+                (self.pred_saver > thre
+                 ) == self.label_saver.astype(np.bool)) / len(self.pred_saver)
+            if acc > best_acc:
+                best_thre = thre
+                best_acc = acc
+        return best_acc
 
 
 class RecallAtPrecision(Auc):
@@ -533,9 +644,7 @@ class PNRatio(Metrics):
                 'expect label shape == pred shape, got: label.shape=%s, pred.shape = %s'
                 % (repr(label), repr(pred)))
 
-        self.qid = qid
-        self.label = label
-        self.pred = pred
+        self.qid, self.label, self.pred = _allgather_2dim(qid, label, pred)
         self.saver = {}
 
     def reset(self):
@@ -581,7 +690,7 @@ class PNRatio(Metrics):
                             p += 1
                         elif p1 > p2:
                             n += 1
-        pn = p / n if n > 0 else 0.0
+        pn = 1. * p / n if n > 0 else 0.0
         return np.float32(pn)
 
 
@@ -696,7 +805,7 @@ class PrecisionAtK(Metrics):
 #        dic = {}
 #        for qid, vec, type_id in self.saver():
 #            dic.setdefault(i, {}).setdefault(k, []).append(vec)
-#
+#        
 #        for qid in dic:
 #            assert len(dic[qid]) == 3
 #            qvec = np.arrray(dic[qid][0])
@@ -706,4 +815,4 @@ class PrecisionAtK(Metrics):
 #
 #            np.matmul(qvec, np.transpose(ptvec))
 #            np.matmul(qvec, np.transpose(ntvec))
-#
+#            

@@ -86,6 +86,32 @@ def _shuffle_func(dataset, buffer_size):
     return _gen
 
 
+def _cache_shuffle_shard_func(dataset, num_shards, index, seed, drop_last):
+    def _gen():
+        iterable = dataset()
+        data_list = list(iterable)
+        len_per_shard = len(data_list) // num_shards
+        rng = np.random.RandomState(seed)
+        while True:
+            random.shuffle(data_list, rng.uniform)
+
+            iter_data_list = [
+                data_list[i] for i in range(index, len(data_list), num_shards)
+            ]
+
+            if drop_last:
+                iter_data_list = iter_data_list[:len_per_shard]
+            else:
+                fill_start_idx = len(data_list) % num_shards
+                if 0 < fill_start_idx <= index:
+                    iter_data_list.append(random.choice(data_list))
+
+            for data in iter_data_list:
+                yield data
+
+    return _gen
+
+
 def _interleave_func(iterable, map_fn, cycle_length, block_length):
     def _gen():
         ls = itertools.tee(iterable(), cycle_length)
@@ -93,7 +119,9 @@ def _interleave_func(iterable, map_fn, cycle_length, block_length):
         for i, j in enumerate(ls):
             j = itertools.islice(j, i, None, cycle_length)
             j = map(map_fn, j)
+
             j = (jjj for jj in j for jjj in jj)  #flatten
+
             buf.append(j)
 
         for tup in six.moves.zip_longest(*buf):
@@ -105,11 +133,14 @@ def _interleave_func(iterable, map_fn, cycle_length, block_length):
 
 def _repeat_func(dataset, n):
     def _gen():
-        iterable = dataset()
+        # iterable = dataset()
         if n >= 0:
-            ret = itertools.chain(*itertools.tee(iterable, n))
+            iters = []
+            for i in range(n):
+                iters.append(dataset())
+            ret = itertools.chain(*iters)
         else:
-            ret = itertools.cycle(iterable)
+            ret = itertools.cycle(dataset())
 
         for i in ret:
             yield i
@@ -147,6 +178,20 @@ def _shard_func(dataset, num_shards, index):
         ret = itertools.islice(iterable, index, None, num_shards)
         for i in ret:
             yield i
+
+    return _gen
+
+
+def _chunk_func(dataset, num_shards):
+    def _gen():
+        iterable = dataset()
+        while True:
+            ret = list(itertools.islice(iterable, num_shards))
+            if len(ret) == num_shards:
+                for r in ret:
+                    yield r
+            else:
+                raise StopIteration
 
     return _gen
 
@@ -229,7 +274,11 @@ def _batch_func(dataset, batch_size):
     return _gen
 
 
-def _padded_batch_func(dataset, batch_size, pad_value=0, max_seqlen=None):
+def _padded_batch_func(dataset,
+                       batch_size,
+                       pad_value=0,
+                       max_seqlen=None,
+                       droplast=False):
     if not isinstance(batch_size, int):
         raise ValueError('unknown batch_size: %s' % repr(batch_size))
 
@@ -238,6 +287,8 @@ def _padded_batch_func(dataset, batch_size, pad_value=0, max_seqlen=None):
         pad_value_t = pad_value
         while True:
             buf = list(itertools.islice(iterable, batch_size))
+            if droplast and len(buf) != batch_size:
+                raise StopIteration
             if not len(buf):
                 raise StopIteration
             buf = list(zip(*buf))  # transpose
@@ -268,14 +319,50 @@ def _padded_batch_func(dataset, batch_size, pad_value=0, max_seqlen=None):
     return _gen
 
 
+def flatten(structure):
+    flt = []
+
+    def map_structure(s):
+        if isinstance(s, np.ndarray):
+            flt.append(s)
+            return len(flt) - 1
+        elif isinstance(s, list):
+            return [map_structure(item) for item in s]
+        elif isinstance(s, tuple):
+            return tuple([map_structure(item) for item in s])
+        elif isinstance(s, dict):
+            return {key: map_structure(s[key]) for key in sorted(s.keys())}
+        else:
+            raise TypeError
+
+    return flt, map_structure(structure)
+
+
+def unflatten(flt, schema):
+    def map_structure(s):
+        if isinstance(s, int):
+            return flt[s]
+        elif isinstance(s, list):
+            return [map_structure(item) for item in s]
+        elif isinstance(s, tuple):
+            return tuple([map_structure(item) for item in s])
+        elif isinstance(s, dict):
+            return {key: map_structure(s[key]) for key in sorted(s.keys())}
+        else:
+            raise TypeError
+
+    return map_structure(schema)
+
+
 class Dataset(object):
     """Python Wrapper for PyReader"""
 
     @classmethod
     def from_generator_func(cls, _gen, data_shapes=None, data_types=None):
         """doc"""
-        if not inspect.isgeneratorfunction(_gen):
-            raise ValueError('expect generator function, got %s' % repr(_gen))
+
+        #if not inspect.isgeneratorfunction(_gen):
+        #raise ValueError('expect generator function, got %s' % repr(_gen))
 
         def _wrapper():  #compat to py3.7
             try:
@@ -340,6 +427,7 @@ class Dataset(object):
         self.name = None
         self._data_shapes = None
         self._data_types = None
+        self._data_schema = None
         self.generator = None
         self.pyreader = None
 
@@ -358,22 +446,37 @@ class Dataset(object):
     #def __call__(self):
     #    return self.generator()
 
-    def _infer_shapes_and_types(self):
+    def _infer_shapes_and_types_and_schema(self):
         if self.generator is not None and self.name is not None:
             log.info('Try to infer data shapes & types from generator')
-            first_value = next(self.generator())
+            first_gen = self.generator()
+            first_value = next(first_gen)
+            first_value, self._data_schema = flatten(first_value)
             shapes, types = [], []
             for v in first_value:
                 if not isinstance(v, np.ndarray):
                     raise ValueError(
                         'dataset generator should use numpy elements, got %s' %
                         first_value)
-                shapes.append(v.shape)
+                # use black magic to keep the same dataset shape.
+                shapes.append([(i > 1) + 1 for i in v.shape])
                 types.append(v.dtype.name)
             self._data_shapes = shapes
             self._data_types = types
             log.info('Dataset `%s` has data_shapes: %s data_types: %s' %
                      (self.name, repr(shapes), repr(types)))
+            original_generator = self.generator
+            self.is_first_call = True
+
+            def _gen():
+                if self.is_first_call:
+                    self.is_first_call = False
+                    generator = itertools.chain([first_value], first_gen)
+                else:
+                    generator = original_generator()
+                yield from generator
+
+            self.generator = _gen
         else:
             raise ValueError(
                 'Try to infer data shapes or types from incomplete Dataset')
@@ -382,7 +485,7 @@ class Dataset(object):
     def data_shapes(self):
         """doc"""
         if self._data_shapes is None:
-            self._infer_shapes_and_types()
+            self._infer_shapes_and_types_and_schema()
             return self._data_shapes
         else:
             return self._data_shapes
@@ -393,10 +496,27 @@ class Dataset(object):
         self._data_shapes = val
 
     @property
+    def data_schema(self):
+        """doc"""
+        if self._data_schema is None:
+            if self._data_shapes is not None and self._data_types is not None:
+                self._data_schema = [i for i in range(len(self._data_shapes))]
+            else:
+                self._infer_shapes_and_types_and_schema()
+            return self._data_schema
+        else:
+            return self._data_schema
+
+    @data_schema.setter
+    def data_schema(self, val):
+        """doc"""
+        self._data_schema = val
+
+    @property
     def data_types(self):
         """doc"""
         if self._data_types is None:
-            self._infer_shapes_and_types()
+            self._infer_shapes_and_types_and_schema()
             return self._data_types
         else:
             return self._data_types
@@ -448,6 +568,10 @@ class Dataset(object):
             _shard_func, num_shards=num_shards, index=index)
         return self.apply(func)
 
+    def chunk(self, num_shards):
+        func = functools.partial(_chunk_func, num_shards=num_shards)
+        return self.apply(func)
+
     def interleave(self, map_fn, cycle_length, block_length):
         """doc"""
         func = functools.partial(
@@ -461,13 +585,18 @@ class Dataset(object):
         func = functools.partial(_batch_func, batch_size=batch_size)
         return self.apply(func)
 
-    def padded_batch(self, batch_size, pad_value=0, max_seqlen=None):
+    def padded_batch(self,
+                     batch_size,
+                     pad_value=0,
+                     max_seqlen=None,
+                     droplast=False):
         """doc"""
         func = functools.partial(
             _padded_batch_func,
             batch_size=batch_size,
             pad_value=pad_value,
-            max_seqlen=max_seqlen)
+            max_seqlen=max_seqlen,
+            droplast=droplast)
         return self.apply(func)
 
     def take(self, count=1):
@@ -482,4 +611,14 @@ class Dataset(object):
 
     def chain(self, other):
         func = functools.partial(_chain_func, dataset2=other.generator)
+        return self.apply(func)
+
+    def cache_shuffle_shard(self, num_shards, index, seed=0, drop_last=True):
+        func = functools.partial(
+            _cache_shuffle_shard_func,
+            num_shards=num_shards,
+            index=index,
+            seed=seed,
+            drop_last=drop_last, )
+
         return self.apply(func)
