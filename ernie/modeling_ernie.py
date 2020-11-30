@@ -202,7 +202,7 @@ class PretrainedModel(object):
             pretrain_dir = _fetch_from_remote(url, force_download)
         else:
             log.info('pretrain dir %s not in %s, read from local' % (pretrain_dir_or_url, repr(cls.resource_map)))
-            pretrain_dir = pretrain_dir_or_url
+            pretrain_dir = Path(pretrain_dir_or_url)
 
         if not pretrain_dir.exists():
             raise ValueError('pretrain dir not found: %s' % pretrain_dir)
