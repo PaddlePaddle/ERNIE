@@ -75,12 +75,6 @@ if __name__ == '__main__':
         type=str,
         default=None,
         help='checkpoint to warm start from')
-    parser.add_argument(
-        '--max_bsz',
-        type=str,
-        default=32,
-        help='maximum batch size for each rank, if bsz > max_bsz, '
-        'will performe gradient accumulate')
 
     parser.add_argument(
         '--use_amp',
@@ -118,24 +112,10 @@ if __name__ == '__main__':
         sentence, segments = tokenizer.build_for_ernie(seg_a, seg_b)
         return sentence, segments, label
 
-    assert args.bsz % env.nranks == 0,  \
-        'assume batch_size %d to be equally split on nranks %d' % (args.bsz, env.nranks)
-    bsz_per_rank = args.bsz // env.nranks
-    assert bsz_per_rank > args.max_bsz or bsz_per_rank % args.max_bsz == 0,  \
-        'cannot do gradient accumulate, bsz:%d, max_bsz:%d nranks:%d' % (args.bsz, args.max_bsz, env.nrank)
-    args.bsz = min(bsz_per_rank, args.max_bsz)
-    acc_steps = bsz_per_rank // args.max_bsz
-    if acc_steps > 1:
-        log.info('doing gradient accumulate, acc_steps:%d, actual_bsz:%d' %
-                 (acc_steps, args.bsz))
-
     train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'),
-                                                shuffle=False, repeat=True, use_gz=False) \
+                                                shuffle=False, repeat=True, use_gz=False, shard=True) \
                                    .map(map_fn) \
                                    .padded_batch(args.bsz, (0, 0, 0))
-    train_ds = train_ds.shard(env.nranks, env.dev_id)
-    log.debug('sharding %d/%d' % (env.nranks, env.dev_id))
-    train_ds = train_ds.shuffle(10000)
 
     dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'),
                                             shuffle=False, repeat=False, use_gz=False) \
@@ -173,21 +153,17 @@ if __name__ == '__main__':
         weight_decay=args.wd,
         grad_clip=g_clip)
     scaler = P.amp.GradScaler(enable=args.use_amp)
-    inner_step, step = 0, 0
+    step = 0
     create_if_not_exists(args.save_dir)
     #with LogWriter(logdir=str(create_if_not_exists(args.save_dir / 'vdl-%d' % env.dev_id))) as log_writer:
 
     for ids, sids, label in UnpackDataLoader(
             train_ds, places=P.CUDAPlace(env.dev_id)):
-        inner_step += 1
+        step += 1
         loss, _ = model(ids, sids, labels=label)
-        loss /= acc_steps
         loss.backward()
-        if inner_step % acc_steps != 0:
-            continue  # do grad average
         lr_scheduler.step()
         opt.step()
-        step += 1
         model.clear_gradients()
 
         # do logging

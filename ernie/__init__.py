@@ -18,9 +18,8 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import paddle
-paddle_version = [i for i in paddle.__version__.split('.')]
-if paddle_version[0] not in {'2', '0'}:
-    raise RuntimeError('paddle-ernie 0.1.0 requires paddle 2.0+, got %s' %
+if paddle.__version__ != '0.0.0' and paddle.__version__ < '2.0.0':
+    raise RuntimeError('propeller 0.2 requires paddle 2.0+, got %s' %
                        paddle.__version__)
 
 from ernie.modeling_ernie import ErnieModel
