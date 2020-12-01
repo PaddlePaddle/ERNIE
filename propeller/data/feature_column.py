@@ -368,19 +368,29 @@ class FeatureColumns(object):
                         distribution.status.num_replica,
                         distribution.status.replica_id,
                         seed=seed,
+                        repeat=-1 if repeat else 1,
                         drop_last=True)
                 else:
                     dataset = dataset.cache_shuffle_shard(
-                        num_shards=1, index=0, seed=seed, drop_last=True)
+                        num_shards=1,
+                        index=0,
+                        seed=seed,
+                        drop_last=True,
+                        repeat=-1 if repeat else 1)
             else:
                 if distribution.status.mode == distribution.DistributionMode.NCCL:
                     dataset = dataset.shard(distribution.status.num_replica,
                                             distribution.status.replica_id)
+            if repeat:
+                dataset.repeat()
         elif shuffle:
             dataset = dataset.cache_shuffle_shard(
-                num_shards=1, index=0, seed=seed, drop_last=True)
-
-        if repeat:
+                num_shards=1,
+                index=0,
+                seed=seed,
+                drop_last=True,
+                repeat=-1 if repeat else 1)
+        elif repeat:
             dataset = dataset.repeat()
 
         def _parse_txt_file(
