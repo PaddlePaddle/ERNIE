@@ -94,7 +94,7 @@ def _cache_shuffle_shard_func(dataset, num_shards, index, seed, drop_last,
         len_per_shard = len(data_list) // num_shards
         rng = np.random.RandomState(seed)
         cnt = 0
-        while cnt < repeat:
+        while cnt != repeat:
             cnt += 1
             random.shuffle(data_list, rng.uniform)
 
