@@ -20,6 +20,10 @@ from __future__ import unicode_literals
 import sys
 import argparse
 import logging
+from functools import partial
+from io import open
+
+open = partial(open, encoding='utf-8')
 
 import json
 from collections import namedtuple

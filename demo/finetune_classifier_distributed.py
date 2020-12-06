@@ -122,9 +122,7 @@ dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir
 shapes = ([-1, args.max_seqlen], [-1, args.max_seqlen], [-1])
 types = ('int64', 'int64', 'int64')
 
-place = P.CUDAPlace(env.dev_id)
 P.distributed.init_parallel_env()
-env = P.distributed.ParallelEnv()
 model = ErnieModelForSequenceClassification.from_pretrained(
     args.from_pretrained, num_labels=3, name='')
 
@@ -152,51 +150,54 @@ opt = P.optimizer.AdamW(
 scaler = P.amp.GradScaler(enable=args.use_amp)
 step = 0
 create_if_not_exists(args.save_dir)
+
 #with LogWriter(logdir=str(create_if_not_exists(args.save_dir / 'vdl-%d' % env.dev_id))) as log_writer:
+with P.amp.auto_cast(enable=args.use_amp):
+    for ids, sids, label in UnpackDataLoader(
+            train_ds, places=P.CUDAPlace(env.dev_id)):
+        step += 1
+        loss, _ = model(ids, sids, labels=label)
+        loss = scaler.scale(loss)
+        loss.backward()
+        scaler.minimize(opt, loss)
+        model.clear_gradients()
+        lr_scheduler.step()
 
-for ids, sids, label in UnpackDataLoader(
-        train_ds, places=P.CUDAPlace(env.dev_id)):
-    step += 1
-    loss, _ = model(ids, sids, labels=label)
-    loss.backward()
-    lr_scheduler.step()
-    opt.step()
-    model.clear_gradients()
+        # do logging
+        if step % 10 == 0:
+            _lr = lr_scheduler.get_lr()
+            if args.use_amp:
+                _l = (loss / scaler._scale).numpy()
+                msg = '[rank-%d][step-%d] train loss %.5f lr %.3e scaling %.3e' % (
+                    env.dev_id, step, _l, _lr, scaler._scale.numpy())
+            else:
+                _l = loss.numpy()
+                msg = '[rank-%d][step-%d] train loss %.5f lr %.3e' % (
+                    env.dev_id, step, _l, _lr)
+            log.debug(msg)
+            #log_writer.add_scalar('loss', _l, step=step)
+            #log_writer.add_scalar('lr', _lr, step=step)
 
-    # do logging
-    if step % 10 == 0:
-        _lr = lr_scheduler.get_lr()
-        if args.use_amp:
-            _l = (loss / scaler._scale).numpy()
-            msg = '[rank-%d][step-%d] train loss %.5f lr %.3e scaling %.3e' % (
-                env.dev_id, step, _l, _lr, scaler._scale.numpy())
-        else:
-            _l = loss.numpy()
-            msg = '[rank-%d][step-%d] train loss %.5f lr %.3e' % (
-                env.dev_id, step, _l, _lr)
-        log.debug(msg)
-        #log_writer.add_scalar('loss', _l, step=step)
-        #log_writer.add_scalar('lr', _lr, step=step)
-
-    # do saving
-    if step % 100 == 0 and env.dev_id == 0:
-        acc = []
-        with P.no_grad():
-            model.eval()
-            for d in UnpackDataLoader(dev_ds, places=P.CUDAPlace(env.dev_id)):
-                ids, sids, label = d
-                loss, logits = model(ids, sids, labels=label)
-                a = (logits.argmax(-1) == label)
-                acc.append(a.numpy())
-            model.train()
-        acc = np.concatenate(acc).mean()
-        #log_writer.add_scalar('eval/acc', acc, step=step)
-        log.debug('acc %.5f' % acc)
-        if args.save_dir is not None:
-            P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
-    # exit 
-    if step > args.max_steps:
-        break
+        # do saving
+        if step % 100 == 0 and env.dev_id == 0:
+            acc = []
+            with P.no_grad():
+                model.eval()
+                for d in UnpackDataLoader(
+                        dev_ds, places=P.CUDAPlace(env.dev_id)):
+                    ids, sids, label = d
+                    loss, logits = model(ids, sids, labels=label)
+                    a = (logits.argmax(-1) == label)
+                    acc.append(a.numpy())
+                model.train()
+            acc = np.concatenate(acc).mean()
+            #log_writer.add_scalar('eval/acc', acc, step=step)
+            log.debug('acc %.5f' % acc)
+            if args.save_dir is not None:
+                P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+        # exit 
+        if step > args.max_steps:
+            break
 
 if args.save_dir is not None and env.dev_id == 0:
     P.save(model.state_dict(), args.save_dir / 'ckpt.bin')

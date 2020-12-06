@@ -138,15 +138,15 @@ def before(seg, label):
 
 train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=True, repeat=False, use_gz=False) \
                                .map(before) \
-                               .padded_batch(args.bsz, (0,0,0, other_tag_id + 1, 0)) \
+                               .padded_batch(args.bsz, (0,0,-100, other_tag_id + 1, 0)) \
 
 dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'), shuffle=False, repeat=False, use_gz=False) \
                                .map(before) \
-                               .padded_batch(args.bsz, (0,0,0, other_tag_id + 1,0)) \
+                               .padded_batch(args.bsz, (0,0,-100, other_tag_id + 1,0)) \
 
 test_ds = feature_column.build_dataset('test', data_dir=os.path.join(args.data_dir, 'test'), shuffle=False, repeat=False, use_gz=False) \
                                .map(before) \
-                               .padded_batch(args.bsz, (0,0,0, other_tag_id + 1,0)) \
+                               .padded_batch(args.bsz, (0,0,-100, other_tag_id + 1,0)) \
 
 
 def evaluate(model, dataset):
@@ -206,7 +206,7 @@ lr_scheduler = P.optimizer.lr.LambdaDecay(
     get_warmup_and_linear_decay(args.max_steps,
                                 int(args.warmup_proportion * args.max_steps)))
 opt = P.optimizer.AdamW(
-    args.lr,
+    lr_scheduler,
     parameters=model.parameters(),
     weight_decay=args.wd,
     apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
@@ -219,18 +219,12 @@ with LogWriter(
         for epoch in range(args.epoch):
             for step, (ids, sids, aligned_label, label,
                        orig_pos) in enumerate(UnpackDataLoader(train_ds)):
-                loss, logits = model(
-                    ids,
-                    sids,
-                    labels=aligned_label,
-                    loss_weights=P.cast(
-                        ids > tokenizer.mask_id,
-                        'float32'))  # [MASK] is the largest special token
+                loss, logits = model(ids, sids, labels=aligned_label)
                 loss = scaler.scale(loss)
                 loss.backward()
                 scaler.minimize(opt, loss)
                 model.clear_gradients()
-                lr_scheduler and lr_scheduler.step()
+                lr_scheduler.step()
 
                 if step % 10 == 0:
                     _lr = lr_scheduler.get_lr()

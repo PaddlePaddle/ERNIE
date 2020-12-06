@@ -23,11 +23,10 @@ import logging
 import json
 import os
 import numpy as np
+from pathlib import Path
 from copy import deepcopy
 
-import paddle.fluid as F
-import paddle.fluid.layers as L
-import paddle.fluid.dygraph as D
+import paddle as P
 
 from tqdm import tqdm
 
@@ -52,11 +51,9 @@ def rev_lookup(i):
 
 
 def evaluate(model, datasets, step, args):
-    did = D.parallel.Env().dev_id
-    place = F.CUDAPlace(D.parallel.Env().dev_id)
     with open(
             os.path.join(args.predict_output_dir,
-                         'pred.step%d.%d' % (step, did)), 'w') as outf:
+                         'pred.step%d.%d' % (step, env.dev_id)), 'w') as outf:
         for step, data in enumerate(datasets.start(place)):
             (example_id, src_ids, src_sids, src_pids, _, _, _, _, _, _, _,
              _) = data  # never use target when infer
@@ -208,110 +205,116 @@ def seq2seq(model, tokenizer, args):
             'tgt', unk_id=tokenizer.unk_id, vocab_dict=bytes_vocab),
     ])
 
-    train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=False, repeat=True, use_gz=False) \
-                                   .map(map_fn)
+    train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=True, repeat=True, use_gz=False) \
+                                   .map(map_fn) \
+                                   .padded_batch(args.bsz) \
+                                   .map(after_padding)
+
 
     dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'), shuffle=False, repeat=False, use_gz=False) \
                                    .map(map_fn) \
                                    .padded_batch(args.eval_bsz) \
-                                   .map(after_padding)
-
-    log.debug('shard %d of %d' %
-              (D.parallel.Env().dev_id, D.parallel.Env().nranks))
-    train_ds = train_ds.shard(D.parallel.Env().nranks, D.parallel.Env(
-    ).dev_id).shuffle(10000).padded_batch(args.bsz).map(after_padding)
-    dev_ds = dev_ds.shard(D.parallel.Env().nranks, D.parallel.Env().dev_id)
-
-    shapes = [[None, None]] * 7 + [[None, None, None]] * 3 + [[None]]
-    types = ['int64'] * 11
-
-    train_ds.data_shapes = shapes
-    train_ds.data_types = types
-    dev_ds.data_shapes = shapes
-    dev_ds.data_types = types
+                                   .map(after_padding) \
+                                   .shard(env.nranks, env.dev_id)
 
     vocab_size, _ = model.word_emb.weight.shape
-    ctx = D.parallel.prepare_context()
-    model = D.parallel.DataParallel(model, ctx)
-    g_clip = F.clip.GradientClipByGlobalNorm(1.0)
-    opt = AdamW(
-        learning_rate=LinearDecay(args.lr,
-                                  int(args.warmup_proportion * args.max_steps),
-                                  args.max_steps),
+    model = P.DataParallel(model)
+    g_clip = P.nn.GradientClipByGlobalNorm(1.0)
+    param_name_to_exclue_from_weight_decay = re.compile(
+        r'.*layer_norm_scale|.*layer_norm_bias|.*b_0')
+    lr_scheduler = P.optimizer.lr.LambdaDecay(
+        args.lr,
+        get_warmup_and_linear_decay(
+            args.max_steps, int(args.warmup_proportion * args.max_steps)))
+
+    opt = P.optimizer.AdamW(
+        learning_rate=lr_scheduler,
         parameter_list=model.parameters(),
         weight_decay=args.wd,
         grad_clip=g_clip)
+
     attn_id = tokenizer.vocab[args.attn_token]
-    for step, data in enumerate(train_ds.start(place)):
-        (example_id, src_ids, src_sids, src_pids, tgt_ids, tgt_sids, tgt_pids,
-         attn_ids, mask_src_2_src, mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
-         tgt_labels) = data
+    with P.amp.auto_cast(enable=args.use_amp):
+        for step, data in enumerate(
+                UnpackDataLoader(
+                    train_ds, places=P.CUDAPlace(env.dev_id))):
+            (example_id, src_ids, src_sids, src_pids, tgt_ids, tgt_sids,
+             tgt_pids, attn_ids, mask_src_2_src, mask_tgt_2_srctgt,
+             mask_attn_2_srctgtattn, tgt_labels) = data
 
-        _, __, info = model(
-            src_ids,
-            sent_ids=src_sids,
-            pos_ids=src_pids,
-            attn_bias=mask_src_2_src,
-            encode_only=True)
-        cached_k, cached_v = info['caches']
-        _, __, info = model(
-            tgt_ids,
-            sent_ids=tgt_sids,
-            pos_ids=tgt_pids,
-            attn_bias=mask_tgt_2_srctgt,
-            past_cache=(cached_k, cached_v),
-            encode_only=True)
-        cached_k2, cached_v2 = info['caches']
-        past_cache_k = [
-            L.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)
-        ]
-        past_cache_v = [
-            L.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)
-        ]
-        if args.label_smooth > 0.:
-            tgt_labels = L.label_smooth(
-                F.one_hot(tgt_labels, vocab_size), epsilon=args.label_smooth)
-        loss, _, __ = model(
-            attn_ids,
-            sent_ids=tgt_sids,
-            pos_ids=tgt_pids,
-            attn_bias=mask_attn_2_srctgtattn,
-            past_cache=(past_cache_k, past_cache_v),
-            tgt_labels=tgt_labels,
-            tgt_pos=L.where(attn_ids == attn_id))
+            _, __, info = model(
+                src_ids,
+                sent_ids=src_sids,
+                pos_ids=src_pids,
+                attn_bias=mask_src_2_src,
+                encode_only=True)
+            cached_k, cached_v = info['caches']
+            _, __, info = model(
+                tgt_ids,
+                sent_ids=tgt_sids,
+                pos_ids=tgt_pids,
+                attn_bias=mask_tgt_2_srctgt,
+                past_cache=(cached_k, cached_v),
+                encode_only=True)
+            cached_k2, cached_v2 = info['caches']
+            past_cache_k = [
+                L.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)
+            ]
+            past_cache_v = [
+                L.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)
+            ]
+            if args.label_smooth > 0.:
+                tgt_labels = F.label_smooth(
+                    F.one_hot(tgt_labels, vocab_size),
+                    epsilon=args.label_smooth)
+            loss, _, __ = model(
+                attn_ids,
+                sent_ids=tgt_sids,
+                pos_ids=tgt_pids,
+                attn_bias=mask_attn_2_srctgtattn,
+                past_cache=(past_cache_k, past_cache_v),
+                tgt_labels=tgt_labels,
+                tgt_pos=L.where(attn_ids == attn_id))
+            loss = scaler.scale(loss)
+            loss.backward()
+            scaler.minimize(opt, loss)
+            model.clear_gradients()
+            lr_scheduler.step()
 
-        scaled_loss = model.scale_loss(loss)
-        scaled_loss.backward()
-        model.apply_collective_grads()
-        opt.minimize(scaled_loss)
-        model.clear_gradients()
-        if step % 10 == 0:
-            loss = loss.numpy()
-            ppl = np.exp(loss)
-            log.debug('[step %d]train loss %.5f, ppl %.5f, lr %.3e' %
-                      (step, loss, ppl, opt.current_step_lr()))
-        if args.save_dir is not None and step % 1000 == 0 and D.parallel.Env(
-        ).dev_id == 0:
-            F.save_dygraph(model.state_dict(), args.save_dir)
-        if args.predict_output_dir is not None and step > args.skip_eval_steps and step % args.eval_steps == 0:
-            assert os.path.exists(
-                args.predict_output_dir
-            ), 'predict_output_dir not found: %s' % args.predict_output_dir
-            log.debug('doing predict on gpu %d...' % D.parallel.Env().dev_id)
-            evaluate(model, dev_ds, step, args)
-        if step > args.max_steps:
-            break
-    evaluate(model, dev_ds, step, args)
+            if step % 10 == 0:
+                _lr = lr_scheduler.get_lr()
+                if args.use_amp:
+                    _l = (loss / scaler._scale).numpy()
+                    msg = '[rank-%d][step-%d] train loss %.5f lr %.3e scaling %.3e' % (
+                        env.dev_id, step, _l, _lr, scaler._scale.numpy())
+                else:
+                    _l = loss.numpy()
+                    msg = '[rank-%d][step-%d] train loss %.5f lr %.3e' % (
+                        env.dev_id, step, _l, _lr)
+                log.debug(msg)
+
+            if args.save_dir is not None and step % 1000 == 0 and env.dev_id == 0:
+                P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+
+            if args.predict_output_dir is not None and step > args.skip_eval_steps and step % args.eval_steps == 0:
+                assert os.path.exists(
+                    args.predict_output_dir
+                ), 'predict_output_dir not found: %s' % args.predict_output_dir
+                log.debug('doing predict on gpu %d...' % env.dev_id)
+                evaluate(model, dev_ds, step, args)
+            if step > args.max_steps:
+                break
+        evaluate(model, dev_ds, step, args)
 
     if args.save_dir is not None:
-        F.save_dygraph(model.state_dict(), args.save_dir)
+        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('seq2seq model with ERNIE')
     parser.add_argument(
         '--from_pretrained',
-        type=str,
+        type=Path,
         required=True,
         help='pretrained model directory or tag')
     parser.add_argument('--bsz', type=int, default=8, help='batchsize')
@@ -372,17 +375,22 @@ if __name__ == '__main__':
         default=None,
         help='checkpoint to warm start from')
     parser.add_argument(
-        '--save_dir', type=str, default=None, help='model output directory')
+        '--save_dir', type=Path, default=None, help='model output directory')
     parser.add_argument(
         '--wd',
         type=float,
         default=0.01,
         help='weight decay, aka L2 regularizer')
+    parser.add_argument(
+        '--use_amp',
+        action='store_true',
+        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+    )
 
     args = parser.parse_args()
 
-    place = F.CUDAPlace(D.parallel.Env().dev_id)
-    D.guard(place).__enter__()
+    env = P.distributed.ParallelEnv()
+    P.distributed.init_parallel_env()
 
     ernie = ErnieModelForGeneration.from_pretrained(args.from_pretrained)
     tokenizer = ErnieTokenizer.from_pretrained(
@@ -393,7 +401,7 @@ if __name__ == '__main__':
 
     if args.init_checkpoint is not None:
         log.info('loading checkpoint from %s' % args.init_checkpoint)
-        sd, _ = D.load_dygraph(args.init_checkpoint)
-        ernie.set_dict(sd)
+        sd, _ = P.load(args.init_checkpoint)
+        ernie.set_state_dict(sd)
 
     seq2seq(ernie, tokenizer, args)

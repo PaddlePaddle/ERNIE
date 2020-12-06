@@ -22,42 +22,45 @@ import re
 import time
 import logging
 import json
+from pathlib import Path
 from random import random
 from tqdm import tqdm
 from functools import reduce, partial
 import pickle
 import argparse
+from functools import partial
+from io import open
 
 import numpy as np
 import logging
 
-import paddle
-import paddle.fluid as F
-import paddle.fluid.dygraph as D
-import paddle.fluid.layers as L
+import paddle as P
 
 from propeller import log
 import propeller.paddle as propeller
 
 from ernie.modeling_ernie import ErnieModel, ErnieModelForQuestionAnswering
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
-from ernie.optimization import AdamW, LinearDecay
+#from ernie.optimization import AdamW, LinearDecay
 
 from demo.mrc import mrc_reader
 from demo.mrc import mrc_metrics
+from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 
 
 def evaluate(model, ds, all_examples, all_features, tokenizer, args):
-    dev_file = json.loads(open(args.dev_file).read())
-    with D.base._switch_tracer_mode_guard_(is_train=False):
+    dev_file = json.loads(open(args.dev_file, encoding='utf8').read())
+    with P.no_grad():
         log.debug('start eval')
         model.eval()
         all_res = []
-        for step, (uids, token_ids, token_type_ids, _,
-                   __) in enumerate(ds.start(place)):
+        for step, (
+                uids, token_ids, token_type_ids, _, __
+        ) in enumerate(UnpackDataLoader(
+                ds, places=P.CUDAPlace(env.dev_id))):
             _, start_logits, end_logits = model(token_ids, token_type_ids)
             res = [
                 mrc_metrics.RawResult(
@@ -83,50 +86,74 @@ def evaluate(model, ds, all_examples, all_features, tokenizer, args):
 
 def train(model, train_dataset, dev_dataset, dev_examples, dev_features,
           tokenizer, args):
-    ctx = D.parallel.prepare_context()
-    model = D.parallel.DataParallel(model, ctx)
+    model = P.DataParallel(model)
 
     max_steps = len(train_features) * args.epoch // args.bsz
-    g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
-    opt = AdamW(
-        learning_rate=args.lr,
-        parameter_list=model.parameters(),
+
+    g_clip = P.nn.ClipGradByGlobalNorm(1.0)  #experimental
+    lr_scheduler = P.optimizer.lr.LambdaDecay(
+        args.lr,
+        get_warmup_and_linear_decay(max_steps,
+                                    int(args.warmup_proportion * max_steps)))
+
+    opt = P.optimizer.AdamW(
+        lr_scheduler,
+        parameters=model.parameters(),
         weight_decay=args.wd,
         grad_clip=g_clip)
 
     train_dataset = train_dataset \
-            .repeat() \
-            .shard(D.parallel.Env().nranks, D.parallel.Env().dev_id) \
-            .shuffle(1000) \
+            .cache_shuffle_shard(env.nranks, env.dev_id, drop_last=True) \
             .padded_batch(args.bsz)
 
     log.debug('init training with args: %s' % repr(args))
-    for step, (_, token_ids, token_type_ids, start_pos,
-               end_pos) in enumerate(train_dataset.start(place)):
-        loss, _, __ = model(
-            token_ids, token_type_ids, start_pos=start_pos, end_pos=end_pos)
-        scaled_loss = model.scale_loss(loss)
-        scaled_loss.backward()
-        model.apply_collective_grads()
-        opt.minimize(scaled_loss)
-        model.clear_gradients()
-        if D.parallel.Env().dev_id == 0 and step % 10 == 0:
-            log.debug('[step %d] train loss %.5f lr %.3e' %
-                      (step, loss.numpy(), opt.current_step_lr()))
-        if D.parallel.Env().dev_id == 0 and step % 100 == 0:
-            f1, em = evaluate(model, dev_dataset, dev_examples, dev_features,
-                              tokenizer, args)
-            log.debug('[step %d] eval result: f1 %.5f em %.5f' %
-                      (step, f1, em))
-        if step > max_steps:
-            break
+    scaler = P.amp.GradScaler(enable=args.use_amp)
+    create_if_not_exists(args.save_dir)
+
+    with P.amp.auto_cast(enable=args.use_amp):
+        for step, (_, token_ids, token_type_ids, start_pos,
+                   end_pos) in enumerate(
+                       UnpackDataLoader(
+                           train_dataset, places=P.CUDAPlace(env.dev_id))):
+            loss, _, __ = model(
+                token_ids,
+                token_type_ids,
+                start_pos=start_pos,
+                end_pos=end_pos)
+            loss = scaler.scale(loss)
+            loss.backward()
+            scaler.minimize(opt, loss)
+            model.clear_gradients()
+            lr_scheduler.step()
+
+            if env.dev_id == 0 and step % 10 == 0:
+                _lr = lr_scheduler.get_lr()
+                if args.use_amp:
+                    _l = (loss / scaler._scale).numpy()
+                    msg = '[rank-%d][step-%d] train loss %.5f lr %.3e scaling %.3e' % (
+                        env.dev_id, step, _l, _lr, scaler._scale.numpy())
+                else:
+                    _l = loss.numpy()
+                    msg = '[rank-%d][step-%d] train loss %.5f lr %.3e' % (
+                        env.dev_id, step, _l, _lr)
+                log.debug(msg)
+
+            if env.dev_id == 0 and step % 100 == 0:
+                f1, em = evaluate(model, dev_dataset, dev_examples,
+                                  dev_features, tokenizer, args)
+                log.debug('[step %d] eval result: f1 %.5f em %.5f' %
+                          (step, f1, em))
+            if env.dev_id == 0 and args.save_dir is not None:
+                P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+            if step > max_steps:
+                break
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('MRC model with ERNIE')
     parser.add_argument(
         '--from_pretrained',
-        type=str,
+        type=Path,
         required=True,
         help='pretrained model directory or tag')
     parser.add_argument(
@@ -149,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument('--warmup_proportion', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=3e-5, help='learning rate')
     parser.add_argument(
-        '--save_dir', type=str, default=None, help='model output directory')
+        '--save_dir', type=Path, required=True, help='model output directory')
     parser.add_argument(
         '--n_best_size', type=int, default=20, help='nbest prediction to keep')
     parser.add_argument(
@@ -157,10 +184,18 @@ if __name__ == "__main__":
     parser.add_argument(
         '--wd',
         type=float,
-        default=0.00,
+        default=0.01,
         help='weight decay, aka L2 regularizer')
+    parser.add_argument(
+        '--use_amp',
+        action='store_true',
+        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+    )
 
     args = parser.parse_args()
+
+    env = P.distributed.ParallelEnv()
+    P.distributed.init_parallel_env()
 
     tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained)
 
@@ -196,28 +231,16 @@ if __name__ == "__main__":
 
     dev_dataset = propeller.data.Dataset.from_list(dev_features).map(
         map_fn).padded_batch(args.bsz)
-    shapes = ([-1], [-1, args.max_seqlen], [-1, args.max_seqlen], [-1], [-1])
-    types = ('int64', 'int64', 'int64', 'int64', 'int64')
 
-    train_dataset.name = 'train'
-    dev_dataset.name = 'dev'
-
-    train_dataset.data_shapes = shapes
-    train_dataset.data_types = types
-    dev_dataset.data_shapes = shapes
-    dev_dataset.data_types = types
-
-    place = F.CUDAPlace(D.parallel.Env().dev_id)
-    D.guard(place).__enter__()
     model = ErnieModelForQuestionAnswering.from_pretrained(
         args.from_pretrained, name='')
 
     train(model, train_dataset, dev_dataset, dev_examples, dev_features,
           tokenizer, args)
 
-    if D.parallel.Env().dev_id == 0:
+    if env.dev_id == 0:
         f1, em = evaluate(model, dev_dataset, dev_examples, dev_features,
                           tokenizer, args)
         log.debug('final eval result: f1 %.5f em %.5f' % (f1, em))
-    if D.parallel.Env().dev_id == 0 and args.save_dir is not None:
-        F.save_dygraph(model.state_dict(), args.save_dir)
+    if env.dev_id == 0 and args.save_dir is not None:
+        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
