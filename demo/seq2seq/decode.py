@@ -34,10 +34,6 @@ from ernie.tokenizing_ernie import ErnieTokenizer
 from propeller import log
 import propeller.paddle as propeller
 
-logging.getLogger().handlers[0] = log.handlers[0]
-logging.getLogger().setLevel(logging.DEBUG)
-log = logging.getLogger()
-
 
 @np.vectorize
 def rev_lookup(i):
@@ -89,7 +85,6 @@ def gen_bias(encoder_inputs, decoder_inputs, step):
 #    return all_ids, all_sids
 
 
-@P.no_grad
 def greedy_search_infilling(model,
                             q_ids,
                             q_sids,
@@ -100,62 +95,63 @@ def greedy_search_infilling(model,
                             max_decode_len=100,
                             tgt_type_id=3):
     model.eval()
-    #log.debug(q_ids.numpy().tolist())
-    _, logits, info = model(q_ids, q_sids)
-    gen_ids = P.argmax(logits, -1)
-    d_batch, d_seqlen = q_ids.shape
-    seqlen = P.reduce_sum(P.cast(q_ids != 0, 'int64'), 1, keep_dim=True)
-    log.debug(seqlen.numpy())
-    log.debug(d_seqlen)
-    has_stopped = np.zeros([d_batch], dtype=np.bool)
-    gen_seq_len = np.zeros([d_batch], dtype=np.int64)
-    output_ids = []
-
-    past_cache = info['caches']
-
-    cls_ids = P.ones([d_batch], dtype='int64') * sos_id
-    attn_ids = P.ones([d_batch], dtype='int64') * attn_id
-    ids = P.stack([cls_ids, attn_ids], -1)
-    for step in range(max_decode_len):
-        log.debug('decode step %d' % step)
-        bias = gen_bias(q_ids, ids, step)
-        pos_ids = P.to_tensor(
-            np.tile(
-                np.array(
-                    [[step, step + 1]], dtype=np.int64), [d_batch, 1]))
-        pos_ids += seqlen
-        _, logits, info = model(
-            ids,
-            P.ones_like(ids) * tgt_type_id,
-            pos_ids=pos_ids,
-            attn_bias=bias,
-            past_cache=past_cache)
+    with P.no_grad():
+        #log.debug(q_ids.numpy().tolist())
+        _, logits, info = model(q_ids, q_sids)
         gen_ids = P.argmax(logits, -1)
+        d_batch, d_seqlen = q_ids.shape
+        seqlen = P.reduce_sum(P.cast(q_ids != 0, 'int64'), 1, keep_dim=True)
+        log.debug(seqlen.numpy())
+        log.debug(d_seqlen)
+        has_stopped = np.zeros([d_batch], dtype=np.bool)
+        gen_seq_len = np.zeros([d_batch], dtype=np.int64)
+        output_ids = []
 
-        past_cached_k, past_cached_v = past_cache
-        cached_k, cached_v = info['caches']
-        cached_k = [
-            P.concat([pk, k[:, :1, :]], 1)
-            for pk, k in zip(past_cached_k, cached_k)
-        ]  # concat cached
-        cached_v = [
-            P.concat([pv, v[:, :1, :]], 1)
-            for pv, v in zip(past_cached_v, cached_v)
-        ]
-        past_cache = (cached_k, cached_v)
+        past_cache = info['caches']
 
-        gen_ids = gen_ids[:, 1]
-        ids = P.stack([gen_ids, attn_ids], 1)
+        cls_ids = P.ones([d_batch], dtype='int64') * sos_id
+        attn_ids = P.ones([d_batch], dtype='int64') * attn_id
+        ids = P.stack([cls_ids, attn_ids], -1)
+        for step in range(max_decode_len):
+            log.debug('decode step %d' % step)
+            bias = gen_bias(q_ids, ids, step)
+            pos_ids = P.to_tensor(
+                np.tile(
+                    np.array(
+                        [[step, step + 1]], dtype=np.int64), [d_batch, 1]))
+            pos_ids += seqlen
+            _, logits, info = model(
+                ids,
+                P.ones_like(ids) * tgt_type_id,
+                pos_ids=pos_ids,
+                attn_bias=bias,
+                past_cache=past_cache)
+            gen_ids = P.argmax(logits, -1)
 
-        gen_ids = gen_ids.numpy()
-        has_stopped |= (gen_ids == eos_id).astype(np.bool)
-        gen_seq_len += (1 - has_stopped.astype(np.int64))
-        output_ids.append(gen_ids.tolist())
-        if has_stopped.all():
-            #log.debug('exit because all done')
-            break
-        #if step == 1: break
-    output_ids = np.array(output_ids).transpose([1, 0])
+            past_cached_k, past_cached_v = past_cache
+            cached_k, cached_v = info['caches']
+            cached_k = [
+                P.concat([pk, k[:, :1, :]], 1)
+                for pk, k in zip(past_cached_k, cached_k)
+            ]  # concat cached
+            cached_v = [
+                P.concat([pv, v[:, :1, :]], 1)
+                for pv, v in zip(past_cached_v, cached_v)
+            ]
+            past_cache = (cached_k, cached_v)
+
+            gen_ids = gen_ids[:, 1]
+            ids = P.stack([gen_ids, attn_ids], 1)
+
+            gen_ids = gen_ids.numpy()
+            has_stopped |= (gen_ids == eos_id).astype(np.bool)
+            gen_seq_len += (1 - has_stopped.astype(np.int64))
+            output_ids.append(gen_ids.tolist())
+            if has_stopped.all():
+                #log.debug('exit because all done')
+                break
+            #if step == 1: break
+        output_ids = np.array(output_ids).transpose([1, 0])
     return output_ids
 
 
@@ -241,7 +237,6 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step,
     return output, next_state
 
 
-@P.no_grad
 def beam_search_infilling(model,
                           q_ids,
                           q_sids,
@@ -254,96 +249,102 @@ def beam_search_infilling(model,
                           tgt_type_id=3,
                           length_penalty=1.0):
     model.eval()
-    #log.debug(q_ids.numpy().tolist())
-    _, __, info = model(q_ids, q_sids)
-    d_batch, d_seqlen = q_ids.shape
+    with P.no_grad():
+        #log.debug(q_ids.numpy().tolist())
+        _, __, info = model(q_ids, q_sids)
+        d_batch, d_seqlen = q_ids.shape
 
-    state = BeamSearchState(
-        log_probs=P.zeros([d_batch, beam_width], 'float32'),
-        lengths=P.zeros([d_batch, beam_width], 'int64'),
-        finished=P.zeros([d_batch, beam_width], 'int64'))
-    outputs = []
+        state = BeamSearchState(
+            log_probs=P.zeros([d_batch, beam_width], 'float32'),
+            lengths=P.zeros([d_batch, beam_width], 'int64'),
+            finished=P.zeros([d_batch, beam_width], 'int64'))
+        outputs = []
 
-    def reorder_(t, parent_id):
-        """reorder cache according to parent beam id"""
-        gather_idx = P.where(parent_id != -1)[:, 0] * beam_width + P.reshape(
-            parent_id, [-1])
-        t = P.gather(t, gather_idx)
-        return t
+        def reorder_(t, parent_id):
+            """reorder cache according to parent beam id"""
+            gather_idx = P.where(parent_id !=
+                                 -1)[:, 0] * beam_width + P.reshape(parent_id,
+                                                                    [-1])
+            t = P.gather(t, gather_idx)
+            return t
 
-    def tile_(t, times):
-        _shapes = list(t.shape[1:])
-        ret = P.reshape(
-            P.expand(
-                P.unsqueeze(t, [1]), [
-                    1,
-                    times,
-                ] + [1, ] * len(_shapes)), [-1, ] + _shapes)
-        return ret
+        def tile_(t, times):
+            _shapes = list(t.shape[1:])
+            ret = P.reshape(
+                P.expand(
+                    P.unsqueeze(t, [1]), [
+                        1,
+                        times,
+                    ] + [1, ] * len(_shapes)), [-1, ] + _shapes)
+            return ret
 
-    cached_k, cached_v = info['caches']
-    cached_k = [tile_(k, beam_width) for k in cached_k]
-    cached_v = [tile_(v, beam_width) for v in cached_v]
-    past_cache = (cached_k, cached_v)
-
-    q_ids = tile_(q_ids, beam_width)
-    seqlen = P.reduce_sum(P.cast(q_ids != 0, 'int64'), 1, keep_dim=True)
-    #log.debug(q_ids.shape)
-
-    cls_ids = P.ones([d_batch * beam_width], dtype='int64') * sos_id
-    attn_ids = P.ones([d_batch * beam_width], dtype='int64') * attn_id  # SOS
-    ids = P.stack([cls_ids, attn_ids], -1)
-    for step in range(max_decode_len):
-        #log.debug('decode step %d' % step)
-        bias = gen_bias(q_ids, ids, step)
-        pos_ids = P.to_tensor(
-            np.tile(
-                np.array(
-                    [[step, step + 1]], dtype=np.int64),
-                [d_batch * beam_width, 1]))
-        pos_ids += seqlen
-        _, logits, info = model(
-            ids,
-            P.ones_like(ids) * tgt_type_id,
-            pos_ids=pos_ids,
-            attn_bias=bias,
-            past_cache=past_cache)
-
-        output, state = beam_search_step(
-            state,
-            logits[:, 1],
-            eos_id=eos_id,
-            beam_width=beam_width,
-            is_first_step=(step == 0),
-            length_penalty=length_penalty)
-        outputs.append(output)
-
-        past_cached_k, past_cached_v = past_cache
         cached_k, cached_v = info['caches']
-        cached_k = [
-            reorder_(P.concat([pk, k[:, :1, :]], 1), output.beam_parent_ids)
-            for pk, k in zip(past_cached_k, cached_k)
-        ]  # concat cached
-        cached_v = [
-            reorder_(P.concat([pv, v[:, :1, :]], 1), output.beam_parent_ids)
-            for pv, v in zip(past_cached_v, cached_v)
-        ]
+        cached_k = [tile_(k, beam_width) for k in cached_k]
+        cached_v = [tile_(v, beam_width) for v in cached_v]
         past_cache = (cached_k, cached_v)
 
-        pred_ids_flatten = P.reshape(output.predicted_ids,
-                                     [d_batch * beam_width])
-        ids = P.stack([pred_ids_flatten, attn_ids], 1)
+        q_ids = tile_(q_ids, beam_width)
+        seqlen = P.reduce_sum(P.cast(q_ids != 0, 'int64'), 1, keep_dim=True)
+        #log.debug(q_ids.shape)
 
-        if state.finished.numpy().all():
-            #log.debug('exit because all done')
-            break
-        #if step == 1: break
+        cls_ids = P.ones([d_batch * beam_width], dtype='int64') * sos_id
+        attn_ids = P.ones(
+            [d_batch * beam_width], dtype='int64') * attn_id  # SOS
+        ids = P.stack([cls_ids, attn_ids], -1)
+        for step in range(max_decode_len):
+            #log.debug('decode step %d' % step)
+            bias = gen_bias(q_ids, ids, step)
+            pos_ids = P.to_tensor(
+                np.tile(
+                    np.array(
+                        [[step, step + 1]], dtype=np.int64),
+                    [d_batch * beam_width, 1]))
+            pos_ids += seqlen
+            _, logits, info = model(
+                ids,
+                P.ones_like(ids) * tgt_type_id,
+                pos_ids=pos_ids,
+                attn_bias=bias,
+                past_cache=past_cache)
 
-    final_ids = P.stack([o.predicted_ids for o in outputs], 0)
-    final_parent_ids = P.stack([o.beam_parent_ids for o in outputs], 0)
-    final_ids = P.gather_tree(final_ids, final_parent_ids)[:, :,
-                                                           0]  #pick best beam
-    final_ids = P.transpose(P.reshape(final_ids, [-1, d_batch * 1]), [1, 0])
+            output, state = beam_search_step(
+                state,
+                logits[:, 1],
+                eos_id=eos_id,
+                beam_width=beam_width,
+                is_first_step=(step == 0),
+                length_penalty=length_penalty)
+            outputs.append(output)
+
+            past_cached_k, past_cached_v = past_cache
+            cached_k, cached_v = info['caches']
+            cached_k = [
+                reorder_(
+                    P.concat([pk, k[:, :1, :]], 1), output.beam_parent_ids)
+                for pk, k in zip(past_cached_k, cached_k)
+            ]  # concat cached
+            cached_v = [
+                reorder_(
+                    P.concat([pv, v[:, :1, :]], 1), output.beam_parent_ids)
+                for pv, v in zip(past_cached_v, cached_v)
+            ]
+            past_cache = (cached_k, cached_v)
+
+            pred_ids_flatten = P.reshape(output.predicted_ids,
+                                         [d_batch * beam_width])
+            ids = P.stack([pred_ids_flatten, attn_ids], 1)
+
+            if state.finished.numpy().all():
+                #log.debug('exit because all done')
+                break
+            #if step == 1: break
+
+        final_ids = P.stack([o.predicted_ids for o in outputs], 0)
+        final_parent_ids = P.stack([o.beam_parent_ids for o in outputs], 0)
+        final_ids = P.gather_tree(final_ids,
+                                  final_parent_ids)[:, :, 0]  #pick best beam
+        final_ids = P.transpose(
+            P.reshape(final_ids, [-1, d_batch * 1]), [1, 0])
     return final_ids
 
 

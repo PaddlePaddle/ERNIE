@@ -21,28 +21,28 @@ import sys
 import argparse
 import logging
 import json
+import re
 import os
 import numpy as np
+
 from pathlib import Path
 from copy import deepcopy
 
 import paddle as P
+from paddle.nn import functional as F
 
 from tqdm import tqdm
 
 from ernie.modeling_ernie import ErnieModel, ErnieModelForPretraining, ErnieModelForGeneration
 from ernie.modeling_ernie import _build_linear, _build_ln, append_name
 from ernie.tokenizing_ernie import ErnieTokenizer
-from ernie.optimization import AdamW, LinearDecay
+#from ernie.optimization import AdamW, LinearDecay
 
 from demo.seq2seq.decode import beam_search_infilling, post_process
+from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
 
 from propeller import log
 import propeller.paddle as propeller
-
-logging.getLogger().handlers[0] = log.handlers[0]
-logging.getLogger().setLevel(logging.DEBUG)
-log = logging.getLogger()
 
 
 @np.vectorize
@@ -54,7 +54,9 @@ def evaluate(model, datasets, step, args):
     with open(
             os.path.join(args.predict_output_dir,
                          'pred.step%d.%d' % (step, env.dev_id)), 'w') as outf:
-        for step, data in enumerate(datasets.start(place)):
+        for step, data in enumerate(
+                UnpackDataLoader(
+                    datasets, places=P.CUDAPlace(env.dev_id))):
             (example_id, src_ids, src_sids, src_pids, _, _, _, _, _, _, _,
              _) = data  # never use target when infer
             output_ids = beam_search_infilling(
@@ -219,7 +221,7 @@ def seq2seq(model, tokenizer, args):
 
     vocab_size, _ = model.word_emb.weight.shape
     model = P.DataParallel(model)
-    g_clip = P.nn.GradientClipByGlobalNorm(1.0)
+    g_clip = P.nn.ClipGradByGlobalNorm(1.0)
     param_name_to_exclue_from_weight_decay = re.compile(
         r'.*layer_norm_scale|.*layer_norm_bias|.*b_0')
     lr_scheduler = P.optimizer.lr.LambdaDecay(
@@ -229,11 +231,15 @@ def seq2seq(model, tokenizer, args):
 
     opt = P.optimizer.AdamW(
         learning_rate=lr_scheduler,
-        parameter_list=model.parameters(),
+        parameters=model.parameters(),
         weight_decay=args.wd,
+        apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
         grad_clip=g_clip)
 
+    scaler = P.amp.GradScaler(enable=args.use_amp)
     attn_id = tokenizer.vocab[args.attn_token]
+    create_if_not_exists(args.save_dir)
+
     with P.amp.auto_cast(enable=args.use_amp):
         for step, data in enumerate(
                 UnpackDataLoader(
@@ -258,10 +264,10 @@ def seq2seq(model, tokenizer, args):
                 encode_only=True)
             cached_k2, cached_v2 = info['caches']
             past_cache_k = [
-                L.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)
+                P.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)
             ]
             past_cache_v = [
-                L.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)
+                P.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)
             ]
             if args.label_smooth > 0.:
                 tgt_labels = F.label_smooth(
@@ -274,7 +280,8 @@ def seq2seq(model, tokenizer, args):
                 attn_bias=mask_attn_2_srctgtattn,
                 past_cache=(past_cache_k, past_cache_v),
                 tgt_labels=tgt_labels,
-                tgt_pos=L.where(attn_ids == attn_id))
+                tgt_pos=P.nonzero(attn_ids == attn_id))
+
             loss = scaler.scale(loss)
             loss.backward()
             scaler.minimize(opt, loss)
