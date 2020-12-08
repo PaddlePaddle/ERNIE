@@ -42,6 +42,7 @@ from demo.seq2seq.decode import beam_search_infilling, post_process
 from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
 
 from propeller import log
+log.setLevel(logging.DEBUG)
 import propeller.paddle as propeller
 
 
@@ -51,9 +52,9 @@ def rev_lookup(i):
 
 
 def evaluate(model, datasets, step, args):
-    with open(
-            os.path.join(args.predict_output_dir,
-                         'pred.step%d.%d' % (step, env.dev_id)), 'w') as outf:
+    predict_output_dir = args.predict_output_dir / ('pred.step%d.%d' %
+                                                    (step, env.dev_id))
+    with predict_output_dir.open('w') as outf:
         for step, data in enumerate(
                 UnpackDataLoader(
                     datasets, places=P.CUDAPlace(env.dev_id))):
@@ -239,6 +240,8 @@ def seq2seq(model, tokenizer, args):
     scaler = P.amp.GradScaler(enable=args.use_amp)
     attn_id = tokenizer.vocab[args.attn_token]
     create_if_not_exists(args.save_dir)
+    if args.predict_output_dir:
+        create_if_not_exists(args.predict_output_dir)
 
     with P.amp.auto_cast(enable=args.use_amp):
         for step, data in enumerate(
@@ -304,9 +307,8 @@ def seq2seq(model, tokenizer, args):
                 P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
 
             if args.predict_output_dir is not None and step > args.skip_eval_steps and step % args.eval_steps == 0:
-                assert os.path.exists(
-                    args.predict_output_dir
-                ), 'predict_output_dir not found: %s' % args.predict_output_dir
+                assert  args.predict_output_dir.exists(), \
+                 'predict_output_dir not found: %s' % args.predict_output_dir
                 log.debug('doing predict on gpu %d...' % env.dev_id)
                 evaluate(model, dev_ds, step, args)
             if step > args.max_steps:
@@ -363,7 +365,7 @@ if __name__ == '__main__':
     parser.add_argument('--length_penalty', type=float, default=1.0)
     parser.add_argument(
         '--predict_output_dir',
-        type=str,
+        type=Path,
         default=None,
         help='predict file output directory')
     parser.add_argument(
