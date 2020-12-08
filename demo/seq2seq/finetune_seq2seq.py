@@ -272,10 +272,10 @@ def seq2seq(model, tokenizer, args):
             past_cache_v = [
                 P.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)
             ]
+            tgt_labels = F.one_hot(tgt_labels, vocab_size)
             if args.label_smooth > 0.:
                 tgt_labels = F.label_smooth(
-                    F.one_hot(tgt_labels, vocab_size),
-                    epsilon=args.label_smooth)
+                    tgt_labels, epsilon=args.label_smooth)
             loss, _, __ = model(
                 attn_ids,
                 sent_ids=tgt_sids,
@@ -410,7 +410,7 @@ if __name__ == '__main__':
 
     if args.init_checkpoint is not None:
         log.info('loading checkpoint from %s' % args.init_checkpoint)
-        sd, _ = P.load(args.init_checkpoint)
+        sd = P.load(args.init_checkpoint)
         ernie.set_state_dict(sd)
 
     seq2seq(ernie, tokenizer, args)

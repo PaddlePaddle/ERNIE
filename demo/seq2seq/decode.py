@@ -18,14 +18,17 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import sys
+import io
 import re
 import argparse
 import logging
 import json
 import numpy as np
+from pathlib import Path
 from collections import namedtuple
 
 import paddle as P
+from paddle.nn import functional as F
 
 from ernie.modeling_ernie import ErnieModel, ErnieModelForPretraining, ErnieModelForGeneration
 from ernie.modeling_ernie import _build_linear, _build_ln, append_name
@@ -43,7 +46,7 @@ def rev_lookup(i):
 def gen_bias(encoder_inputs, decoder_inputs, step):
     decoder_bsz, decoder_seqlen = decoder_inputs.shape[:2]
     attn_bias = P.reshape(
-        P.range(
+        P.arange(
             0, decoder_seqlen, 1, dtype='float32') + 1, [1, -1, 1])
     decoder_bias = P.cast(
         (P.matmul(
@@ -52,10 +55,10 @@ def gen_bias(encoder_inputs, decoder_inputs, step):
     encoder_bias = P.unsqueeze(
         P.cast(P.ones_like(encoder_inputs), 'float32'),
         [1])  #[bsz, 1, encoderlen]
-    encoder_bias = P.expand(
+    encoder_bias = P.tile(
         encoder_bias, [1, decoder_seqlen, 1])  #[bsz,decoderlen, encoderlen]
-    decoder_bias = P.expand(
-        decoder_bias, [decoder_bsz, 1, 1])  #[bsz, decoderlen, decoderlen]
+    decoder_bias = P.tile(decoder_bias,
+                          [decoder_bsz, 1, 1])  #[bsz, decoderlen, decoderlen]
     if step > 0:
         bias = P.concat([
             encoder_bias, P.ones([decoder_bsz, decoder_seqlen, step],
@@ -100,7 +103,7 @@ def greedy_search_infilling(model,
         _, logits, info = model(q_ids, q_sids)
         gen_ids = P.argmax(logits, -1)
         d_batch, d_seqlen = q_ids.shape
-        seqlen = P.reduce_sum(P.cast(q_ids != 0, 'int64'), 1, keep_dim=True)
+        seqlen = P.cast(q_ids != 0, 'int64').sum(1, keepdim=True)
         log.debug(seqlen.numpy())
         log.debug(d_seqlen)
         has_stopped = np.zeros([d_batch], dtype=np.bool)
@@ -187,7 +190,7 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step,
     onehot_eos = P.cast(
         F.one_hot(P.ones([1], 'int64') * eos_id, vocab_size), 'int64')  #[1, V]
 
-    probs = P.log(P.softmax(logits))  #[B*W, V]
+    probs = P.log(F.softmax(logits))  #[B*W, V]
     probs = mask_prob(probs, onehot_eos, state.finished)  #[B*W, V]
     allprobs = P.reshape(state.log_probs, [-1, 1]) + probs  #[B*W, V]
 
@@ -208,12 +211,12 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step,
     next_word_id = idx % vocab_size
 
     gather_idx = P.concat(
-        [P.where(idx != -1)[:, :1], P.reshape(idx, [-1, 1])], 1)
+        [P.nonzero(idx != -1)[:, :1], P.reshape(idx, [-1, 1])], 1)
     next_probs = P.reshape(P.gather_nd(allprobs, gather_idx), idx.shape)
     next_len = P.reshape(P.gather_nd(alllen, gather_idx), idx.shape)
 
     gather_idx = P.concat([
-        P.where(next_beam_id != -1)[:, :1], P.reshape(next_beam_id, [-1, 1])
+        P.nonzero(next_beam_id != -1)[:, :1], P.reshape(next_beam_id, [-1, 1])
     ], 1)
     next_finished = P.reshape(
         P.gather_nd(state.finished, gather_idx), state.finished.
@@ -262,16 +265,16 @@ def beam_search_infilling(model,
 
         def reorder_(t, parent_id):
             """reorder cache according to parent beam id"""
-            gather_idx = P.where(parent_id !=
-                                 -1)[:, 0] * beam_width + P.reshape(parent_id,
-                                                                    [-1])
+            gather_idx = P.nonzero(
+                parent_id != -1)[:, 0] * beam_width + P.reshape(parent_id,
+                                                                [-1])
             t = P.gather(t, gather_idx)
             return t
 
         def tile_(t, times):
             _shapes = list(t.shape[1:])
             ret = P.reshape(
-                P.expand(
+                P.tile(
                     P.unsqueeze(t, [1]), [
                         1,
                         times,
@@ -284,7 +287,7 @@ def beam_search_infilling(model,
         past_cache = (cached_k, cached_v)
 
         q_ids = tile_(q_ids, beam_width)
-        seqlen = P.reduce_sum(P.cast(q_ids != 0, 'int64'), 1, keep_dim=True)
+        seqlen = P.cast(q_ids != 0, 'int64').sum(1, keepdim=True)
         #log.debug(q_ids.shape)
 
         cls_ids = P.ones([d_batch * beam_width], dtype='int64') * sos_id
@@ -341,8 +344,8 @@ def beam_search_infilling(model,
 
         final_ids = P.stack([o.predicted_ids for o in outputs], 0)
         final_parent_ids = P.stack([o.beam_parent_ids for o in outputs], 0)
-        final_ids = P.gather_tree(final_ids,
-                                  final_parent_ids)[:, :, 0]  #pick best beam
+        final_ids = P.fluid.layers.gather_tree(
+            final_ids, final_parent_ids)[:, :, 0]  #pick best beam
         final_ids = P.transpose(
             P.reshape(final_ids, [-1, d_batch * 1]), [1, 0])
     return final_ids
@@ -363,10 +366,13 @@ def post_process(token):
 
 
 if __name__ == '__main__':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
     parser = argparse.ArgumentParser('seq2seq model with ERNIE')
     parser.add_argument(
         '--from_pretrained',
-        type=str,
+        type=Path,
         required=True,
         help='pretrained model directory or tag')
     parser.add_argument('--bsz', type=int, default=8, help='batchsize')
@@ -395,7 +401,7 @@ if __name__ == '__main__':
     rev_dict[tokenizer.pad_id] = ''  # replace [PAD]
     rev_dict[tokenizer.unk_id] = ''  # replace [PAD]
 
-    sd, _ = P.load(args.save_dir)
+    sd = P.load(args.save_dir)
     ernie.set_state_dict(sd)
 
     def map_fn(src_ids):
@@ -424,8 +430,8 @@ if __name__ == '__main__':
         #    tgt_type_id=args.tgt_type_id)
         result_ids = beam_search_infilling(
             ernie,
-            P.to_variable(encoder_ids),
-            P.to_variable(encoder_sids),
+            P.to_tensor(encoder_ids),
+            P.to_tensor(encoder_sids),
             eos_id=tokenizer.sep_id,
             sos_id=tokenizer.cls_id,
             attn_id=tokenizer.vocab[args.attn_token],

@@ -501,10 +501,7 @@ class ErnieModelForTokenClassification(ErnieModel):
             if len(labels.shape) != 2:
                 labels = labels.squeeze()
             loss = F.cross_entropy(
-                logits.transpose([0, 2, 1]),
-                labels,
-                ignore_index=ignore_index,
-                reduction='none')
+                logits, labels, ignore_index=ignore_index, reduction='none')
             if loss_weights is not None:
                 loss = loss * loss_weights
             loss = loss.mean()
@@ -739,14 +736,12 @@ class ErnieModelForGeneration(ErnieModel):
             return output_ids, logits, info
         else:
             encoded_2d = encoded.gather_nd(tgt_pos)
-            encoded_2d = self.mlm(encoded_2d)
+            encoded_2d = self.act(self.mlm(encoded_2d))
             encoded_2d = self.mlm_ln(encoded_2d)
             logits_2d = encoded_2d.matmul(
                 self.word_emb.weight, transpose_y=True) + self.mlm_bias
             assert len(
                 tgt_labels.shape) == 2, 'expect 2d label, got %r' % tgt_labels
 
-            loss = F.kl_div(
-                F.log_softmax(logits_2d),
-                tgt_labels)  # kl-div equals ce when one hot label is used
+            loss = F.cross_entropy(logits_2d, tgt_labels, soft_label=True)
             return loss, logits_2d, info
