@@ -220,6 +220,7 @@ with LogWriter(
             for step, (ids, sids, aligned_label, label,
                        orig_pos) in enumerate(UnpackDataLoader(train_ds)):
                 loss, logits = model(ids, sids, labels=aligned_label)
+                #loss, logits = model(ids, sids, labels=aligned_label, loss_weights=P.cast(ids != 0, 'float32'))
                 loss = scaler.scale(loss)
                 loss.backward()
                 scaler.minimize(opt, loss)

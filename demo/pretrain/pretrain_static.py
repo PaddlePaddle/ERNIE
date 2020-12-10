@@ -29,7 +29,6 @@ import itertools
 
 import paddle
 import paddle.fluid as F
-import paddle.fluid.dygraph as D
 import paddle.fluid.layers as L
 import sentencepiece as spm
 import json
@@ -40,7 +39,7 @@ import random as r
 
 from ernie.modeling_ernie import ErnieModelForPretraining
 from ernie.tokenizing_ernie import ErnieTokenizer
-from ernie.optimization import AdamW, LinearDecay
+from ernie.optimization import optimization
 
 import propeller.paddle as propeller
 from propeller.paddle.data import Dataset
@@ -71,6 +70,45 @@ else:
         for element in it:
             total = func(total, element)
             yield total
+
+
+def ernie_pretrain_model_fn(features, mode, params, run_config):
+    """propeller Model wraper for paddle-ERNIE """
+    src_ids, sent_ids, mlm_label, mask_pos, nsp_label = features
+
+    ernie = ErnieModelForPretraining(params, name='')
+    total_loss, mlm_loss, nsp_loss = ernie(
+        src_ids,
+        sent_ids,
+        labels=mlm_label,
+        mlm_pos=mask_pos,
+        nsp_labels=nsp_label)
+
+    metrics = None
+    inf_spec = None
+
+    propeller.summary.scalar('loss', total_loss)
+    propeller.summary.scalar('nsp-loss', nsp_loss)
+    propeller.summary.scalar('mlm-loss', mlm_loss)
+
+    scheduled_lr, loss_scale_coef = optimization(
+        loss=total_loss,
+        warmup_steps=params['warmup_steps'],
+        num_train_steps=run_config.max_steps,
+        learning_rate=params['learning_rate'],
+        train_program=F.default_main_program(),
+        startup_prog=F.default_startup_program(),
+        weight_decay=params['weight_decay'],
+        scheduler="linear_warmup_decay",
+        use_fp16=params['use_fp16'], )
+
+    propeller.summary.scalar('lr', scheduled_lr)
+    if params['use_fp16']:
+        propeller.summary.scalar('loss_scale', loss_scale_coef)
+    pred = [total_loss]
+
+    return propeller.ModelSpec(
+        loss=total_loss, mode=mode, metrics=metrics, predictions=pred)
 
 
 def truncate_sentence(seq, from_length, to_length):
@@ -151,10 +189,10 @@ def apply_mask(sentence, seg_info, mask_rate, vocab_size, vocab):
     return sentence, np.stack(mask_pos, -1), mask_label
 
 
-def make_pretrain_dataset(name, dir, vocab, args):
+def make_pretrain_dataset(name, dir, vocab, hparams, args):
     gz_files = glob(dir)
     if not gz_files:
-        raise ValueError('train data not found in %s' % gz_files)
+        raise ValueError('train data not found in %s' % dir)
 
     log.info('read from %s' % '\n'.join(gz_files))
     max_input_seqlen = args.max_seqlen
@@ -242,9 +280,8 @@ def make_pretrain_dataset(name, dir, vocab, args):
 
     def after(sentence, seg_info, segments, label):
         batch_size, seqlen = sentence.shape
-        sentence, mask_pos, mlm_label = apply_mask(sentence, seg_info,
-                                                   args.mask_rate,
-                                                   len(vocab), vocab)
+        sentence, mask_pos, mlm_label = apply_mask(
+            sentence, seg_info, args.mask_rate, hparams.vocab_size, vocab)
 
         ra = r.random()
         if ra < args.check:
@@ -266,11 +303,6 @@ def make_pretrain_dataset(name, dir, vocab, args):
     dataset = Dataset.from_list(gz_files)
     if propeller.train.distribution.status.mode == propeller.train.distribution.DistributionMode.NCCL:
         log.info('Apply sharding in distribution env')
-        if len(gz_files) < propeller.train.distribution.status.num_replica:
-            raise ValueError(
-                'not enough train file to shard: # of train files: %d, # of workers %d'
-                % (len(gz_files),
-                   propeller.train.distribution.status.num_replica))
         dataset = dataset.shard(
             propeller.train.distribution.status.num_replica,
             propeller.train.distribution.status.replica_id)
@@ -281,7 +313,7 @@ def make_pretrain_dataset(name, dir, vocab, args):
     dataset = dataset.shuffle(
         buffer_size=1000)  #must shuffle to ensure negative sample randomness
     dataset = sample_negative(dataset)
-    dataset = dataset.padded_batch(args.bsz, (0, 0, 0, 0)).map(after)
+    dataset = dataset.padded_batch(hparams.batch_size, (0, 0, 0, 0)).map(after)
     dataset.name = name
     return dataset
 
@@ -293,44 +325,54 @@ if __name__ == '__main__':
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
     parser = propeller.ArgumentParser('DAN model with Paddle')
-    parser.add_argument(
-        '--max_seqlen',
-        type=int,
-        default=256,
-        help='max sequence length, documents from pretrain data will expand to this length'
-    )
-    parser.add_argument(
-        '--data_dir',
-        type=str,
-        required=True,
-        help='protobuf pretrain data directory')
-    parser.add_argument(
-        '--mask_rate',
-        type=float,
-        default=0.15,
-        help='probability of input token tobe masked')
-    parser.add_argument(
-        '--check', type=float, default=0., help='probability of debug info')
-    parser.add_argument(
-        '--warmup_steps', type=int, default=10000, help='warmups steps')
-    parser.add_argument(
-        '--max_steps', type=int, default=1000000, help='max pretrian steps')
-    parser.add_argument('--lr', type=float, default=1e-4, help='learning_rate')
-    parser.add_argument(
-        '--from_pretrained',
-        type=str,
-        required=True,
-        help='pretraind model dir')
-    parser.add_argument(
-        '--save_dir', type=str, default=None, help='model output_dir')
-    parser.add_argument('--bsz', type=int, default=50)
+    parser.add_argument('--max_seqlen', type=int, default=256)
+    parser.add_argument('--data_dir', type=str, required=True)
+    parser.add_argument('--from_pretrained', type=str, default=None)
+    parser.add_argument('--mask_rate', type=float, default=0.15)
+    parser.add_argument('--check', type=float, default=0.)
 
     args = parser.parse_args()
+
+    if not os.path.exists(args.from_pretrained):
+        raise ValueError('--from_pretrained not found: %s' %
+                         args.from_pretrained)
+    cfg_file_path = os.path.join(args.from_pretrained, 'ernie_config.json')
+    param_path = os.path.join(args.from_pretrained, 'params')
+    vocab_path = os.path.join(args.from_pretrained, 'vocab.txt')
+    assert os.path.exists(cfg_file_path) and os.path.exists(
+        param_path) and os.path.exists(vocab_path)
+
+    hparams_cli = propeller.parse_hparam(args)
+    hparams_config_file = json.loads(open(cfg_file_path).read())
+    default_hparams = propeller.HParams(
+        batch_size=50,
+        warmup_steps=10000,
+        learning_rate=1e-4,
+        weight_decay=0.01,
+        use_fp16=False, )
+
+    hparams = default_hparams.join(propeller.HParams(
+        **hparams_config_file)).join(hparams_cli)
+
+    default_run_config = dict(
+        max_steps=1000000,
+        save_steps=10000,
+        log_steps=10,
+        max_ckpt=3,
+        skip_steps=0,
+        eval_steps=-1)
+
+    run_config = dict(default_run_config, **json.loads(args.run_config))
+    run_config = propeller.RunConfig(**run_config)
 
     tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained)
 
     train_ds = make_pretrain_dataset(
-        'train', args.data_dir, vocab=tokenizer.vocab, args=args)
+        'train',
+        args.data_dir,
+        vocab=tokenizer.vocab,
+        hparams=hparams,
+        args=args)
 
     seq_shape = [-1, args.max_seqlen]
     ints_shape = [-1, ]
@@ -339,35 +381,20 @@ if __name__ == '__main__':
 
     train_ds.data_shapes = shapes
     train_ds.data_types = types
+    ws = None
 
-    place = F.CUDAPlace(D.parallel.Env().dev_id)
-    with D.guard(place):
-        model = ErnieModelForPretraining.from_pretrained(args.from_pretrained)
-        opt = AdamW(
-            learning_rate=LinearDecay(args.lr, args.warmup_steps,
-                                      args.max_steps),
-            parameter_list=model.parameters(),
-            weight_decay=0.01)
+    #varname_to_warmstart = re.compile(r'^encoder.*[wb]_0$|^.*embedding$|^.*bias$|^.*scale$|^pooled_fc.[wb]_0$')
+    varname_to_warmstart = re.compile(r'.*')
+    if args.from_pretrained is not None:
+        warm_start_dir = os.path.join(args.from_pretrained, 'params')
+        ws = propeller.WarmStartSetting(
+                predicate_fn=lambda v: varname_to_warmstart.match(v.name) and os.path.exists(os.path.join(warm_start_dir, v.name)),
+                from_dir=warm_start_dir
+            )
 
-        ctx = D.parallel.prepare_context()
-        model = D.parallel.DataParallel(model, ctx)
-
-        for step, samples in enumerate(tqdm(train_ds.start(place))):
-            (src_ids, sent_ids, mlm_label, mask_pos, nsp_label) = samples
-            loss, mlmloss, nsploss = model(
-                src_ids,
-                sent_ids,
-                labels=mlm_label,
-                mlm_pos=mask_pos,
-                nsp_labels=nsp_label)
-            scaled_loss = model.scale_loss(loss)
-            scaled_loss.backward()
-            model.apply_collective_grads()
-            opt.minimize(scaled_loss)
-            model.clear_gradients()
-            if step % 10 == 0:
-                log.debug('train loss %.5f scaled loss %.5f' %
-                          (loss.numpy(), scaled_loss.numpy()))
-            if step % 10000 == 0 and D.parallel.Env(
-            ).dev_id == 0 and args.save_dir is not None:
-                F.save_dygraph(model.state_dict(), args.save_dir)
+    ernie_learner = propeller.Learner(
+        ernie_pretrain_model_fn,
+        run_config,
+        params=hparams,
+        warm_start_setting=ws)
+    ernie_learner.train(train_ds)
