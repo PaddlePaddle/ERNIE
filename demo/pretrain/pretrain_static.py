@@ -27,9 +27,7 @@ from glob import glob
 from functools import reduce, partial
 import itertools
 
-import paddle
-import paddle.fluid as F
-import paddle.fluid.layers as L
+import paddle as P
 import sentencepiece as spm
 import json
 
@@ -41,6 +39,7 @@ from ernie.modeling_ernie import ErnieModelForPretraining
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.optimization import optimization
 
+import propeller as propeller_base
 import propeller.paddle as propeller
 from propeller.paddle.data import Dataset
 
@@ -96,8 +95,8 @@ def ernie_pretrain_model_fn(features, mode, params, run_config):
         warmup_steps=params['warmup_steps'],
         num_train_steps=run_config.max_steps,
         learning_rate=params['learning_rate'],
-        train_program=F.default_main_program(),
-        startup_prog=F.default_startup_program(),
+        train_program=P.static.default_main_program(),
+        startup_prog=P.static.default_startup_program(),
         weight_decay=params['weight_decay'],
         scheduler="linear_warmup_decay",
         use_fp16=params['use_fp16'], )
@@ -199,7 +198,7 @@ def make_pretrain_dataset(name, dir, vocab, hparams, args):
     max_pretrain_seqlen = lambda: max_input_seqlen if r.random() > 0.15 else r.randint(1, max_input_seqlen)  # short sentence rate
 
     def _parse_gz(record_str):  # function that takes python_str as input
-        ex = propeller.data.example_pb2.SequenceExample()
+        ex = propeller_base.data.example_pb2.SequenceExample()
         ex.ParseFromString(record_str)
         doc = [
             np.array(
@@ -332,6 +331,7 @@ if __name__ == '__main__':
     parser.add_argument('--check', type=float, default=0.)
 
     args = parser.parse_args()
+    P.enable_static()
 
     if not os.path.exists(args.from_pretrained):
         raise ValueError('--from_pretrained not found: %s' %
