@@ -26,9 +26,7 @@ import multiprocessing
 import tempfile
 import re
 
-import paddle
-import paddle.fluid as F
-import paddle.fluid.layers as L
+import paddle as P
 
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
@@ -44,8 +42,10 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 def model_fn(features, mode, params, run_config):
     ernie = ErnieModelForSequenceClassification(params, name='')
-    if not params is propeller.RunMode.TRAIN:
+    if mode is not propeller.RunMode.TRAIN:
         ernie.eval()
+    else:
+        ernie.train()
 
     metrics, loss = None, None
     if mode is propeller.RunMode.PREDICT:
@@ -56,7 +56,7 @@ def model_fn(features, mode, params, run_config):
         src_ids, sent_ids, labels = features
         if mode is propeller.RunMode.EVAL:
             loss, logits = ernie(src_ids, sent_ids, labels=labels)
-            pred = L.argmax(logits, axis=1)
+            pred = logits.argmax(axis=1)
             acc = propeller.metrics.Acc(labels, pred)
             metrics = {'acc': acc}
             predictions = [pred]
@@ -68,8 +68,8 @@ def model_fn(features, mode, params, run_config):
                                  params['warmup_proportion']),
                 num_train_steps=run_config.max_steps,
                 learning_rate=params['learning_rate'],
-                train_program=F.default_main_program(),
-                startup_prog=F.default_startup_program(),
+                train_program=P.static.default_main_program(),
+                startup_prog=P.static.default_startup_program(),
                 use_fp16=params.use_fp16,
                 weight_decay=params['weight_decay'],
                 scheduler="linear_warmup_decay", )
@@ -91,6 +91,8 @@ if __name__ == '__main__':
     parser.add_argument('--use_fp16', action='store_true')
 
     args = parser.parse_args()
+
+    P.enable_static()
 
     if not os.path.exists(args.from_pretrained):
         raise ValueError('--from_pretrained not found: %s' %

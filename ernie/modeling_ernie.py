@@ -320,6 +320,23 @@ class ErnieModel(nn.Layer, PretrainedModel):
             self.pooler = None
         self.train()
 
+    #FIXME:remove this
+    def eval(self):
+        if P.in_dynamic_mode():
+            super(ErnieModel, self).eval()
+        self.training = False
+        for l in self.sublayers():
+            l.training = False
+        return self
+
+    def train(self):
+        if P.in_dynamic_mode():
+            super(ErnieModel, self).train()
+        self.training = True
+        for l in self.sublayers():
+            l.training = True
+        return self
+
     def forward(self,
                 src_ids,
                 sent_ids=None,
@@ -427,6 +444,7 @@ class ErnieModelForSequenceClassification(ErnieModel):
 
         prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = nn.Dropout(p=prob)
+        self.train()
 
     @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
@@ -471,6 +489,7 @@ class ErnieModelForTokenClassification(ErnieModel):
 
         prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = nn.Dropout(p=prob)
+        self.train()
 
     @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
@@ -531,6 +550,7 @@ class ErnieModelForQuestionAnswering(ErnieModel):
 
         prob = cfg.get('classifier_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = nn.Dropout(p=prob)
+        self.train()
 
     @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
@@ -628,6 +648,7 @@ class ErnieModelForPretraining(ErnieModel):
                 name=append_name(name, 'mask_lm_out_fc.b_0'),
                 initializer=nn.initializer.Constant(value=0.0)),
             is_bias=True, )
+        self.train()
 
     @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
@@ -708,6 +729,7 @@ class ErnieModelForGeneration(ErnieModel):
                 name=append_name(name, 'mask_lm_out_fc.b_0'),
                 initializer=nn.initializer.Constant(value=0.0)),
             is_bias=True, )
+        self.train()
 
     @add_docstring(ErnieModel.forward.__doc__)
     def forward(self, *args, **kwargs):
