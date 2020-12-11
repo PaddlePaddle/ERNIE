@@ -54,18 +54,16 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 
 ```python
 import numpy as np
-import paddle.fluid.dygraph as D
+import paddle as P
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.modeling_ernie import ErnieModel
-
-D.guard().__enter__() # activate paddle `dygrpah` mode
 
 model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
 model.eval()
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
 ids, _ = tokenizer.encode('hello world')
-ids = D.to_variable(np.expand_dims(ids, 0))  # insert extra `batch` dimension
+ids = P.to_tensor(np.expand_dims(ids, 0))  # insert extra `batch` dimension
 pooled, encoded = model(ids)                 # eager execution
 print(pooled.numpy())                        # convert  results to numpy
 
@@ -152,7 +150,7 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 - try eager execution with `dygraph model` :
 
 ```script
-python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
+python3 ./demo/finetune_classifier.py \
        --from_pretrained ernie-1.0 \
        --data_dir ./data/xnli
 ```
@@ -173,7 +171,7 @@ you need to run single card finetuning first to get pretrained model, or donwloa
 
 ```script
 python3 -m paddle.distributed.launch \
-./demo/finetune_classifier_dygraph_distributed.py \
+./demo/finetune_classifier_distributed.py  \
     --data_dir data/mnli \
     --max_steps 10000 \
     --from_pretrained ernie-2.0-en
@@ -182,11 +180,12 @@ python3 -m paddle.distributed.launch \
 
 many other demo python scripts:
 
-1. [Sentiment Analysis](./demo/finetune_sentiment_analysis_dygraph.py)
-1. [Semantic Similarity](./demo/finetune_classifier_dygraph.py)
-1. [Name Entity Recognition(NER)](./demo/finetune_ner_dygraph.py)
-1. [Machine Reading Comprehension](./demo/finetune_mrc_dygraph.py)
+1. [Sentiment Analysis](./demo/finetune_sentiment_analysis.py)
+1. [Semantic Similarity](./demo/finetune_classifier.py)
+1. [Name Entity Recognition(NER)](./demo/finetune_ner.py)
+1. [Machine Reading Comprehension](./demo/finetune_mrc.py)
 1. [Text generation](./demo/seq2seq/README.md)
+1. [Text classification with `paddle.static` API](./demo/finetune_classifier_static.py)
 
 
 

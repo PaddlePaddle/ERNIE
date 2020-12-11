@@ -52,18 +52,16 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 # 快速上手
 ```python
 import numpy as np
-import paddle.fluid.dygraph as D
+import paddle as P
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.modeling_ernie import ErnieModel
-
-D.guard().__enter__() # activate paddle `dygrpah` mode
 
 model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
 model.eval()
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
 ids, _ = tokenizer.encode('hello world')
-ids = D.to_variable(np.expand_dims(ids, 0))  # insert extra `batch` dimension
+ids = P.to_tensor(np.expand_dims(ids, 0))  # insert extra `batch` dimension
 pooled, encoded = model(ids)                 # eager execution
 print(pooled.numpy())                        # convert  results to numpy
 
@@ -159,7 +157,7 @@ data/xnli
 - 使用 `动态图` 模型进行finetune:
 
 ```script
-python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
+python3 ./ernie_d/demo/finetune_classifier.py \
        --from_pretrained ernie-1.0 \
        --data_dir ./data/xnli
 ```
@@ -177,7 +175,7 @@ python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
 
 ```script
 python3 -m paddle.distributed.launch \
-./demo/finetune_classifier_dygraph_distributed.py \
+./demo/finetune_classifier_distributed.py \
     --data_dir data/mnli \
     --max_steps 10000 \
     --from_pretrained ernie2.0-en
@@ -186,11 +184,12 @@ python3 -m paddle.distributed.launch \
 
 更多示例脚本:
 
-1. [情感分析](./demo/finetune_sentiment_analysis_dygraph.py)
-1. [语义匹配](./demo/finetune_classifier_dygraph.py)
-1. [命名实体识别(NER)](./demo/finetune_ner_dygraph.py)
-1. [机器阅读理解](./demo/finetune_mrc_dygraph.py) (需要多卡环境运行；参见上面"分布式 finetune"一节)
+1. [情感分析](./demo/finetune_sentiment_analysis.py)
+1. [语义匹配](./demo/finetune_classifier.py)
+1. [命名实体识别(NER)](./demo/finetune_ner.py)
+1. [机器阅读理解](./demo/finetune_mrc.py) (需要多卡环境运行；参见上面"分布式 finetune"一节)
 1. [文本摘要生成](./demo/seq2seq/README.md)
+1. [使用静态图完成文本分类](./demo/finetune_classifier_static.py)
 
 
 **推荐超参数设置：**
@@ -221,7 +220,7 @@ python3 -m paddle.distributed.launch \
 
 # 在线预测
 
-如果`finetune_classifier_dygraph.py`中指定了`--inference_model_dir`参数，funetune脚本会将你的模型序列化并产出可以直接部署线上预测的`inference_model`.
+如果`finetune_classifier.py`中指定了`--inference_model_dir`参数，funetune脚本会将你的模型序列化并产出可以直接部署线上预测的`inference_model`.
 
 关于生产环境中使用线上预测代码的实现细节，请见[C++ inference API](./inference/README.md).
 或者你可以使用`propeller`启动一个多GPU预测服务(需要GPU环境)，只需执行：
