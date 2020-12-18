@@ -22,53 +22,25 @@ import logging
 import re
 
 import numpy as np
-import paddle.fluid as F
-import paddle.fluid.layers as L
-import paddle.fluid.dygraph as D
+import paddle as P
+import paddle.distributed.fleet as fleet
+from propeller.paddle.train.hooks import RunHook
 
 log = logging.getLogger(__name__)
 
-
-def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
-    """ Applies linear warmup of learning rate from 0 and decay to 0."""
-    with F.default_main_program()._lr_schedule_guard():
-        lr = L.tensor.create_global_var(
-            shape=[1],
-            value=0.0,
-            dtype='float32',
-            persistable=True,
-            name="scheduled_learning_rate")
-
-        global_step = L.learning_rate_scheduler._decay_step_counter()
-
-        warmup_lr = learning_rate * (global_step / warmup_steps)
-
-        poly_decay_lr = L.learning_rate_scheduler.polynomial_decay(
-            learning_rate=learning_rate,
-            decay_steps=num_train_steps,
-            end_learning_rate=0.0,
-            power=1.0,
-            cycle=False)
-        #
-        decayed_lr = L.elementwise_min(warmup_lr, poly_decay_lr)
-        L.assign(decayed_lr, lr)
-        return lr
+from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
 
 
-def optimization(loss,
-                 warmup_steps,
-                 num_train_steps,
-                 learning_rate,
-                 train_program,
-                 startup_prog,
-                 weight_decay,
-                 scheduler='linear_warmup_decay',
-                 use_fp16=False,
-                 init_loss_scaling=128,
-                 incr_every_n_steps=1000,
-                 decr_every_n_nan_or_inf=2,
-                 incr_ratio=2.0,
-                 decr_ratio=0.8):
+def optimization(
+        loss,
+        warmup_steps,
+        num_train_steps,
+        learning_rate,
+        train_program,
+        startup_prog,
+        weight_decay,
+        scheduler='linear_warmup_decay',
+        use_fp16=False, ):
     """do backword for static"""
 
     def exclude_from_weight_decay(param):
@@ -81,63 +53,36 @@ def optimization(loss,
                 return True
         return False
 
-    if warmup_steps > 0:
-        if scheduler == 'noam_decay':
-            scheduled_lr = L.learning_rate_scheduler\
-             .noam_decay(1/(warmup_steps *(learning_rate ** 2)),
-                         warmup_steps)
-        elif scheduler == 'linear_warmup_decay':
-            scheduled_lr = linear_warmup_decay(learning_rate, warmup_steps,
-                                               num_train_steps)
-        else:
-            raise ValueError("Unkown learning rate scheduler, should be "
-                             "'noam_decay' or 'linear_warmup_decay'")
-        log.debug('using Adam')
-        optimizer = F.optimizer.Adam(learning_rate=scheduled_lr)
-    else:
-        scheduled_lr = L.create_global_var(
-            name=F.unique_name.generate("learning_rate"),
-            shape=[1],
-            value=learning_rate,
-            dtype='float32',
-            persistable=True)
-        log.debug('using Adam')
+    g_clip = P.nn.ClipGradByGlobalNorm(1.0)
+    lr_scheduler = P.optimizer.lr.LambdaDecay(
+        learning_rate,
+        get_warmup_and_linear_decay(num_train_steps, warmup_steps))
 
-        optimizer = F.optimizer.Adam(learning_rate=scheduled_lr)
-        optimizer._learning_rate_map[F.default_main_program()] = scheduled_lr
+    optimizer = P.optimizer.AdamW(
+        learning_rate=lr_scheduler,
+        weight_decay=weight_decay,
+        grad_clip=g_clip,
+        apply_decay_param_fun=exclude_from_weight_decay)
 
     if use_fp16:
         log.info('AMP activated')
-        optimizer = F.contrib.mixed_precision.decorate(
+        amp_list = P.fluid.contrib.mixed_precision.AutoMixedPrecisionLists(
+            custom_white_list=['softmax', 'layer_norm', 'gelu'])
+        optimizer = P.fluid.contrib.mixed_precision.decorate(
             optimizer,
-            amp_lists=F.contrib.mixed_precision.AutoMixedPrecisionLists(
-                custom_black_varnames={"loss"},
-                custom_black_list={'layer_norm', 'arg_max', 'argmax'}),
-            init_loss_scaling=init_loss_scaling,
-            use_dynamic_loss_scaling=True, )
-        loss_scaling = optimizer.get_loss_scaling()
+            amp_list,
+            init_loss_scaling=128,
+            use_dynamic_loss_scaling=True)
+        _, param_grads = optimizer.minimize(loss)
+        loss_scaling = P.static.default_main_program().global_block().var(
+            'loss_scaling_0')
     else:
+        _, param_grads = optimizer.minimize(loss)
         loss_scaling = None
 
-    F.clip.set_gradient_clip(
-        clip=F.clip.GradientClipByGlobalNorm(clip_norm=1.0))
+    class LRStepHook(RunHook):
+        def after_run(self, _, __):
+            lr_scheduler.step()
+            log.debug('lr step: %.5f' % lr_scheduler.get_lr())
 
-    param_list = {}
-
-    for param in train_program.global_block().all_parameters():
-        param_list[param.name] = param * 1.0
-        param_list[param.name].stop_gradient = True
-
-    _, param_grads = optimizer.minimize(loss)
-
-    if weight_decay > 0:
-        for param, grad in param_grads:
-            if exclude_from_weight_decay(param):
-                continue
-            with param.block.program._optimized_guard(
-                [param, grad]), F.framework.name_scope("weight_decay"):
-                updated_param = param - param_list[
-                    param.name] * weight_decay * scheduled_lr
-                L.assign(output=param, input=updated_param)
-
-    return scheduled_lr, loss_scaling
+    return LRStepHook(), loss_scaling

@@ -24,11 +24,11 @@ import re
 import logging
 import six
 from glob import glob
+from pathlib import Path
 from functools import reduce, partial
 import itertools
 
 import paddle as P
-import sentencepiece as spm
 import json
 
 from tqdm import tqdm
@@ -39,8 +39,8 @@ from ernie.modeling_ernie import ErnieModelForPretraining
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.optimization import optimization
 
-import propeller as propeller_base
 import propeller.paddle as propeller
+import propeller as propeller_base
 from propeller.paddle.data import Dataset
 
 from propeller import log
@@ -90,7 +90,7 @@ def ernie_pretrain_model_fn(features, mode, params, run_config):
     propeller.summary.scalar('nsp-loss', nsp_loss)
     propeller.summary.scalar('mlm-loss', mlm_loss)
 
-    scheduled_lr, loss_scale_coef = optimization(
+    lr_step_hook, loss_scale_coef = optimization(
         loss=total_loss,
         warmup_steps=params['warmup_steps'],
         num_train_steps=run_config.max_steps,
@@ -99,15 +99,20 @@ def ernie_pretrain_model_fn(features, mode, params, run_config):
         startup_prog=P.static.default_startup_program(),
         weight_decay=params['weight_decay'],
         scheduler="linear_warmup_decay",
-        use_fp16=params['use_fp16'], )
-
+        use_fp16=args.use_amp, )
+    scheduled_lr = P.static.default_main_program().global_block().var(
+        'learning_rate_0')
     propeller.summary.scalar('lr', scheduled_lr)
-    if params['use_fp16']:
-        propeller.summary.scalar('loss_scale', loss_scale_coef)
+    if args.use_amp:
+        propeller.summary.scalar('loss_scaling', loss_scale_coef)
     pred = [total_loss]
 
     return propeller.ModelSpec(
-        loss=total_loss, mode=mode, metrics=metrics, predictions=pred)
+        loss=total_loss,
+        mode=mode,
+        metrics=metrics,
+        predictions=pred,
+        train_hooks=[lr_step_hook])
 
 
 def truncate_sentence(seq, from_length, to_length):
@@ -326,7 +331,8 @@ if __name__ == '__main__':
     parser = propeller.ArgumentParser('DAN model with Paddle')
     parser.add_argument('--max_seqlen', type=int, default=256)
     parser.add_argument('--data_dir', type=str, required=True)
-    parser.add_argument('--from_pretrained', type=str, default=None)
+    parser.add_argument('--from_pretrained', type=Path, default=None)
+    parser.add_argument('--use_amp', action='store_true')
     parser.add_argument('--mask_rate', type=float, default=0.15)
     parser.add_argument('--check', type=float, default=0.)
 
@@ -348,8 +354,7 @@ if __name__ == '__main__':
         batch_size=50,
         warmup_steps=10000,
         learning_rate=1e-4,
-        weight_decay=0.01,
-        use_fp16=False, )
+        weight_decay=0.01, )
 
     hparams = default_hparams.join(propeller.HParams(
         **hparams_config_file)).join(hparams_cli)
