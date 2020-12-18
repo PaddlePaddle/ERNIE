@@ -30,7 +30,7 @@ import paddle as P
 
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
-from ernie.optimization import optimization
+from demo.optimization import optimization
 #import utils.data
 
 from propeller import log
@@ -60,9 +60,10 @@ def model_fn(features, mode, params, run_config):
             acc = propeller.metrics.Acc(labels, pred)
             metrics = {'acc': acc}
             predictions = [pred]
+            train_hooks = None
         else:
             loss, logits = ernie(src_ids, sent_ids, labels=labels)
-            scheduled_lr, _ = optimization(
+            lr_step_hook, loss_scale_coef = optimization(
                 loss=loss,
                 warmup_steps=int(run_config.max_steps *
                                  params['warmup_proportion']),
@@ -70,14 +71,21 @@ def model_fn(features, mode, params, run_config):
                 learning_rate=params['learning_rate'],
                 train_program=P.static.default_main_program(),
                 startup_prog=P.static.default_startup_program(),
-                use_fp16=params.use_fp16,
+                use_fp16=args.use_amp,
                 weight_decay=params['weight_decay'],
                 scheduler="linear_warmup_decay", )
+            scheduled_lr = P.static.default_main_program().global_block().var(
+                'learning_rate_0')
             propeller.summary.scalar('lr', scheduled_lr)
             predictions = [logits, ]
+            train_hooks = [lr_step_hook]
 
     return propeller.ModelSpec(
-        loss=loss, mode=mode, metrics=metrics, predictions=predictions)
+        loss=loss,
+        mode=mode,
+        metrics=metrics,
+        predictions=predictions,
+        train_hooks=train_hooks)
 
 
 if __name__ == '__main__':
@@ -88,7 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--from_pretrained', type=str, required=True)
     parser.add_argument('--warm_start_from', type=str)
     parser.add_argument('--epoch', type=int, default=3)
-    parser.add_argument('--use_fp16', action='store_true')
+    parser.add_argument('--use_amp', action='store_true')
 
     args = parser.parse_args()
 
@@ -113,7 +121,7 @@ if __name__ == '__main__':
         learning_rate=5e-5,
         weight_decay=0.01,
         use_task_id=False,
-        use_fp16=args.use_fp16, )
+        use_fp16=args.use_amp)
 
     hparams = default_hparams.join(propeller.HParams(
         **hparams_config_file)).join(hparams_cli)

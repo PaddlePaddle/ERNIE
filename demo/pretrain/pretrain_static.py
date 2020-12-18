@@ -37,7 +37,7 @@ import random as r
 
 from ernie.modeling_ernie import ErnieModelForPretraining
 from ernie.tokenizing_ernie import ErnieTokenizer
-from ernie.optimization import optimization
+from demo.optimization import optimization
 
 import propeller.paddle as propeller
 import propeller as propeller_base
