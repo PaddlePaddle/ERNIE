@@ -56,7 +56,7 @@ def _build_ln(n_in, name):
             initializer=nn.initializer.Constant(1.)),
         bias_attr=P.ParamAttr(
             name='%s_layer_norm_bias' % name if name is not None else None,
-            initializer=nn.initializer.Constant(1.)), )
+            initializer=nn.initializer.Constant(0.)), )
 
 
 def append_name(name, postfix):
