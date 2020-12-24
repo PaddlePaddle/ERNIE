@@ -364,7 +364,6 @@ if __name__ == '__main__':
 
     scaler = P.amp.GradScaler(enable=args.use_amp)
     create_if_not_exists(args.save_dir)
-
     with P.amp.auto_cast(args.use_amp):
         for step, samples in enumerate(
                 UnpackDataLoader(
@@ -396,3 +395,6 @@ if __name__ == '__main__':
             if step % 1000 == 0 and env.dev_id == 0:
                 log.debug('saveing...')
                 P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+            if step > args.max_steps:
+                break
+    log.info('done')
