@@ -519,13 +519,8 @@ class ErnieModelForTokenClassification(ErnieModel):
         if labels is not None:
             if len(labels.shape) != 2:
                 labels = labels.squeeze()
-            #loss = F.cross_entropy(
-            #    logits, labels, ignore_index=ignore_index, reduction='none')
-            loss = F.nll_loss(
-                F.log_softmax(logits).transpose([0, 2, 1]),
-                labels,
-                ignore_index=ignore_index,
-                reduction='none')
+            loss = F.cross_entropy(
+                logits, labels, ignore_index=ignore_index, reduction='none')
             if loss_weights is not None:
                 loss = loss * loss_weights
             loss = loss.mean()

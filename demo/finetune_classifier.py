@@ -166,6 +166,7 @@ else:
         weight_decay=args.wd,
         apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
         grad_clip=g_clip)
+
 scaler = P.amp.GradScaler(enable=args.use_amp)
 with LogWriter(
         logdir=str(create_if_not_exists(args.save_dir / 'vdl'))) as log_writer:
