@@ -50,7 +50,17 @@ parser.add_argument(
     type=int,
     default=128,
     help='max sentence length, should not greater than 512')
-parser.add_argument('--bsz', type=int, default=32, help='batchsize')
+parser.add_argument(
+    '--bsz',
+    type=int,
+    default=128,
+    help='global batch size for each optimizer step')
+parser.add_argument(
+    '--micro_bsz',
+    type=int,
+    default=32,
+    help='batch size for each device. if `--bsz` > `--micro_bsz` * num_device, will do grad accumulate'
+)
 parser.add_argument('--epoch', type=int, default=3, help='epoch')
 parser.add_argument(
     '--data_dir',
@@ -95,6 +105,17 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
+
+if args.bsz > args.micro_bsz:
+    assert args.bsz % args.micro_bsz == 0, 'cannot perform gradient accumulate with bsz:%d micro_bsz:%d' % (
+        args.bsz, args.micro_bsz)
+    acc_step = args.bsz // args.micro_bsz
+    log.info(
+        'performing gradient accumulate: global_bsz:%d, micro_bsz:%d, accumulate_steps:%d'
+        % (args.bsz, args.micro_bsz, acc_step))
+    args.bsz = args.micro_bsz
+else:
+    acc_step = 1
 
 tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained)
 #tokenizer = ErnieTinyTokenizer.from_pretrained(args.from_pretrained)
@@ -168,17 +189,21 @@ else:
         grad_clip=g_clip)
 
 scaler = P.amp.GradScaler(enable=args.use_amp)
+step, inter_step = 0, 0
 with LogWriter(
         logdir=str(create_if_not_exists(args.save_dir / 'vdl'))) as log_writer:
     with P.amp.auto_cast(enable=args.use_amp):
         for epoch in range(args.epoch):
-            for step, (
-                    ids, sids, label
-            ) in enumerate(UnpackDataLoader(
-                    train_ds, places=P.CUDAPlace(0))):
+            for ids, sids, label in P.io.DataLoader(
+                    train_ds, places=P.CUDAPlace(0), batch_size=None):
+                inter_step += 1
                 loss, _ = model(ids, sids, labels=label)
+                loss /= acc_step
                 loss = scaler.scale(loss)
                 loss.backward()
+                if inter_step % acc_step != 0:
+                    continue
+                step += 1
                 scaler.minimize(opt, loss)
                 model.clear_gradients()
                 lr_scheduler and lr_scheduler.step()
@@ -200,10 +225,9 @@ with LogWriter(
                     acc = []
                     with P.no_grad():
                         model.eval()
-                        for step, d in enumerate(
-                                UnpackDataLoader(
-                                    dev_ds, places=P.CUDAPlace(0))):
-                            ids, sids, label = d
+                        for ids, sids, label in P.io.DataLoader(
+                                dev_ds, places=P.CUDAPlace(0),
+                                batch_size=None):
                             loss, logits = model(ids, sids, labels=label)
                             #print('\n'.join(map(str, logits.numpy().tolist())))
                             a = (logits.argmax(-1) == label)
