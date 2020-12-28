@@ -754,7 +754,7 @@ class ErnieModelForGeneration(ErnieModel):
             encoded = self.mlm_ln(encoded)
             logits = encoded.matmul(
                 self.word_emb.weight, transpose_y=True) + self.mlm_bias
-            output_ids = logits.argmax(-1)
+            output_ids = logits.cast('float32').argmax(-1)
             return output_ids, logits, info
         else:
             encoded_2d = encoded.gather_nd(tgt_pos)

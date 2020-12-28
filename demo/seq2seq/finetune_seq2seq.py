@@ -55,30 +55,33 @@ def evaluate(model, datasets, step, args):
     predict_output_dir = args.predict_output_dir / ('pred.step%d.%d' %
                                                     (step, env.dev_id))
     with predict_output_dir.open('w') as outf:
-        for step, data in enumerate(
-                UnpackDataLoader(
-                    datasets, places=P.CUDAPlace(env.dev_id))):
-            (example_id, src_ids, src_sids, src_pids, _, _, _, _, _, _, _,
-             _) = data  # never use target when infer
-            output_ids = beam_search_infilling(
-                model,
-                src_ids,
-                src_sids,
-                eos_id=tokenizer.sep_id,
-                sos_id=tokenizer.cls_id,
-                attn_id=tokenizer.vocab[args.attn_token],
-                max_decode_len=args.max_decode_len,
-                max_encode_len=args.max_encode_len,
-                beam_width=args.beam_width,
-                length_penalty=args.length_penalty,
-                tgt_type_id=args.tgt_type_id, )
-            output_str = rev_lookup(output_ids.numpy())
-            for eid, ostr in zip(example_id.numpy().tolist(),
-                                 output_str.tolist()):
-                if '[SEP]' in ostr:
-                    ostr = ostr[:ostr.index('[SEP]')]
-                ostr = ''.join(map(post_process, ostr))
-                print('%d\t%s' % (eid, ostr), file=outf)
+        with P.amp.auto_cast(enable=False):
+            for step, data in enumerate(
+                    P.io.DataLoader(
+                        datasets,
+                        places=P.CUDAPlace(env.dev_id),
+                        batch_size=None)):
+                (example_id, src_ids, src_sids, src_pids, _, _, _, _, _, _, _,
+                 _) = data  # never use target when infer
+                output_ids = beam_search_infilling(
+                    model,
+                    src_ids,
+                    src_sids,
+                    eos_id=tokenizer.sep_id,
+                    sos_id=tokenizer.cls_id,
+                    attn_id=tokenizer.vocab[args.attn_token],
+                    max_decode_len=args.max_decode_len,
+                    max_encode_len=args.max_encode_len,
+                    beam_width=args.beam_width,
+                    length_penalty=args.length_penalty,
+                    tgt_type_id=args.tgt_type_id, )
+                output_str = rev_lookup(output_ids.numpy())
+                for eid, ostr in zip(example_id.numpy().tolist(),
+                                     output_str.tolist()):
+                    if '[SEP]' in ostr:
+                        ostr = ostr[:ostr.index('[SEP]')]
+                    ostr = ''.join(map(post_process, ostr))
+                    print('%d\t%s' % (eid, ostr), file=outf)
 
     model.train()
 
@@ -245,8 +248,9 @@ def seq2seq(model, tokenizer, args):
 
     with P.amp.auto_cast(enable=args.use_amp):
         for step, data in enumerate(
-                UnpackDataLoader(
-                    train_ds, places=P.CUDAPlace(env.dev_id))):
+                P.io.DataLoader(
+                    train_ds, places=P.CUDAPlace(env.dev_id),
+                    batch_size=None)):
             (example_id, src_ids, src_sids, src_pids, tgt_ids, tgt_sids,
              tgt_pids, attn_ids, mask_src_2_src, mask_tgt_2_srctgt,
              mask_attn_2_srctgtattn, tgt_labels) = data
