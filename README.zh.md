@@ -253,7 +253,7 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
 
 # 蒸馏
 
-知识蒸馏是进行ERNIE模型压缩、加速的有效方式；关于知识蒸馏的实现细节请参见[这里](./distill/README.md)。
+知识蒸馏是进行ERNIE模型压缩、加速的有效方式；关于知识蒸馏的实现细节请参见[这里](./demo/distill/README.md)。
 
 # 文献引用
 

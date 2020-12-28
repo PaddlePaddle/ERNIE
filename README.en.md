@@ -250,7 +250,7 @@ It can be used for feature-based finetuning or feature extraction.
 
 Knowledge distillation is good way to compress and accelerate ERNIE.
 
-For details about distillation, see [here](./distill/README.md)
+For details about distillation, see [here](./demo/distill/README.md)
 
 # Citation
 
