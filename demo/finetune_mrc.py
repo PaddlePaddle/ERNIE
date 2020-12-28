@@ -45,7 +45,7 @@ from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
 
 from demo.mrc import mrc_reader
 from demo.mrc import mrc_metrics
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
@@ -57,10 +57,9 @@ def evaluate(model, ds, all_examples, all_features, tokenizer, args):
         log.debug('start eval')
         model.eval()
         all_res = []
-        for step, (
-                uids, token_ids, token_type_ids, _, __
-        ) in enumerate(UnpackDataLoader(
-                ds, places=P.CUDAPlace(env.dev_id))):
+        for step, (uids, token_ids, token_type_ids, _, __) in enumerate(
+                P.io.DataLoader(
+                    ds, places=P.CUDAPlace(env.dev_id), batch_size=None)):
             _, start_logits, end_logits = model(token_ids, token_type_ids)
             res = [
                 mrc_metrics.RawResult(
@@ -113,8 +112,10 @@ def train(model, train_dataset, dev_dataset, dev_examples, dev_features,
     with P.amp.auto_cast(enable=args.use_amp):
         for step, (_, token_ids, token_type_ids, start_pos,
                    end_pos) in enumerate(
-                       UnpackDataLoader(
-                           train_dataset, places=P.CUDAPlace(env.dev_id))):
+                       P.io.DataLoader(
+                           train_dataset,
+                           places=P.CUDAPlace(env.dev_id),
+                           batch_size=None)):
             loss, _, __ = model(
                 token_ids,
                 token_type_ids,

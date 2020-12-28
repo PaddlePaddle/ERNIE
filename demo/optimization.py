@@ -28,7 +28,7 @@ from propeller.paddle.train.hooks import RunHook
 
 log = logging.getLogger(__name__)
 
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
 
 def optimization(

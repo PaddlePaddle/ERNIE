@@ -40,7 +40,7 @@ log = logging.getLogger()
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
 #from ernie.optimization import AdamW, LinearDecay
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
 parser = argparse.ArgumentParser('classify model with ERNIE')
 parser.add_argument(
@@ -130,8 +130,8 @@ if not args.eval:
         with P.amp.auto_cast(enable=args.use_amp):
             for epoch in range(args.epoch):
                 for step, d in enumerate(
-                        UnpackDataLoader(
-                            train_ds, places=P.CUDAPlace(0))):
+                        P.io.DataLoader(
+                            train_ds, places=P.CUDAPlace(0), batch_size=None)):
                     ids, sids, label = d
                     loss, _ = model(ids, sids, labels=label)
                     loss = scaler.scale(loss)
@@ -159,8 +159,10 @@ if not args.eval:
                         with P.no_grad():
                             model.eval()
                             for step, d in enumerate(
-                                    UnpackDataLoader(
-                                        dev_ds, places=P.CUDAPlace(0))):
+                                    P.io.DataLoader(
+                                        dev_ds,
+                                        places=P.CUDAPlace(0),
+                                        batch_size=None)):
                                 ids, sids, label = d
                                 loss, logits = model(ids, sids, labels=label)
                                 a = (logits.argmax(-1) == label)
@@ -196,10 +198,9 @@ else:
                                    .map(map_fn) \
                                    .padded_batch(args.bsz)
 
-    for step, (
-            ids, sids
-    ) in enumerate(UnpackDataLoader(
-            predict_ds, places=P.CUDAPlace(0))):
+    for step, (ids, sids) in enumerate(
+            P.io.DataLoader(
+                predict_ds, places=P.CUDAPlace(0), batch_size=None)):
         _, logits = model(ids, sids)
         pred = logits.numpy().argmax(-1)
         print('\n'.join(map(str, pred.tolist())))

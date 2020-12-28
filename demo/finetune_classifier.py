@@ -37,7 +37,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
 #from ernie.optimization import AdamW, LinearDecay
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
 parser = argparse.ArgumentParser('classify model with ERNIE')
 parser.add_argument(

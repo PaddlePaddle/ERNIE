@@ -39,7 +39,7 @@ from ernie.tokenizing_ernie import ErnieTokenizer
 #from ernie.optimization import AdamW, LinearDecay
 
 from demo.seq2seq.decode import beam_search_infilling, post_process
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
 from propeller import log
 log.setLevel(logging.DEBUG)

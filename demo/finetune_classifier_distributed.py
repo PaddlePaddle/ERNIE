@@ -33,7 +33,7 @@ import propeller.paddle as propeller
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
 #from ernie.optimization import AdamW, LinearDecay
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
@@ -153,8 +153,8 @@ create_if_not_exists(args.save_dir)
 
 #with LogWriter(logdir=str(create_if_not_exists(args.save_dir / 'vdl-%d' % env.dev_id))) as log_writer:
 with P.amp.auto_cast(enable=args.use_amp):
-    for ids, sids, label in UnpackDataLoader(
-            train_ds, places=P.CUDAPlace(env.dev_id)):
+    for ids, sids, label in P.io.DataLoader(
+            train_ds, places=P.CUDAPlace(env.dev_id), batch_size=None):
         step += 1
         loss, _ = model(ids, sids, labels=label)
         loss = scaler.scale(loss)
@@ -183,8 +183,9 @@ with P.amp.auto_cast(enable=args.use_amp):
             acc = []
             with P.no_grad():
                 model.eval()
-                for d in UnpackDataLoader(
-                        dev_ds, places=P.CUDAPlace(env.dev_id)):
+                for d in P.io.DataLoader(
+                        dev_ds, places=P.CUDAPlace(env.dev_id),
+                        batch_size=None):
                     ids, sids, label = d
                     loss, logits = model(ids, sids, labels=label)
                     a = (logits.argmax(-1) == label)

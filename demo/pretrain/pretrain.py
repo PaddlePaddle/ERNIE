@@ -44,7 +44,7 @@ import propeller as propeller_base
 import propeller.paddle as propeller
 from propeller.paddle.data import Dataset
 from propeller import log
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
@@ -366,8 +366,8 @@ if __name__ == '__main__':
     create_if_not_exists(args.save_dir)
     with P.amp.auto_cast(args.use_amp):
         for step, samples in enumerate(
-                UnpackDataLoader(
-                    train_ds, places=P.CUDAPlace(env.dev_id))):
+                P.io.DataLoader(
+                    train_ds, places=P.CUDAPlace(env.dev_id), batch_size=0)):
             (src_ids, sent_ids, mlm_label, mask_pos, nsp_label) = samples
             loss, mlmloss, nsploss = model(
                 src_ids,

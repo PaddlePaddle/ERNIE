@@ -39,7 +39,7 @@ import propeller.paddle as propeller
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 
-from demo.utils import UnpackDataLoader, create_if_not_exists, get_warmup_and_linear_decay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification, ErnieModelForTokenClassification
 from ernie.tokenizing_ernie import ErnieTokenizer
 #from ernie.optimization import AdamW, LinearDecay
@@ -153,8 +153,9 @@ def evaluate(model, dataset):
     model.eval()
     with P.no_grad():
         chunkf1 = propeller.metrics.ChunkF1(None, None, None, len(feature_map))
-        for step, (ids, sids, aligned_label, label,
-                   orig_pos) in enumerate(UnpackDataLoader(dataset)):
+        for step, (ids, sids, aligned_label, label, orig_pos
+                   ) in enumerate(P.io.DataLoader(
+                       dataset, batch_size=None)):
             loss, logits = model(ids, sids)
             #print('\n'.join(map(str, logits.numpy().tolist())))
 
@@ -217,8 +218,10 @@ with LogWriter(
         logdir=str(create_if_not_exists(args.save_dir / 'vdl'))) as log_writer:
     with P.amp.auto_cast(enable=args.use_amp):
         for epoch in range(args.epoch):
-            for step, (ids, sids, aligned_label, label,
-                       orig_pos) in enumerate(UnpackDataLoader(train_ds)):
+            for step, (
+                    ids, sids, aligned_label, label, orig_pos
+            ) in enumerate(P.io.DataLoader(
+                    train_ds, batch_size=None)):
                 loss, logits = model(ids, sids, labels=aligned_label)
                 #loss, logits = model(ids, sids, labels=aligned_label, loss_weights=P.cast(ids != 0, 'float32'))
                 loss = scaler.scale(loss)
