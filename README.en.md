@@ -11,6 +11,12 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 [\[more information\]](https://wenxin.baidu.com/)
 
 # News
+
+- Dec.29.2020:
+ 	- Pretrain and finetune ERNIE with [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc).
+    - New AMP(auto mixed precision) feature for every demo in this repo.
+    - Introducing `Gradient accumulation`, run `ERNIE-large` with only 8G memory.
+
 - Sept.24.2020:
     - [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) is **avaliable** now!
         - A **knowledge-enhanced** joint representations for vision-language tasks.
@@ -20,7 +26,6 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 - May.20.2020:
 
     - Try ERNIE in "`dygraph`", with:
-    	- Pretrain and finetune ERNIE with [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc).
     	- Eager execution with `paddle.fluid.dygraph`.
     	- Distributed training.
     	- Easy deployment.
@@ -154,6 +159,11 @@ python3 ./demo/finetune_classifier.py \
        --from_pretrained ernie-1.0 \
        --data_dir ./data/xnli
 ```
+
+  - specify `--use_amp` to activate AMP training.
+  - `--bsz` denotes global batch size for one optimization step, `--micro_bsz` denotes maximum batch size for each GPU device.
+if `--micro_bsz < --bsz`, gradient accumulation will be actiavted.
+
 
 - Distributed finetune
 

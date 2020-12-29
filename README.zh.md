@@ -10,6 +10,11 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 # 新闻
 
+- 2020.12.29:
+   - `ERNIE`开源工具套件全面升级 [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc)
+   - 所有demo教程均引入AMP（混合精度训练), 平均提速达2.3倍。
+   - 引入`Gradient accumulation`, 8G显存也可运行`ERNIE-large`模型。
+
 - 2020.9.24:
    - `ERNIE-ViL` 模型正式开源! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil))
        - 面向视觉-语言知识增强的预训练框架，首次在视觉-语言预训练引入结构化的知识。
@@ -19,7 +24,6 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 - 2020.5.20:
     - 欢迎试用`动态图`实现的 ERNIE:
-        - 基于[PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc)使用 ERNIE 进行 Pretrain 和 Finetune.
         - 动态执行, 所见即所得。
         - 大规模分布式训练。
         - 易于部署。
@@ -161,6 +165,11 @@ python3 ./ernie_d/demo/finetune_classifier.py \
        --from_pretrained ernie-1.0 \
        --data_dir ./data/xnli
 ```
+
+   - 加入`--use_amp`以启用AMP功能(请在支持`TensorCore`设备上启用AMP)
+   - 通过`--bsz`指定全局batch\_size(一步优化中模型所能见到的样本数), 通过`--micro_bsz` 指定输入给每一张GPU卡的样本数
+若`--bsz > --micro_bsz` 脚本会自动开启梯度累计功能.
+
 
 - 分布式 finetune
 
