@@ -49,11 +49,12 @@ __all__ = ['train_and_eval', 'Learner']
 def _get_summary_writer(path):
     summary_writer = None
     try:
-        from tensorboardX import SummaryWriter
+        #from tensorboardX import SummaryWriter
+        from visualdl import LogWriter as SummaryWriter
         if distribution.status.is_master:
             summary_writer = SummaryWriter(os.path.join(path))
     except ImportError:
-        log.warning('tensorboardX not installed, will not log to tensorboard')
+        log.warning('Visual DL not installed, will not log to tensorboard')
     return summary_writer
 
 
