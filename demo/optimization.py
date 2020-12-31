@@ -44,7 +44,7 @@ def optimization(
     """do backword for static"""
 
     def exclude_from_weight_decay(param):
-        name = param.name.rstrip('.master')
+        name = param.rstrip('.master')
         if name.find("layer_norm") > -1:
             return True
         bias_suffix = ["_bias", "_b", ".b_0"]
@@ -66,13 +66,14 @@ def optimization(
 
     if use_fp16:
         log.info('AMP activated')
-        amp_list = P.fluid.contrib.mixed_precision.AutoMixedPrecisionLists(
-            custom_white_list=['softmax', 'layer_norm', 'gelu'])
+        if weight_decay > 0.:
+            raise ValueError(
+                'paddle amp will ignore `weight_decay`, see https://github.com/PaddlePaddle/Paddle/issues/29794'
+            )
+        #amp_list = P.fluid.contrib.mixed_precision.AutoMixedPrecisionLists(
+        #    custom_white_list=['softmax', 'layer_norm', 'gelu'])
         optimizer = P.fluid.contrib.mixed_precision.decorate(
-            optimizer,
-            amp_list,
-            init_loss_scaling=128,
-            use_dynamic_loss_scaling=True)
+            optimizer, init_loss_scaling=3**15, use_dynamic_loss_scaling=True)
         _, param_grads = optimizer.minimize(loss)
         loss_scaling = P.static.default_main_program().global_block().var(
             'loss_scaling_0')
