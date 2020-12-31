@@ -19,4 +19,5 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from propeller.paddle.data.functional import *
-from propeller.paddle.data.feature_column import *
+from propeller.data.feature_column import *  # columns
+from propeller.paddle.data.feature_column import *  #feature_column

@@ -15,16 +15,21 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
+
 def gen_segs(segment_piece):
     if len(segment_piece) == 0:
         return []
     else:
         return [min(segment_piece)] * len(segment_piece)
 
+
 whit_space_pat = re.compile(r'\S+')
+
+
 def segment(inputs, inputs_segment):
     ret = [r.span() for r in whit_space_pat.finditer(inputs)]
-    ret = [(inputs[s: e], gen_segs(inputs_segment[s: e])) for i, (s, e) in enumerate(ret)]
+    ret = [(inputs[s:e], gen_segs(inputs_segment[s:e]))
+           for i, (s, e) in enumerate(ret)]
     return ret
 
 
@@ -36,11 +41,13 @@ def tokenize(sen, seg_info):
     sen = sen.lower()
     res_word, res_segments = [], []
     for match in pat.finditer(sen):
-        words, pos = _wordpiece(match.group(0), vocab=vocab_set, unk_token='[UNK]')
+        words, pos = _wordpiece(
+            match.group(0), vocab=vocab_set, unk_token='[UNK]')
         start_of_word = match.span()[0]
         for w, p in zip(words, pos):
             res_word.append(w)
-            res_segments.append(gen_segs(seg_info[p[0] + start_of_word: p[1] + start_of_word]))
+            res_segments.append(
+                gen_segs(seg_info[p[0] + start_of_word:p[1] + start_of_word]))
     return res_word, res_segments
 
 
@@ -63,22 +70,32 @@ def parse_txt(line):
         print('****', file=sys.stderr)
 
     ret_line = [vocab.get(r, vocab['[UNK]']) for r in ret_line]
-    ret_seginfo = [[-1] if i == [] else i for i in ret_seginfo] #for sentence piece only
+    ret_seginfo = [[-1] if i == [] else i
+                   for i in ret_seginfo]  #for sentence piece only
     ret_seginfo = [min(i) for i in ret_seginfo]
     return ret_line, ret_seginfo
 
 
 def build_example(slots):
     txt, seginfo = slots
-    txt_fe_list = feature_pb2.FeatureList(feature=[feature_pb2.Feature(int64_list=feature_pb2.Int64List(value=t)) for t in txt])
-    segsinfo_fe_list = feature_pb2.FeatureList(feature=[feature_pb2.Feature(int64_list=feature_pb2.Int64List(value=s)) for s in seginfo])
-    assert len(txt_fe_list.feature) == len(segsinfo_fe_list.feature), 'txt[%d] and seginfo[%d] size not match' % (len(txt_fe_list.feature), len(segsinfo_fe_list.feature))
+    txt_fe_list = feature_pb2.FeatureList(feature=[
+        feature_pb2.Feature(int64_list=feature_pb2.Int64List(value=t))
+        for t in txt
+    ])
+    segsinfo_fe_list = feature_pb2.FeatureList(feature=[
+        feature_pb2.Feature(int64_list=feature_pb2.Int64List(value=s))
+        for s in seginfo
+    ])
+    assert len(txt_fe_list.feature) == len(
+        segsinfo_fe_list.feature), 'txt[%d] and seginfo[%d] size not match' % (
+            len(txt_fe_list.feature), len(segsinfo_fe_list.feature))
     features = {
-        'txt':  txt_fe_list,
+        'txt': txt_fe_list,
         'segs': segsinfo_fe_list,
     }
 
-    ex = example_pb2.SequenceExample(feature_lists=feature_pb2.FeatureLists(feature_list=features))
+    ex = example_pb2.SequenceExample(feature_lists=feature_pb2.FeatureLists(
+        feature_list=features))
     return ex
 
 
@@ -122,15 +139,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     log.setLevel(logging.DEBUG)
 
-
     from ernie.tokenizing_ernie import _wordpiece
     pat = re.compile(r'([a-zA-Z0-9]+|\S)')
 
-    vocab = {j.strip().split(b'\t')[0].decode('utf8'): i for i, j in enumerate(open(args.vocab, 'rb'))}
+    vocab = {
+        j.strip().split(b'\t')[0].decode('utf8'): i
+        for i, j in enumerate(open(args.vocab, 'rb'))
+    }
     vocab_set = set(vocab.keys())
 
-
-    with open(args.src, 'rb') as from_file, gzip.open(args.tgt, 'wb') as to_file:
+    with open(args.src, 'rb') as from_file, gzip.open(args.tgt,
+                                                      'wb') as to_file:
         log.info('making gz from bb %s ==> %s' % (from_file, to_file))
         build_bb(from_file, to_file)
         log.info('done: %s' % to_file)

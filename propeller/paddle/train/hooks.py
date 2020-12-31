@@ -45,7 +45,7 @@ class RunHook(object):
         """doc"""
         pass
 
-    def before_train(self, program):
+    def before_train(self, program, state):
         """doc"""
         pass
 
@@ -61,7 +61,7 @@ class RunHook(object):
         """doc"""
         return False
 
-    def after_train(self):
+    def after_train(self, program, state):
         """doc"""
         pass
 
@@ -144,12 +144,13 @@ class TqdmNotebookProgressBarHook(RunHook):
 
 
 class LoggingHook(RunHook):
-    """log tensor in to screan and VisualDL"""
+    """log tensor in to screan and tensorboard"""
 
     def __init__(self,
                  loss,
                  per_step=10,
                  skip_step=100,
+                 prefix='training',
                  summary_writer=None,
                  summary_record=None):
         """doc"""
@@ -158,12 +159,13 @@ class LoggingHook(RunHook):
                              (per_step, skip_step))
         self.loss = loss
         self.per_step = per_step
+        self.prefix = prefix
         self.skip_step = skip_step
         self.summary_record = summary_record
         self.writer = summary_writer
         self.last_state = None
 
-    def before_train(self, program):
+    def before_train(self, program, _):
         """doc"""
         if self.summary_record:
             if self.summary_record.scalar:
@@ -205,7 +207,7 @@ class LoggingHook(RunHook):
                 speed = -1.
             self.last_state = state
 
-            # log to VisualDL
+            # log to tensorboard
             if self.writer is not None:
                 self.writer.add_scalar('loss', loss, state.gstep)
                 for name, t in zip(self.s_name, s_np):
@@ -225,12 +227,17 @@ class LoggingHook(RunHook):
 
             # log to stdout
             log.debug('\t'.join([
+                '[%s]' % self.prefix,
                 'step: %d' % state.gstep,
                 'steps/sec: %.5f' % speed,
                 'loss: %.5f' % loss,
                 '' if self.summary_record is None else ' '.join(
                     map(lambda t: '%s:%s' % t, zip(self.s_name, s_np))),
             ]))
+
+    def after_train(self, program, state):
+        if self.writer is not None:
+            self.writer.close()
 
 
 class StopAtStepHook(RunHook):
@@ -274,7 +281,7 @@ class EvalHook(RunHook):
         else:
             self.names, self.metrics = [], []
 
-    def before_train(self, program):
+    def before_train(self, program, _):
         """doc"""
         for m in self.metrics:
             m.reset()
@@ -307,9 +314,8 @@ class EvalHook(RunHook):
         """doc"""
         return self._result
 
-    def after_train(self):
+    def after_train(self, program, state):
         """doc"""
-        printable = []
         self._result = {}
         for n, m in zip(self.names, self.metrics):
             val = m.eval()
@@ -332,3 +338,6 @@ class CheckpointSaverHook(RunHook):
         if state.gstep % self.per_step == 0 and \
                 state.step > self.skip_step:
             self.saver.save(state)
+
+    def after_train(self, program, state):
+        self.saver.save(state)

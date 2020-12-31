@@ -11,7 +11,13 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 [\[more information\]](https://wenxin.baidu.com/)
 
 # News
-- Sept.24.2020: 
+
+- Dec.29.2020:
+ 	- Pretrain and finetune ERNIE with [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc).
+    - New AMP(auto mixed precision) feature for every demo in this repo.
+    - Introducing `Gradient accumulation`, run `ERNIE-large` with only 8G memory.
+
+- Sept.24.2020:
     - [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) is **avaliable** now!
         - A **knowledge-enhanced** joint representations for vision-language tasks.
             - Constructing three **Scene Graph Prediction** tasks utilizing structured knowledge.
@@ -20,20 +26,19 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 - May.20.2020:
 
     - Try ERNIE in "`dygraph`", with:
-    	- Pretrain and finetune ERNIE with [PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8).
     	- Eager execution with `paddle.fluid.dygraph`.
     	- Distributed training.
     	- Easy deployment.
     	- Learn NLP in Aistudio tutorials.
     	- Backward compatibility for old-styled checkpoint
-    
+
     - [`ERNIE-GEN`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen) is **avaliable** now! ([link here](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gen))
     	- the **state-of-the-art** pre-trained model for generation tasks, accepted by `IJCAI-2020`.
         	- A novel **span-by-span generation pre-training task**.
         	- An **infilling generation** echanism and a **noise-aware generation** method.
         	- Implemented by a carefully designed **Multi-Flow Attention** architecture.
     	- You are able to `download` all models including `base/large/large-430G`.
-  
+
 - Apr.30.2020: Release [ERNIESage](https://github.com/PaddlePaddle/PGL/tree/master/examples/erniesage), a novel Graph Neural Network Model using ERNIE as its aggregator. It is implemented through [PGL](https://github.com/PaddlePaddle/PGL)
 - Mar.27.2020: [Champion on 5 SemEval2020 sub tasks](https://www.jiqizhixin.com/articles/2020-03-27-8)
 - Dec.26.2019: [1st place on GLUE leaderboard](https://www.technologyreview.com/2019/12/26/131372/ai-baidu-ernie-google-bert-natural-language-glue/)
@@ -41,7 +46,7 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 - Jul.7.2019: [Introducing ERNIE2.0](https://www.jiqizhixin.com/articles/2019-07-31-10)
 - Mar.16.2019: [Introducing ERNIE1.0](https://www.jiqizhixin.com/articles/2019-03-16-3)
 
-	
+
 # Table of contents
 * [Tutorials](#tutorials)
 * [Setup](#setup)
@@ -54,18 +59,16 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 
 ```python
 import numpy as np
-import paddle.fluid.dygraph as D
+import paddle as P
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.modeling_ernie import ErnieModel
-
-D.guard().__enter__() # activate paddle `dygrpah` mode
 
 model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
 model.eval()
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
 ids, _ = tokenizer.encode('hello world')
-ids = D.to_variable(np.expand_dims(ids, 0))  # insert extra `batch` dimension
+ids = P.to_tensor(np.expand_dims(ids, 0))  # insert extra `batch` dimension
 pooled, encoded = model(ids)                 # eager execution
 print(pooled.numpy())                        # convert  results to numpy
 
@@ -95,7 +98,7 @@ This repo requires PaddlePaddle 1.7.0+, please see [here](https://www.paddlepadd
 pip install paddle-ernie
 ```
 
-or 
+or
 
 ```shell
 git clone https://github.com/PaddlePaddle/ERNIE.git --depth 1
@@ -117,10 +120,10 @@ pip install -e .
 | [ERNIE Gen Large 430G for English](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-430g-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 430G pretrain corpus | ernie-gen-large-430g-en |
 
 ##### 4. download datasets
- 
+
 **English Datasets**
 
-Download the [GLUE datasets](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) 
+Download the [GLUE datasets](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e)
 
 the `--data_dir` option in the following section assumes a directory tree like this:
 
@@ -152,10 +155,15 @@ see [demo](https://ernie-github.cdn.bcebos.com/data-mnli-m.tar.gz) data for MNLI
 - try eager execution with `dygraph model` :
 
 ```script
-python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
+python3 ./demo/finetune_classifier.py \
        --from_pretrained ernie-1.0 \
-       --data_dir ./data/xnli  
+       --data_dir ./data/xnli
 ```
+
+  - specify `--use_amp` to activate AMP training.
+  - `--bsz` denotes global batch size for one optimization step, `--micro_bsz` denotes maximum batch size for each GPU device.
+if `--micro_bsz < --bsz`, gradient accumulation will be actiavted.
+
 
 - Distributed finetune
 
@@ -165,15 +173,15 @@ When in distributed training, `max_steps` is used as stopping criteria rather th
 You could calculate `max_steps` with `EPOCH * NUM_TRAIN_EXAMPLES / TOTAL_BATCH`.
 Also notice than we shard the train data according to device id to prevent over fitting.
 
-demo: 
-(make sure you have more than 2 GPUs, 
-online model download can not work in `paddle.distributed.launch`, 
-you need to run single card finetuning first to get pretrained model, or donwload and extract one manualy from [here](#section-pretrained-models)): 
+demo:
+(make sure you have more than 2 GPUs,
+online model download can not work in `paddle.distributed.launch`,
+you need to run single card finetuning first to get pretrained model, or donwload and extract one manualy from [here](#section-pretrained-models)):
 
 
 ```script
 python3 -m paddle.distributed.launch \
-./demo/finetune_classifier_dygraph_distributed.py \
+./demo/finetune_classifier_distributed.py  \
     --data_dir data/mnli \
     --max_steps 10000 \
     --from_pretrained ernie-2.0-en
@@ -182,11 +190,12 @@ python3 -m paddle.distributed.launch \
 
 many other demo python scripts:
 
-1. [Sentiment Analysis](./demo/finetune_sentiment_analysis_dygraph.py)
-1. [Semantic Similarity](./demo/finetune_classifier_dygraph.py)
-1. [Name Entity Recognition(NER)](./demo/finetune_ner_dygraph.py)
-1. [Machine Reading Comprehension](./demo/finetune_mrc_dygraph.py)
+1. [Sentiment Analysis](./demo/finetune_sentiment_analysis.py)
+1. [Semantic Similarity](./demo/finetune_classifier.py)
+1. [Name Entity Recognition(NER)](./demo/finetune_ner.py)
+1. [Machine Reading Comprehension](./demo/finetune_mrc.py)
 1. [Text generation](./demo/seq2seq/README.md)
+1. [Text classification with `paddle.static` API](./demo/finetune_classifier_static.py)
 
 
 
@@ -220,7 +229,7 @@ see [here](./demo/pretrain/README.md)
 
 # Online inference
 
-If `--inference_model_dir` is passed to `finetune_classifier_dygraph.py`, 
+If `--inference_model_dir` is passed to `finetune_classifier_dygraph.py`,
 a deployable model will be generated at the end of finetuning and your model is ready to serve.
 
 For details about online inferece, see [C++ inference API](./inference/README.md),
@@ -244,14 +253,14 @@ sids = np.expand_dims(sids, 0)
 result = client(ids, sids)
 ```
 
-A pre-made `inference model` for ernie-1.0 can be downloaded at [here](https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz). 
+A pre-made `inference model` for ernie-1.0 can be downloaded at [here](https://ernie.bj.bcebos.com/ernie1.0_zh_inference_model.tar.gz).
 It can be used for feature-based finetuning or feature extraction.
 
 # Distillation
 
-Knowledge distillation is good way to compress and accelerate ERNIE. 
+Knowledge distillation is good way to compress and accelerate ERNIE.
 
-For details about distillation, see [here](./distill/README.md)
+For details about distillation, see [here](./demo/distill/README.md)
 
 # Citation
 
@@ -271,7 +280,7 @@ For details about distillation, see [here](./distill/README.md)
   title={ERNIE 2.0: A Continual Pre-training Framework for Language Understanding},
   author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Tian, Hao and Wu, Hua and Wang, Haifeng},
   journal={arXiv preprint arXiv:1907.12412},
-  year={2019} 
+  year={2019}
 }
 ```
 
@@ -306,4 +315,3 @@ For full reproduction of paper results, please checkout to `repro` branch of thi
 - QQ discussion group: 760439550 (ERNIE discussion group).
 - QQ discussion group: 958422639 (ERNIE discussion group-v2).
 - [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
-

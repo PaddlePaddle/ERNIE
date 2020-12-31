@@ -10,16 +10,20 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 # 新闻
 
-- 2020.9.24: 
+- 2020.12.29:
+   - `ERNIE`开源工具套件全面升级 [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc)
+   - 所有demo教程均引入AMP（混合精度训练), 平均提速达2.3倍。
+   - 引入`Gradient accumulation`, 8G显存也可运行`ERNIE-large`模型。
+
+- 2020.9.24:
    - `ERNIE-ViL` 模型正式开源! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil))
        - 面向视觉-语言知识增强的预训练框架，首次在视觉-语言预训练引入结构化的知识。
            - 利用场景图中的知识，构建了物体、属性和关系预测任务，精细刻画模态间细粒度语义对齐。
        - 五项视觉-语言下游任务取得最好效果，[视觉常识推理榜单](https://visualcommonsense.com/)取得第一。
-       
-        
-- 2020.5.20:     
+
+
+- 2020.5.20:
     - 欢迎试用`动态图`实现的 ERNIE:
-        - 基于[PaddlePaddle v1.8](https://github.com/PaddlePaddle/Paddle/tree/release/1.8)使用 ERNIE 进行 Pretrain 和 Finetune.
         - 动态执行, 所见即所得。
         - 大规模分布式训练。
         - 易于部署。
@@ -52,18 +56,16 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 # 快速上手
 ```python
 import numpy as np
-import paddle.fluid.dygraph as D
+import paddle as P
 from ernie.tokenizing_ernie import ErnieTokenizer
 from ernie.modeling_ernie import ErnieModel
-
-D.guard().__enter__() # activate paddle `dygrpah` mode
 
 model = ErnieModel.from_pretrained('ernie-1.0')    # Try to get pretrained model from server, make sure you have network connection
 model.eval()
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
 ids, _ = tokenizer.encode('hello world')
-ids = D.to_variable(np.expand_dims(ids, 0))  # insert extra `batch` dimension
+ids = P.to_tensor(np.expand_dims(ids, 0))  # insert extra `batch` dimension
 pooled, encoded = model(ids)                 # eager execution
 print(pooled.numpy())                        # convert  results to numpy
 
@@ -71,7 +73,7 @@ print(pooled.numpy())                        # convert  results to numpy
 
 # 教程
 
-手边没有GPU？欢迎在[AIStudio](https://aistudio.baidu.com/aistudio/index)中直接试用 ERNIE. 
+手边没有GPU？欢迎在[AIStudio](https://aistudio.baidu.com/aistudio/index)中直接试用 ERNIE.
 (请选择最新版本的教程并申请GPU运行环境)
 
 1. [从0开始学ERNIE](https://aistudio.baidu.com/studio/edu/group/quick/join/314947)
@@ -159,10 +161,15 @@ data/xnli
 - 使用 `动态图` 模型进行finetune:
 
 ```script
-python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
+python3 ./ernie_d/demo/finetune_classifier.py \
        --from_pretrained ernie-1.0 \
-       --data_dir ./data/xnli  
+       --data_dir ./data/xnli
 ```
+
+   - 加入`--use_amp`以启用AMP功能(请在支持`TensorCore`设备上启用AMP)
+   - 通过`--bsz`指定全局batch\_size(一步优化中模型所能见到的样本数), 通过`--micro_bsz` 指定输入给每一张GPU卡的样本数
+若`--bsz > --micro_bsz` 脚本会自动开启梯度累计功能.
+
 
 - 分布式 finetune
 
@@ -177,7 +184,7 @@ python3 ./ernie_d/demo/finetune_classifier_dygraph.py \
 
 ```script
 python3 -m paddle.distributed.launch \
-./demo/finetune_classifier_dygraph_distributed.py \
+./demo/finetune_classifier_distributed.py \
     --data_dir data/mnli \
     --max_steps 10000 \
     --from_pretrained ernie2.0-en
@@ -186,11 +193,12 @@ python3 -m paddle.distributed.launch \
 
 更多示例脚本:
 
-1. [情感分析](./demo/finetune_sentiment_analysis_dygraph.py)
-1. [语义匹配](./demo/finetune_classifier_dygraph.py)
-1. [命名实体识别(NER)](./demo/finetune_ner_dygraph.py)
-1. [机器阅读理解](./demo/finetune_mrc_dygraph.py) (需要多卡环境运行；参见上面"分布式 finetune"一节)
+1. [情感分析](./demo/finetune_sentiment_analysis.py)
+1. [语义匹配](./demo/finetune_classifier.py)
+1. [命名实体识别(NER)](./demo/finetune_ner.py)
+1. [机器阅读理解](./demo/finetune_mrc.py) (需要多卡环境运行；参见上面"分布式 finetune"一节)
 1. [文本摘要生成](./demo/seq2seq/README.md)
+1. [使用静态图完成文本分类](./demo/finetune_classifier_static.py)
 
 
 **推荐超参数设置：**
@@ -221,7 +229,7 @@ python3 -m paddle.distributed.launch \
 
 # 在线预测
 
-如果`finetune_classifier_dygraph.py`中指定了`--inference_model_dir`参数，funetune脚本会将你的模型序列化并产出可以直接部署线上预测的`inference_model`.
+如果`finetune_classifier.py`中指定了`--inference_model_dir`参数，funetune脚本会将你的模型序列化并产出可以直接部署线上预测的`inference_model`.
 
 关于生产环境中使用线上预测代码的实现细节，请见[C++ inference API](./inference/README.md).
 或者你可以使用`propeller`启动一个多GPU预测服务(需要GPU环境)，只需执行：
@@ -254,7 +262,7 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
 
 # 蒸馏
 
-知识蒸馏是进行ERNIE模型压缩、加速的有效方式；关于知识蒸馏的实现细节请参见[这里](./distill/README.md)。
+知识蒸馏是进行ERNIE模型压缩、加速的有效方式；关于知识蒸馏的实现细节请参见[这里](./demo/distill/README.md)。
 
 # 文献引用
 
@@ -274,7 +282,7 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
   title={ERNIE 2.0: A Continual Pre-training Framework for Language Understanding},
   author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Tian, Hao and Wu, Hua and Wang, Haifeng},
   journal={arXiv preprint arXiv:1907.12412},
-  year={2019} 
+  year={2019}
 }
 ```
 
@@ -309,4 +317,3 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
 - QQ 群: 760439550 (ERNIE discussion group).
 - QQ 2群: 958422639 (ERNIE discussion group-v2).
 - [Forums](http://ai.baidu.com/forum/topic/list/168?pageNo=1): discuss implementations, research, etc.
-

@@ -6,3 +6,4 @@ sentencepiece==0.1.8
 jieba==0.39
 visualdl>=2.0.0b7
 pathlib2>=2.3.2
+tqdm>=4.32.2
