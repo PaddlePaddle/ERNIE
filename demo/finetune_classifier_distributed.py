@@ -128,7 +128,7 @@ model = ErnieModelForSequenceClassification.from_pretrained(
 
 if args.init_checkpoint is not None:
     log.info('loading checkpoint from %s' % args.init_checkpoint)
-    sd, _ = P.load(args.init_checkpoint)
+    sd = P.load(args.init_checkpoint)
     model.set_state_dict(sd)
 
 model = P.DataParallel(model)

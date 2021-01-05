@@ -70,6 +70,11 @@ parser.add_argument('--eval', action='store_true')
 parser.add_argument(
     '--save_dir', type=Path, required=True, help='model output directory')
 parser.add_argument(
+    '--init_checkpoint',
+    type=str,
+    default=None,
+    help='checkpoint to warm start from')
+parser.add_argument(
     '--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 parser.add_argument(
     '--use_amp',
@@ -184,7 +189,7 @@ else:
             tokenizer=tokenizer.tokenize),
     ])
 
-    sd, _ = P.load(args.save_dir / 'ckpt.bin')
+    sd = P.load(args.init_checkpoint)
     model.set_dict(sd)
     model.eval()
 
