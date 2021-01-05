@@ -34,7 +34,6 @@ import propeller.paddle as propeller
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
-log = logging.getLogger()
 
 #from model.bert import BertConfig, BertModelLayer
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
