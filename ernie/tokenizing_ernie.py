@@ -94,16 +94,16 @@ class ErnieTokenizer(object):
                         pretrain_dir_or_url,
                         force_download=False,
                         **kwargs):
-        if pretrain_dir_or_url in cls.resource_map:
-            url = cls.resource_map[pretrain_dir_or_url]
+        if not Path(pretrain_dir_or_url).exists() and str(
+                pretrain_dir_or_url) in cls.resource_map:
+            url = cls.resource_map[str(pretrain_dir_or_url)]
             log.info('get pretrain dir from %s' % url)
             pretrain_dir = _fetch_from_remote(
                 url, force_download=force_download)
         else:
             log.info('pretrain dir %s not in %s, read from local' %
                      (pretrain_dir_or_url, repr(cls.resource_map)))
-            pretrain_dir = pretrain_dir_or_url
-        pretrain_dir = Path(pretrain_dir)
+            pretrain_dir = Path(pretrain_dir_or_url)
         if not pretrain_dir.exists():
             raise ValueError('pretrain dir not found: %s' % pretrain_dir)
         vocab_path = pretrain_dir / 'vocab.txt'
@@ -235,12 +235,14 @@ class ErnieTinyTokenizer(ErnieTokenizer):
                         pretrain_dir_or_url,
                         force_download=False,
                         **kwargs):
-        if pretrain_dir_or_url in cls.resource_map:
-            url = cls.resource_map[pretrain_dir_or_url]
+        if not Path(pretrain_dir_or_url).exists() and str(
+                pretrain_dir_or_url) in cls.resource_map:
+            url = cls.resource_map[str(pretrain_dir_or_url)]
             log.info('get pretrain dir from %s' % url)
             pretrain_dir = _fetch_from_remote(url, force_download)
         else:
-            log.info('pretrain dir %s not in %s, read from local' % (pretrain_dir_or_url, repr(cls.resource_map)))
+            log.info('pretrain dir %s not in %s, read from local' %
+                     (pretrain_dir_or_url, repr(cls.resource_map)))
             pretrain_dir = Path(pretrain_dir_or_url)
         if not pretrain_dir.exists():
             raise ValueError('pretrain dir not found: %s' % pretrain_dir)

@@ -34,7 +34,6 @@ import propeller.paddle as propeller
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
-log = logging.getLogger()
 
 #from model.bert import BertConfig, BertModelLayer
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
@@ -70,6 +69,11 @@ parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
 parser.add_argument('--eval', action='store_true')
 parser.add_argument(
     '--save_dir', type=Path, required=True, help='model output directory')
+parser.add_argument(
+    '--init_checkpoint',
+    type=str,
+    default=None,
+    help='checkpoint to warm start from')
 parser.add_argument(
     '--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
 parser.add_argument(
@@ -185,7 +189,7 @@ else:
             tokenizer=tokenizer.tokenize),
     ])
 
-    sd, _ = P.load(args.save_dir / 'ckpt.bin')
+    sd = P.load(args.init_checkpoint)
     model.set_dict(sd)
     model.eval()
 
