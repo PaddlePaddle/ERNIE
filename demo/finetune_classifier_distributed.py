@@ -144,7 +144,7 @@ lr_scheduler = P.optimizer.lr.LambdaDecay(
 opt = P.optimizer.AdamW(
     learning_rate=lr_scheduler,
     parameters=model.parameters(),
-    apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
+    apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
     weight_decay=args.wd,
     grad_clip=g_clip)
 scaler = P.amp.GradScaler(enable=args.use_amp)
