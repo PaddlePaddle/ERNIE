@@ -177,15 +177,15 @@ if args.use_lr_decay:
         lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.wd,
-        apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
+        apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
         grad_clip=g_clip)
 else:
     lr_scheduler = None
-    opt = P.optimizer.Adam(
+    opt = P.optimizer.AdamW(
         args.lr,
         parameters=model.parameters(),
         weight_decay=args.wd,
-        apply_decay_param_fun=lambda n: param_name_to_exclue_from_weight_decay.match(n),
+        apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
         grad_clip=g_clip)
 
 scaler = P.amp.GradScaler(enable=args.use_amp)
@@ -209,7 +209,8 @@ with LogWriter(
                 lr_scheduler and lr_scheduler.step()
 
                 if step % 10 == 0:
-                    _lr = lr_scheduler.get_lr()
+                    _lr = lr_scheduler.get_lr(
+                    ) if args.use_lr_decay else args.lr
                     if args.use_amp:
                         _l = (loss / scaler._scale).numpy()
                         msg = '[step-%d] train loss %.5f lr %.3e scaling %.3e' % (
