@@ -214,7 +214,7 @@ If your GPU memory is not enough, you can reduce the batch size in the correspon
   ```script
        sh run_inference.sh flickr eval $split(dev/test) conf/flickr/model_conf_flickr $vocab_file $ernie_vil_config $model_params $res_file
   ```
-  注：_Get the accuray score by using the given tools of tools/get_recall.py._
+  _Get the accuray score by using the given tools of tools/get_recall.py._
   
 
 
