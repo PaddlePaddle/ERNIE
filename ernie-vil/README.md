@@ -6,7 +6,7 @@ English| [简体中文](./README_zh.md)
 - [Downstream tasks](#downstream-tasks)
   * [VCR](#VCR)
   * [VQA](#VQA)
-  * [IRTR](#Retrieval)
+  * [IR&TR](#Retrieval)
   * [RefCOCO+](#RefCOCO+)
   
   
@@ -68,7 +68,7 @@ _Code and pre-trained models related to VCR task are made public now, and those 
 
 ### VCR
    * datasets
-      * The training, validation and testing data of VCR task are provided by [**VCR Website**](https://visualcommonsense.com/download/).
+      * The training, validation and testing data of **VCR** task are provided by [**VCR Website**](https://visualcommonsense.com/download/).
       * Organization of visual features is modified from [**ViLBERT**](https://github.com/jiasenlu/vilbert_beta), we directly use the data from it. Data can be downloaded [here](https://github.com/jiasenlu/vilbert_beta/tree/master/data).
       * Put all downloaded files under diretory "data/vcr".
       
@@ -95,7 +95,7 @@ _Code and pre-trained models related to VCR task are made public now, and those 
            question_id, question, answer_label, answer_score, image_w, image_h, number_box, image_loc, image_embeddings
            ```
            _The labels and scores of multiple answers are separated by the character ‘|’._ 
-   * Performance: Results of VQA task for different scale settings of ERNIE-ViL model
+   * Performance: Results of **VQA** task for different scale settings of ERNIE-ViL model
       | Models                              |      <strong>test-dev</strong>    |      <strong>test-std</strong>    |
       | :-------------------------------- | :-------------------------------: | :------------------------------:  | 
       | ERNIE-ViL _base_                  |           73.18                   |              73.36                |         
