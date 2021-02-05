@@ -1,0 +1,11 @@
+[
+{
+"prob": 1.0,
+"data_func": "refcoco+",
+"task_name": "refcoco+",
+"train_filelist": "./conf/refcoco_plus/refer_train.filelist",
+"Proprocessor": "PreprocessorBasic",
+"tokenizer_name" : "FullTokenizer",
+"vocab_path" : "./package/vocab.txt"
+}
+]

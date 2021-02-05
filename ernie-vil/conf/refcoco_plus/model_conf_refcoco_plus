@@ -1,0 +1,13 @@
+output_model_path="output_refcoco_plus"
+lr_scheduler="manual_warmup_decay"
+decay_steps="3290;4700;7050"
+lr_decay_ratio=0.2
+num_train_steps=26640
+SAVE_STEPS=470
+WARMUP_STEPS=940
+BATCH_SIZE=32
+VALID_STEPS=20000
+LR_RATE=2e-5
+WEIGHT_DECAY=0.01
+MAX_LEN=80
+layer_decay_rate=0.9

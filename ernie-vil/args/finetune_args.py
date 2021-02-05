@@ -35,8 +35,13 @@ model_g.add_arg("task_name", str, "vcr", "Task to finetune on ERNIE-ViL")
 train_g = ArgumentGroup(parser, "training", "training options.")
 train_g.add_arg("epoch", int, 100, "Number of epoches for training.")
 train_g.add_arg("learning_rate", float, 0.0001, "Learning rate used to train with warmup.")
+train_g.add_arg("seq_dropout", float, 0.0, "dropout rate after the sequence output.")
 train_g.add_arg("lr_scheduler", str, "linear_warmup_decay",
                 "scheduler of learning rate.", choices=['linear_warmup_decay', 'noam_decay', 'manual_warmup_decay'])
+train_g.add_arg("layer_decay_rate", float, 0.0, "layer wise decay, 0.0 denote no layer decay")
+train_g.add_arg("text_init_layers", int, 18, "diff from text and image layer, base:12-6=6, large:24-6=18")
+train_g.add_arg("n_layers", int, 30, "max layers of text and image, base:12 + 6 , large:24 + 6")
+
 train_g.add_arg("decay_steps", str, "", "learning rate decay steps, list with ;")
 train_g.add_arg("lr_decay_ratio", float, 0.1, "learning rate decay ratio, used with manual_warmup_decay")
 train_g.add_arg("weight_decay", float, 0.01, "Weight decay rate for L2 regularizer.")
@@ -68,6 +73,9 @@ data_g.add_arg("feature_size", int, 2048, "Number of roi feature size of image."
 data_g.add_arg("fusion_method", str, "sum", "Number of roi feature size of image.")
 data_g.add_arg("batch_size", int, 16, "Total examples' number in batch for training. see also --in_tokens.")
 data_g.add_arg("task_group_json", str, "", "Path to task json")
+data_g.add_arg("scale_circle", float, "1.0", "The scale factor in circle loss function, only use in circle loss mode")
+data_g.add_arg("use_sigmoid", bool, False, "Whether to use sigmoid to match score, use for explode problem")
+data_g.add_arg("margin", float, "0.2", "The margin value in triplet loss function")
 
 run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
 run_type_g.add_arg("is_distributed", bool, False, "If set, then start distributed training.")

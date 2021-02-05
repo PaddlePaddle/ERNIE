@@ -63,7 +63,6 @@ class ErnieVilModel(object):
                  src_ids,
                  position_ids,
                  sentence_ids,
-                 task_ids,
                  input_mask,
                  image_embeddings,
                  image_loc,
@@ -115,10 +114,10 @@ class ErnieVilModel(object):
         self._param_initializer = fluid.initializer.TruncatedNormal(
             scale=config['initializer_range'])
 
-        self._build_model(src_ids, position_ids, sentence_ids, task_ids, input_mask, \
+        self._build_model(src_ids, position_ids, sentence_ids, input_mask, \
                 image_embeddings, image_loc, input_image_mask)
 
-    def _build_model(self, src_ids, position_ids, sentence_ids, task_ids, input_mask, \
+    def _build_model(self, src_ids, position_ids, sentence_ids, input_mask, \
             image_embeddings, image_loc, input_image_mask):
         # padding id in vocabulary must be set to 0
         emb_out = fluid.layers.embedding(

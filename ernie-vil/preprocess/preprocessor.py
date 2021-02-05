@@ -17,7 +17,6 @@ import sys
 import os
 import base64
 import numpy as np
-
 reload(sys)
 sys.setdefaultencoding("utf-8")
 
@@ -25,7 +24,7 @@ from preprocess import tokenization
 
 class PreprocessorBasic(object):
     """
-    Main class for text preprocess
+    parent class for preprocess
     """
     def __init__(self,
                  tokenizer_name,
@@ -39,7 +38,7 @@ class PreprocessorBasic(object):
     
     def convert_sentence_to_ids_without_cls(self, sentence):
         """
-        Convert sentence to ids without cls
+        convert sentence to ids without cls
         """
         tokens = self.tokenizer.tokenize(sentence)
         ids = self.tokenizer.convert_tokens_to_ids(tokens)

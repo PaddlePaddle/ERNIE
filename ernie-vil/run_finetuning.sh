@@ -13,6 +13,8 @@ source $CONF_FILE
 
 #configure your cuda and cudnn 
 #configure nccl
+#export LD_LIBRARY_PATH=/home/work/cuda-9.0/lib64:/home/work/cudnn/cudnn_v7/cuda/lib64:$LD_LIBRARY_PATH
+#export LD_LIBRARY_PATH=./nccl_2.3.5/lib/:$LD_LIBRARY_PATH
 
 export FLAGS_fast_eager_deletion_mode=1
 export FLAGS_eager_delete_tensor_gb=0.0
@@ -44,6 +46,10 @@ python finetune.py --use_cuda "True"             \
                 --lr_scheduler ${lr_scheduler}                                 \
                 --decay_steps ${decay_steps-""}                                 \
                 --lr_decay_ratio ${lr_decay_ratio-0.1}                                 \
+                --layer_decay_rate ${layer_decay_rate-0.0}                         \
+                --text_init_layers ${text_init_layers-18}                        \
+                --n_layers ${n_layers-30}                                      \
+                --margin ${margin-0.3}                                       \
                 --num_train_steps ${num_train_steps}                           \
                 --checkpoints $output_model_path                                       \
                 --save_steps ${SAVE_STEPS}                                     \
@@ -53,7 +59,6 @@ python finetune.py --use_cuda "True"             \
                 --warmup_steps ${WARMUP_STEPS}                                               \
                 --weight_decay ${WEIGHT_DECAY:-0}                              \
                 --max_seq_len ${MAX_LEN}                                       \
-                --validation_steps ${VALID_STEPS}                              \
                 --skip_steps 10 
 
 

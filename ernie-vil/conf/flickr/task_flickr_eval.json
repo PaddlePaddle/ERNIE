@@ -1,0 +1,16 @@
+[
+{
+"prob": 1.0,
+"data_func": "image_text_match",
+"task_name": "image_text_match",
+"test_filelist": "./conf/flickr/flickr_retrieval_test.filelist",
+"dev_filelist": "./conf/flickr/flickr_retrieval_dev.filelist",
+"train_filelist": "./conf/flickr/flickr_retrieval_train.filelist",
+"train_image_path":"./data/flickr/flickr_bottom_up_10_36.csv.0",
+"dev_image_path": "data/flickr/flickr_dev_10_36.csv.0",
+"test_image_path": "data/flickr/flickr_test_10_36.csv.0",
+"Proprocessor": "PreprocessorBasic",
+"tokenizer_name" : "FullTokenizer",
+"vocab_path" : "./package/vocab.txt"
+}
+]
