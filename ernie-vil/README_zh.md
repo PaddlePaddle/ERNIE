@@ -54,7 +54,6 @@ Captions**](http://papers.nips.cc/paper/4470-im2text-describing-images-using-1-m
 基于两个out-of-domian数据集([**Conceptual
 Captions**](https://www.aclweb.org/anthology/P18-1238.pdf)，[**SBU
 Captions**](http://papers.nips.cc/paper/4470-im2text-describing-images-using-1-million-captio))和两个in-domain数据集([**MS-COCO**](https://arxiv.org/abs/1405.0312)，[**Visual-Genome**](https://arxiv.org/abs/1602.07332))训练了large参数规模的模型：
-Captions**](http://papers.nips.cc/paper/4470-im2text-describing-images-using-1-million-captio)两个out-of-domian数据集和[**MS-COCO**](https://arxiv.org/abs/1405.0312)，[**Visual-Genome**](https://arxiv.org/abs/1602.07332)两个in-domain数据集训练的large参数规模的模型：
 
 - [**ERNIE-ViL-Out&in-domain _large_**](https://ernie-github.cdn.bcebos.com/model-ernie-vil-all-domain-large-en.1.tar.gz) (_lowercased | 24-text-stream-layer, 6-visual-stream-layer_)
 
@@ -91,12 +90,14 @@ ERNIE-ViL在五个视觉语言下游任务进行了实验，包括[**视觉常�
    * 数据集合
        * 原始图片、问题和答案可以由[**视觉问答官网**](https://visualqa.org/)获取。
        * 视觉端特征使用[**bottom-up attention**](https://github.com/jiasenlu/bottom-up-attention)中的工具提取，提取的box动态值为100-100。
-       * 训练 & 测试数据的组织方式按照如下方式组织:
+       * 训练 & 测试数据按照如下方式组织:
            ```script
            question_id, question, answer_label, answer_score, image_w, image_h, number_box, image_loc, image_embeddings
            ```
            _多个答案的label和score用 ‘|’ 分隔，和image相关的项均可以从bottom up attention的工具提取。_
+           
    * 效果：ERNIE-ViL的三种预训练模型在**视觉问答**任务下的效果如下表
+   
       | 模型                               |      <strong>test-dev</strong>    |      <strong>test-std</strong>    |
       | :-------------------------------- | :-------------------------------: | :------------------------------:  | 
       | ERNIE-ViL _base_                  |           73.18                   |              73.36                |         
@@ -106,22 +107,22 @@ ERNIE-ViL在五个视觉语言下游任务进行了实验，包括[**视觉常�
       
 ### **跨模态检索**
    * 数据集合
-       * 原始图片和文本描述相关的数据，可以从[**下载链接**](https://www.kaggle.com/hsankesara/flickr-image-dataset)获取。
-       * 视觉端特征使用[**bottom-up attention**](https://github.com/jiasenlu/bottom-up-attention)提取，提取的box动态值为0-36.
+       * 原始图片和文本描述相关的数据，可以从[**这里**](https://www.kaggle.com/hsankesara/flickr-image-dataset)获取。
+       * 视觉端特征使用[**bottom-up attention**](https://github.com/jiasenlu/bottom-up-attention)提取，提取的box动态值为0-36。
        * 文本相关的数据可以参见data/flickr给出的示例 flickr.dev.data，图片端特征组织方式为
            ```script
            image_w, image_h, number_box, image_loc, image_embeddings
            ```
            
    * 效果
-       * ERNIE-ViL的三种预训练模型在**跨模态图片检索**上的效果如下表
+       * ERNIE-ViL的三种预训练模型在**跨模态图片检索（Flickr30k 数据集）**上的效果如下表
           | 模型                               |    <strong>R@1</strong>  |    <strong>R@5</strong>   |   <strong>R@10</strong>   |
           | :-------------------------------- | :---------------------:  | :----------------------:  | :----------------------:  | 
           | ERNIE-ViL _base_                  |           74.44          |          92.72            |           95.94           |        
           | ERNIE-ViL _large_                 |           75.10          |          93.42            |           96.26           |
           | ERNIE-ViL-Out&in-domain _large_   |           76.66          |          94.16            |           96.76           |
           
-       * ERNIE-ViL的三种预训练模型在**跨模态文本检索**任务上的效果如下表
+       * ERNIE-ViL的三种预训练模型在**跨模态文本检索（Flickr30k 数据集）**任务上的效果如下表
           | 模型                               |    <strong>R@1</strong>  |    <strong>R@5</strong>   |   <strong>R@10</strong>   |
           | :-------------------------------- | :---------------------:  | :----------------------:  | :----------------------:  | 
           | ERNIE-ViL _base_                  |           86.70          |          97.80            |           99.00           |        
@@ -130,7 +131,7 @@ ERNIE-ViL在五个视觉语言下游任务进行了实验，包括[**视觉常�
          
 ### **引用表达式理解**
    * 数据集合
-       * 视觉端特征参考了[MAttNet](https://github.com/lichengunc/MAttNet)的提取方式
+       * 视觉端特征参考了[MAttNet](https://github.com/lichengunc/MAttNet)的提取方式。
        * 单条训练 & 验证 数据的组织方式为
            ```script
            expressions, image_w, image_h, number_box, number_boxes_gt, image_loc, image_embeddings, box_label, label
