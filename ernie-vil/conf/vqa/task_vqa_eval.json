@@ -1,0 +1,16 @@
+[
+{
+"prob": 1.0,
+"data_func": "image_text_match",
+"task_name": "image_text_match",
+"val_filelist": "./conf/vqa/vqa_val.filelist",
+"test_dev_filelist": "./conf/vqa/vqa_test_dev.filelist",
+"test_std_filelist": "./conf/vqa/vqa_test_std.filelist",
+"pickle_file": "./data/vqa/trainval_label2ans.pkl",
+"num_class": 3129,
+"classifier_hid_size": 2048,
+"Proprocessor": "PreprocessorBasic",
+"tokenizer_name" : "FullTokenizer",
+"vocab_path" : "./package/vocab.txt"
+}
+]

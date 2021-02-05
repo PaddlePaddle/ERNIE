@@ -20,9 +20,7 @@ import numpy as np
 import paddle.fluid as fluid
 
 def manual_warmup_decay(learning_rate, warmup_steps, num_train_steps, decay_steps=[], lr_decay_ratio=0.1):
-    """ 
-    Applies linear warmup of learning rate from 0 and keep constant.
-    """
+    """ Applies linear warmup of learning rate from 0 and keep constant."""
     with fluid.default_main_program()._lr_schedule_guard():
         lr = fluid.layers.tensor.create_global_var(
             shape=[1],
@@ -49,9 +47,7 @@ def manual_warmup_decay(learning_rate, warmup_steps, num_train_steps, decay_step
 
 
 def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
-    """ 
-    Applies linear warmup of learning rate from 0 and decay to 0.
-    """
+    """ Applies linear warmup of learning rate from 0 and decay to 0."""
     with fluid.default_main_program()._lr_schedule_guard():
         lr = fluid.layers.tensor.create_global_var(
             shape=[1],
@@ -78,6 +74,41 @@ def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
 
         return lr
 
+
+def layer_decay(param, param_last, learning_rate, decay_rate, text_layers, n_layers):
+    """ layer_decay implementation """
+    delta = param - param_last
+    if "encoder_layer" in param.name and param.name.index("encoder_layer")==0:
+        layer = int(param.name.split("_")[2])
+        if layer >= text_layers:
+            cur_layer = text_layers + (layer - text_layers) * 2 + 1
+        else:
+            cur_layer = layer
+        ratio = decay_rate ** (n_layers - cur_layer)
+        print("text_layer_name:", param.name, "\t", "ratio:", ratio)
+        param_update = param + (ratio - 1) * delta
+    elif "encoder_vlayer" in param.name and param.name.index("encoder_vlayer")==0:
+        layer = int(param.name.split("_")[2])
+        cur_layer = text_layers + (layer) * 2 + 1
+        ratio = decay_rate ** (n_layers - cur_layer)
+        param_update = param + (ratio - 1) * delta
+        print("image_layer_name:", param.name, "\t", "ratio:", ratio)
+    elif "encoder_colayer" in param.name and param.name.index("encoder_colayer")==0:
+        layer = int(param.name.split("_")[2])
+        cur_layer = text_layers + (layer) * 2
+        ratio = decay_rate ** (n_layers - cur_layer)
+        param_update = param + (ratio - 1) * delta
+        print("co_layer_name:", param.name, "\t", "ratio:", ratio)
+    elif "embedding" in param.name:
+        ratio = decay_rate ** (n_layers + 1)
+        param_update = param + (ratio - 1) * delta
+    elif "image_emb" in param.name or "image_loc" in param.name:
+        ratio = decay_rate ** (n_layers - text_layers + 1)
+        param_update = param + (ratio - 1) * delta
+    else:
+        param_update = None
+    return param_update
+
 def optimization(loss,
                  warmup_steps,
                  num_train_steps,
@@ -88,10 +119,11 @@ def optimization(loss,
                  scheduler='linear_warmup_decay',
                  decay_steps=[],
                  lr_decay_dict_file="",
-                 lr_decay_ratio=0.1):
-    """ 
-    optimization implementation 
-    """
+                 lr_decay_ratio=0.1,
+                 layer_decay_rate=0.0,
+                 text_init_layers=18,
+                 n_layers=30):
+    """ optimization implementation """
     if warmup_steps > 0:
         if scheduler == 'noam_decay':
             scheduled_lr = fluid.layers.learning_rate_scheduler \
@@ -135,8 +167,7 @@ def optimization(loss,
         clip=fluid.clip.GradientClipByGlobalNorm(clip_norm=1.0))
 
     def exclude_from_weight_decay(name):
-        """ 
-        Parameters not use weight decay
+        """ parameters not use weight decay
         """
         if name.find("layer_norm") > -1:
             return True
@@ -154,6 +185,16 @@ def optimization(loss,
 
     _, param_grads = optimizer.minimize(loss)
 
+    
+    if layer_decay_rate > 0:
+        for param, grad in param_grads:
+            with param.block.program._optimized_guard(
+                [param, grad]), fluid.framework.name_scope("layer_decay"):
+                param_decay = layer_decay(param, param_list[param.name], scheduled_lr, 
+                                  layer_decay_rate, text_init_layers, n_layers)
+                if param_decay:
+                    fluid.layers.assign(output=param, input=param_decay)
+    
     if weight_decay > 0:
         for param, grad in param_grads:
             if exclude_from_weight_decay(param.name):

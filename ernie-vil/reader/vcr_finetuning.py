@@ -33,9 +33,7 @@ from batching.finetune_batching import prepare_batch_data
 import paddle.fluid as fluid
 
 def _converId(img_id):
-    """ 
-    conversion for image ID 
-    """
+    """ conversion for image ID """
     img_id = img_id.split('-')
     if 'train' in img_id[0]:
         new_id = int(img_id[1])
@@ -49,9 +47,7 @@ def _converId(img_id):
 
 
 def _load_annotationsQ_A(annotations_jsonpath, split):
-    """
-    Build an index out of FOIL annotations, mapping each image ID with its corresponding captions.
-    """
+    """Build an index out of FOIL annotations, mapping each image ID with its corresponding captions."""
     entries = []
     with open(annotations_jsonpath) as f:
         for annotation in json_lines.reader(f):
@@ -76,9 +72,7 @@ def _load_annotationsQ_A(annotations_jsonpath, split):
 
 
 def _load_annotationsQA_R(annotations_jsonpath, split):
-    """
-    Build an index out of FOIL annotations, mapping each image ID with its corresponding captions.
-    """
+    """Build an index out of FOIL annotations, mapping each image ID with its corresponding captions."""
     entries = []
     with open(annotations_jsonpath, 'rb') as f: 
         for annotation in json_lines.reader(f):
@@ -117,7 +111,7 @@ def _load_annotationsQA_R(annotations_jsonpath, split):
 
 class VCRDataReader(object):
     """ 
-    Data reader for sub VCR task
+        data reader task for vcr
     """
     def __init__(self,
                  task_conf,
@@ -193,7 +187,7 @@ class VCRDataReader(object):
 
     def generate_random_name(self, det_names):
         """ 
-        Replace "person" with a random name
+            replace "person" with a random name
         """
         random_name = []
         for name in det_names:
@@ -207,7 +201,7 @@ class VCRDataReader(object):
 
     def replace_det_with_name(self, inputs, random_names):
         """
-        Replace det with name
+            replace det with name
         """
         tokens = []
         mask = []
@@ -224,7 +218,7 @@ class VCRDataReader(object):
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """
-        Truncates a sequence pair in place to the maximum length.
+            Truncates a sequence pair in place to the maximum length.
         """
         while True:
             total_length = len(tokens_a) + len(tokens_b)
@@ -237,7 +231,7 @@ class VCRDataReader(object):
 
     def get_progress(self):
         """
-        Return current progress of traning data
+            return current progress of traning data
         """
         progress_dict = {"current_epoch": self.current_epoch,
                          "current_file_index": self.current_file_index,
@@ -248,7 +242,7 @@ class VCRDataReader(object):
 
     def tokenize(self):
         """
-        Tokenizes the captions.
+            Tokenizes the captions.
         """
         # This will add caption_tokens in each entry of the dataset.
         # -1 represents nil, and should be treated as padding_idx in embedding.
@@ -312,7 +306,7 @@ class VCRDataReader(object):
 
     def parse_line(self, s_index):
         """
-        Form slot info with the line information
+           form the slot info from line
         """
         entry = self._entries[s_index]
         image_id = entry["img_id"]
@@ -367,13 +361,11 @@ class VCRDataReader(object):
         return record
 
     def data_generator(self):
-        """ 
-        Data_generator 
-        """
+        """ data_generator """
         sample_indice = range(len(self._entries))
         def wrapper():
             """
-            Wrapper
+            wrapper
             """
             for epoch_index in range(self.epoch):
                 if self._split == "train":
@@ -402,9 +394,7 @@ class VCRDataReader(object):
 
 
 class VCRDataJointReader(object):
-    """ 
-    Joint data reader for Q2A task and QA2R task
-    """
+    """ Joint data reader for Q2A task and QA2R task"""
     def __init__(self,
                  task_conf_group,
                  split,
@@ -435,8 +425,7 @@ class VCRDataJointReader(object):
         self.task_generators = [reader.data_generator() for reader in self.task_readers]
 
     def get_progress(self):
-        """
-        Return current progress of traning data
+        """return current progress of traning data
         """
         current_epoch = max([reader.current_epoch for reader in self.task_readers])
         current_file_index = max([reader.current_file_index for reader in self.task_readers])
@@ -450,9 +439,7 @@ class VCRDataJointReader(object):
         return self.progress_dict
 
     def data_generator(self):
-        """ 
-        Data_generator 
-        """
+        """ data_generator """
         def wrapper():
             """
             warpper

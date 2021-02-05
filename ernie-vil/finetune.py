@@ -23,12 +23,18 @@ import argparse
 import numpy as np
 import multiprocessing
 import json
+import math
+import pickle 
 
 from reader.vcr_finetuning import VCRDataJointReader
+from reader.refcoco_plus_finetuning import RefcocoPlusDataReader
+from reader.flickr_finetuning import FlickrDataReader
+from reader.vqa_finetuning import VQADataReader
 from model.ernie_vil import ErnieVilModel, ErnieVilConfig
 from optim.optimization import optimization
 from utils.args import print_arguments
 from utils.init import init_checkpoint, init_pretraining_params
+from utils.loss import circle_loss
 from args.finetune_args import parser
 
 import paddle.fluid as fluid
@@ -37,8 +43,23 @@ args = parser.parse_args()
 
 # yapf: enable.
 
-#READERS = {"vcr": VCRDataJointReader, "vqa": VQADataReader, "refcoco+": RefcocoReader, "flickr": FlickrReader}
-READERS = {"vcr": VCRDataJointReader}
+#READERS = {"vcr": VCRDataJointReader, "vqa": VQADataReader, "refcoco_plus": RefcocoPlusReader, "flickr": FlickrReader}
+READERS = {"vcr": VCRDataJointReader, "refcoco_plus": RefcocoPlusDataReader, 
+           "flickr": FlickrDataReader, "vqa": VQADataReader}
+
+
+def write_result_file(res_arr, qids, labels, ans_arr):
+    """ trans batch results into json format (for VQA test)
+    """
+    for i in range(len(qids)):
+        #print(int(qids[i]))
+        res = {
+             'question_id': int(qids[i]),
+             'answer': ans_arr[labels[i]]
+            }
+        res_arr.append(res)
+    return res_arr
+
 
 def format_result(res_arr, qids, pred, labels, scores):
     """
@@ -50,6 +71,249 @@ def format_result(res_arr, qids, pred, labels, scores):
     return res_arr
 
 
+def vqa_classifier_loss(emb_fuse, hidden_size, label, is_test):
+    """
+       classifier loss for vqa
+    """
+    co_emb_size = emb_fuse.shape[-1]
+    num_class = label.shape[-1]
+
+    weight_init_0 = fluid.initializer.UniformInitializer(
+        low = - math.sqrt(3 / (co_emb_size + hidden_size)), high = math.sqrt(3 / (co_emb_size + hidden_size)))
+
+    weight_init_1 = fluid.initializer.UniformInitializer(
+        low = - math.sqrt(3 / (hidden_size + num_class)), high =  math.sqrt(3 / (hidden_size + num_class)))
+
+
+    hidden_emb = fluid.layers.fc(input=emb_fuse, size=hidden_size,
+                                 param_attr = fluid.ParamAttr(
+                                 initializer = weight_init_0, name = "vqa_fc_w_0"),
+                                 bias_attr = "vqa_fc_b_0", act='relu')
+
+    hidden_emb = fluid.layers.dropout(hidden_emb, 0.5, dropout_implementation="upscale_in_train")
+
+    pred = fluid.layers.fc(input=hidden_emb,
+                           param_attr = fluid.ParamAttr(
+                           initializer = weight_init_1, name = "vqa_fc_w_1"),
+                           bias_attr = "vqa_fc_b_1", size=num_class)
+
+    pred = fluid.layers.cast(x=pred, dtype='float32')
+    cost = fluid.layers.sigmoid_cross_entropy_with_logits(pred, label, name="cross_entropy_loss")
+    cost = fluid.layers.reduce_sum(cost, -1)
+    max_conf_label = fluid.layers.argmax(pred, axis=1)
+    max_conf_label_re = fluid.layers.reshape(max_conf_label, [-1, 1])
+    one_hot_label = fluid.layers.one_hot(input=max_conf_label_re, depth=num_class)
+    acc = fluid.layers.reduce_sum(one_hot_label * label, -1)
+    return max_conf_label, fluid.layers.reduce_mean(cost), fluid.layers.reduce_mean(acc)
+
+
+def create_vqa_model(pyreader_name, ernie_config, task_group, is_prediction=False):
+    """
+        detail model arch for vqa task
+    """
+    num_class = task_group[0]["num_class"]
+    classifier_hid_size = task_group[0]["classifier_hid_size"]
+    shapes=[[-1, args.max_seq_len, 1],    #src_id 
+            [-1, args.max_seq_len, 1],    #pos_id
+            [-1, args.max_seq_len, 1],    #sent_id
+            [-1, args.max_seq_len, 1],    #input_mask
+            [-1, args.max_img_len, args.feature_size],  #image_embedding
+            [-1, args.max_img_len, 5],     #image_loc
+            [-1, args.max_img_len, 1],    #image_mask
+            [-1, num_class],     #soft_labels
+            [-1],                     #q_id
+            ]
+    dtypes = ['int64', 'int64', 'int64', 'float32', 'float32', 'float32', 'float32', 'float32', 'int64']
+              #srd_id   pos_id   sent_id  input_mask image_emb image_loc image_mask, labels
+    lod_levels = [0] * len(dtypes)
+
+    pyreader = fluid.layers.py_reader(
+        capacity=30,
+        shapes=shapes,
+        dtypes=dtypes,
+        lod_levels=lod_levels,
+        name=pyreader_name,
+        use_double_buffer=True)
+
+    inputs = fluid.layers.read_file(pyreader)
+    src_ids, pos_ids, sent_ids, input_mask, image_embeddings, \
+        image_loc, image_mask, labels, q_ids = inputs[: 11]
+    ernie_vil = ErnieVilModel(
+        src_ids=src_ids,
+        position_ids=pos_ids,
+        sentence_ids=sent_ids,
+        input_mask=input_mask,
+        image_embeddings=image_embeddings,
+        image_loc=image_loc,
+        input_image_mask=image_mask,
+        config=ernie_config
+        )
+
+    h_cls, h_img = ernie_vil.get_pooled_output()
+    score = ernie_vil.get_match_score(h_cls, h_img, "mul")
+    pred_label, loss, acc = vqa_classifier_loss(score, classifier_hid_size, labels, args.do_test)
+
+    task_vars = [loss, acc, pred_label, q_ids]
+    for var in task_vars:
+        var.persistable = True
+
+    return pyreader, task_vars
+
+
+def create_refcoco_plus_model(pyreader_name, ernie_config, task_group, is_prediction=False):
+    """
+        detail model arch for refcoco_plus task
+    """
+    shapes=[[-1, args.max_seq_len, 1],                  #src_id
+            [-1, args.max_seq_len, 1],                  #pos_id
+            [-1, args.max_seq_len, 1],                  #sent_id
+            [-1, args.max_seq_len, 1],                  #input_mask
+            [-1, 1],                                    #seq_lens
+            [-1, args.max_img_len, args.feature_size],  #image_embedding
+            [-1, args.max_img_len, 5],                  #image_loc
+            [-1, args.max_img_len, 1],                  #image_mask
+            [-1, args.max_img_len, 1],                  #labels
+            [-1, 1],                                    #add_items
+            ]
+    dtypes = ['int64', 'int64', 'int64', 'float', 'int64', \
+            'float32', 'float32', 'float32', 'float32', 'float32']
+
+    lod_levels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    pyreader = fluid.layers.py_reader(
+        capacity=30,
+        shapes=shapes,
+        dtypes=dtypes,
+        lod_levels=lod_levels,
+        name=pyreader_name,
+        use_double_buffer=True)
+    inputs = fluid.layers.read_file(pyreader)
+    src_ids, pos_ids, sent_ids, input_mask, seq_lens, \
+            image_embeddings, image_loc, image_mask, labels, add_item = inputs[: 10]
+
+    ernie_vil = ErnieVilModel(
+        src_ids=src_ids,
+        position_ids=pos_ids,
+        sentence_ids=sent_ids,
+        input_mask=input_mask,
+        image_embeddings=image_embeddings,
+        image_loc=image_loc,
+        input_image_mask=image_mask,
+        config=ernie_config
+        )
+
+    enc_l_out, enc_vl_out = ernie_vil.get_sequence_output()
+    pred_fc = enc_vl_out
+    if args.seq_dropout > 0.0:
+        pred_fc = fluid.layers.dropout(pred_fc, args.seq_dropout, dropout_implementation="upscale_in_train")
+
+    logits = fluid.layers.fc(
+        input=pred_fc, size=1,
+        num_flatten_dims=2,
+        param_attr=fluid.ParamAttr(
+            name="cls_seq_label_vl_out_w",
+            initializer=fluid.initializer.TruncatedNormal(scale=0.02),
+            learning_rate=1.0),
+        bias_attr=fluid.ParamAttr(
+            name="cls_seq_label_vl_out_b",
+            initializer=fluid.initializer.Constant(0.),
+            learning_rate=1.0))
+
+    logits_re = fluid.layers.reduce_mean(logits, -1)
+    labels_re = fluid.layers.reduce_mean(labels, -1)
+    input_image_mask = fluid.layers.reduce_mean(image_mask, -1)
+    ce_loss = fluid.layers.sigmoid_cross_entropy_with_logits(logits_re, labels_re)
+    ce_loss = ce_loss * input_image_mask
+    loss = fluid.layers.reduce_sum(ce_loss) / fluid.layers.reduce_sum(input_image_mask)
+    loss = fluid.layers.mean(x = loss) * args.batch_size
+    with_mask_loss = fluid.layers.mean(ce_loss) * args.batch_size
+    if is_prediction:
+        task_vars = [logits, image_loc, labels, add_item]
+    else:
+        task_vars = [loss, with_mask_loss] 
+    for var in task_vars:
+        var.persistable = True
+    return pyreader, task_vars
+
+
+def create_flickr_model(pyreader_name, ernie_config, task_group, is_prediction=False):
+    """
+       detailed  model arch for flickr task
+    """
+    shapes=[[-1, args.max_seq_len, 1],    #src_id 
+            [-1, args.max_seq_len, 1],    #pos_id
+            [-1, args.max_seq_len, 1],    #sent_id
+            [-1, args.max_seq_len, 1],    #input_mask
+            [-1, args.max_img_len, args.feature_size],  #image_embedding
+            [-1, args.max_img_len, 5],     #image_loc
+            [-1, args.max_img_len, 1],  #image_mask
+            [-1, 1],     #labels
+            [-1, 1],     #ids
+            ]
+    dtypes = ['int64', 'int64', 'int64', 'float', 'float32', 'float32', 'float32', 'int64', 'int64']
+              #srd_id   pos_id   sent_id  input_mask image_emb image_loc image_mask, labels, ids
+    #lod_levels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    lod_levels = [0] * len(dtypes)
+
+    pyreader = fluid.layers.py_reader(
+        capacity=30,
+        shapes=shapes,
+        dtypes=dtypes,
+        lod_levels=lod_levels,
+        name=pyreader_name,
+        use_double_buffer=True)
+
+    inputs = fluid.layers.read_file(pyreader)
+    src_ids, pos_ids, sent_ids, input_mask, image_embeddings, \
+        image_loc, image_mask, labels, ids = inputs[: 9]
+    ernie = ErnieVilModel(
+        src_ids=src_ids,
+        position_ids=pos_ids,
+        sentence_ids=sent_ids,
+        input_mask=input_mask,
+        image_embeddings=image_embeddings,
+        image_loc=image_loc,
+        input_image_mask=image_mask,
+        config=ernie_config
+        )
+
+    h_cls, h_img = ernie.get_pooled_output()
+    match_emb = ernie.get_match_score(h_cls, h_img)
+
+    match_score = fluid.layers.fc(
+        input=match_emb,
+        size=1,
+        act=None,
+        param_attr=fluid.ParamAttr(
+            name='match_fc.w_0',
+            initializer=fluid.initializer.Xavier()),
+        bias_attr=fluid.ParamAttr(name='match_fc.b_0',
+            initializer=fluid.initializer.UniformInitializer()))
+
+    if not is_prediction:
+        outs = len(task_group[0]["negative_schema"]) + 1
+        match_score = fluid.layers.reshape(match_score, [-1, outs])
+        match_score = fluid.layers.sigmoid(match_score)
+        positive_score = match_score[:, 0]
+        image_neg_score = match_score[:, 1:int((outs + 1) / 2)]
+        caption_neg_score = match_score[:, int((outs + 1) / 2):]
+
+        positive_score = fluid.layers.reshape(x=positive_score, shape=[-1, 1])
+        loss_c = circle_loss(positive_score, caption_neg_score, args.margin, args.scale_circle)
+        loss_i = circle_loss(positive_score, image_neg_score, args.margin, args.scale_circle)
+        #total_loss = fluid.layers.mean(loss_c + loss_i)
+        total_loss = (loss_c + loss_i) / 2
+        acc = fluid.layers.accuracy(match_score, labels, k=1)
+        task_vars = [total_loss, acc, match_score, ids]
+    else:
+        outs = 1
+        match_score = fluid.layers.reshape(match_score, [-1, outs])
+        task_vars = [match_score, ids]
+    for var in task_vars:
+        var.persistable = True
+
+    return pyreader, task_vars
+
 def create_vcr_model(pyreader_name, ernie_config, task_group, is_prediction=False):
     """
         create model arc for vcr tasks
@@ -57,7 +321,6 @@ def create_vcr_model(pyreader_name, ernie_config, task_group, is_prediction=Fals
     shapes = [[-1, args.max_seq_len, 1],    #src_id 
              [-1, args.max_seq_len, 1],    #pos_id
              [-1, args.max_seq_len, 1],    #sent_id
-             [-1, args.max_seq_len, 1],    #task_id
              [-1, args.max_seq_len, 1],    #input_mask
              [-1, args.max_img_len, args.feature_size],  #image_embedding
              [-1, args.max_img_len, 5],     #image_loc
@@ -67,7 +330,7 @@ def create_vcr_model(pyreader_name, ernie_config, task_group, is_prediction=Fals
              [],          #task_index
              [-1, 1],     #binary_labels
              ]
-    dtypes = ['int64', 'int64', 'int64', 'int64', 'float32', 'float32', 'float32', 'float32', 
+    dtypes = ['int64', 'int64', 'int64', 'float32', 'float32', 'float32', 'float32', 
                        'int64', 'int64', 'int64', 'float32']
     lod_levels = [0] * len(dtypes)
 
@@ -85,14 +348,13 @@ def create_vcr_model(pyreader_name, ernie_config, task_group, is_prediction=Fals
         use_double_buffer=False)
 
     inputs = fluid.layers.read_file(pyreader)
-    src_ids, pos_ids, sent_ids, task_ids, input_mask, image_embeddings, \
-         image_loc, image_mask, labels, q_ids, task_index, binary_labels = inputs[: 12]
+    src_ids, pos_ids, sent_ids, input_mask, image_embeddings, \
+         image_loc, image_mask, labels, q_ids, task_index, binary_labels = inputs[: 11]
 
     ernie_vil = ErnieVilModel(
         src_ids=src_ids,
         position_ids=pos_ids,
         sentence_ids=sent_ids,
-        task_ids=task_ids,
         input_mask=input_mask,
         image_embeddings=image_embeddings,
         image_loc=image_loc,
@@ -124,7 +386,7 @@ def create_vcr_model(pyreader_name, ernie_config, task_group, is_prediction=Fals
             var.persistable = True
         return pyreader, task_vars
     else:
-        start_ind = 12
+        start_ind = 11
         mean_loss = fluid.layers.zeros(shape = [1], dtype = 'float32')
         mean_acc = fluid.layers.zeros(shape = [1], dtype = 'float32')
         for task_conf in task_group:
@@ -151,9 +413,9 @@ def create_vcr_model(pyreader_name, ernie_config, task_group, is_prediction=Fals
 
         return pyreader, task_vars
 
-
 #MODELS = {"vcr": create_vcr_model, "vqa": create_vqa_model, "refcoco+": create_refcoco_model}
-MODELS = {"vcr": create_vcr_model}
+MODELS = {"vcr": create_vcr_model, "refcoco_plus": create_refcoco_plus_model, 
+          "flickr": create_flickr_model, "vqa": create_vqa_model}
 
 def predict_wrapper(args,
                     exe,
@@ -170,7 +432,6 @@ def predict_wrapper(args,
         split=args.test_split,
         vocab_path=args.vocab_path,
         is_test=True,
-        shuffle=False,
         batch_size=args.batch_size,
         epoch=args.epoch)
     if args.do_test:
@@ -180,20 +441,16 @@ def predict_wrapper(args,
         init_pretraining_params(exe, args.init_checkpoint, test_prog)
         print(("testing on %s %s split") % (args.task_name, args.test_split))
 
-    def predict(exe=exe, pyreader=pyreader):
+    def predict_vcr(exe=exe, pyreader=pyreader):
         """
-            inference for downstream tasks
+            inference for vcr tasks
         """
         pyreader.decorate_tensor_provider(data_reader.data_generator())
         pyreader.start()
 
-        cost = 0
-        appear_step = 0
         task_acc = {}
         task_steps = {}
         steps = 0
-        case_f1 = 0
-        appear_f1 = 0
         time_begin = time.time()
         task_name_list = [v.name for v in graph_vars]
         fetch_list = task_name_list
@@ -233,7 +490,145 @@ def predict_wrapper(args,
             except:
                 pass
         return ret
-    return predict
+
+    def predict_flickr(exe=exe, pyreader=pyreader):
+        """
+            inference for flickr tasks
+        """
+        pyreader.decorate_tensor_provider(data_reader.data_generator())
+        pyreader.start()
+
+        task_acc = {}
+        task_steps = {} 
+        steps = 0
+        time_begin = time.time()
+        task_name_list = [v.name for v in graph_vars]
+        fetch_list = task_name_list
+        print('task name list : ', task_name_list)
+        out_file = open(args.result_file, 'w')
+        sum_acc = 0
+        res_arr = []
+        while True:
+            try:
+                outputs = exe.run(fetch_list=fetch_list, program=test_prog)
+                score = outputs[0]
+                ids = outputs[1]
+                for i in range(len(score)):
+                    out_list = [str(score[i][0]), str(ids[i][0]), str(ids[i][1])]
+                    out_file.write('\t'.join(out_list) + '\n')
+                steps += 1
+
+            except fluid.core.EOFException:
+                pyreader.reset()
+                break
+        out_file.close()
+        used_time = time.time() - time_begin
+        return None
+    
+    def predict_vqa(exe=exe, pyreader=pyreader):
+        """
+            inference for vqa tasks
+        """
+        pyreader.decorate_tensor_provider(data_reader.data_generator())
+        pyreader.start()
+
+        appear_step = 0
+        task_acc = {}
+        task_steps = {}
+        steps = 0
+        time_begin = time.time()
+        task_name_list = [v.name for v in graph_vars]
+        fetch_list =  task_name_list
+
+        print('task name list : ', task_name_list)
+        sum_acc = 0
+        total_data = 0
+        res_arr = []
+        pickle_file = task_group[0]["pickle_file"]
+        pkl_file = open(pickle_file)
+        ans_arr = pickle.load(pkl_file)
+        while True:
+            try:
+                outputs = exe.run(fetch_list=fetch_list, program=test_prog)
+                each_acc = outputs[1][0]
+                labels = outputs[2]
+                qids = outputs[3]
+                total_data += len(qids.tolist())
+                sum_acc += each_acc * len(qids.tolist())
+                steps += 1
+                if steps % 10 == 0:
+                    print('cur_step:', steps, 'cur_acc:', sum_acc / total_data)
+                write_result_file(res_arr, qids.tolist(), labels.tolist(), ans_arr)
+            except fluid.core.EOFException:
+                pyreader.reset()
+                break
+
+        used_time = time.time() - time_begin
+
+        with open(args.result_file, "w") as f:
+            json.dump(res_arr, f)
+        print("step:", steps)
+        print("average_acc:", sum_acc / total_data)
+        ret = {}
+        ret["acc"] = "acc: %f" % (sum_acc / total_data)
+        for item in ret:
+            try:
+                ret[item] = ret[item].split(':')[-1]
+            except:
+                pass
+        return ret
+    
+    def predict_refcoco_plus(exe=exe, pyreader=pyreader):
+        """
+            inference for refcoco_plus tasks
+        """
+        pyreader.decorate_tensor_provider(data_reader.data_generator())
+        pyreader.start()
+
+        task_acc = {}
+        task_steps = {}
+        steps = 0
+        time_begin = time.time()
+        task_name_list = [v.name for v in graph_vars]
+        fetch_list = task_name_list
+
+        print('task name list : ', task_name_list)
+        res_arr = []
+        acc_all = 0
+        sample_all = 0
+        while True:
+            try:
+                outputs = exe.run(fetch_list=fetch_list, program=test_prog)
+                logits, image_locs, labels, items = outputs[0:]
+                for i in range(len(items)):
+                    acc = 0
+                    logit, loc, label, item = logits[i], image_locs[i], labels[i], items[i]
+                    number_box, width, height, w1, h1, w2, h2 = item
+                    start_idx = 1
+                    list_label = list(label[:, 0])[start_idx: int(number_box)]
+                    list_logit = list(logit[:, 0])[start_idx: int(number_box)]
+                    logit = logit[start_idx:int(number_box), 0]
+                    pred = np.argmax(logit)
+                    if label[pred + start_idx, 0] >= 0.5:
+                        acc = 1
+                    acc_all += acc
+                    sample_all += 1
+
+                print(acc_all * 1.0 / sample_all)
+                steps += 1
+            except fluid.core.EOFException:
+                pyreader.reset()
+                break
+        print('all', sample_all, acc_all * 1.0 / sample_all) 
+
+    if args.task_name == "vcr":
+        return predict_vcr
+    elif args.task_name == "refcoco_plus":
+        return predict_refcoco_plus
+    elif args.task_name == "flickr":
+        return predict_flickr
+    else:
+        return predict_vqa
 
 
 def get_optimizer(total_loss, train_program, startup_prog, args):
@@ -255,7 +650,10 @@ def get_optimizer(total_loss, train_program, startup_prog, args):
          weight_decay=args.weight_decay,
          scheduler=args.lr_scheduler,
          decay_steps=decay_steps,
-         lr_decay_ratio=args.lr_decay_ratio)
+         lr_decay_ratio=args.lr_decay_ratio,
+         layer_decay_rate=args.layer_decay_rate,
+         text_init_layers=args.text_init_layers,
+         n_layers=args.n_layers)
     return scheduled_lr
 
 
@@ -368,7 +766,7 @@ def main(args):
             split="train",
             vocab_path=args.vocab_path,
             batch_size=args.batch_size,
-            epoch=args.epoch,)
+            epoch=args.epoch)
 
     exec_strategy = fluid.ExecutionStrategy()
     if args.use_fast_executor:
@@ -411,6 +809,12 @@ def main(args):
         time_begin = time.time()
         node_nums = 1 #int(os.getenv("PADDLE_NODES_NUM"))
         used_time_all = 0 
+        
+        if args.task_name == "refcoco_plus":
+            metr = "all image loss"
+        else:
+            metr = "acc"
+        
         while steps < args.num_train_steps:
             try:
                 steps += node_nums
@@ -423,6 +827,7 @@ def main(args):
                 
                 time_begin = time.time()
                 outputs = train_exe.run(fetch_list=fetch_list)
+                
                 if outputs:
                     print("feed_queue size", train_pyreader.queue.size())
                     progress_file = data_reader.get_progress()
@@ -432,12 +837,11 @@ def main(args):
                     current_file = progress_file["current_file"]
                     print(
                         "epoch: %d, progress: %d/%d, step: %d, loss: %f, "
-                        "acc: %f"
+                        "%s : %f"
                         % (epoch, current_file_index, total_file, steps,
                            outputs[0][0],
+                           metr,
                            outputs[1][0]))
-                    print("steps:", steps)
-                    print("save_steps:", args.save_steps)
 
                     np_lr = outputs[-1:]
 

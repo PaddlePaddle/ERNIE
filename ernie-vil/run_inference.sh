@@ -13,6 +13,8 @@ RES_FILE=$8
 
 source $CONF_FILE
 
+#export LD_LIBRARY_PATH=/home/work/cuda-9.0/lib64:/home/work/cudnn/cudnn_v7/cuda/lib64:$LD_LIBRARY_PATH
+#export LD_LIBRARY_PATH=./nccl_2.3.5/lib/:$LD_LIBRARY_PATH
 #configure your cuda and cudnn
 #configure nccl
 

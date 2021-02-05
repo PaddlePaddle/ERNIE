@@ -1,0 +1,16 @@
+output_model_path="./output_flickr"
+lr_scheduler="manual_warmup_decay"
+decay_steps="54360;72480"
+num_train_steps=90600
+SAVE_STEPS=4530
+WARMUP_STEPS=9060
+BATCH_SIZE=4
+LR_RATE=1e-5
+WEIGHT_DECAY=0.01
+MAX_LEN=48
+hardest=False
+meansum=False
+use_circle_loss=True
+scale_circle=32.0
+use_sigmoid=True
+margin=0.3
