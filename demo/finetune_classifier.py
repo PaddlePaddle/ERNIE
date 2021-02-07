@@ -11,204 +11,258 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import absolute_import
-
 
 import os
 import re
 import time
 import logging
-from random import random
 import json
+from random import random
 from functools import reduce, partial
+from visualdl import LogWriter
 
 import numpy as np
-import multiprocessing
-import tempfile
-import re
-
-import paddle
-import paddle.fluid as F
-import paddle.fluid.layers as L
-
-
-from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
-from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
-from ernie.optimization import optimization
-#import utils.data
+import logging
+import argparse
+from pathlib import Path
+import paddle as P
 
 from propeller import log
 import propeller.paddle as propeller
 
-
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 
-def model_fn(features, mode, params, run_config):
-    ernie = ErnieModelForSequenceClassification(params, name='')
-    if not params is propeller.RunMode.TRAIN:
-        ernie.eval()
+#from model.bert import BertConfig, BertModelLayer
+from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
+from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
+#from ernie.optimization import AdamW, LinearDecay
+from demo.utils import create_if_not_exists, get_warmup_and_linear_decay
 
-    metrics, loss = None, None
-    if mode is propeller.RunMode.PREDICT:
-        src_ids, sent_ids = features
-        _, logits = ernie(src_ids, sent_ids)
-        predictions = [logits,]
-    else:
-        src_ids, sent_ids, labels = features
-        if mode is propeller.RunMode.EVAL:
-            loss, logits = ernie(src_ids, sent_ids, labels=labels)
-            pred = L.argmax(logits, axis=1)
-            acc = propeller.metrics.Acc(labels, pred)
-            metrics = {'acc': acc}
-            predictions = [pred]
-        else:
-            loss, logits = ernie(src_ids, sent_ids, labels=labels)
-            scheduled_lr, _ = optimization(
-                loss=loss,
-                warmup_steps=int(run_config.max_steps * params['warmup_proportion']),
-                num_train_steps=run_config.max_steps,
-                learning_rate=params['learning_rate'],
-                train_program=F.default_main_program(), 
-                startup_prog=F.default_startup_program(),
-                use_fp16=params.use_fp16,
-                weight_decay=params['weight_decay'],
-                scheduler="linear_warmup_decay",
-                )
-            propeller.summary.scalar('lr', scheduled_lr)
-            predictions = [logits,]
+parser = argparse.ArgumentParser('classify model with ERNIE')
+parser.add_argument(
+    '--from_pretrained',
+    type=Path,
+    required=True,
+    help='pretrained model directory or tag')
+parser.add_argument(
+    '--max_seqlen',
+    type=int,
+    default=128,
+    help='max sentence length, should not greater than 512')
+parser.add_argument(
+    '--bsz',
+    type=int,
+    default=128,
+    help='global batch size for each optimizer step')
+parser.add_argument(
+    '--micro_bsz',
+    type=int,
+    default=32,
+    help='batch size for each device. if `--bsz` > `--micro_bsz` * num_device, will do grad accumulate'
+)
+parser.add_argument('--epoch', type=int, default=3, help='epoch')
+parser.add_argument(
+    '--data_dir',
+    type=str,
+    required=True,
+    help='data directory includes train / develop data')
+parser.add_argument(
+    '--use_lr_decay',
+    action='store_true',
+    help='if set, learning rate will decay to zero at `max_steps`')
+parser.add_argument(
+    '--warmup_proportion',
+    type=float,
+    default=0.1,
+    help='if use_lr_decay is set, '
+    'learning rate will raise to `lr` at `warmup_proportion` * `max_steps` and decay to 0. at `max_steps`'
+)
+parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
+parser.add_argument(
+    '--inference_model_dir',
+    type=Path,
+    default=None,
+    help='inference model output directory')
+parser.add_argument(
+    '--save_dir', type=Path, required=True, help='model output directory')
+parser.add_argument(
+    '--max_steps',
+    type=int,
+    default=None,
+    help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
+parser.add_argument(
+    '--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
+parser.add_argument(
+    '--init_checkpoint',
+    type=str,
+    default=None,
+    help='checkpoint to warm start from')
+parser.add_argument(
+    '--use_amp',
+    action='store_true',
+    help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+)
 
-    return propeller.ModelSpec(loss=loss, mode=mode, metrics=metrics, predictions=predictions)
+args = parser.parse_args()
 
+if args.bsz > args.micro_bsz:
+    assert args.bsz % args.micro_bsz == 0, 'cannot perform gradient accumulate with bsz:%d micro_bsz:%d' % (
+        args.bsz, args.micro_bsz)
+    acc_step = args.bsz // args.micro_bsz
+    log.info(
+        'performing gradient accumulate: global_bsz:%d, micro_bsz:%d, accumulate_steps:%d'
+        % (args.bsz, args.micro_bsz, acc_step))
+    args.bsz = args.micro_bsz
+else:
+    acc_step = 1
 
-if __name__ == '__main__':
-    parser = propeller.ArgumentParser('DAN model with Paddle')
-    parser.add_argument('--do_predict', action='store_true')
-    parser.add_argument('--max_seqlen', type=int, default=128)
-    parser.add_argument('--data_dir', type=str, required=True)
-    parser.add_argument('--from_pretrained', type=str, required=True)
-    parser.add_argument('--warm_start_from', type=str)
-    parser.add_argument('--epoch', type=int, default=3)
-    parser.add_argument('--use_fp16', action='store_true')
+tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained)
+#tokenizer = ErnieTinyTokenizer.from_pretrained(args.from_pretrained)
 
-    args = parser.parse_args()
-
-    if not os.path.exists(args.from_pretrained):
-        raise ValueError('--from_pretrained not found: %s' % args.from_pretrained)
-    cfg_file_path = os.path.join(args.from_pretrained, 'ernie_config.json')
-    param_path = os.path.join(args.from_pretrained, 'params')
-    vocab_path = os.path.join(args.from_pretrained, 'vocab.txt')
-
-    assert os.path.exists(cfg_file_path) and os.path.exists(param_path) and os.path.exists(vocab_path)
-
-    hparams_cli = propeller.parse_hparam(args)
-    hparams_config_file = json.loads(open(cfg_file_path).read())
-    default_hparams = propeller.HParams(
-        batch_size=32,
-        num_labels=3,
-        warmup_proportion=0.1,
-        learning_rate=5e-5,
-        weight_decay=0.01,
-        use_task_id=False,
-        use_fp16=args.use_fp16,
-    )
-
-    hparams = default_hparams.join(propeller.HParams(**hparams_config_file)).join(hparams_cli)
-
-    default_run_config=dict(
-        max_steps=args.epoch * 390000 / hparams.batch_size,
-        save_steps=1000,
-        log_steps=10,
-        max_ckpt=1,
-        skip_steps=0,
-        model_dir=tempfile.mkdtemp(),
-        eval_steps=100)
-    run_config = dict(default_run_config, **json.loads(args.run_config))
-    run_config = propeller.RunConfig(**run_config)
-
-    tokenizer = ErnieTokenizer.from_pretrained(args.from_pretrained)
-    #tokenizer = ErnieTinyTokenizer.from_pretrained(args.from_pretrained)
-    unk_id = tokenizer.vocab['[UNK]']
-
-    shapes = ([-1, args.max_seqlen], [-1, args.max_seqlen], [-1])
-    types = ('int64', 'int64', 'int64')
-    if not args.do_predict:
-        feature_column = propeller.data.FeatureColumns([
-            propeller.data.TextColumn('title', unk_id=unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
-            propeller.data.TextColumn('comment', unk_id=unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
-            propeller.data.LabelColumn('label', vocab_dict={
-                b"contradictory": 0,
-                b"contradiction": 0,
-                b"entailment": 1,
-                b"neutral": 2,
-            }),
-        ])
-
-        def map_fn(seg_a, seg_b, label):
-            seg_a, seg_b = tokenizer.truncate(seg_a, seg_b, seqlen=args.max_seqlen)
-            sentence, segments = tokenizer.build_for_ernie(seg_a, seg_b)
-            #label = np.expand_dims(label, -1) #
-            return sentence, segments, label
-
-        train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=True, repeat=True, use_gz=False) \
-                                       .map(map_fn) \
-                                       .padded_batch(hparams.batch_size) 
-
-        dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'), shuffle=False, repeat=False, use_gz=False) \
-                                       .map(map_fn) \
-                                       .padded_batch(hparams.batch_size) 
-
-        test_ds = feature_column.build_dataset('test', data_dir=os.path.join(args.data_dir, 'test'), shuffle=False, repeat=False, use_gz=False) \
-                                       .map(map_fn) \
-                                       .padded_batch(hparams.batch_size) \
-
-        train_ds.data_shapes = shapes
-        train_ds.data_types = types
-        dev_ds.data_shapes = shapes
-        dev_ds.data_types = types
-        test_ds.data_shapes = shapes
-        test_ds.data_types = types
-
-        varname_to_warmstart = re.compile(r'^encoder.*[wb]_0$|^.*embedding$|^.*bias$|^.*scale$|^pooled_fc.[wb]_0$')
-
-        ws = propeller.WarmStartSetting(
-                predicate_fn=lambda v: varname_to_warmstart.match(v.name) and os.path.exists(os.path.join(param_path, v.name)),
-                from_dir=param_path,
-            )
-
-        best_exporter = propeller.train.exporter.BestExporter(os.path.join(run_config.model_dir, 'best'), cmp_fn=lambda old, new: new['dev']['acc'] > old['dev']['acc'])
-        propeller.train.train_and_eval(
-                model_class_or_model_fn=model_fn,
-                params=hparams, 
-                run_config=run_config, 
-                train_dataset=train_ds, 
-                eval_dataset={'dev': dev_ds, 'test': test_ds}, 
-                warm_start_setting=ws, 
-                exporters=[best_exporter])
-
-        print('dev_acc3\t%.5f\ntest_acc3\t%.5f' % (best_exporter._best['dev']['acc'], best_exporter._best['test']['acc']))
-
-    else:
-        feature_column = propeller.data.FeatureColumns([
-            propeller.data.TextColumn('title', unk_id=unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
-            propeller.data.TextColumn('comment', unk_id=unk_id, vocab_dict=tokenizer.vocab, tokenizer=tokenizer.tokenize),
-        ])
-
-        def map_fn(seg_a, seg_b):
-            seg_a, seg_b = tokenizer.truncate(seg_a, seg_b, seqlen=args.max_seqlen)
-            sentence, segments = tokenizer.build_for_ernie(seg_a, seg_b)
-            return sentence, segments
+feature_column = propeller.data.FeatureColumns([
+    propeller.data.TextColumn(
+        'seg_a',
+        unk_id=tokenizer.unk_id,
+        vocab_dict=tokenizer.vocab,
+        tokenizer=tokenizer.tokenize),
+    propeller.data.TextColumn(
+        'seg_b',
+        unk_id=tokenizer.unk_id,
+        vocab_dict=tokenizer.vocab,
+        tokenizer=tokenizer.tokenize),
+    propeller.data.LabelColumn(
+        'label',
+        vocab_dict={
+            b"contradictory": 0,
+            b"contradiction": 0,
+            b"entailment": 1,
+            b"neutral": 2,
+        }),
+])
 
 
-        predict_ds = feature_column.build_dataset_from_stdin('predict') \
+def map_fn(seg_a, seg_b, label):
+    seg_a, seg_b = tokenizer.truncate(seg_a, seg_b, seqlen=args.max_seqlen)
+    sentence, segments = tokenizer.build_for_ernie(seg_a, seg_b)
+    return sentence, segments, label
+
+
+train_ds = feature_column.build_dataset('train', data_dir=os.path.join(args.data_dir, 'train'), shuffle=True, repeat=False, use_gz=False) \
                                .map(map_fn) \
-                               .padded_batch(hparams.batch_size) \
+                               .padded_batch(args.bsz, (0, 0, 0))
 
-        predict_ds.data_shapes = shapes[: -1]
-        predict_ds.data_types = types[: -1]
+dev_ds = feature_column.build_dataset('dev', data_dir=os.path.join(args.data_dir, 'dev'), shuffle=False, repeat=False, use_gz=False) \
+                               .map(map_fn) \
+                               .padded_batch(args.bsz, (0, 0, 0))
 
-        est = propeller.Learner(model_fn, run_config, hparams)
-        for res, in est.predict(predict_ds, ckpt=-1):
-            print('%d\t%.5f\t%.5f\t%.5f' % (np.argmax(res), res[0], res[1], res[2]))
+place = P.CUDAPlace(0)
+model = ErnieModelForSequenceClassification.from_pretrained(
+    args.from_pretrained, num_labels=3, name='')
 
+if args.init_checkpoint is not None:
+    log.info('loading checkpoint from %s' % args.init_checkpoint)
+    sd = P.load(args.init_checkpoint)
+    model.set_state_dict(sd)
 
+g_clip = P.nn.ClipGradByGlobalNorm(1.0)  #experimental
+param_name_to_exclue_from_weight_decay = re.compile(
+    r'.*layer_norm_scale|.*layer_norm_bias|.*b_0')
+if args.use_lr_decay:
+    lr_scheduler = P.optimizer.lr.LambdaDecay(
+        args.lr,
+        get_warmup_and_linear_decay(
+            args.max_steps, int(args.warmup_proportion * args.max_steps)))
+    opt = P.optimizer.AdamW(
+        lr_scheduler,
+        parameters=model.parameters(),
+        weight_decay=args.wd,
+        apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
+        grad_clip=g_clip)
+else:
+    lr_scheduler = None
+    opt = P.optimizer.AdamW(
+        args.lr,
+        parameters=model.parameters(),
+        weight_decay=args.wd,
+        apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
+        grad_clip=g_clip)
+
+scaler = P.amp.GradScaler(enable=args.use_amp)
+step, inter_step = 0, 0
+with LogWriter(
+        logdir=str(create_if_not_exists(args.save_dir / 'vdl'))) as log_writer:
+    with P.amp.auto_cast(enable=args.use_amp):
+        for epoch in range(args.epoch):
+            for ids, sids, label in P.io.DataLoader(
+                    train_ds, places=P.CUDAPlace(0), batch_size=None):
+                inter_step += 1
+                loss, _ = model(ids, sids, labels=label)
+                loss /= acc_step
+                loss = scaler.scale(loss)
+                loss.backward()
+                if inter_step % acc_step != 0:
+                    continue
+                step += 1
+                scaler.minimize(opt, loss)
+                model.clear_gradients()
+                lr_scheduler and lr_scheduler.step()
+
+                if step % 10 == 0:
+                    _lr = lr_scheduler.get_lr(
+                    ) if args.use_lr_decay else args.lr
+                    if args.use_amp:
+                        _l = (loss / scaler._scale).numpy()
+                        msg = '[step-%d] train loss %.5f lr %.3e scaling %.3e' % (
+                            step, _l, _lr, scaler._scale.numpy())
+                    else:
+                        _l = loss.numpy()
+                        msg = '[step-%d] train loss %.5f lr %.3e' % (step, _l,
+                                                                     _lr)
+                    log.debug(msg)
+                    log_writer.add_scalar('loss', _l, step=step)
+                    log_writer.add_scalar('lr', _lr, step=step)
+                if step % 100 == 0:
+                    acc = []
+                    with P.no_grad():
+                        model.eval()
+                        for ids, sids, label in P.io.DataLoader(
+                                dev_ds, places=P.CUDAPlace(0),
+                                batch_size=None):
+                            loss, logits = model(ids, sids, labels=label)
+                            #print('\n'.join(map(str, logits.numpy().tolist())))
+                            a = (logits.argmax(-1) == label)
+                            acc.append(a.numpy())
+                        model.train()
+                    acc = np.concatenate(acc).mean()
+                    log_writer.add_scalar('eval/acc', acc, step=step)
+                    log.debug('acc %.5f' % acc)
+                    if args.save_dir is not None:
+                        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+if args.save_dir is not None:
+    P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+if args.inference_model_dir is not None:
+
+    class InferenceModel(ErnieModelForSequenceClassification):
+        def forward(self, ids, sids):
+            _, logits = super(InferenceModel, self).forward(ids, sids)
+            return logits
+
+    model.__class__ = InferenceModel
+    log.debug('saving inference model')
+    src_placeholder = P.zeros([2, 2], dtype='int64')
+    sent_placehodler = P.zeros([2, 2], dtype='int64')
+    _, static = P.jit.TracedLayer.trace(
+        model, inputs=[src_placeholder, sent_placehodler])
+    static.save_inference_model(str(args.inference_model_dir))
+
+    #class InferenceModel(ErnieModelForSequenceClassification):
+    #    @P.jit.to_static
+    #    def forward(self, ids, sids):
+    #        _, logits =  super(InferenceModel, self).forward(ids, sids, labels=None)
+    #        return logits
+    #model.__class__ = InferenceModel
+    #src_placeholder = P.zeros([2, 2], dtype='int64')
+    #sent_placehodler = P.zeros([2, 2], dtype='int64')
+    #P.jit.save(model, args.inference_model_dir, input_var=[src_placeholder, sent_placehodler])
+    log.debug('done')

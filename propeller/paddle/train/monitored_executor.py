@@ -24,8 +24,11 @@ import sys
 import json
 from functools import reduce
 import six
-from time import time
+#from time import time
+import time
 import shutil
+import tarfile
+import tempfile
 
 import logging
 import numpy as np
@@ -65,7 +68,7 @@ class RunState(object):
 
     def __init__(self):
         """doc"""
-        self.__dict__ = {'gstep': 0, 'step': 0, 'time': time()}
+        self.__dict__ = {'gstep': 0, 'step': 0, 'time': time.time()}
 
     @property
     def gstep(self):
@@ -107,7 +110,7 @@ class RunState(object):
             self.__dict__,
             gstep=self.gstep + 1,
             step=self.step + 1,
-            time=time())
+            time=time.time())
         ret = RunState()
         ret.__dict__ = newd
         return ret
@@ -121,8 +124,10 @@ class Saver(object):
                  exe,
                  program,
                  save_prefix='model',
-                 max_ckpt_to_keep=None):
+                 max_ckpt_to_keep=None,
+                 save_tarckpt=False):
         """doc"""
+        self.save_tarckpt = save_tarckpt
         assert isinstance(
             exe, F.Executor
         ), 'expect normal executor to save, got executor of type %s' % repr(
@@ -177,6 +182,10 @@ class Saver(object):
                 'can not load model from %s, is this a textone checkpoint?' %
                 dir)
 
+    def tarball(self, src_dir, output_name):
+        with tarfile.open(output_name, "w:") as tar:
+            tar.add(src_dir, arcname=os.path.basename(src_dir))
+
     def save(self, state):
         """doc"""
         save_name = '%s_%d' % (self._save_prefix, state.gstep)
@@ -189,9 +198,19 @@ class Saver(object):
             pass
         log.debug('saving step %d to %s' % (state.gstep, save_dir))
         self._save_program(tmp_dir)
+
         shutil.move(tmp_dir, save_dir)
         meta = state.serialize()
         open(os.path.join(save_dir, 'meta'), 'w').write(meta)
+
+        if self.save_tarckpt:
+            now = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
+            save_dir_tar = save_dir + '_' + now + '.tar'
+            tar_name = os.path.basename(save_dir_tar)
+            log.debug('taring %s to %s' % (save_dir, save_dir_tar))
+            self.tarball(save_dir, save_dir_tar)
+            shutil.rmtree(save_dir)
+            save_name = tar_name
 
         self.ckpt_list.append(save_name)
         if len(self.ckpt_list) > self._max_ckpt_to_keep:
@@ -201,7 +220,9 @@ class Saver(object):
             for ckpt in ckpt_to_remove:
                 ckpt_dir = os.path.join(self._save_dir, ckpt)
                 if os.path.exists(ckpt_dir):
-                    shutil.rmtree(ckpt_dir)
+                    rm = shutil.rmtree if os.path.isdir(
+                        ckpt_dir) else os.remove
+                    rm(ckpt_dir)
                     log.debug('No. of ckpt exceed %d, clean up: %s' %
                               (self._max_ckpt_to_keep, ckpt_dir))
         open(self.ckpt_info_path, 'w').write('\n'.join(self.ckpt_list))
@@ -220,6 +241,17 @@ class Saver(object):
         else:
             raise ValueError('ckpt type not understood %s' % repr(ckpt))
 
+        if os.path.isfile(path) and tarfile.is_tarfile(path):
+            log.info('restore from tar file : {}'.format(path))
+            tf = tarfile.open(path)
+            dirs = [m for m in tf.getmembers() if m.isdir()]
+            assert (len(dirs) == 1), dirs
+            tmp_dir = tempfile.mkdtemp()
+            log.info('extracting to : {}'.format(tmp_dir))
+            tf.extractall(tmp_dir)
+            path = os.path.join(tmp_dir, dirs[0].name)
+            log.info('model path : {}'.format(path))
+
         meta_file = os.path.join(path, 'meta')
         if not os.path.exists(meta_file):
             raise RuntimeError('meta not found in restore dir: %s' % path)
@@ -236,16 +268,20 @@ class SaverV2(Saver):
         F.save(self._program.train_program, save_path)
 
     def _load_program(self, dir, predicate_fn=None):
-        try:
-            save_path = os.path.join(dir, 'ckpt')
-            F.load(
-                self._program.train_program,
-                save_path, )
-        except F.core.EnforceNotMet as e:
-            log.exception(e)
-            raise RuntimeError(
-                'can not load model from %s, is this a textone checkpoint?' %
-                dir)
+        save_path = os.path.join(dir, 'ckpt')
+        if not os.path.exists(save_path + '.pdparams'):
+            try:
+                log.warn('failed to load model, try old-styled saver')
+                super(SaverV2, self)._load_program(
+                    dir, predicate_fn=predicate_fn)
+            except F.core.EnforceNotMet as e:
+                log.exception(e)
+                raise RuntimeError(
+                    'can not load model from %s, is this a textone checkpoint?'
+                    % dir)
+        else:
+            sd = F.load_program_state(save_path)
+            F.set_program_state(self._program.train_program, sd)
 
 
 TextoneTrainer = None
@@ -263,7 +299,7 @@ class MonitoredExecutor(object):
             state=None,
             run_config=None,  #none if not load
             run_hooks=[],
-            warm_start_setting=None):
+            warm_start_setting=None, ):
         if not isinstance(executor, F.Executor):
             raise ValueError('PE is no longer supported')
         if isinstance(executor, F.ParallelExecutor):
@@ -285,6 +321,10 @@ class MonitoredExecutor(object):
             self._skip_steps = run_config.skip_steps if run_config.skip_steps else 100
             self._save_prefix = 'model'
             self._max_ckpt = run_config.max_ckpt
+            self._save_tarckpt = False
+            if hasattr(run_config,
+                       'save_tarckpt') and run_config.save_tarckpt is True:
+                self._save_tarckpt = True
 
     @property
     def state(self):
@@ -306,7 +346,8 @@ class MonitoredExecutor(object):
             self._model_dir,
             F.Executor(_get_one_place()),
             program=self._program,
-            max_ckpt_to_keep=self._max_ckpt)
+            max_ckpt_to_keep=self._max_ckpt,
+            save_tarckpt=self._save_tarckpt)
 
         if self._warm_start_setting is not None:
             if not os.path.exists(self._warm_start_setting.from_dir):
@@ -316,7 +357,6 @@ class MonitoredExecutor(object):
             if isinstance(self._warm_start_setting, WarmStartSetting):
                 log.info("warm start from %s" %
                          self._warm_start_setting.from_dir)
-                log.info(self._saver)
                 if (not type(self._saver) is Saver) and (
                         not type(self._saver) is SaverV2):
                     raise ValueError(
@@ -330,17 +370,8 @@ class MonitoredExecutor(object):
                             log.info('warm start: %s' % v.name)
                         return ret
 
-                    try:
-                        F.io.load_vars(
-                            self._exe,
-                            self._warm_start_setting.from_dir,
-                            main_program=self._program.train_program,
-                            predicate=_fn)
-                    except F.core.EnforceNotMet as e:
-                        log.exception(e)
-                        raise RuntimeError(
-                            'can not load model from %s, is this a textone checkpoint?'
-                            % dir)
+                    self._saver._load_program(
+                        self._warm_start_setting.from_dir, predicate_fn=_fn)
                 else:
                     raise NotImplementedError()
             elif isinstance(self._warm_start_setting, TextoneWarmStartSetting):
@@ -366,10 +397,10 @@ class MonitoredExecutor(object):
         will do nothing if loss is None i.e. not in train mode
         """
         if self._loss is None:
-            log.debug('will not freeze a program without loss')
+            #log.debug('will not freeze a program without loss')
             return
         if isinstance(self._program.train_program, F.compiler.CompiledProgram):
-            log.debug('program has already been built')
+            #log.debug('program has already been built')
             return
         exec_strategy = F.ExecutionStrategy()
         exec_strategy.num_threads = 4  #2 for fp32 4 for fp16
@@ -378,6 +409,7 @@ class MonitoredExecutor(object):
 
         build_strategy = F.BuildStrategy()
         build_strategy.remove_unnecessary_lock = False
+        build_strategy.enable_sequential_execution = True  # prevent hang
         #build_strategy.fuse_broadcast_ops = True
         build_strategy.num_trainers = distribution.status.num_replica
         build_strategy.trainer_id = distribution.status.replica_id
@@ -413,7 +445,7 @@ class MonitoredExecutor(object):
         self.result = None
         for h in self._hooks:
             log.debug('train loop has hook %s' % h)
-            h.before_train(self._program)
+            h.before_train(self._program, self._state)
         return self
 
     def run(self, fetch_list=[], *args, **kwargs):
@@ -469,7 +501,8 @@ class MonitoredExecutor(object):
                 log.info('********** Stop Loop ************')
                 self.result = []
                 for h in self._hooks:
-                    self.result.append(h.after_train())
+                    self.result.append(
+                        h.after_train(self._program, self._state))
             except Exception as e:
                 log.exception('error occur after loop %s' % repr(e))
         else:

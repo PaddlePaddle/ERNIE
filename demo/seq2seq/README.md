@@ -23,15 +23,15 @@ python3 -m paddle.distributed.launch \
     --max_steps $((287113*30/64))
 ```
 
-Note that you need more than 2 GPUs to run the finetuning. 
-During multi-gpu finetuning, `max_steps` is used as stop criteria rather than `epoch` to prevent dead block. 
+Note that you need more than 2 GPUs to run the finetuning.
+During multi-gpu finetuning, `max_steps` is used as stop criteria rather than `epoch` to prevent dead block.
 We simply canculate `max_steps` with: `EPOCH * NUM_TRIAN_EXAMPLE / TOTAL_BATCH`.
 This demo script will save a finetuned model at `--save_dir`, and do muti-gpu prediction every `--eval_steps` and save prediction results at `--predict_output_dir`.
 
 
 ### Evalution
 
-While finetuning, a serials of prediction files is generated. 
+While finetuning, a serials of prediction files is generated.
 First you need to sort and join all files with:
 
 ```shell
@@ -40,13 +40,13 @@ sort -t$'\t' -k1n ./pred/pred.step60000.* |awk -F"\t" '{print $2}'> final_predic
 
 then use `./eval_cnndm/cnndm_eval.sh` to calcuate all metrics
 (`pyrouge` is required to evalute CNN/Daily Mail.)
- 
+
 ```shell
 sh cnndm_eval.sh final_prediction ./data/cnndm/dev.summary
 ```
 
 
-### Inference 
+### Inference
 
 To run beam serach decode after you got a finetuned model. try:
 
@@ -57,5 +57,3 @@ cat one_column_source_text| python3 demo/seq2seq/decode.py \
     --save_dir ./model_cnndm \
     --bsz 8
 ```
-
-

@@ -16,7 +16,7 @@
 // model training or inference.
 syntax = "proto3";
 
-import "propeller/paddle/data/feature.proto";
+import "propeller/data/feature.proto";
 package propeller;
 
 message Example {

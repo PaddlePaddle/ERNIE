@@ -47,4 +47,3 @@ make
 | ----- | -----    |
 | CPU（Intel(R) Xeon(R) Gold 5117 CPU @ 2.00GHz (20 线程)） | 29.8818|
 | GPU （P4）  | 8.5 |
-

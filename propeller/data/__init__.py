@@ -14,3 +14,5 @@
 """
 doc
 """
+from propeller.data.functional import *
+from propeller.data.feature_column import *

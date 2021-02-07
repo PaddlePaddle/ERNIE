@@ -28,4 +28,3 @@ LINK_DIRECTORIES(${MKLDNN_LIB_PATH})
 
 ADD_EXECUTABLE(inference inference.cc)
 TARGET_LINK_LIBRARIES(inference dl paddle_fluid glog gflags pthread)
-

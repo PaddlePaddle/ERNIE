@@ -28,7 +28,10 @@ else:
 
 log = logging.getLogger(__name__)
 
-def _fetch_from_remote(url, force_download=False, cached_dir='~/.paddle-ernie-cache'):
+
+def _fetch_from_remote(url,
+                       force_download=False,
+                       cached_dir='~/.paddle-ernie-cache'):
     import hashlib, tempfile, requests, tarfile
     sig = hashlib.md5(url.encode('utf8')).hexdigest()
     cached_dir = Path(cached_dir).expanduser()
@@ -44,15 +47,16 @@ def _fetch_from_remote(url, force_download=False, cached_dir='~/.paddle-ernie-ca
             #url = 'https://ernie.bj.bcebos.com/ERNIE_stable.tgz'
             r = requests.get(url, stream=True)
             total_len = int(r.headers.get('content-length'))
-            for chunk in tqdm(r.iter_content(chunk_size=1024), 
-                    total=total_len // 1024, 
-                    desc='downloading %s' % url, 
+            for chunk in tqdm(
+                    r.iter_content(chunk_size=1024),
+                    total=total_len // 1024,
+                    desc='downloading %s' % url,
                     unit='KB'):
                 if chunk:
-                    f.write(chunk)  
+                    f.write(chunk)
                     f.flush()
             log.debug('extacting... to %s' % tmpfile)
-            with tarfile.open(tmpfile.as_posix())  as tf:
+            with tarfile.open(tmpfile.as_posix()) as tf:
                 tf.extractall(path=cached_dir_model.as_posix())
         os.remove(tmpfile.as_posix())
     log.debug('%s cached in %s' % (url, cached_dir))
@@ -63,5 +67,5 @@ def add_docstring(doc):
     def func(f):
         f.__doc__ += ('\n======other docs from supper class ======\n%s' % doc)
         return f
-    return func
 
+    return func

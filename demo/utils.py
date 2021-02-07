@@ -17,14 +17,28 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import sys
+import argparse
+import logging
 import paddle
-if paddle.__version__ != '0.0.0' and paddle.__version__ < '2.0.0':
-    raise RuntimeError('propeller 0.2 requires paddle 2.0+, got %s' %
-                       paddle.__version__)
 
-from ernie.modeling_ernie import ErnieModel
-from ernie.modeling_ernie import (
-    ErnieModelForSequenceClassification, ErnieModelForTokenClassification,
-    ErnieModelForQuestionAnswering, ErnieModelForPretraining)
 
-from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
+class UnpackDataLoader(paddle.io.DataLoader):
+    def __init__(self, *args, **kwargs):
+        super(UnpackDataLoader, self).__init__(*args, batch_size=1, **kwargs)
+
+    def __iter__(self):
+        return ([yy[0] for yy in y]
+                for y in super(UnpackDataLoader, self).__iter__())
+
+
+def create_if_not_exists(dir):
+    try:
+        dir.mkdir(parents=True)
+    except FileExistsError:
+        pass
+    return dir
+
+
+def get_warmup_and_linear_decay(max_steps, warmup_steps):
+    return lambda step: min(step / warmup_steps, 1. - (step - warmup_steps) / (max_steps - warmup_steps))
