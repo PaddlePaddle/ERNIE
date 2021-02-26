@@ -73,7 +73,7 @@ def optimization(
         #amp_list = P.fluid.contrib.mixed_precision.AutoMixedPrecisionLists(
         #    custom_white_list=['softmax', 'layer_norm', 'gelu'])
         optimizer = P.fluid.contrib.mixed_precision.decorate(
-            optimizer, init_loss_scaling=3**15, use_dynamic_loss_scaling=True)
+            optimizer, init_loss_scaling=2**15, use_dynamic_loss_scaling=True)
         _, param_grads = optimizer.minimize(loss)
         loss_scaling = P.static.default_main_program().global_block().var(
             'loss_scaling_0')
