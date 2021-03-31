@@ -247,7 +247,7 @@ class ErnieTinyTokenizer(ErnieTokenizer):
         if not pretrain_dir.exists():
             raise ValueError('pretrain dir not found: %s' % pretrain_dir)
         vocab_path = pretrain_dir / 'vocab.txt'
-        sp_model_path = pretrain_dir / 'subword/spm_cased_simp_sampled.model'
+        sp_model_path = str(pretrain_dir / 'subword/spm_cased_simp_sampled.model')
 
         if not vocab_path.exists():
             raise ValueError('no vocab file in pretrain dir: %s' %
