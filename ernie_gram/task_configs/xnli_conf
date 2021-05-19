@@ -1,0 +1,9 @@
+data_dir="data/xnli"
+max_steps=4600 #3 epoch
+lr=1.5e-4
+label_map='{"contradictory":0,"contradiction":0,"entailment":1,"neutral":2}'
+num_labels=3
+valid_steps=25
+from_pretrained="ernie-gram-zh"
+pair_input=1
+bsz=32

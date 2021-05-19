@@ -13,7 +13,8 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 # News
 
 - May.20.2021:
-    - ERNIE-Doc, ERNIE-Gram, [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil), ERNIE-UNIMO are **avaliable** now!
+    - [`ERNIE-Doc`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc), [`ERNIE-Gram`](./ernie_gram/), [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) models are **avaliable** now!
+    - `ERNIE-UNIMO` will be released soon.
 
 - Dec.29.2020:
  	- Pretrain and finetune ERNIE with [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc).
@@ -21,7 +22,7 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
     - Introducing `Gradient accumulation`, run `ERNIE-large` with only 8G memory.
 
 - Sept.24.2020:
-    - [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) is **avaliable** now!
+    - We have announced the [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil)!
         - A **knowledge-enhanced** joint representations for vision-language tasks.
             - Constructing three **Scene Graph Prediction** tasks utilizing structured knowledge.
 	    - The state-of-the-art performance on 5 downstream tasks, 1st place on [VCR leaderboad](https://visualcommonsense.com/leaderboard/).

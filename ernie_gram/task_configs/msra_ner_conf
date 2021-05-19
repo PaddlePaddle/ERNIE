@@ -1,0 +1,5 @@
+data_dir="data/msra_ner"
+epoch=10
+max_steps=13040
+lr=5e-5
+from_pretrained="ernie-gram-zh"

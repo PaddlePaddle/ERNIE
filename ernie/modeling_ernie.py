@@ -19,12 +19,13 @@ from __future__ import unicode_literals
 
 import json
 import logging
+import math
 import six
 if six.PY2:
     from pathlib2 import Path
 else:
     from pathlib import Path
-
+import numpy as np
 import paddle as P
 from paddle import nn
 from paddle.nn import functional as F
@@ -36,7 +37,35 @@ ACT_DICT = {
     'relu': nn.ReLU,
     'gelu': nn.GELU,
 }
+def _get_rel_pos_bias(seq_len, max_len=128, num_buckets=32, bidirectional=True, reset=True):
+    #max_len = 520
+    pos = np.array(range(seq_len))
+    rel_pos = pos[:, None] - pos[None, :]
+    ret = 0
+    n = -rel_pos
+    if bidirectional:
+        num_buckets //= 2
+        ret += (n < 0).astype('int32') * num_buckets  # mtf.to_int32(mtf.less(n, 0)) * num_buckets
+        n = np.abs(n)
+    else:
+        n = np.max(n, np.zeros_like(n))
+    # now n is in the range [0, inf)
 
+    # half of the buckets are for exact increments in positions
+    max_exact = num_buckets // 2
+    is_small = n < max_exact
+    # The other half of the buckets are for logarithmically bigger bins in positions up to max_distance
+    val_if_large = max_exact + (np.log(n.astype('float32') / max_exact) / math.log(max_len / max_exact) * (num_buckets - max_exact)).astype('int32')
+    tmp = np.full_like(val_if_large, num_buckets-1)
+    val_if_large = np.where(val_if_large < tmp, val_if_large, tmp)
+
+    ret += np.where(is_small, n, val_if_large)
+    if reset:
+        num_buckets *= 2
+        ret[:, 0] = num_buckets
+        ret[0, :] = num_buckets // 2
+
+    return np.array(ret).reshape([seq_len, seq_len]).astype("int64")
 
 def _build_linear(n_in, n_out, name, init):
     return nn.Linear(
@@ -223,6 +252,8 @@ class PretrainedModel(object):
         'ernie-2.0-en': bce + 'model-ernie2.0-en.1.tar.gz',
         'ernie-2.0-large-en': bce + 'model-ernie2.0-large-en.1.tar.gz',
         'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz',
+        'ernie-gram-zh': bce + 'model-ernie-gram-zh.1.tar.gz',
+        'ernie-gram-en': bce + 'model-ernie-gram-en.1.tar.gz',
     }
 
     @classmethod
@@ -283,10 +314,14 @@ class ErnieModel(nn.Layer, PretrainedModel):
         d_vocab = cfg['vocab_size']
         d_pos = cfg['max_position_embeddings']
         d_sent = cfg.get("sent_type_vocab_size") or cfg['type_vocab_size']
+        self.d_rel_pos = cfg.get('rel_pos_size', None)
+        max_seq_len = cfg.get("max_seq_len", 512)
         self.n_head = cfg['num_attention_heads']
         self.return_additional_info = cfg.get('return_additional_info', False)
         initializer = nn.initializer.TruncatedNormal(
             std=cfg['initializer_range'])
+        if self.d_rel_pos:
+            self.rel_pos_bias = _get_rel_pos_bias(max_seq_len) 
 
         self.ln = _build_ln(d_model, name=append_name(name, 'pre_encoder'))
         self.word_emb = nn.Embedding(
@@ -307,6 +342,13 @@ class ErnieModel(nn.Layer, PretrainedModel):
             weight_attr=P.ParamAttr(
                 name=append_name(name, 'sent_embedding'),
                 initializer=initializer))
+        if self.d_rel_pos:
+            self.rel_pos_bias_emb = nn.Embedding(
+                self.d_rel_pos,
+                self.n_head,
+                weight_attr=P.ParamAttr(
+                    name=append_name(name, 'rel_pos_embedding'),
+                    initializer=initializer))
         prob = cfg['hidden_dropout_prob']
         self.dropout = nn.Dropout(p=prob)
 
@@ -347,6 +389,7 @@ class ErnieModel(nn.Layer, PretrainedModel):
                 attn_bias=None,
                 past_cache=None,
                 use_causal_mask=False):
+                
         """
         Args:
             src_ids (`Variable` of shape `[batch_size, seq_len]`):
@@ -402,14 +445,19 @@ class ErnieModel(nn.Layer, PretrainedModel):
         attn_bias = (1. - attn_bias) * -10000.0
         attn_bias = attn_bias.unsqueeze(1).tile(
             [1, self.n_head, 1, 1])  # avoid broadcast =_=
-
+        attn_bias.stop_gradient=True
         if sent_ids is None:
             sent_ids = P.zeros_like(src_ids)
-
+        if self.d_rel_pos:
+            rel_pos_ids = self.rel_pos_bias[:d_seqlen, :d_seqlen]
+            rel_pos_ids = P.to_tensor(rel_pos_ids, dtype='int64')
+            rel_pos_bias = self.rel_pos_bias_emb(rel_pos_ids).transpose([2, 0, 1])
+            attn_bias += rel_pos_bias
         src_embedded = self.word_emb(src_ids)
         pos_embedded = self.pos_emb(pos_ids)
         sent_embedded = self.sent_emb(sent_ids)
         embedded = src_embedded + pos_embedded + sent_embedded
+
 
         embedded = self.dropout(self.ln(embedded))
 

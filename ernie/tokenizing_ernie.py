@@ -87,6 +87,8 @@ class ErnieTokenizer(object):
         'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz',
         'ernie-gen-base-en': bce + 'model-ernie-gen-base-en.1.tar.gz',
         'ernie-gen-large-en': bce + 'model-ernie-gen-large-en.1.tar.gz',
+        'ernie-gram-zh': bce + 'model-ernie-gram-zh.1.tar.gz',
+        'ernie-gram-en': bce + 'model-ernie-gram-en.1.tar.gz',
     }
 
     @classmethod
