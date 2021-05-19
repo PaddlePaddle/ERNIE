@@ -125,6 +125,8 @@ pip install -e .
 | [ERNIE Doc Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie-doc-base-zh.tar.gz)| L12H768A12 | ernie-doc-base-zh |
 | [ERNIE Doc Base for English](https://ernie-github.cdn.bcebos.com/model-ernie-doc-base-en.tar.gz)| L12H768A12 | ernie-doc-base-en |
 | [ERNIE Doc Large for English](https://ernie-github.cdn.bcebos.com/model-ernie-doc-large-en.tar.gz)| L24H1024A16 | ernie-doc-large-zh |
+| [ERNIE Gram Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie-gram-zh.1.tar.gz) | L12H768A12 | ernie-gram-zh |
+| [ERNIE Gram Base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gram-en.1.tar.gz) | L12H768A12 | ernie-gram-en |
 
 ##### 4. download datasets
 

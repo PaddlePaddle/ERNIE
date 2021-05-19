@@ -132,6 +132,8 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 | [ERNIE Doc Base 中文](https://ernie-github.cdn.bcebos.com/model-ernie-doc-base-zh.tar.gz)| Layer:12, Hidden:768, Heads:12 |ernie-doc-base-zh|
 | [ERNIE Doc Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-doc-base-en.tar.gz)| Layer:12, Hidden:768, Heads:12 |ernie-doc-base-en|
 | [ERNIE Doc Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-doc-large-en.tar.gz)| Layer:24, Hidden:1024, Heads:16 |ernie-doc-large-en|
+| [ERNIE Gram Base 中文](https://ernie-github.cdn.bcebos.com/model-ernie-gram-zh.1.tar.gz)| L12H768A12 |ernie-gram-zh|
+| [ERNIE Gram Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gram-en.1.tar.gz)| L12H768A12 |ernie-gram-en|
 
 ##### 4. 下载数据集
 
