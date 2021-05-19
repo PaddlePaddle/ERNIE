@@ -30,11 +30,13 @@ The **ERNIE-Gram** paper has been accepted for **NAACL-HLT 2021**, for more deta
 ### Quick Tour
 
 ```shell
-import numpy as np
-import paddle as P
-pooled, encoded = model(ids)                 # eager execution
-print(pooled.numpy())                        # convert  results to numpy
-
+mkdir -p data
+cd data
+wget https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz
+tar xf data-xnli.tar.gz
+cd ..
+#demo for NLI task
+sh ernie_gram/run_cls.sh ernie_gram/task_configs/xnli_conf
 ```
 
 ### Setup

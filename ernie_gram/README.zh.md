@@ -32,13 +32,13 @@
 
 ### 快速上手(待补充运行示例)
 ```shell
-import numpy as np
-import paddle as P
-from ernie.tokenizing_ernie import ErnieTokenizer
-from ernie.modeling_ernie import ErnieModel
-
-model = ErnieModel.from_pretrained('ernie-gram')    # Try to get 
-
+mkdir -p data
+cd data
+wget https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz
+tar xf data-xnli.tar.gz
+cd ..
+#demo for NLI task
+sh ernie_gram/run_cls.sh ernie_gram/task_configs/xnli_conf
 ```
 
 
