@@ -13,7 +13,7 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 - 2021.5.20:
    - ERNIE 开源家族又添生力军!
       - 显式多粒度语言知识模型[ERNIE-Gram]()
-      - 超长文本双向建模预训练模型[ERNIE-Doc]()
+      - 超长文本双向建模预训练模型[ERNIE-Doc](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc)
       - 融合场景图知识的跨模态预训练模型[ERNIE-ViL](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil)
       - 语言与视觉一体的预训练模型[ERNIE-UNIMO]()
 
@@ -129,6 +129,9 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 | [ERNIE Gen Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-base-en.1.tar.gz)  | Layer:12, Hidden:768, Heads:12  |ernie-gen-base-en|
 | [ERNIE Gen Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 |ernie-gen-large-en|
 | [ERNIE Gen Large 430G英文](https://ernie-github.cdn.bcebos.com/model-ernie-gen-large-430g-en.1.tar.gz)| Layer:24, Hidden:1024, Heads:16 + 额外430G 预训练语料 | ernie-gen-large-430g-en |
+| [ERNIE Doc Base 中文](https://ernie-github.cdn.bcebos.com/model-ernie-doc-base-zh.tar.gz)| Layer:12, Hidden:768, Heads:12 |ernie-doc-base-zh)
+| [ERNIE-Doc Base 英文](https://ernie-github.cdn.bcebos.com/model-ernie-doc-base-en.tar.gz)| Layer:12, Hidden:768, Heads:12 |ernie-doc-base-en)
+| [ERNIE-Doc Large 英文](https://ernie-github.cdn.bcebos.com/model-ernie-doc-large-en.tar.gz)| Layer:24, Hidden:1024, Heads:16 |ernie-doc-large-en)
 
 ##### 4. 下载数据集
 
