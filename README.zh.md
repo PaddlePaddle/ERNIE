@@ -12,10 +12,10 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 - 2021.5.20:
    - ERNIE 开源家族又添生力军!
-      - 显式多粒度语言知识模型[ERNIE-Gram]()
-      - 超长文本双向建模预训练模型[ERNIE-Doc]()
-      - 融合场景图知识的跨模态预训练模型[ERNIE-ViL](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil)
-      - 语言与视觉一体的预训练模型[ERNIE-UNIMO]()
+      - 显式多粒度语言知识模型`ERNIE-Gram` [正式开源](./ernie_gram/)
+      - 超长文本双向建模预训练模型`ERNIE-Doc` [正式开源](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc)
+      - 融合场景图知识的跨模态预训练模型`ERNIE-ViL` [正式开源](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil)
+      - 语言与视觉一体的预训练模型`ERNIE-UNIMO` 将近期开源
 
 - 2020.12.29:
    - `ERNIE`开源工具套件全面升级 [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc)
@@ -23,7 +23,7 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
    - 引入`Gradient accumulation`, 8G显存也可运行`ERNIE-large`模型。
 
 - 2020.9.24:
-   - `ERNIE-ViL` 模型正式开源! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil))
+   - `ERNIE-ViL` 技术发布! ([点击进入](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil))
        - 面向视觉-语言知识增强的预训练框架，首次在视觉-语言预训练引入结构化的知识。
            - 利用场景图中的知识，构建了物体、属性和关系预测任务，精细刻画模态间细粒度语义对齐。
        - 五项视觉-语言下游任务取得最好效果，[视觉常识推理榜单](https://visualcommonsense.com/)取得第一。
