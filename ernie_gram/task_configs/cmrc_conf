@@ -1,0 +1,5 @@
+train_file="data/cmrc2018/train/train.json"
+dev_file="data/cmrc2018/dev/dev.json"
+max_steps=1320
+lr=1.5e-4
+from_pretrained="ernie-gram-zh"
