@@ -1,14 +1,21 @@
 [English](./README.en.md)|简体中文
 
-![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone_zh.png)
+![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone_20210519_zh.png)
 
-ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，该框架将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读理解、智能问答等16个公开数据集上全面显著超越世界领先技术，在国际权威的通用语言理解评估基准GLUE上，得分首次突破90分，获得全球第一。在今年3月落下帷幕的全球最大语义评测SemEval 2020上，ERNIE摘得5项世界冠军， 该技术也被全球顶级科技商业杂志《麻省理工科技评论》官方网站报道，相关创新成果也被国际顶级学术会议AAAI、IJCAI收录。ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
+ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，该框架将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。ERNIE在累积 40 余个典型 NLP 任务取得 SOTA 效果，并在 GLUE、VCR、XTREME、SemEval 等国际权威评测上斩获十余项冠军。ERNIE 在 2020年荣获了中国人工智能学会优秀科技成果奖及世界人工智能大会最高荣誉 SAIL奖，该技术也被全球顶级科技商业杂志《麻省理工科技评论》官方网站报道，相关创新成果也被国际顶级学术会议AAAI、ACL、NAACL、IJCAI收录。ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
 
 **提醒: ERNIE老版本代码已经迁移至[repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)，欢迎使用我们全新升级的基于动静结合的新版ERNIE套件进行开发。另外，也欢迎上[EasyDL](https://ai.baidu.com/easydl/pro)体验更丰富的功能（如ERNIE 2.0、ERNIE 2.1、ERNIE领域模型等）。**
 
 [【了解更多】](https://wenxin.baidu.com/)
 
 # 新闻
+
+- 2021.5.20:
+   - ERNIE 开源家族又添生力军!
+      - 显式多粒度语言知识模型[ERNIE-Gram]()
+      - 超长文本双向建模预训练模型[ERNIE-Doc]()
+      - 融合场景图知识的跨模态预训练模型[ERNIE-ViL](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil)
+      - 语言与视觉一体的预训练模型[ERNIE-UNIMO]()
 
 - 2020.12.29:
    - `ERNIE`开源工具套件全面升级 [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc)
@@ -307,6 +314,39 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
   year={2020}
 }
 
+```
+
+### ERNIE-Gram
+
+```
+@article{xiao2020ernie,
+  title={ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding},
+  author={Xiao, Dongling and Li, Yu-Kun and Zhang, Han and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2010.12148},
+  year={2020}
+}
+```
+
+### ERNIE-Doc
+
+```
+@article{ding2020ernie,
+  title={ERNIE-DOC: The Retrospective Long-Document Modeling Transformer},
+  author={Ding, Siyu and Shang, Junyuan and Wang, Shuohuan and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2012.15688},
+  year={2020}
+}
+```
+
+### ERNIE-UNIMO
+
+```
+@article{li2020unimo,
+  title={UNIMO: Towards Unified-Modal Understanding and Generation via Cross-Modal Contrastive Learning},
+  author={Li, Wei and Gao, Can and Niu, Guocheng and Xiao, Xinyan and Liu, Hao and Liu, Jiachen and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2012.15409},
+  year={2020}
+}
 ```
 
 若希望复现 paper 中的所有实验，请切换至本repo的`repro`分支。

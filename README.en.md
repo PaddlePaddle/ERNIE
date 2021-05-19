@@ -1,6 +1,6 @@
 English|[简体中文](./README.zh.md)
 
-![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone_en.png)
+![./.metas/ERNIE_milestone.png](./.metas/ERNIE_milestone_20210519_en.png)
 
 
 **Remind： This repo has been refactored, for paper re-production or backward compatibility; plase checkout to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro)**
@@ -11,6 +11,9 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 [\[more information\]](https://wenxin.baidu.com/)
 
 # News
+
+- May.20.2021:
+    - ERNIE-Doc, ERNIE-Gram, [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil), ERNIE-UNIMO are **avaliable** now!
 
 - Dec.29.2020:
  	- Pretrain and finetune ERNIE with [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc).
@@ -296,6 +299,7 @@ For details about distillation, see [here](./demo/distill/README.md)
 ```
 
 ### ERNIE-ViL
+
 ```
 @article{yu2020ernie,
   title={ERNIE-ViL: Knowledge Enhanced Vision-Language Representations Through Scene Graph},
@@ -304,6 +308,39 @@ For details about distillation, see [here](./demo/distill/README.md)
   year={2020}
 }
 
+```
+
+### ERNIE-Gram
+
+```
+@article{xiao2020ernie,
+  title={ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding},
+  author={Xiao, Dongling and Li, Yu-Kun and Zhang, Han and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2010.12148},
+  year={2020}
+}
+```
+
+### ERNIE-Doc
+
+```
+@article{ding2020ernie,
+  title={ERNIE-DOC: The Retrospective Long-Document Modeling Transformer},
+  author={Ding, Siyu and Shang, Junyuan and Wang, Shuohuan and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2012.15688},
+  year={2020}
+}
+```
+
+### ERNIE-UNIMO
+
+```
+@article{li2020unimo,
+  title={UNIMO: Towards Unified-Modal Understanding and Generation via Cross-Modal Contrastive Learning},
+  author={Li, Wei and Gao, Can and Niu, Guocheng and Xiao, Xinyan and Liu, Hao and Liu, Jiachen and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2012.15409},
+  year={2020}
+}
 ```
 
 For full reproduction of paper results, please checkout to `repro` branch of this repo.
