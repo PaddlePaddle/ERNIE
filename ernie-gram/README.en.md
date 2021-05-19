@@ -1,9 +1,11 @@
 English|[简体中文](./README.zh.md)
 
-`Remind`: *ERNIE-Gram* model has been officially released in [here](??). Our reproduction codes will be released to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro) soon.
+`Remind`: *ERNIE-Gram* model has been officially released in [here](#3-download-pretrained-models-optional). Our reproduction codes will be released to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro) soon.
 
 
 ## _ERNIE-Gram_: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding
+
+![ERNIE-Gram](.meta/ernie-gram.jpeg)
 
 - [Framework](#ernie-gram-framework)
 - [Quick Tour](#quick-tour)
@@ -16,8 +18,6 @@ English|[简体中文](./README.zh.md)
 - [Citation](#citation)
 
 ### ERNIE-Gram Framework
-
-整图
 
 Since **ERNIE 1.0**, Baidu researchers have introduced **knowledge-enhanced representation learning** in pre-training to achieve better pre-training learning by masking consecutive words, phrases, named entities, and other semantic knowledge units. Furthermore, we propose **ERNIE-Gram**, an explicitly n-gram masking language model to enhance the integration of coarse-grained information for pre-training. In **ERNIE-Gram**, **n-grams** are masked and predicted directly using **explicit** n-gram identities rather than contiguous sequences of tokens.
 
@@ -56,8 +56,8 @@ pip install -e .
 
 | Model                                              | Description                                                  |abbreviation|
 | :------------------------------------------------- | :----------------------------------------------------------- |:-----------|
-| [ERNIE-Gram Base for Chinese](补充链接) | Layer:12, Hidden:768, Heads:12 | ernie-gram|
-| [ERNIE-Gram Base for English](补充链接) | Layer:12, Hidden:768, Heads:12 | ernie-gram-en |
+| [ERNIE-Gram Base for Chinese](https://ernie-github.cdn.bcebos.com/model-ernie-gram-zh.1.tar.gz) | Layer:12, Hidden:768, Heads:12 | ernie-gram|
+| [ERNIE-Gram Base for English](https://ernie-github.cdn.bcebos.com/model-ernie-gram-en.1.tar.gz) | Layer:12, Hidden:768, Heads:12 | ernie-gram-en |
 
 ##### 4. Download datasets
 
