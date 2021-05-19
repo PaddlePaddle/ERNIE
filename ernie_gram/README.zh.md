@@ -30,7 +30,7 @@
 
 **ERNIE-Gram** 工作已被 **NAACL-HLT 2021** 作为长文收录，更多细节见 [link](https://arxiv.org/abs/2010.12148)。
 
-### 快速上手(待补充运行示例)
+### 快速上手
 ```shell
 mkdir -p data
 cd data
@@ -67,7 +67,7 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 | Model                                              | 细节参数                                                                  |下载简写|
 | :------------------------------------------------- |:------------------------------------------------------------------------- |:-------|
 | [ERNIE-Gram 中文](https://ernie-github.cdn.bcebos.com/model-ernie-gram-zh.1.tar.gz)           | Layer:12, Hidden:768, Heads:12  |ernie-gram|
-| [ERNIE-Gram 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gram-en.1.tar.gz)                  | Layer:3, Hdden:1024, Heads:16   |ernie-gram-en|
+| [ERNIE-Gram 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gram-en.1.tar.gz)                  | Layer:12, Hdden:768, Heads:12   |ernie-gram-en|
 
 ##### 4. 下载数据集
 
