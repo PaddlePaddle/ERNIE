@@ -1,0 +1,73 @@
+output_name="seq2seq"
+
+init_model="./model_files/unimo_base_en"
+data_path='./data/coqa'
+
+# hyper param
+lr_scheduler="linear_warmup_decay"
+use_fp16="False"
+# Merge the ALLReduce times of a layer
+use_fuse="True"
+use_hierarchical_allreduce="True"
+loss_scaling=12800
+
+skip_steps=100
+save_steps=10000
+validation_steps=10000
+label_smooth=0.1
+weight_decay=0.01
+max_seq_len=512
+random_seed=666
+
+#for multi-turn dialog/qa
+task_type="dialog"
+role_type_size=3
+turn_type_size=16
+
+#decoding params
+do_decode="true"
+max_src_len=480
+max_tgt_len=32
+max_out_len=30
+min_out_len=0
+beam_size=3
+length_penalty=0.0
+block_trigram="False"
+use_multi_gpu_test="True"
+
+#adam optimizer
+beta1=0.9
+beta2=0.98
+epsilon=1e-06
+
+#data
+tokenized_input="True"
+continuous_position="False"
+
+#dataset
+train_set="train.tsv"
+dev_set="dev.tsv"
+test_set="dev.tsv"
+do_train="true"
+do_val="true"
+do_test="false"
+do_pred="false"
+
+#evaluate
+eval_script="bash ./src/eval/tasks/coqa/eval.sh"
+eval_mertrics="f1"
+
+
+## turning params
+in_tokens="False"
+pred_batch_size=4
+epoch=20
+BATCH_SIZE=("8")
+LR_RATE=("1e-5")
+DD_RAND_SEED=("1")
+WARMUP_PROP=("0.06")
+
+config_path="./model_files/config/unimo_base_en.json"
+vocab_file="./model_files/dict/unimo_en.vocab.txt"
+bpe_json="./model_files/dict/unimo_en.encoder.json"
+bpe_file="./model_files/dict/unimo_en.vocab.bpe"

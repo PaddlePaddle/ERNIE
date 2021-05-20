@@ -1,0 +1,3 @@
+paddlepaddle-gpu==1.8.4.post107
+pyrouge==0.1.3
+regex==2020.7.14
