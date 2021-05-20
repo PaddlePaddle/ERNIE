@@ -30,6 +30,8 @@ import pickle
 import argparse
 from functools import partial
 from io import open
+import sys
+sys.path.append("../")
 
 import numpy as np
 import logging
@@ -38,22 +40,23 @@ import paddle as P
 
 from propeller import log
 import propeller.paddle as propeller
-from ernie_gram.optimization import AdamW
+from optimization import AdamW
 
 from ernie.modeling_ernie import ErnieModel, ErnieModelForQuestionAnswering
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
 #from ernie.optimization import AdamW, LinearDecay
 
-from ernie_gram.mrc import mrc_reader
-from ernie_gram.mrc import mrc_metrics
-from ernie_gram.utils import create_if_not_exists, get_warmup_and_linear_decay
+from mrc import mrc_reader
+from mrc import mrc_metrics
+from utils import create_if_not_exists, get_warmup_and_linear_decay
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-def evaluate(model, ds, all_examples, all_features, tokenizer, args):
-    dev_file = json.loads(open(args.dev_file, encoding='utf8').read())
+def evaluate(model, ds, all_examples, all_features, tokenizer, args, is_test=False):
+    dev_file = args.dev_file if not is_test else args.test_file
+    dev_file = json.loads(open(dev_file, encoding='utf8').read())
     with P.no_grad():
         log.debug('start eval')
         model.eval()
@@ -84,8 +87,8 @@ def evaluate(model, ds, all_examples, all_features, tokenizer, args):
         return f1, em
 
 
-def train(model, train_dataset, dev_dataset, dev_examples, dev_features,
-          tokenizer, args):
+def train(model, train_dataset, dev_dataset, dev_examples, dev_features, 
+          tokenizer, args, test_dataset=None, test_examples=None, test_features=None, do_test=False):
     model = P.DataParallel(model)
 
     max_steps = args.max_steps
@@ -142,10 +145,14 @@ def train(model, train_dataset, dev_dataset, dev_examples, dev_features,
                 log.debug(msg)
 
             if env.dev_id == 0 and step % 100==0 and step:
-                print(step)
                 f1, em = evaluate(model, dev_dataset, dev_examples,
                                   dev_features, tokenizer, args)
-                log.debug('[step %d] eval result: f1 %.5f em %.5f' %
+                log.debug('[step %d] dev eval result: f1 %.5f em %.5f' %
+                          (step, f1, em))
+                if do_test:
+                    f1, em = evaluate(model, test_dataset, test_examples,
+                                  test_features, tokenizer, args, True)
+                    log.debug('[step %d] test eval result: f1 %.5f em %.5f' %
                           (step, f1, em))
                 if env.dev_id == 0 and args.save_dir is not None:
                     P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
@@ -177,7 +184,12 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help='data directory includes train / develop data')
-    parser.add_argument('--warmup_proportion', type=float, default=0.0)
+    parser.add_argument(
+        '--test_file',
+        type=str,
+        default=None,
+        help='data directory includes train / develop data')
+    parser.add_argument('--warmup_proportion', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=3e-5, help='learning rate')
     parser.add_argument(
         '--save_dir', type=Path, required=True, help='model output directory')
@@ -216,6 +228,10 @@ if __name__ == "__main__":
     dev_examples = mrc_reader.read_files(args.dev_file, is_training=False)
     dev_features = mrc_reader.convert_example_to_features(
         dev_examples, args.max_seqlen, tokenizer, is_training=False)
+    if args.test_file:
+        test_examples = mrc_reader.read_files(args.test_file, is_training=False)
+        test_features = mrc_reader.convert_example_to_features(
+            test_examples, args.max_seqlen, tokenizer, is_training=False)
 
     log.info('train examples: %d, features: %d' %
              (len(train_examples), len(train_features)))
@@ -235,16 +251,28 @@ if __name__ == "__main__":
 
     dev_dataset = propeller.data.Dataset.from_list(dev_features).map(
         map_fn).padded_batch(args.bsz)
-
     model = ErnieModelForQuestionAnswering.from_pretrained(
         args.from_pretrained, name='')
 
-    train(model, train_dataset, dev_dataset, dev_examples, dev_features,
+    if args.test_file:
+        test_dataset = propeller.data.Dataset.from_list(test_features).map(
+            map_fn).padded_batch(args.bsz)
+        train(model, train_dataset, dev_dataset, dev_examples, dev_features,
+          tokenizer, args, test_dataset, test_examples, test_features, True)
+
+    else:
+        train(model, train_dataset, dev_dataset, dev_examples, dev_features,
           tokenizer, args)
 
+    
+    
     if env.dev_id == 0:
         f1, em = evaluate(model, dev_dataset, dev_examples, dev_features,
                           tokenizer, args)
-        log.debug('final eval result: f1 %.5f em %.5f' % (f1, em))
+        log.debug('final dev eval result: f1 %.5f em %.5f' % (f1, em))
+        if args.test_file:
+            f1, em = evaluate(model, test_dataset, test_examples, test_features,
+                          tokenizer, args, True)
+            log.debug('final test eval result: f1 %.5f em %.5f' % (f1, em))
     if env.dev_id == 0 and args.save_dir is not None:
         P.save(model.state_dict(), args.save_dir / 'ckpt.bin')

@@ -1,6 +1,6 @@
 source $1
 
-python3 -m paddle.distributed.launch ./ernie_gram/finetune_ner.py \
+python3 -m paddle.distributed.launch ./finetune_ner.py \
     --data_dir $data_dir \
     --max_steps $max_steps \
     --epoch $epoch \

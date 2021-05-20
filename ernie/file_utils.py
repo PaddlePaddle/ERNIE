@@ -68,12 +68,9 @@ def _fetch_from_remote(url,
             f = done_file.open('wb')
             f.close()
         else:
-            while True:
-                if done_file.exists():
-                    break
-                else:
-                    time.sleep(1)
-            
+            while not done_file.exists():
+                time.sleep(1)
+
     log.debug('%s cached in %s' % (url, cached_dir))
     return cached_dir_model
 

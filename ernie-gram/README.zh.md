@@ -38,7 +38,7 @@ wget https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz
 tar xf data-xnli.tar.gz
 cd ..
 #demo for NLI task
-sh ernie_gram/run_cls.sh ernie_gram/task_configs/xnli_conf
+sh run_cls.sh task_configs/xnli_conf
 ```
 
 
