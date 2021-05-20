@@ -349,7 +349,10 @@ def make_results(vocab, all_examples, all_features, all_results, n_best_size,
 
     unique_id_to_result = {}
     for result in all_results:
-        unique_id_to_result[result.unique_id] = result
+        try:
+        	unique_id_to_result[result.unique_id] = result
+        except:
+            continue
 
     _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
         "PrelimPrediction", [

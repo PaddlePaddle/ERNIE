@@ -29,6 +29,8 @@ import numpy as np
 import multiprocessing
 import pickle
 import logging
+import sys
+sys.path.append("../")
 
 from sklearn.metrics import f1_score
 import paddle as P
@@ -39,10 +41,10 @@ import propeller.paddle as propeller
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 
-from ernie_gram.utils import create_if_not_exists, get_warmup_and_linear_decay
+from utils import create_if_not_exists, get_warmup_and_linear_decay
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification, ErnieModelForTokenClassification
 from ernie.tokenizing_ernie import ErnieTokenizer
-from ernie_gram.optimization import AdamW
+from optimization import AdamW
 
 parser = propeller.ArgumentParser('NER model with ERNIE')
 parser.add_argument('--max_seqlen', type=int, default=256)

@@ -23,6 +23,8 @@ from functools import reduce, partial
 import numpy as np
 import logging
 #from visualdl import LogWriter
+import sys
+sys.path.append("../")
 
 from pathlib import Path
 import paddle as P
@@ -32,8 +34,8 @@ import propeller.paddle as propeller
 #from model.bert import BertConfig, BertModelLayer
 from ernie.modeling_ernie import ErnieModel, ErnieModelForSequenceClassification
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
-from ernie_gram.optimization import AdamW
-from ernie_gram.utils import create_if_not_exists, get_warmup_and_linear_decay
+from optimization import AdamW
+from utils import create_if_not_exists, get_warmup_and_linear_decay
 
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)

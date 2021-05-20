@@ -25,11 +25,13 @@ from paddle.fluid.framework import Variable, default_main_program
 import numpy as np
 import paddle as P
 import paddle.distributed.fleet as fleet
+import sys
+sys.path.append("../") 
 from propeller.paddle.train.hooks import RunHook
 import paddle.fluid as F
 log = logging.getLogger(__name__)
 
-from ernie_gram.utils import create_if_not_exists, get_warmup_and_linear_decay
+from utils import create_if_not_exists, get_warmup_and_linear_decay
 
 class AdamW(P.optimizer.AdamW):
     """AdamW object for dygraph"""
