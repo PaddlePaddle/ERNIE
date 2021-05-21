@@ -13,8 +13,8 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 # News
 
 - May.20.2021:
-    - [`ERNIE-Doc`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc), [`ERNIE-Gram`](./ernie_gram/), [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) models are **avaliable** now!
-    - `ERNIE-UNIMO` will be released soon.
+    - [`ERNIE-Doc`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc), [`ERNIE-Gram`](./ernie-gram/), [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) models are **avaliable** now!
+    - `ERNIE-UNIMO` will be released soon, [link](./ernie-unimo)
 
 - Dec.29.2020:
  	- Pretrain and finetune ERNIE with [PaddlePaddle v2.0](https://github.com/PaddlePaddle/Paddle/tree/release/2.0-rc).
