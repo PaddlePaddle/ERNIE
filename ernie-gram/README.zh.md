@@ -1,9 +1,11 @@
 [English](./README.en.md)|简体中文
 
-`提醒`: *ERNIE-Gram* 中/英文模型已经[正式开源](??)，paper 复现代码也即将开源至 [repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)。现在您可以使用基于 Paddle 2.0 全新升级、基于动静结合的新版 ERNIE 套件体验 *ERNIE-Gram* 中/英文开源模型。
+`提醒`: *ERNIE-Gram* 中/英文模型已经[正式开源](#3-下载预训练模型可选)，paper 复现代码也即将开源至 [repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)。现在您可以使用基于 Paddle 2.0 全新升级、基于动静结合的新版 ERNIE 套件体验 *ERNIE-Gram* 中/英文开源模型。
 
 
 ## _ERNIE-Gram_: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding
+
+![ERNIE-Gram](.meta/ernie-gram.jpeg)
 
 - [模型框架](#模型框架)
 - [快速上手](#快速上手)
@@ -17,8 +19,6 @@
 
 ### 模型框架
 
-![ERNIE-Gram](.meta/ernie-gram.jpeg)
-
 从 **ERNIE 1.0** 起，百度研究者们就在预训练中引入**知识增强**学习，通过掩码连续的词、phrase、named entity 等语义知识单元，实现更好的预训练学习。本次开源的通用语义理解模型 **ERNIE-Gram** 更进一步，提出的**显式**、**完备**的 n-gram 掩码语言模型，实现了显式的 n-gram 语义单元知识建模。
 
 #### ERNIE 多粒度预训练语义理解技术
@@ -30,15 +30,15 @@
 
 **ERNIE-Gram** 工作已被 **NAACL-HLT 2021** 作为长文收录，更多细节见 [link](https://arxiv.org/abs/2010.12148)。
 
-### 快速上手(待补充运行示例)
+### 快速上手
 ```shell
-import numpy as np
-import paddle as P
-from ernie.tokenizing_ernie import ErnieTokenizer
-from ernie.modeling_ernie import ErnieModel
-
-model = ErnieModel.from_pretrained('ernie-gram')    # Try to get 
-
+mkdir -p data
+cd data
+wget https://ernie-github.cdn.bcebos.com/data-xnli.tar.gz
+tar xf data-xnli.tar.gz
+cd ..
+#demo for NLI task
+sh run_cls.sh task_configs/xnli_conf
 ```
 
 
@@ -66,8 +66,8 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 
 | Model                                              | 细节参数                                                                  |下载简写|
 | :------------------------------------------------- |:------------------------------------------------------------------------- |:-------|
-| [ERNIE-Gram 中文](补充链接)           | Layer:12, Hidden:768, Heads:12  |ernie-gram|
-| [ERNIE-Gram 英文](补充链接)                  | Layer:3, Hdden:1024, Heads:16   |ernie-gram-en|
+| [ERNIE-Gram 中文](https://ernie-github.cdn.bcebos.com/model-ernie-gram-zh.1.tar.gz)           | Layer:12, Hidden:768, Heads:12  |ernie-gram|
+| [ERNIE-Gram 英文](https://ernie-github.cdn.bcebos.com/model-ernie-gram-en.1.tar.gz)                  | Layer:12, Hdden:768, Heads:12   |ernie-gram-en|
 
 ##### 4. 下载数据集
 
@@ -101,20 +101,20 @@ data/xnli
   - [句对分类](./demo/finetune_classifier_distributed.py)
   - [语义匹配](./demo/finetune_classifier_distributed.py)
   - [机器阅读理解](./demo/finetune_mrc.py)
-  - [命名实体识别](./demo/finetune_ner.py)
 
 
 **推荐超参数设置：**
 
-|任务|batch size|learning rate|epoch|dropout rate|
-|--|--|--|--|--|
-| XNLI         | 256             | 1.5e-4 | 3 | 0.1 |
-| LCQMC        | 32              | 4e-5   | 2 | 0.1 |
-| DRCD         | 64              | 1e-4   | 3 | 0.2 |
-| CMRC2018     | 64              | 1.5e-4 | 5 | 0.2 |
-| DuReader     | 64              | 1.5e-4 | 5 | 0.1 |
-| MSRA-NER(SIGHAN2006) | 16      | 5e-5   | 10| 0.1 |
+|任务|batch size|learning rate|
+|--|--|--|
+| XNLI         | 256             | 1.5e-4 |
+| LCQMC        | 16              | 4e-5 |
+| DRCD         | 64              | 5e-5 |
+| CMRC2018     | 64              | 1.5e-4 |
+| DuReader     | 64              | 1.5e-5 |
+| MSRA-NER(SIGHAN2006)  | 16      | 5e-5 |
 
+若希望复现 paper 中的所有实验，请切换至本 repo 的 `repro` 分支。
 
 ### 文献引用
 
@@ -126,9 +126,6 @@ data/xnli
   year={2020}
 }
 ```
-
-
-若希望复现 paper 中的所有实验，请切换至本 repo 的 `repro` 分支。
 
 ### 讨论组
 - [ERNIE官方主页](https://wenxin.baidu.com/)
