@@ -105,14 +105,15 @@ data/xnli
 
 **推荐超参数设置：**
 
-|任务|batch size|learning rate|
-|--|--|--|
-| XNLI         | 256             | 1.5e-4 |
-| LCQMC        | 16              | 4e-5 |
-| DRCD         | 64              | 5e-5 |
-| CMRC2018     | 64              | 1.5e-4 |
-| DuReader     | 64              | 1.5e-5 |
-| MSRA-NER(SIGHAN2006)  | 16      | 5e-5 |
+|任务|batch size|learning rate|epoch|dropout rate|
+|--|--|--|--|--|
+| XNLI         | 256             | 1.5e-4 | 3 | 0.1 |
+| LCQMC        | 32              | 4e-5   | 2 | 0.1 |
+| DRCD         | 64              | 1e-4   | 3 | 0.2 |
+| CMRC2018     | 64              | 1.5e-4 | 5 | 0.2 |
+| DuReader     | 64              | 1.5e-4 | 5 | 0.1 |
+| MSRA-NER(SIGHAN2006) | 16      | 5e-5   | 10| 0.1 |
+
 
 若希望复现 paper 中的所有实验，请切换至本 repo 的 `repro` 分支。
 
