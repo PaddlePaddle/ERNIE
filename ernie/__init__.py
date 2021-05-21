@@ -17,6 +17,9 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import sys
+import logging
+
 import paddle
 if paddle.__version__ != '0.0.0' and paddle.__version__ < '2.0.0':
     raise RuntimeError('propeller 0.2 requires paddle 2.0+, got %s' %
@@ -28,3 +31,10 @@ from ernie.modeling_ernie import (
     ErnieModelForQuestionAnswering, ErnieModelForPretraining)
 
 from ernie.tokenizing_ernie import ErnieTokenizer, ErnieTinyTokenizer
+
+log = logging.getLogger(__name__)
+formatter = logging.Formatter(fmt='[%(levelname)s] %(asctime)s [%(filename)12s:%(lineno)5d]:    %(message)s')
+stream_hdl = logging.StreamHandler(stream=sys.stderr)
+stream_hdl.setFormatter(formatter)
+log.addHandler(stream_hdl)
+log.propagate = False
