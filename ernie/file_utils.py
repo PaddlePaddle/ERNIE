@@ -50,7 +50,6 @@ def _fetch_from_remote(url,
             cached_dir_model.mkdir()
             tmpfile = cached_dir_model / 'tmp'
             with tmpfile.open('wb') as f:
-                #url = 'https://ernie.bj.bcebos.com/ERNIE_stable.tgz'
                 r = requests.get(url, stream=True)
                 total_len = int(r.headers.get('content-length'))
                 for chunk in tqdm(
