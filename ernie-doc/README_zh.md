@@ -98,7 +98,7 @@
 | **ERNIE-Doc** Base  |  **96.3** | 
 | **ERNIE-Doc** Large | **96.6** | 
 
-- [THUCNews(THU)](http://thuctc.thunlp.org/)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
+- [THUCNews(THU)](https://github.com/gaussic/text-classification-cnn-rnn)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
 
 | 模型          |    THU   |    THU   |    IFK   |
 |-----------------|:--------:|:--------:|:--------:|

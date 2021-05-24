@@ -99,7 +99,7 @@ We compare the performance of [ERNIE-Doc](https://arxiv.org/abs/2012.15688) with
 | **ERNIE-Doc** Base  |  **96.3** | 
 | **ERNIE-Doc** Large | **96.6** | 
 
-- [THUCNews(THU)](http://thuctc.thunlp.org/)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
+- [THUCNews(THU)](https://github.com/gaussic/text-classification-cnn-rnn)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
 
 | Models          |    THU   |    THU   |    IFK   |
 |-----------------|:--------:|:--------:|:--------:|
