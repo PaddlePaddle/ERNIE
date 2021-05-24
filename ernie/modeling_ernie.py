@@ -272,7 +272,7 @@ class PretrainedModel(object):
             pretrain_dir = Path(pretrain_dir_or_url)
 
         if not pretrain_dir.exists():
-            raise ValueError('pretrain dir not found: %s' % pretrain_dir)
+            raise ValueError('pretrain dir not found: %s, optional: %s' % (pretrain_dir, cls.resource_map.keys()))
         state_dict_path = pretrain_dir / 'saved_weights.pdparams'
         config_path = pretrain_dir / 'ernie_config.json'
 

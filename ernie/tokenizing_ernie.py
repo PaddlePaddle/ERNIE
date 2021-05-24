@@ -107,7 +107,7 @@ class ErnieTokenizer(object):
                      (pretrain_dir_or_url, repr(cls.resource_map)))
             pretrain_dir = Path(pretrain_dir_or_url)
         if not pretrain_dir.exists():
-            raise ValueError('pretrain dir not found: %s' % pretrain_dir)
+            raise ValueError('pretrain dir not found: %s, optional: %s' % (pretrain_dir, cls.resource_map.keys()))
         vocab_path = pretrain_dir / 'vocab.txt'
         if not vocab_path.exists():
             raise ValueError('no vocab file in pretrain dir: %s' %
