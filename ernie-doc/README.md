@@ -99,7 +99,7 @@ We compare the performance of [ERNIE-Doc](https://arxiv.org/abs/2012.15688) with
 | **ERNIE-Doc** Base  |  **96.3** | 
 | **ERNIE-Doc** Large | **96.6** | 
 
-- [THUCNews(THU)](http://thuctc.thunlp.org/)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
+- [THUCNews(THU)](https://github.com/gaussic/text-classification-cnn-rnn)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
 
 | Models          |    THU   |    THU   |    IFK   |
 |-----------------|:--------:|:--------:|:--------:|
@@ -179,7 +179,7 @@ We compare the performance of [ERNIE-Doc](https://arxiv.org/abs/2012.15688) with
 
 ### Install PaddlePaddle
 
-This code base has been tested with Paddle (version>=2.0) with Python3. Other dependency of ERNIE-Doc is listed in `requirements.txt`, you can install it by
+This code base has been tested with Paddle (version>=1.8) with Python3. Other dependency of ERNIE-GEN is listed in `requirements.txt`, you can install it by
 ```script
 pip install -r requirements.txt
 ```
@@ -191,7 +191,7 @@ sh script/run_imdb.sh
 sh script/run_iflytek.sh
 sh script/run_dureader.sh
 ```
-[Preprocessing code for IMDB dataset](./data/imdb/README.md)
+[Preprocessing code for IMDB dataset](./ernie_doc/data/imdb/README.md)
 
 
 The log of training and the evaluation results are in `log/job.log.0`.

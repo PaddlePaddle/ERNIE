@@ -98,7 +98,7 @@
 | **ERNIE-Doc** Base  |  **96.3** | 
 | **ERNIE-Doc** Large | **96.6** | 
 
-- [THUCNews(THU)](http://thuctc.thunlp.org/)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
+- [THUCNews(THU)](https://github.com/gaussic/text-classification-cnn-rnn)、[IFLYTEK(IFK)](https://arxiv.org/abs/2004.05986)
 
 | 模型          |    THU   |    THU   |    IFK   |
 |-----------------|:--------:|:--------:|:--------:|
@@ -178,7 +178,7 @@
 
 ### 安装飞桨
 
-我们的代码基于 Paddle(version>=2.0)，推荐使用python3运行。 ERNIE-Doc 依赖的其他模块也列举在 `requirements.txt`，可以通过下面的指令安装:
+我们的代码基于 Paddle(version>=1.8)，推荐使用python3运行。 ERNIE-Doc 依赖的其他模块也列举在 `requirements.txt`，可以通过下面的指令安装:
 ```script
 pip install -r requirements.txt
 ```
@@ -190,7 +190,7 @@ sh script/run_imdb.sh # 英文分类任务
 sh script/run_iflytek.sh # 中文分类任务
 sh script/run_dureader.sh # 中文阅读理解任务
 ```
-[imdb数据处理说明](./data/imdb/README.md)
+[imdb数据处理说明](./ernie_doc/data/imdb/README.md)
 
 
 具体微调参数均可在上述脚本中进行修改，训练和评估的日志在 `log/job.log.0`。 
