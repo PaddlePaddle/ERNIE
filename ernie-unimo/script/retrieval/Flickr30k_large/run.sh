@@ -2,6 +2,7 @@
 set -eux
 R_DIR=`dirname $0`; MYDIR=`cd $R_DIR;pwd`
 cd ${MYDIR}/../../../
+# config env
 source ${MYDIR}/model_conf
 
 source ./env.sh

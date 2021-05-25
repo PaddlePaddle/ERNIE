@@ -1,0 +1,74 @@
+output_name="img2txt"
+
+init_model="./model_files/unimo_base_en"
+data_path="./data/coco"
+object_file_local_path="coco_object_0.35_tot.ids"
+
+# hyper param
+lr_scheduler="linear_warmup_decay"
+use_fp16="False"
+# Merge the ALLReduce times of a layer
+use_fuse="True"
+use_hierarchical_allreduce="True"
+loss_scaling=12800
+
+skip_steps=100
+save_steps=10000
+validation_steps=10000
+label_smooth=0.1
+weight_decay=0.01
+max_seq_len=50
+random_seed=666
+
+#decoding params
+do_decode="true"
+max_img_len=101
+max_obj_len=100
+max_tgt_len=50
+max_out_len=50
+min_out_len=5
+beam_size=5
+length_penalty=0.6
+block_trigram="False"
+use_multi_gpu_test="True"
+
+#adam optimizer
+beta1=0.9
+beta2=0.98
+epsilon=1e-06
+
+#dataset
+train_filelist="train_filelist"
+valid_filelist="valid_filelist"
+test_filelist="test_filelist"
+do_train="true"
+do_val="false"
+do_test="true"
+do_pred="false"
+
+#evaluate
+eval_script="bash ./src/eval/tasks/coco/eval.sh"
+eval_mertrics="Bleu_1,Bleu_2,Bleu_3,Bleu_4,METEOR,ROUGE_L,CIDEr,SPICE"
+
+## turning params
+pred_batch_size=8
+epoch=20
+BATCH_SIZE=("4")
+LR_RATE=("7e-6")
+DD_RAND_SEED=("1")
+WARMUP_PROP=("0.06")
+
+## adversial training params
+adv_type="villa"
+adv_step=4
+adv_lr=0.03
+norm_type="l2"
+adv_max_norm=0
+adv_init_mag=0.4
+adv_kl_weight=1.0
+
+##configuration
+config_path="./model_files/config/unimo_base_en.json"
+vocab_file="./model_files/dict/unimo_en.vocab.txt"
+bpe_json="./model_files/dict/unimo_en.encoder.json"
+bpe_file="./model_files/dict/unimo_en.vocab.bpe"

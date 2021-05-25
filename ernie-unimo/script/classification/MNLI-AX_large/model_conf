@@ -1,0 +1,33 @@
+output_name="classification"
+task=MNLI-AX_large
+
+## hyper param
+use_fp16="False"
+do_train="True"
+do_val="True"
+do_val_hard="True"
+do_test="False"
+do_test_hard="False"
+do_pred="True"
+do_pred_hard="True"
+do_diagnostic="True"
+num_labels=3
+weight_decay=0
+max_len=512
+warmup_ratio=0.06
+save_checkpoints="False"
+save_steps=10000
+validation_steps=20000
+skip_steps=100
+eval_mertrics=simple_accuracy
+
+EPOCH=("10")
+BATCH_SIZE=("16" "32")
+LR_RATE=("1e-5" "2e-5" "3e-5")
+DD_RAND_SEED=("1" "2" "3" "4" "5")
+
+init_model="./model_files/unimo_large_en"
+config_path="./model_files/config/unimo_large_en.json"
+vocab_file="./model_files/dict/unimo_en.vocab.txt"
+bpe_json="./model_files/dict/unimo_en.encoder.json"
+bpe_file="./model_files/dict/unimo_en.vocab.bpe"

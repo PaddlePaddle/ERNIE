@@ -92,17 +92,6 @@ class UNIMOModel(object):
         self._is_img2txt_task = (task_type == "img2txt")
         self._is_multimodal_task = (image_input is not None)
 
-        if emb_ids is not None and image_input is not None and emb_obj_ids is not None:
-            self._input_type = 'vol'
-        elif emb_ids is not None and image_input is not None:
-            self._input_type = 'vl'
-        elif emb_ids is not None:
-            self._input_type = 'l'
-        elif image_input is not None and emb_obj_ids is not None:
-            self._input_type = 'vo'
-        else:
-            raise ValueError('input feature error')
-
         if self._is_dialogue_task:
             self._role_type_size = config["role_type_size"]
             self._turn_type_size = config["turn_type_size"]
@@ -156,28 +145,39 @@ class UNIMOModel(object):
     def _build_model(self, emb_ids=None, input_mask=None, image_input=None, emb_obj_ids=None, gather_idx=None):
         """build unimo model"""
 
+        if emb_ids is not None and image_input is not None and emb_obj_ids is not None:
+            input_type = 'vol'
+        elif emb_ids is not None and image_input is not None:
+            input_type = 'vl'
+        elif emb_ids is not None:
+            input_type = 'l'
+        elif image_input is not None and emb_obj_ids is not None:
+            input_type = 'vo'
+        else:
+            raise ValueError('input feature error')
+
         self._enc_vol_out = None
         self._enc_vl_out = None
         self._enc_v_out = None
         self._enc_l_out = None
 
-        if self._input_type == 'vol':
+        if input_type == 'vol':
             self._enc_vol_out, self._enc_v_out, self._enc_l_out = self.encode(emb_ids=emb_ids,
                                                                               input_mask=input_mask,
                                                                               image_input=image_input,
                                                                               emb_obj_ids=emb_obj_ids,
                                                                               gather_idx=gather_idx)
-        elif self._input_type == 'vl':
+        elif input_type == 'vl':
             self._enc_vl_out, self._enc_v_out, self._enc_l_out = self.encode(emb_ids=emb_ids,
                                                                              input_mask=input_mask,
                                                                              image_input=image_input,
                                                                              gather_idx=gather_idx)
-        elif self._input_type == 'vo':
+        elif input_type == 'vo':
             self._enc_v_out = self.encode(input_mask=input_mask,
                                           image_input=image_input,
                                           emb_obj_ids=emb_obj_ids,
                                           gather_idx=gather_idx)
-        elif self._input_type == 'l':
+        elif input_type == 'l':
             self._enc_l_out = self.encode(emb_ids=emb_ids,
                                           input_mask=input_mask,
                                           gather_idx=gather_idx)
@@ -186,10 +186,22 @@ class UNIMOModel(object):
 
     def encode(self, emb_ids=None, input_mask=None, image_input=None, emb_obj_ids=None, gather_idx=None):
         """unimo encoder"""
+        if emb_ids is not None and image_input is not None and emb_obj_ids is not None:
+            input_type = 'vol'
+        elif emb_ids is not None and image_input is not None:
+            input_type = 'vl'
+        elif emb_ids is not None:
+            input_type = 'l'
+        elif image_input is not None and emb_obj_ids is not None:
+            input_type = 'vo'
+        else:
+            raise ValueError('input feature error')
+
         emb_feature, n_head_self_attn_mask, _v_seq_len, _o_seq_len = self._gen_input(emb_ids=emb_ids,
                                                                                      input_mask=input_mask,
                                                                                      image_input=image_input,
-                                                                                     emb_obj_ids=emb_obj_ids)
+                                                                                     emb_obj_ids=emb_obj_ids,
+                                                                                     input_type=input_type)
         enc_out = encoder(
             enc_input=emb_feature,
             attn_bias=n_head_self_attn_mask,
@@ -210,7 +222,7 @@ class UNIMOModel(object):
             caches=self.caches,
             gather_idx=gather_idx)
 
-        if self._input_type == 'vol':
+        if input_type == 'vol':
             assert _v_seq_len is not None and _o_seq_len is not None, "the input is invalid"
             _vol_seq_len = layers.shape(enc_out)[1]
             enc_v_out = fluid.layers.slice(
@@ -221,7 +233,7 @@ class UNIMOModel(object):
                 input=enc_out, axes=[1], starts=[_v_seq_len + _o_seq_len], ends=[_vol_seq_len])
             enc_vol_out = enc_out
             return enc_vol_out, enc_v_out, enc_l_out
-        elif self._input_type == 'vl':
+        elif input_type == 'vl':
             assert _v_seq_len is not None and _o_seq_len is None, "the input is invalid"
             _vl_seq_len = layers.shape(enc_out)[1]
             enc_v_out = fluid.layers.slice(
@@ -230,20 +242,22 @@ class UNIMOModel(object):
                 input=enc_out, axes=[1], starts=[_v_seq_len], ends=[_vl_seq_len])
             enc_vl_out = enc_out
             return enc_vl_out, enc_v_out, enc_l_out
-        elif self._input_type == 'vo':
+        elif input_type == 'vo':
             assert _v_seq_len is not None and _o_seq_len is not None, "the input is invalid"
             enc_v_out = fluid.layers.slice(
                 input=enc_out, axes=[1], starts=[0], ends=[_v_seq_len])
             return enc_v_out
-        elif self._input_type == 'l':
+        elif input_type == 'l':
             assert _v_seq_len is None and _o_seq_len is None, "the input is invalid"
             enc_l_out = enc_out
             return enc_l_out
         else:
             raise ValueError("The input type is invalid")
 
-    def _gen_input(self, emb_ids=None, input_mask=None, image_input=None, emb_obj_ids=None):
+    def _gen_input(self, emb_ids=None, input_mask=None, image_input=None, emb_obj_ids=None, input_type=None):
         assert input_mask is not None, "input_mask should not be none"
+        assert input_type is not None, "input_type should not be none"
+
         self_attn_mask = input_mask
         self_attn_mask = fluid.layers.scale(
             x=self_attn_mask, scale=1e4, bias=-1.0, bias_after_scale=False)
@@ -320,16 +334,16 @@ class UNIMOModel(object):
                 emb_obj_out, 'nd', self._prepostprocess_dropout, name="pre_encoder")
             _o_seq_len = layers.shape(emb_obj_out)[1]
 
-        if self._input_type == 'vol':
+        if input_type == 'vol':
             assert emb_ids is not None and image_input is not None and emb_obj_ids is not None, "the input is invalid"
             emb_feature = fluid.layers.concat([emb_v_out, emb_obj_out, emb_out], axis=1)
-        elif self._input_type == 'vl':
+        elif input_type == 'vl':
             assert emb_ids is not None and image_input is not None and emb_obj_ids is None, "the input is invalid"
             emb_feature = fluid.layers.concat([emb_v_out, emb_out], axis=1)
-        elif self._input_type == 'l':
+        elif input_type == 'l':
             assert emb_ids is not None and image_input is None and emb_obj_ids is None, "the input is invalid"
             emb_feature = emb_out
-        elif self._input_type == 'vo':
+        elif input_type == 'vo':
             assert emb_ids is None and image_input is not None and emb_obj_ids is not None, "the input is invalid"
             emb_feature = fluid.layers.concat([emb_v_out, emb_obj_out], axis=1)
         else:
