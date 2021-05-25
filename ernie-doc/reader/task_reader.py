@@ -351,19 +351,19 @@ class MRCReader(BaseReader):
                  for_cn=True,
                  doc_stride=128,
                  max_query_length=64):
-        super(MRCReader, self).__init__(trainer_id,
-                                        trainer_num,
-                                        vocab_path,
-                                        memory_len=128,
-                                        repeat_input=False,
-                                        train_all=False,
-                                        eval_all=False,
-                                        label_map_config=None,
-                                        max_seq_len=512,
-                                        do_lower_case=True,
-                                        in_tokens=False,
-                                        random_seed=None,
-                                        tokenizer="FullTokenizer")
+        super(MRCReader, self).__init__(trainer_id=trainer_id,
+                                        trainer_num=trainer_num,
+                                        vocab_path=vocab_path,
+                                        memory_len=memory_len,
+                                        repeat_input=repeat_input,
+                                        train_all=train_all,
+                                        eval_all=eval_all,
+                                        label_map_config=label_map_config,
+                                        max_seq_len=max_seq_len,
+                                        do_lower_case=do_lower_case,
+                                        in_tokens=in_tokens,
+                                        random_seed=random_seed,
+                                        tokenizer=tokenizer)
         self.for_cn = for_cn
         self.doc_stride = doc_stride
         self.max_query_length = max_query_length
