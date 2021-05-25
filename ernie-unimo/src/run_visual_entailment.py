@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Finetuning on retrieval tasks."""
+"""visual entailment tasks."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -20,21 +20,22 @@ from __future__ import print_function
 import os
 import time
 import multiprocessing
-
-import paddle.fluid as fluid
 import numpy as np
-
-from reader.retrieval_reader import RetrievalTrainReader, RetrievalTestReader
-from model.unimo_finetune import UNIMOConfig
-from model.tokenization import GptBpeTokenizer
-from finetune.retrieval import create_model, evaluate
+import paddle.fluid as fluid
 from utils.optimization import optimization
-from utils.args import print_arguments
 from utils.utils import get_time
 from utils.init import init_pretraining_params, init_checkpoint
-from args.retrieval_args import parser
+from utils.args import print_arguments
+from model.tokenization import GptBpeTokenizer
+from args.visual_entailment_args import parser
+from collections import OrderedDict
+from model.unimo_finetune import UNIMOConfig
+from finetune.visual_entailment import create_model, evaluate
+from reader.visual_entailment_reader import ClassifyReader
+
 
 args = parser.parse_args()
+
 
 def main(args):
     """main"""
@@ -60,8 +61,8 @@ def main(args):
                                 vocab_bpe_file=args.vocab_bpe_file,
                                 do_lower_case=args.do_lower_case)
 
-    if not (args.do_train or args.do_val or args.do_test):
-        raise ValueError("For args `do_train`, `do_val`, `do_test`, at "
+    if not (args.do_train or args.do_val or args.do_test or args.do_test_hard):
+        raise ValueError("For args `do_train`, `do_val`, `do_test`, `do_test_hard`, at "
                          "least one of them must be True.")
 
     startup_prog = fluid.Program()
@@ -71,33 +72,38 @@ def main(args):
     trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
 
     if args.do_train:
-        train_data_reader = RetrievalTrainReader(tokenizer, args, args.train_image_feature_dir,
-                                                 args.train_image_caption)
-        train_data_generator = train_data_reader.data_generator()
-        num_train_examples, captions_num, image_num = train_data_reader.get_num_examples()
+        train_data_reader = ClassifyReader(args.train_filelist, args.max_seq_len, tokenizer)
+        train_data_generator = train_data_reader.data_generator(
+            batch_size=args.batch_size,
+            epoch=args.epoch,
+            phase="train")
+
+        if args.num_train_examples:
+            num_train_examples = args.num_train_examples
+        else:
+            num_train_examples = train_data_reader.get_num_examples()
         step_num_per_epoch = num_train_examples // args.batch_size // trainers_num
         max_train_steps = args.epoch * step_num_per_epoch
-        args.learning_rate_decay_step1 = args.learning_rate_decay_epoch1 * step_num_per_epoch
-        args.learning_rate_decay_step2 = args.learning_rate_decay_epoch2 * step_num_per_epoch
 
+        warmup_steps = int(max_train_steps * args.warmup_proportion)
         print("Device count: %d, gpu_id: %d" % (dev_count, gpu_id))
         print("Num train examples: %d" % num_train_examples)
         print("Max train steps: %d" % max_train_steps)
+        print("Num warmup steps: %d" % warmup_steps)
 
         train_program = fluid.Program()
-        lr_boundaries = [args.learning_rate_decay_step1, args.learning_rate_decay_step2]
-        lr_value = [args.learning_rate * args.learning_rate_scale ** i for i in range(len(lr_boundaries)+1)]
 
         with fluid.program_guard(train_program, startup_prog):
             with fluid.unique_name.guard():
                 train_pyreader, graph_vars = create_model(
                     args,
-                    phase='train',
                     config=model_config,
-                    samples_num=args.samples_num + 1)
+                    pyreader_name="train_reader",
+                    is_train=True)
+
                 scheduled_lr, loss_scaling = optimization(
                     loss=graph_vars["loss"],
-                    warmup_steps=args.warmup_step,
+                    warmup_steps=warmup_steps,
                     num_train_steps=max_train_steps,
                     learning_rate=args.learning_rate,
                     train_program=train_program,
@@ -108,29 +114,38 @@ def main(args):
                     init_loss_scaling=args.init_loss_scaling,
                     beta1=args.beta1,
                     beta2=args.beta2,
-                    epsilon=args.epsilon,
-                    boundaries=lr_boundaries,
-                    values=lr_value)
+                    epsilon=args.epsilon)
 
-    if args.do_val or args.do_test:
+    if args.do_val or args.do_test or args.do_test_hard:
         test_prog = fluid.Program()
         with fluid.program_guard(test_prog, startup_prog):
             with fluid.unique_name.guard():
                 test_pyreader, test_graph_vars = create_model(
                     args,
-                    phase='dev',
                     config=model_config,
-                    samples_num=1)
+                    pyreader_name="dev_reader",
+                    is_train=False)
         test_prog = test_prog.clone(for_test=True)
-
         if args.do_val:
-            dev_data_reader = RetrievalTestReader(tokenizer, args, \
-                    args.dev_image_feature_dir, args.dev_image_caption)
-            dev_data_generator = dev_data_reader.data_generator()
+            dev_data_reader = ClassifyReader(args.dev_filelist, args.max_seq_len, tokenizer)
+            dev_data_generator = dev_data_reader.data_generator(
+                batch_size=args.test_batch_size,
+                epoch=1,
+                phase="dev")
+
         if args.do_test:
-            test_data_reader = RetrievalTestReader(tokenizer, args, \
-                    args.test_image_feature_dir, args.test_image_caption)
-            test_data_generator = test_data_reader.data_generator()
+            test_data_reader = ClassifyReader(args.test_filelist, args.max_seq_len, tokenizer)
+            test_data_generator = test_data_reader.data_generator(
+                batch_size=args.test_batch_size,
+                epoch=1,
+                phase="test")
+
+        if args.do_test_hard:
+            test_hard_data_reader = ClassifyReader(args.test_hard_filelist, args.max_seq_len, tokenizer)
+            test_hard_data_generator = test_hard_data_reader.data_generator(
+                batch_size=args.test_batch_size,
+                epoch=1,
+                phase="test_hard")
 
     nccl2_num_trainers = 1
     nccl2_trainer_id = 0
@@ -175,22 +190,21 @@ def main(args):
     exe.run(startup_prog)
 
     if args.do_train:
-        if not args.run_random:
-            if args.init_checkpoint and args.init_pretraining_params:
-                print(
-                    "WARNING: args 'init_checkpoint' and 'init_pretraining_params' "
-                    "both are set! Only arg 'init_checkpoint' is made valid.")
-            if args.init_checkpoint:
-                init_checkpoint(
-                    exe,
-                    args.init_checkpoint,
-                    main_program=train_program)
-            elif args.init_pretraining_params:
-                init_pretraining_params(
-                    exe,
-                    args.init_pretraining_params,
-                    main_program=train_program)
-    elif args.do_val or args.do_test:
+        if args.init_checkpoint and args.init_pretraining_params:
+            print(
+                "WARNING: args 'init_checkpoint' and 'init_pretraining_params' "
+                "both are set! Only arg 'init_checkpoint' is made valid.")
+        if args.init_checkpoint:
+            init_checkpoint(
+                exe,
+                args.init_checkpoint,
+                main_program=train_program)
+        elif args.init_pretraining_params:
+            init_pretraining_params(
+                exe,
+                args.init_pretraining_params,
+                main_program=train_program)
+    elif args.do_val or args.do_test or args.do_test_hard:
         args.init_checkpoint = args.init_pretraining_params
         if not args.init_checkpoint:
             raise ValueError("args 'init_checkpoint' should be set if"
@@ -198,7 +212,7 @@ def main(args):
         init_checkpoint(
             exe,
             args.init_checkpoint,
-            main_program=test_prog)
+            main_program=startup_prog)
 
     if args.do_train:
         exec_strategy = fluid.ExecutionStrategy()
@@ -221,17 +235,18 @@ def main(args):
             main_program=train_program,
             num_trainers=nccl2_num_trainers,
             trainer_id=nccl2_trainer_id)
-        train_pyreader.set_batch_generator(train_data_generator, places=place)
+        train_pyreader.decorate_tensor_provider(train_data_generator)
     else:
         train_exe = None
 
-    if args.do_val or args.do_test:
+    if args.do_val or args.do_test or args.do_test_hard:
         test_exe = fluid.ParallelExecutor(use_cuda=args.use_cuda,
                 main_program=test_prog,
                 share_vars_from=train_exe)
 
     dev_ret_history = [] # (steps, key_eval, eval)
     test_ret_history = [] # (steps, key_eval, eval)
+    test_hard_ret_history = []  # (steps, key_eval, eval)
     steps = 0
 
     if args.do_train:
@@ -249,12 +264,14 @@ def main(args):
                         verbose = "train pyreader queue size: %d, learning_rate: %.10f" % \
                                 (train_pyreader.queue.size(), outputs['learning_rate'])
                         print(verbose)
-                    current_example, current_epoch = train_data_reader.get_train_progress()
+                    current_epoch, current_example, current_file_index, total_file, current_file = \
+                            train_data_reader.get_progress()
+
                     time_end = time.time()
                     used_time = time_end - time_begin
-                    print("%s - epoch: %d, progress: %d/%d, step: %d, ave loss: %f, speed: %f steps/s" % \
-                          (get_time(), current_epoch, current_example, num_train_examples, \
-                          steps, outputs["loss"], args.skip_steps / used_time))
+                    print("%s - epoch: %d, progress: %d/%d, %d/%d, step: %d, ave loss: %f, speed: %f steps/s" % \
+                          (get_time(), current_epoch, current_example, num_train_examples, current_file_index, \
+                          total_file, steps, outputs["loss"], args.skip_steps / used_time))
                     time_begin = time.time()
                 else:
                     train_exe.run(fetch_list=[])
@@ -268,19 +285,27 @@ def main(args):
                 if steps % args.validation_steps == 0:
                     # evaluate dev set
                     if args.do_val:
-                        test_pyreader.set_batch_generator(dev_data_generator, places=place)
-                        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, "dev", \
-                                trainers_num, nccl2_trainer_id, data_reader=dev_data_reader)
+                        test_pyreader.decorate_tensor_provider(dev_data_generator)
+                        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, \
+                                "dev", trainers_num, nccl2_trainer_id)
                         if nccl2_trainer_id == 0:
                             dev_ret_history.append((steps, outputs['key_eval'], outputs[outputs['key_eval']]))
 
                     # evaluate test set
                     if args.do_test:
-                        test_pyreader.set_batch_generator(test_data_generator, places=place)
-                        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, "test", \
-                                trainers_num, nccl2_trainer_id, data_reader=test_data_reader)
+                        test_pyreader.decorate_tensor_provider(test_data_generator)
+                        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, \
+                                "test", trainers_num, nccl2_trainer_id)
                         if nccl2_trainer_id == 0:
                             test_ret_history.append((steps, outputs['key_eval'], outputs[outputs['key_eval']]))
+
+                    # evaluate test set
+                    if args.do_test_hard:
+                        test_pyreader.decorate_tensor_provider(test_hard_data_generator)
+                        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, \
+                                "test_hard", trainers_num, nccl2_trainer_id)
+                        if nccl2_trainer_id == 0:
+                            test_hard_ret_history.append((steps, outputs['key_eval'], outputs[outputs['key_eval']]))
 
             except fluid.core.EOFException:
                 if args.save_checkpoints:
@@ -291,25 +316,31 @@ def main(args):
 
     # final eval on dev set
     if args.do_val:
-        test_pyreader.set_batch_generator(dev_data_generator, places=place)
-        if nccl2_trainer_id == 0:
-            print("Final validation result:")
-        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, "dev", \
-                trainers_num, nccl2_trainer_id, data_reader=dev_data_reader)
-
+        test_pyreader.decorate_tensor_provider(dev_data_generator)
+        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, "dev", trainers_num, nccl2_trainer_id)
         if nccl2_trainer_id == 0:
             dev_ret_history.append((steps, outputs['key_eval'], outputs[outputs['key_eval']]))
+
+    # final eval on test set
+    if args.do_test:
+        test_pyreader.decorate_tensor_provider(test_data_generator)
+        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, "test", trainers_num, nccl2_trainer_id)
+        if nccl2_trainer_id == 0:
+            test_ret_history.append((steps, outputs['key_eval'], outputs[outputs['key_eval']]))
+
+    # final eval on test_hard set
+    if args.do_test_hard:
+        test_pyreader.decorate_tensor_provider(test_hard_data_generator)
+        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, "test_hard", trainers_num, nccl2_trainer_id)
+        if nccl2_trainer_id == 0:
+            test_hard_ret_history.append((steps, outputs['key_eval'], outputs[outputs['key_eval']]))
+
+    if nccl2_trainer_id == 0:
+        if args.do_val:
             dev_ret_history = sorted(dev_ret_history, key=lambda a: a[2], reverse=True)
             print("Best validation result: step %d %s %f" % \
                     (dev_ret_history[0][0], dev_ret_history[0][1], dev_ret_history[0][2]))
 
-    # final eval on test set
-    if args.do_test:
-        test_pyreader.set_batch_generator(test_data_generator, places=place)
-        if nccl2_trainer_id == 0:
-            print("Final test result:")
-        outputs = evaluate(args, test_exe, test_pyreader, test_graph_vars, "test", \
-                trainers_num, nccl2_trainer_id, data_reader=test_data_reader)
 
 if __name__ == '__main__':
     print_arguments(args)

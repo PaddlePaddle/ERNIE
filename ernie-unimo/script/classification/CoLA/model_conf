@@ -1,0 +1,29 @@
+output_name="classification"
+task=CoLA
+
+## hyper param
+use_fp16="False"
+do_train="True"
+do_val="True"
+do_test="False"
+do_pred="True"
+num_labels=2
+weight_decay=0
+max_len=512
+warmup_ratio=0.06
+save_checkpoints="False"
+save_steps=500
+validation_steps=500
+skip_steps=10
+eval_mertrics=matthews_corrcoef
+
+EPOCH=("10")
+BATCH_SIZE=("16" "32")
+LR_RATE=("1e-5" "2e-5" "3e-5")
+DD_RAND_SEED=("1" "2" "3" "4" "5")
+
+init_model="./model_files/unimo_base_en"
+config_path="./model_files/config/unimo_base_en.json"
+vocab_file="./model_files/dict/unimo_en.vocab.txt"
+bpe_json="./model_files/dict/unimo_en.encoder.json"
+bpe_file="./model_files/dict/unimo_en.vocab.bpe"
