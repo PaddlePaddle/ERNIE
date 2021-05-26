@@ -21,7 +21,7 @@ with open("README.md", "r", encoding='utf-8') as fh:
 
 setuptools.setup(
     name="paddle-ernie",  # Replace with your own username
-    version="0.1.0dev1",
+    version="0.2.0dev1",
     author="Baidu Ernie Team",
     author_email="ernieernie.team@gmail.com",
     description="A pretrained NLP model for every NLP tasks",
