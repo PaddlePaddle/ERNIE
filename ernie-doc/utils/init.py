@@ -103,9 +103,9 @@ def init_model(args, exe, startup_prog):
             init_path = args.init_pretraining_params
 
     elif args.do_val or args.do_test:
-        init_path = args.init_checkpoint or args.init_pretraining_params
+        init_path = args.init_pretraining_params
         if not init_path:
-            raise ValueError("args 'init_checkpoint' should be set if"
+            raise ValueError("args 'init_pretraining_params' should be set if"
                              "only doing validation or testing!")
         init_func = init_checkpoint
         print("init pretraining params from ", args.init_checkpoint if args.init_checkpoint else args.init_pretraining_params)
