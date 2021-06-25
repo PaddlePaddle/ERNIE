@@ -1,0 +1,42 @@
+[
+{
+"task": "VCR_Q-A",
+"num_choice": 4,
+"annotations_jsonpath_train": "./data/vcr/train.jsonl",
+"annotations_jsonpath_val": "./data/vcr/val.jsonl",
+"annotations_jsonpath_test": "./data/vcr/test.jsonl",
+"feature_lmdb_path": "./data/vcr/VCR_resnet101_faster_rcnn_genome_pickle2.lmdb",
+"gt_feature_lmdb_path": "./data/vcr/VCR_gt_resnet101_faster_rcnn_genome_pickle2.lmdb",
+"unisex_names_table" : "./data/vcr/unisex_names_table.csv",
+"Proprocessor": "PreprocessorBasic",
+"tokenizer_name" : "FullTokenizer",
+"fusion_method" : "mul",
+"dropout_rate" : 0.1,
+"max_seq_len" : 60,
+"use_gt_fea" : true,
+"shufflekeep_across_task": true,
+"shuffle_every_epoch": true,
+"task_weight": 1.0,
+"task_prefix": "vcr_qa"
+},
+{
+"task": "VCR_QA-R",
+"num_choice": 4,
+"annotations_jsonpath_train": "./data/vcr/train.jsonl",
+"annotations_jsonpath_val": "./data/vcr/val.jsonl",
+"annotations_jsonpath_test": "./data/vcr/test.jsonl",
+"feature_lmdb_path": "./data/vcr/VCR_resnet101_faster_rcnn_genome_pickle2.lmdb",
+"gt_feature_lmdb_path": "./data/vcr/VCR_gt_resnet101_faster_rcnn_genome_pickle2.lmdb",
+"unisex_names_table" : "./data/vcr/unisex_names_table.csv",
+"Proprocessor": "PreprocessorBasic",
+"tokenizer_name" : "FullTokenizer",
+"fusion_method" : "mul",
+"dropout_rate" : 0.1,
+"max_seq_len" : 80,
+"use_gt_fea" : true,
+"shufflekeep_across_task": true,
+"shuffle_every_epoch" : true,
+"task_weight": 1.0,
+"task_prefix": "vcr_qar"
+}
+]

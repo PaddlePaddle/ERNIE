@@ -1,0 +1,14 @@
+[
+{
+"prob": 1.0,
+"valid_filelist": "./conf/vqa/vqa_valid.filelist",
+"vg_train_filelist": "./conf/vqa/vg_train.filelist",
+"train_filelist": "./conf/vqa/vqa_train.filelist",
+"num_class": 3129,
+"classifier_hid_size": 2048,
+"vg_init_epochs": 2,
+"Proprocessor": "PreprocessorBasic",
+"tokenizer_name" : "FullTokenizer",
+"vocab_path" : "./package/vocab.txt"
+}
+]

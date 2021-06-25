@@ -1,0 +1,15 @@
+lr_decay_dict_file="./conf/vqa/vqa_finetune_decay.list"
+output_model_path="output_20_mask"
+lr_scheduler="manual_warmup_decay"
+num_train_steps=50200
+SAVE_STEPS=2510
+WARMUP_STEPS=3710
+BATCH_SIZE=16
+LR_RATE=1e-4
+decay_steps="15100;22590"
+WEIGHT_DECAY=0.01
+layer_decay_rate=0.9
+text_init_layers=6
+n_layers=18
+MAX_LEN=16
+task_group_json=./conf/vqa/task_vqa.json

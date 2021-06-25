@@ -1,0 +1,8 @@
+nltk==3.2.4
+numpy==1.14.3
+scipy==1.2.1
+six==1.11.0
+json_lines==0.5.0
+lmdb==0.97
+opencv-python==3.2.0.8
+paddlepaddle-gpu==1.8.3.post97
