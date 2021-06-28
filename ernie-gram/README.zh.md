@@ -1,6 +1,6 @@
 [English](./README.en.md)|简体中文
 
-`提醒`: *ERNIE-Gram* 中/英文模型已经[正式开源](#3-下载预训练模型可选)，paper 复现代码也即将开源至 [repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro)。现在您可以使用基于 Paddle 2.0 全新升级、基于动静结合的新版 ERNIE 套件体验 *ERNIE-Gram* 中/英文开源模型。
+`提醒`: *ERNIE-Gram* 中/英文模型已经[正式开源](#3-下载预训练模型可选)，paper 复现代码开源至 [repro分支](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gram)。现在您可以使用基于 Paddle 2.0 全新升级、基于动静结合的新版 ERNIE 套件体验 *ERNIE-Gram* 中/英文开源模型。
 
 
 ## _ERNIE-Gram_: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding

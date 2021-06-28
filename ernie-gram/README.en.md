@@ -1,6 +1,6 @@
 English|[简体中文](./README.zh.md)
 
-`Remind`: *ERNIE-Gram* model has been officially released in [here](#3-download-pretrained-models-optional). Our reproduction codes will be released to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro) soon.
+`Remind`: *ERNIE-Gram* model has been officially released in [here](#3-download-pretrained-models-optional). Our reproduction codes have been released to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gram).
 
 
 ## _ERNIE-Gram_: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding
