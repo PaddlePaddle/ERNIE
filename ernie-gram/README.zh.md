@@ -115,7 +115,7 @@ data/xnli
 | MSRA-NER(SIGHAN2006) | 16      | 5e-5   | 10| 0.1 |
 
 
-若希望复现 paper 中的所有实验，请切换至本 repo 的 `repro` 分支。
+若希望复现 paper 中的所有实验，请切换至本 repo 的 `repro` 分支, 地址为[ernie-gram](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gram)。
 
 ### 文献引用
 

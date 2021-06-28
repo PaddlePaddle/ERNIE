@@ -96,7 +96,7 @@ try eager execution with `dygraph model` :
 
  - See **ERNIE-Gram** paper [Appendix B.1-4](https://arxiv.org/abs/2010.12148)
 
-For full reproduction of paper results, please checkout to `repro` branch of this repo.
+For full reproduction of paper results, please checkout to `repro` branch of this repo, the site is at [ernie-gram](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gram).
 
 # Citation
 
