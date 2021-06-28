@@ -1,6 +1,6 @@
 English|[简体中文](./README.zh.md)
 
-`Remind`: *ERNIE-Gram* model has been officially released in [here](#3-download-pretrained-models-optional). Our reproduction codes will be released to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro) soon.
+`Remind`: *ERNIE-Gram* model has been officially released in [here](#3-download-pretrained-models-optional). Our reproduction codes have been released to [repro branch](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gram).
 
 
 ## _ERNIE-Gram_: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding
@@ -96,7 +96,7 @@ try eager execution with `dygraph model` :
 
  - See **ERNIE-Gram** paper [Appendix B.1-4](https://arxiv.org/abs/2010.12148)
 
-For full reproduction of paper results, please checkout to `repro` branch of this repo.
+For full reproduction of paper results, please checkout to `repro` branch of this repo, the site is at [ernie-gram](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-gram).
 
 # Citation
 
