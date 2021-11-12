@@ -290,7 +290,7 @@ class PretrainedModel(object):
         #    log.debug('load pretrained weight from program state')
         #    F.io.load_program_state(param_path) #buggy in dygraph.gurad, push paddle to fix
         if state_dict_path.exists():
-            m = P.load(state_dict_path)
+            m = P.load(str(state_dict_path))
             for k, v in model.state_dict().items():
                 if k not in m:
                     log.warn('param:%s not set in pretrained model, skip' % k)
