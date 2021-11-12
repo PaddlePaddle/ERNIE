@@ -249,10 +249,10 @@ with LogWriter(
                     log.debug('eval f1: %.5f' % f1)
                     log_writer.add_scalar('eval/f1', f1, step=step)
                     if args.save_dir is not None:
-                        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+                        P.save(model.state_dict(),str( args.save_dir / 'ckpt.bin'))
 
 f1 = evaluate(model, dev_ds)
 log.debug('final eval f1: %.5f' % f1)
 log_writer.add_scalar('eval/f1', f1, step=step)
 if args.save_dir is not None:
-    P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+    P.save(model.state_dict(),str( args.save_dir / 'ckpt.bin'))

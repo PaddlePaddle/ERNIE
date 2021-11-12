@@ -308,7 +308,7 @@ def seq2seq(model, tokenizer, args):
                 log.debug(msg)
 
             if args.save_dir is not None and step % 1000 == 0 and env.dev_id == 0:
-                P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+                P.save(model.state_dict(), str(args.save_dir / 'ckpt.bin'))
 
             if args.predict_output_dir is not None and step > args.skip_eval_steps and step % args.eval_steps == 0:
                 assert  args.predict_output_dir.exists(), \
@@ -320,7 +320,7 @@ def seq2seq(model, tokenizer, args):
         evaluate(model, dev_ds, step, args)
 
     if args.save_dir is not None:
-        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+        P.save(model.state_dict(),str( args.save_dir / 'ckpt.bin'))
 
 
 if __name__ == '__main__':
@@ -414,7 +414,7 @@ if __name__ == '__main__':
 
     if args.init_checkpoint is not None:
         log.info('loading checkpoint from %s' % args.init_checkpoint)
-        sd = P.load(args.init_checkpoint)
+        sd = P.load(str(args.init_checkpoint))
         ernie.set_state_dict(sd)
 
     seq2seq(ernie, tokenizer, args)

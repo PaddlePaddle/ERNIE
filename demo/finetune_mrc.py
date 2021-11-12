@@ -145,7 +145,7 @@ def train(model, train_dataset, dev_dataset, dev_examples, dev_features,
                 log.debug('[step %d] eval result: f1 %.5f em %.5f' %
                           (step, f1, em))
             if env.dev_id == 0 and args.save_dir is not None:
-                P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+                P.save(model.state_dict(), str(args.save_dir / 'ckpt.bin'))
             if step > max_steps:
                 break
 
@@ -244,4 +244,4 @@ if __name__ == "__main__":
                           tokenizer, args)
         log.debug('final eval result: f1 %.5f em %.5f' % (f1, em))
     if env.dev_id == 0 and args.save_dir is not None:
-        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+        P.save(model.state_dict(), str(args.save_dir / 'ckpt.bin'))

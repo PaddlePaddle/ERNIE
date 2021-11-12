@@ -153,7 +153,7 @@ if not os.path.exists('./teacher_model.bin'):
             if step % 100 == 0:
                 f1 = evaluate_teacher(teacher_model, dev_ds)
                 print('teacher f1: %.5f' % f1)
-    P.save(teacher_model.state_dict(), './teacher_model.bin')
+    P.save(teacher_model.state_dict(),str( './teacher_model.bin'))
 else:
     state_dict = P.load('./teacher_model.bin')
     teacher_model.set_state_dict(state_dict)

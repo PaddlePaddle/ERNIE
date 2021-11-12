@@ -177,9 +177,9 @@ if not args.eval:
                         log.debug('acc %.5f' % acc)
                         if args.save_dir is not None:
                             P.save(model.state_dict(),
-                                   args.save_dir / 'ckpt.bin')
+                                   str(args.save_dir / 'ckpt.bin'))
         if args.save_dir is not None:
-            P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+            P.save(model.state_dict(), str(args.save_dir / 'ckpt.bin'))
 else:
     feature_column = propeller.data.FeatureColumns([
         propeller.data.TextColumn(
@@ -189,7 +189,7 @@ else:
             tokenizer=tokenizer.tokenize),
     ])
 
-    sd = P.load(args.init_checkpoint)
+    sd = P.load(str(args.init_checkpoint))
     model.set_dict(sd)
     model.eval()
 
