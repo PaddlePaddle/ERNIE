@@ -8,7 +8,7 @@ import logging
 from itertools import accumulate
 from functools import reduce, partial, wraps
 from propeller import log
-from propeller.paddle.data import feature_pb2, example_pb2
+from propeller.data import feature_pb2, example_pb2
 #jfrom data_util import RawtextColumn
 
 import io
