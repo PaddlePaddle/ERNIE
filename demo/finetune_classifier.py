@@ -162,7 +162,7 @@ model = ErnieModelForSequenceClassification.from_pretrained(
 
 if args.init_checkpoint is not None:
     log.info('loading checkpoint from %s' % args.init_checkpoint)
-    sd = P.load(args.init_checkpoint)
+    sd = P.load(str(args.init_checkpoint))
     model.set_state_dict(sd)
 
 g_clip = P.nn.ClipGradByGlobalNorm(1.0)  #experimental
@@ -238,9 +238,9 @@ with LogWriter(
                     log_writer.add_scalar('eval/acc', acc, step=step)
                     log.debug('acc %.5f' % acc)
                     if args.save_dir is not None:
-                        P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+                        P.save(model.state_dict(), str(args.save_dir / 'ckpt.bin'))
 if args.save_dir is not None:
-    P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+    P.save(model.state_dict(),str( args.save_dir / 'ckpt.bin'))
 if args.inference_model_dir is not None:
 
     class InferenceModel(ErnieModelForSequenceClassification):

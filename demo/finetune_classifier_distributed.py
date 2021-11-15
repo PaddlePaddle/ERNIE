@@ -128,7 +128,7 @@ model = ErnieModelForSequenceClassification.from_pretrained(
 
 if args.init_checkpoint is not None:
     log.info('loading checkpoint from %s' % args.init_checkpoint)
-    sd = P.load(args.init_checkpoint)
+    sd = P.load(str(args.init_checkpoint))
     model.set_state_dict(sd)
 
 model = P.DataParallel(model)
@@ -195,11 +195,11 @@ with P.amp.auto_cast(enable=args.use_amp):
             #log_writer.add_scalar('eval/acc', acc, step=step)
             log.debug('acc %.5f' % acc)
             if args.save_dir is not None:
-                P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+                P.save(model.state_dict(),str( args.save_dir / 'ckpt.bin'))
         # exit 
         if step > args.max_steps:
             break
 
 if args.save_dir is not None and env.dev_id == 0:
-    P.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+    P.save(model.state_dict(),str( args.save_dir / 'ckpt.bin'))
 log.debug('done')

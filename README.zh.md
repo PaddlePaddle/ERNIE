@@ -173,7 +173,7 @@ data/xnli
 - 使用 `动态图` 模型进行finetune:
 
 ```script
-python3 ./ernie_d/demo/finetune_classifier.py \
+python3 ./demo/finetune_classifier.py \
        --from_pretrained ernie-1.0 \
        --data_dir ./data/xnli
 ```

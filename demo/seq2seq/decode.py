@@ -401,7 +401,7 @@ if __name__ == '__main__':
     rev_dict[tokenizer.pad_id] = ''  # replace [PAD]
     rev_dict[tokenizer.unk_id] = ''  # replace [PAD]
 
-    sd = P.load(args.save_dir)
+    sd = P.load(str(args.save_dir))
     ernie.set_state_dict(sd)
 
     def map_fn(src_ids):
