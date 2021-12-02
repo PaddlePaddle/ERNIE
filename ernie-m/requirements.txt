@@ -1,0 +1,3 @@
+six==1.16.0
+sentencepiece==0.1.96
+numpy==1.21.4
