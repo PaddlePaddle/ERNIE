@@ -12,6 +12,9 @@ ERNIE 2.0 builds a strong basic for nearly every NLP tasks: Text Classification,
 
 # News
 
+- Dec.03.2021:
+    - [`ERNIE-M`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-m) models are **avaliable** now!
+
 - May.20.2021:
     - [`ERNIE-Doc`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc), [`ERNIE-Gram`](./ernie-gram/), [`ERNIE-ViL`](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-vil) models are **avaliable** now!
     - `ERNIE-UNIMO` has been released in [here](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-unimo).
@@ -345,6 +348,17 @@ For details about distillation, see [here](./demo/distill/README.md)
   title={UNIMO: Towards Unified-Modal Understanding and Generation via Cross-Modal Contrastive Learning},
   author={Li, Wei and Gao, Can and Niu, Guocheng and Xiao, Xinyan and Liu, Hao and Liu, Jiachen and Wu, Hua and Wang, Haifeng},
   journal={arXiv preprint arXiv:2012.15409},
+  year={2020}
+}
+```
+
+### ERNIE-M
+
+```
+@article{ouyang2020ernie,
+  title={Ernie-m: Enhanced multilingual representation by aligning cross-lingual semantics with monolingual corpora},
+  author={Ouyang, Xuan and Wang, Shuohuan and Pang, Chao and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2012.15674},
   year={2020}
 }
 ```

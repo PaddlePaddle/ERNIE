@@ -10,6 +10,9 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 # 新闻
 
+- 2021.12.3:
+  - 多语言预训练模型`ERNIE-M` [正式开源](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-m)
+
 - 2021.5.20:
    - ERNIE 最新开源四大预训练模型:
       - 多粒度语言知识模型`ERNIE-Gram` [正式开源](./ernie-gram/)
@@ -350,6 +353,17 @@ ids = np.expand_dims(ids, -1) # ids.shape==[BATCH, SEQLEN, 1]
   title={UNIMO: Towards Unified-Modal Understanding and Generation via Cross-Modal Contrastive Learning},
   author={Li, Wei and Gao, Can and Niu, Guocheng and Xiao, Xinyan and Liu, Hao and Liu, Jiachen and Wu, Hua and Wang, Haifeng},
   journal={arXiv preprint arXiv:2012.15409},
+  year={2020}
+}
+```
+
+### ERNIE-M
+
+```
+@article{ouyang2020ernie,
+  title={Ernie-m: Enhanced multilingual representation by aligning cross-lingual semantics with monolingual corpora},
+  author={Ouyang, Xuan and Wang, Shuohuan and Pang, Chao and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
+  journal={arXiv preprint arXiv:2012.15674},
   year={2020}
 }
 ```
