@@ -244,7 +244,7 @@ python3 -m paddle.distributed.launch \
 
 # 在线预测
 
-如果`finetune_classifier.py`中指定了`--inference_model_dir`参数，funetune脚本会将你的模型序列化并产出可以直接部署线上预测的`inference_model`.
+如果`finetune_classifier.py`中指定了`--inference_model_dir`参数，finetune脚本会将你的模型序列化并产出可以直接部署线上预测的`inference_model`.
 
 关于生产环境中使用线上预测代码的实现细节，请见[C++ inference API](./inference/README.md).
 或者你可以使用`propeller`启动一个多GPU预测服务(需要GPU环境)，只需执行：
