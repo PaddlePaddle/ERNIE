@@ -72,7 +72,7 @@ text_generation/
 
 - 进入指定任务的目录：./wenxin_appzoo/tasks/text_generation
 
-```json
+```
 cd ./wenxin_appzoo/tasks/text_generation
 ```
 
