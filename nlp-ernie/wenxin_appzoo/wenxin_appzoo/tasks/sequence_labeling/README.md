@@ -40,8 +40,8 @@
 
 ### 数据准备
 
-- 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg/readme.md)」进行处理。
-- 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning/readme.md)」进行格式转换。
+- 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg/README.md)」进行处理。
+- 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning/README.md)」进行格式转换。
 - 文心中的训练集、测试集、验证集、预测集和词表分别存放在./wenxin_appzoo/tasks/sequence_labeling/data目录下的train_data、test_data、dev_data、predict_data、dict文件夹下。
 
 #### 训练集/测试集/验证集文件格式
@@ -98,7 +98,7 @@ B-PER   0
 
 ### ERNIE预训练模型下载
 
-- 文心提供的[ERNIE预训练模型](../../../../../readme_model.md)的参数文件和配置文件在wenxin_appzoo/models_hub目录下，由对应的download_xx.sh文件是下载得到，包括模型的参数文件、配置文件以及词表等。
+- 文心提供的[ERNIE预训练模型](../../../../../README_MODEL.md)的参数文件和配置文件在wenxin_appzoo/models_hub目录下，由对应的download_xx.sh文件是下载得到，包括模型的参数文件、配置文件以及词表等。
 
 | 模型名称        | 下载脚本                           | 备注                                       |
 | --------------- | ---------------------------------- | ------------------------------------------ |

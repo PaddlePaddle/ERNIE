@@ -49,7 +49,7 @@ ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框
 
 # 环境安装
 
-1. 安装环境依赖：[环境安装](./readme_env.md)
+1. 安装环境依赖：[环境安装](./README_ENV.md)
 2. 安装Ernie套件
 
 ```plain
@@ -148,7 +148,7 @@ python run_infer.py --param_path ./examples/cls_enrie_fc_ch_infer.json
 
 # 预训练模型介绍
 
-- 参考预训练模型原理介绍:[模型介绍](readme_model.md)
+- 参考预训练模型原理介绍:[模型介绍](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/models_hub/README.md)
 - 预训练模型下载：进入./wenxin_appzoo/models_hub目录下,下载示例：
 
 ```plain
@@ -162,7 +162,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 # 模型效果评估
 
-[模型效果评估](readme_score.md)
+[模型效果评估](README_SCORE.md)
 
 # 数据集下载
 
@@ -192,7 +192,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE 1.0
 
-```json
+```
 @article{sun2019ernie,
   title={Ernie: Enhanced representation through knowledge integration},
   author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Chen, Xuyi and Zhang, Han and Tian, Xin and Zhu, Danxiang and Tian, Hao and Wu, Hua},
@@ -203,7 +203,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE 2.0
 
-```json
+```
 @inproceedings{sun2020ernie,
   title={Ernie 2.0: A continual pre-training framework for language understanding},
   author={Sun, Yu and Wang, Shuohuan and Li, Yukun and Feng, Shikun and Tian, Hao and Wu, Hua and Wang, Haifeng},
@@ -217,7 +217,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE-GEN
 
-```json
+```
 @article{xiao2020ernie,
   title={Ernie-gen: An enhanced multi-flow pre-training and fine-tuning framework for natural language generation},
   author={Xiao, Dongling and Zhang, Han and Li, Yukun and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
@@ -228,7 +228,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE-ViL
 
-```json
+```
 @article{yu2020ernie,
   title={Ernie-vil: Knowledge enhanced vision-language representations through scene graph},
   author={Yu, Fei and Tang, Jiji and Yin, Weichong and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
@@ -239,7 +239,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE-Gram
 
-```json
+```
 @article{xiao2020ernie,
   title={ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding},
   author={Xiao, Dongling and Li, Yu-Kun and Zhang, Han and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
@@ -250,7 +250,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE-Doc
 
-```json
+```
 @article{ding2020ernie,
   title={ERNIE-Doc: A retrospective long-document modeling transformer},
   author={Ding, Siyu and Shang, Junyuan and Wang, Shuohuan and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
@@ -261,7 +261,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE-UNIMO
 
-```json
+```
 @article{li2020unimo,
   title={Unimo: Towards unified-modal understanding and generation via cross-modal contrastive learning},
   author={Li, Wei and Gao, Can and Niu, Guocheng and Xiao, Xinyan and Liu, Hao and Liu, Jiachen and Wu, Hua and Wang, Haifeng},
@@ -272,7 +272,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 ### ERNIE-M
 
-```json
+```
 @article{ouyang2020ernie,
   title={Ernie-m: Enhanced multilingual representation by aligning cross-lingual semantics with monolingual corpora},
   author={Ouyang, Xuan and Wang, Shuohuan and Pang, Chao and Sun, Yu and Tian, Hao and Wu, Hua and Wang, Haifeng},
