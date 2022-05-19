@@ -128,7 +128,7 @@ fleetrun --gpus=x,y run_trainer.py./examples/cls_ernie_fc_ch.json
 - 其预置json文件在./examples/目录下，使用ERNIE2.0预训练模型训练的模型进行预测的配置文件为的./examples/cls_ernie_fc_ch_infer.json
 - 主要修改./examples/cls_ernie_fc_ch_infer.json文件的预测模型的输入路径、预测文件的输入路径、预测结果的输出路径，对应修改配置如下：
 
-```json
+```
 {
 "dataset_reader":{"train_reader":{"config":{"data_path":"./data/predict_data"}}},
 "inference":{"inference_model_path":"./output/cls_ernie_fc_ch/save_inference_model/inference_step_251",
