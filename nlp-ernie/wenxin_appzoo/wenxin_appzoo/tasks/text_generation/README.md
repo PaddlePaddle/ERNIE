@@ -59,7 +59,7 @@ text_generation/
 
 ### ERNIE预训练模型下载
 
-- 文心提供的[ERNIE预训练模型](../../../../../README_MODEL.md)的参数文件和配置文件在 wenxin_appzoo/wenxin_appzoo/models_hub目录下，使用对应的sh脚本，即可拉取对应的模型、字典、必要环境等文件。
+- 文心提供的[ERNIE预训练模型](../../models_hub/README.md)的参数文件和配置文件在 wenxin_appzoo/wenxin_appzoo/models_hub目录下，使用对应的sh脚本，即可拉取对应的模型、字典、必要环境等文件。
 
 | 模型名称  | 下载脚本                         | 备注                                                     |
 | --------- | -------------------------------- | -------------------------------------------------------- |
