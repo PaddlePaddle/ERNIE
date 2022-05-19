@@ -201,7 +201,7 @@ python run_trainer_ernie_gen.py --param_path ./examples/cls_ernie_gen_infilling_
 - 配置文件：./examples/cls_ernie_gen_infilling_ch_infer.json
 - 在配置文件./examples/cls_ernie_gen_infilling_ch_infer.json中需要更改 inference.inference_model_path 为上面训练过程中所保存的**预测模型的路径**
 
-```json
+```
 {
   "dataset_reader": {
     "predict_reader": {
