@@ -1,0 +1,217 @@
+{
+  "dataset_reader": {
+    "train_reader": {
+      "name": "train_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "FullTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        },
+        {
+          "name": "label",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieSeqlabelLabelFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "O",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./dict/vocab_label_map.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        }
+      ],
+      "config": {
+        "data_path": "./data/train_data",
+        "shuffle": false,
+        "batch_size": 1,
+        "epoch": 30,
+        "sampling_rate": 1.0,
+        "need_data_distribute": true,
+        "need_generate_examples": false
+      }
+    },
+    "test_reader": {
+      "name": "test_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "FullTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        },
+        {
+          "name": "label",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieSeqlabelLabelFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "O",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./dict/vocab_label_map.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": {
+            "type": "CustomFluidTokenEmbedding",
+            "use_reader_emb": false,
+            "emb_dim": 128
+          }
+        }
+      ],
+      "config": {
+        "data_path": "./data/test_data",
+        "shuffle": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": false
+      }
+    },
+    "dev_reader": {
+      "name": "dev_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "FullTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        },
+        {
+          "name": "label",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieSeqlabelLabelFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "O",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./dict/vocab_label_map.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": {
+            "type": "CustomFluidTokenEmbedding",
+            "use_reader_emb": false,
+            "emb_dim": 128
+          }
+        }
+      ],
+      "config": {
+        "data_path": "./data/dev_data",
+        "shuffle": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": false
+      }
+    }
+  },
+  "model": {
+    "type": "ErnieFcSeqLabel",
+    "is_dygraph": 1,
+    "optimization": {
+      "learning_rate": 5e-05,
+      "use_lr_decay": true,
+      "warmup_steps": 0,
+      "warmup_proportion": 0.1,
+      "weight_decay": 0.01,
+      "use_dynamic_loss_scaling": false,
+      "init_loss_scaling": 128,
+      "incr_every_n_steps": 100,
+      "decr_every_n_nan_or_inf": 2,
+      "incr_ratio": 2.0,
+      "decr_ratio": 0.8
+    },
+    "embedding": {
+      "config_path": "../../models_hub/ernie_3.0_base_ch_dir/ernie_config.json"
+    },
+    "vocab_path": "./dict/vocab_label_map.txt"
+  },
+  "trainer": {
+    "type": "CustomDynamicTrainer",
+    "PADDLE_PLACE_TYPE": "gpu",
+    "PADDLE_IS_FLEET": 0,
+    "train_log_step": 10,
+    "use_amp": true,
+    "is_eval_dev": 0,
+    "is_eval_test": 1,
+    "eval_step": 100,
+    "save_model_step": 1000,
+    "load_parameters": "",
+    "load_checkpoint": "",
+    "pre_train_model": [
+      {
+        "name": "ernie_3.0_base_ch",
+        "params_path": "../../models_hub/ernie_3.0_base_ch_dir/params"
+      }
+    ],
+    "output_path": "./output/seqlab_ernie_3.0_base_fc_ch",
+    "extra_param": {
+      "meta":{
+        "job_type": "sequence_labeling"
+      }
+    }
+  }
+}

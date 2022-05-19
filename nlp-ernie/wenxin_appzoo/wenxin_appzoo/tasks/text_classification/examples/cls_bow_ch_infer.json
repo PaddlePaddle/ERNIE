@@ -1,0 +1,54 @@
+{
+  "dataset_reader": {
+    "predict_reader": {
+      "name": "predict_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "CustomTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./data/dict/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        }
+      ],
+      "config": {
+        "data_path": "./data/predict_data",
+        "shuffle": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": true,
+        "key_tag": false
+      }
+    }
+  },
+
+  "inference": {
+    "type": "CustomInference",
+    "output_path": "./output/predict_result.txt",
+    "PADDLE_PLACE_TYPE": "cpu",
+    "num_labels": 2,
+    "thread_num": 2,
+    "inference_model_path": "./output/cls_bow_ch/save_inference_model_0/inference_step_381/",
+    "extra_param": {
+      "meta":{
+        "job_type": "text_classification"
+      }
+
+    }
+  }
+}

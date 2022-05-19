@@ -1,0 +1,59 @@
+{
+  "dataset_reader": {
+    "predict_reader": {
+     "name": "predict_reader",
+     "type": "BasicDataSetReader",
+     "fields" : [
+       {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {"type":"ErnieTextFieldReaderForMultilingual"},
+          "tokenizer":{
+              "type":"FullTokenizerErnieM",
+              "split_char":" ",
+              "unk_token":"[UNK]",
+              "params":{
+                "do_lower_case": "false",
+                "spm_model_file": "./data/dict/sentencepiece.bpe.model"
+              }
+            },
+          "need_convert": true,
+          "vocab_path": "../../models_hub/ernie_m_1.0_base_dir/erniem.vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 1,
+          "embedding": {
+            "type":"ErnieTokenEmbedding",
+            "use_reader_emb":false,
+            "emb_dim":768,
+            "config_path":"../../models_hub/ernie_m_1.0_base_dir/ernie_m_1.0_base_config.json"
+          }
+       }
+      ],
+      "config": {
+        "data_path": "./data/predict_data_one_sent_multilingual",
+        "shuffle": false,
+        "key_tag": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": true
+      }
+    }
+  },
+
+  "inference": {
+    "output_path": "./output/predict_result.txt",
+    "inference_model_path": "./output/cls_ernie_m_1.0_base_one_sent/save_inference_model/inference_step_100",
+    "PADDLE_PLACE_TYPE": "gpu",
+    "num_labels": 2,
+    "thread_num": 2,
+    "extra_param": {
+      "meta":{
+        "job_type": "text_classification"
+      }
+
+    }
+  }
+}

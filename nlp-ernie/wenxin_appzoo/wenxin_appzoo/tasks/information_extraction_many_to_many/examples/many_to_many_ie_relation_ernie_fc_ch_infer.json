@@ -1,0 +1,39 @@
+{
+  "dataset_reader": {
+      "predict_reader": {
+          "name": "predict_reader",
+          "type": "IEReader",
+          "fields": [],
+          "config": {
+              "data_path": "./data/entity_relation_data/predict_data/",
+              "shuffle": false,
+              "batch_size": 2,
+              "epoch": 1,
+              "sampling_rate": 1.0,
+              "extra_params": {
+                  "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+                  "label_map_config": "./dict/entity_relation_label_map.json",
+                  "num_labels": 12,
+                  "max_seq_len": 512,
+                  "do_lower_case":true,
+                  "in_tokens":false,
+                  "tokenizer": "FullTokenizer",
+                  "need_data_distribute": false,
+                  "need_generate_examples": true
+              }
+          }
+      }
+  },
+
+  "inference": {
+      "output_path": "./output/predict_result.txt",
+      "label_map_config": "./dict/entity_relation_label_map.json",
+      "PADDLE_PLACE_TYPE": "gpu",
+      "inference_model_path": "./output/ie_relation_ernie_3.0_base_fc_ch/save_inference_model/inference_step_1000",
+      "extra_param": {
+          "meta": {
+              "job_type": "information_extraction"
+          }
+      }
+  }
+}
