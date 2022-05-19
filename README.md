@@ -58,7 +58,7 @@ git clone https://github.com/PaddlePaddle/ERNIE.git
 
 # 快速上手：使用文心ERNIE大模型进行训练
 
-- 使用ERNIE2.0作为预训练模型，准备工作包括：
+- 使用ERNIE3.0作为预训练模型，准备工作包括：
   - 下载模型
   - 准备数据
   - 配置训练json文件
@@ -69,15 +69,15 @@ git clone https://github.com/PaddlePaddle/ERNIE.git
 
 ## 下载模型
 
-- 使用ERNIE2.0预训练模型进行文本分类任务
-- ERNNIE2.0预训练模型的下载与配置
+- 使用ERNIE3.0预训练模型进行文本分类任务
+- ERNNIE3.0预训练模型的下载与配置
 
 ```plain
-# ernie_2.0 模型下载
+# ernie_3.0 模型下载
 # 进入models_hub目录
-cd ./wenxin_appzoo/models_hub
+cd ./nlp-ernie/wenxin_appzoo/wenxin_appzoo/models_hub
 # 运行下载脚本
-sh download_ernie_2.0_base_ch.sh
+sh download_ernie_3.0_base_ch.sh
 ```
 
 ## 准备数据
@@ -87,7 +87,7 @@ sh download_ernie_2.0_base_ch.sh
 
 ```shell
 #进入文本分类任务文件夹
-cd ./wenxin_appzoo/tasks/text_classification/
+cd ./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/
 #查看文本分类任务自带数据集
 ls ./data
 ```
@@ -96,10 +96,10 @@ ls ./data
 
 ## 配置训练json文件
 
-- 其预置json文件在./examples/目录下，使用ERNIE2.0预训练模型进行训练的配置文件为的./examples/cls_ernie_fc_ch.json，在该json文件中对数据、模型、训练方式等逻辑进行了配置。
+- 其预置json文件在./examples/目录下，使用ERNIE3.0预训练模型进行训练的配置文件为的./examples/cls_ernie_fc_ch.json，在该json文件中对数据、模型、训练方式等逻辑进行了配置。
 
 ```shell
-#查看 ERNIE2.0预训练模型 训练文本分类任务的配置文件
+#查看 ERNIE3.0预训练模型 训练文本分类任务的配置文件
 cat ./examples/cls_ernie_fc_ch.json
 ```
 
