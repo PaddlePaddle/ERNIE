@@ -4,7 +4,7 @@
 
 - 进入分类任务的目录./wenxin_appzoo/tasks/text_classification
 
-```json
+```
 cd ./wenxin_appzoo/tasks/text_classification
 ```
 
@@ -12,7 +12,7 @@ cd ./wenxin_appzoo/tasks/text_classification
 
 - 模型均存放于wenxin_appzoo/wenxin_appzoo/models_hub文件夹下，进入该文件夹下载对应ERNIE-M模型
 
-```json
+```
 cd ../../models_hub
 sh download_ernie_m_1.0_base.sh
 cd ../tasks/text_classification
