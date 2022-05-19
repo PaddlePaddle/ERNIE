@@ -190,10 +190,10 @@
 
 - 文心预置的可用于文本分类的模型源文件在wenxin_appzoo/tasks/text_matching/model目录下，在介绍具体的模型前先对文本匹配网络涉及到的概念进行描述。
 
-|           | 单塔                                                         | 双塔                                                         |
-| --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Pointwise | ![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=d073cf2950254c4e96d9184602bb387f) | ![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=a2f5a0e365aa43ea8de78aab336a74d4) |
-| Pairwise  | ![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=e6e4bd559f28483b91936b462cbe9f05) | ![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=4612d2dc25434aa291b1cfd8ceb38a25) |
+|           | 单塔            | 双塔            |
+| --------- | --------------- | --------------- |
+| Pointwise | ![img](./1.png) | ![img](./2.png) |
+| Pairwise  | ![img](./3.png) | ![img](./4.png) |
 
 - Pointwise/Pairwise
   - Pointwise：输入两个文本和一个标签，可看作为一个分类问题，即判断输入的两个文本是否匹配。
