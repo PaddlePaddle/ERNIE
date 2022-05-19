@@ -121,7 +121,7 @@ B-PER   0
 
 - 进入制定任务目录 ./wenxin_appzoo/tasks/sequence_labeling
 
-```json
+```
 cd ./wenxin_appzoo/tasks/sequence_labeling
 ```
 
