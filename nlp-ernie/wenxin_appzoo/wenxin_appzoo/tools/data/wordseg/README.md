@@ -12,7 +12,7 @@ pip install lac
 
 - 运行脚本 wordseg_lac.py：
 
-```json
+```
  python wordseg_lac.py -i "输入文件夹的目录" -o "输出文件的目录"
 ```
 
