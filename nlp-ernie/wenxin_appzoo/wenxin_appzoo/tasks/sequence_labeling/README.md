@@ -6,7 +6,7 @@
 
 - 序列标注任务位于 ./wenxin_appzoo/tasks/sequence_labeling
 
-```json
+```
 .
 ├── data                                                                                    ### 示例数据文件夹，包括各任务所需的训练集、测试集、验证集和预测集
 │   ├── dev_data
@@ -121,7 +121,7 @@ B-PER   0
 
 - 进入制定任务目录 ./wenxin_appzoo/tasks/sequence_labeling
 
-```json
+```
 cd ./wenxin_appzoo/tasks/sequence_labeling
 ```
 
@@ -129,7 +129,7 @@ cd ./wenxin_appzoo/tasks/sequence_labeling
 
 - 配置文件：./examples/seqlab_ernie_fc_ch.json
 
-```json
+```
 {
   "dataset_reader": {                                  
     "train_reader": {                                   ### 训练、验证、测试各自基于不同的数据集，数据格式也可能不一样，可以在json中配置不同的reader，此处为训练集的reader。
@@ -227,7 +227,7 @@ cd ./wenxin_appzoo/tasks/sequence_labeling
 
 ### 训练ERNIE模型
 
-```json
+```
 python run_trainer.py --param_path ./examples/seqlab_ernie_fc_ch.json
 ```
 

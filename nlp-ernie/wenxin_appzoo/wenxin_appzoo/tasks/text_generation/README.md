@@ -1,6 +1,7 @@
 # 文本生成
 
 - 文本生成是自然语言处理中一个重要的研究领域，具有广阔的应用前景。简单来说，模型接受源文本（source text）输入，完成目标文本（target text）输出。经典地应用场景如对话生成、翻译、摘要、纠错、改写、Text2SQL、生成式问答、问题生成等。
+- 目前文本生成任务只支持单机单卡。
 
 ## 代码结构
 
@@ -72,7 +73,7 @@ text_generation/
 
 - 进入指定任务的目录：./wenxin_appzoo/tasks/text_generation
 
-```json
+```
 cd ./wenxin_appzoo/tasks/text_generation
 ```
 
@@ -201,7 +202,7 @@ python run_trainer_ernie_gen.py --param_path ./examples/cls_ernie_gen_infilling_
 - 配置文件：./examples/cls_ernie_gen_infilling_ch_infer.json
 - 在配置文件./examples/cls_ernie_gen_infilling_ch_infer.json中需要更改 inference.inference_model_path 为上面训练过程中所保存的**预测模型的路径**
 
-```json
+```
 {
   "dataset_reader": {
     "predict_reader": {
