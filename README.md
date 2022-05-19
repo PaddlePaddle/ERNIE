@@ -174,7 +174,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 # 应用场景
 
-文本分类（[文本分类](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/readme.md)）
+文本分类（[文本分类](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/README.md)）
 
 文本匹配（[文本匹配](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_matching/readme.md)）
 
