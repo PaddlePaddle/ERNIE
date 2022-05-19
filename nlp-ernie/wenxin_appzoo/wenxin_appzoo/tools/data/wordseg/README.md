@@ -41,7 +41,7 @@ python build_voc.py -i "分好词的数据集目录路径" -o "生成的词表�
 
 - build_voc.py脚本的传参说明：
 
-```json
+```
 输入：
     python build_voc.py -h
 输出：
