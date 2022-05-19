@@ -1,0 +1,96 @@
+{
+  "dataset_reader": {
+    "train_reader": {
+      "name": "train_reader",
+      "type": "IEReader",
+      "fields": [],
+      "config": {
+        "data_path": "./data/entity_relation_data/train_data/",
+        "shuffle": false,
+        "batch_size": 2,
+        "epoch": 5,
+        "sampling_rate": 1.0,
+        "need_data_distribute": true,
+        "need_generate_examples": false,
+        "extra_params": {
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "label_map_config": "./dict/entity_relation_label_map.json",
+          "num_labels": 12,
+          "max_seq_len": 512,
+          "do_lower_case":true,
+          "in_tokens":false,
+          "tokenizer": "FullTokenizer"
+        }
+      }
+    },
+    "test_reader": {
+      "name": "test_reader",
+      "type": "IEReader",
+      "fields": [],
+      "config": {
+        "data_path": "./data/entity_relation_data/test_data/",
+        "shuffle": false,
+        "batch_size": 2,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": false,
+        "extra_params": {
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "label_map_config": "./dict/entity_relation_label_map.json",
+          "num_labels": 12,
+          "max_seq_len": 512,
+          "do_lower_case":true,
+          "in_tokens":false,
+          "tokenizer": "FullTokenizer"
+        }
+      }
+    }
+  },
+  "model": {
+    "type": "ErnieFcIe",
+    "is_dygraph":1,
+    "num_labels":12,
+    "optimization": {
+      "learning_rate": 5e-05,
+      "use_lr_decay": true,
+      "warmup_steps": 0,
+      "warmup_proportion": 0.1,
+      "weight_decay": 0.01,
+      "use_dynamic_loss_scaling": false,
+      "init_loss_scaling": 128,
+      "incr_every_n_steps": 100,
+      "decr_every_n_nan_or_inf": 2,
+      "incr_ratio": 2.0,
+      "decr_ratio": 0.8
+    },
+    "embedding": {
+      "config_path": "../../models_hub/ernie_3.0_base_ch_dir/ernie_config.json"
+    }
+  },
+  "trainer": {
+    "type": "CustomDynamicTrainer",
+    "PADDLE_PLACE_TYPE": "gpu",
+    "PADDLE_IS_FLEET": 0,
+    "train_log_step": 10,
+    "use_amp": true,
+    "is_eval_dev": 0,
+    "is_eval_test": 1,
+    "eval_step": 50,
+    "save_model_step": 100,
+    "load_parameters": "",
+    "load_checkpoint": "",
+    "pre_train_model": [
+      {
+        "name": "ernie_3.0_base_ch",
+        "params_path": "../../models_hub/ernie_3.0_base_ch_dir/params"
+      }
+    ],
+    "output_path": "./output/ie_relation_ernie_3.0_base_fc_ch",
+    "extra_param": {
+      "meta":{
+        "job_type": "entity_relation_extraction"
+      }
+    }
+  }
+}

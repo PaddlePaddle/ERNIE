@@ -1,0 +1,52 @@
+{
+  "dataset_reader": {
+    "predict_reader": {
+      "name": "predict_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "FullTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        }
+      ],
+      "config": {
+        "data_path": "./predict_input",
+        "shuffle": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": true
+      }
+    }
+  },
+
+  "inference": {
+    "output_path": "./output/predict_result.txt",
+    "PADDLE_PLACE_TYPE": "gpu",
+    "num_labels": 2,
+    "thread_num": 2,
+    "inference_model_path": "./output/cls_ernie_3.0_base_fc_ch_dy/save_inference_model/inference_step_4000/",
+    "extra_param": {
+      "meta":{
+        "job_type": "text_classification"
+      }
+
+    }
+  }
+}

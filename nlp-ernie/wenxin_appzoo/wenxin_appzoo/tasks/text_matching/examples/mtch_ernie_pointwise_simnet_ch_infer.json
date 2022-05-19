@@ -1,0 +1,68 @@
+{
+  "dataset_reader": {
+    "predict_reader": {
+      "name": "predict_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "FullTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0
+        },
+        {
+          "name": "text_b",
+          "data_type": "string",
+          "reader": {
+            "type": "ErnieTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "FullTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "../../models_hub/ernie_3.0_base_ch_dir/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0
+        }
+      ],
+      "config": {
+        "data_path": "./data/predict_data",
+        "shuffle": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": true
+      }
+    }
+  },
+
+  "inference": {
+    "output_path": "./output/predict_result.txt",
+    "PADDLE_PLACE_TYPE": "gpu",
+    "num_labels": 2,
+    "inference_model_path": "./output/mtch_ernie_3.0_base_pointwise_simnet_ch/save_inference_model/inference_step_1251",
+    "extra_param": {
+      "meta":{
+        "job_type": "text_matching"
+      }
+
+    }
+  }
+}

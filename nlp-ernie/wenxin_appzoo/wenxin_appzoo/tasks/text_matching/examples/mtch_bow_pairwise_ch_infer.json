@@ -1,0 +1,69 @@
+{
+  "dataset_reader": {
+    "predict_reader": {
+      "name": "predict_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "CustomTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./data/dict/vocab.txt",
+          "max_seq_len": 128,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        },
+        {
+          "name": "text_b",
+          "data_type": "string",
+          "reader": {
+            "type": "CustomTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./data/dict/vocab.txt",
+          "max_seq_len": 128,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        }
+      ],
+      "config": {
+        "data_path": "./data/predict_data_tokenized",
+        "shuffle": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": true
+      }
+    }
+  },
+  "inference": {
+    "output_path": "./output/predict_result.txt",
+    "PADDLE_PLACE_TYPE": "cpu",
+    "num_labels": 2,
+    "thread_num": 1,
+    "inference_model_path": "./output/mtch_bow_pairwise_ch/save_inference_model_0/inference_step_126/",
+    "extra_param": {
+      "meta":{
+        "job_type": "text_matching"
+      }
+    }
+  }
+}

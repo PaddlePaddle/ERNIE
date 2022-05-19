@@ -1,0 +1,71 @@
+{
+  "dataset_reader": {
+    "predict_reader": {
+      "name": "predict_reader",
+      "type": "InfillingGenReader",
+      "fields": [],
+      "config": {
+        "data_path": "./data/ernie_gen_dureader/test.tsv",
+        "shuffle": false,
+        "batch_size": 8,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": true,
+        "extra_params":{
+          "vocab_path":"../../models_hub/ernie_gen_ch_dir/vocab_ernie_gen_ch.txt",
+          "max_seq_len":512,
+          "do_lower_case":true,
+          "in_tokens":false,
+          "tokenizer": "FullTokenizer",
+          "tgt_type_id": 7,
+          "max_src_len": 320,
+          "max_tgt_len": 64,
+          "max_dec_len": 32
+        }
+      }
+    }
+  },
+  "model": {
+    "type": "ErnieInfillingGeneration",
+    "is_dygraph": 0,
+    "embedding": {
+      "emb_dim": 768,
+      "use_amp": false,
+      "config_path": "../../models_hub/ernie_gen_ch_dir/ernie_gen_ch_config.json"
+    },
+    "optimization":{
+      "learning_rate": 5e-5,
+      "use_lr_decay": true,
+      "use_default_decay": false,
+      "lr_scheduler": "linear_warmup_decay",
+      "epsilon": 1e-6,
+      "warmup_steps": 0,
+      "warmup_proportion": 0.1,
+      "weight_decay": 0.01,
+      "use_dynamic_loss_scaling": false,
+      "init_loss_scaling": 128,
+      "incr_every_n_steps": 100,
+      "decr_every_n_nan_or_inf": 2,
+      "incr_ratio": 2.0,
+      "decr_ratio": 0.8
+    },
+    "label_smooth": 0.1,
+    "beam_size": 4,
+    "weight_sharing": true,
+    "length_penalty": 1.0
+  },
+  "inference": {
+    "type": "CustomInference",
+    "output_path": "./output/predict_result.txt",
+    "PADDLE_PLACE_TYPE": "gpu",
+    "thread_num": 1,
+    "inference_model_path": "output/ernie_gen_ch/save_inference_model/inference_step_39421/",
+    "extra_param": {
+      "meta":{
+        "job_type": "text_generation"
+      }
+
+    }
+  }
+}

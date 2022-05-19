@@ -1,0 +1,130 @@
+{
+  "dataset_reader": {
+    "train_reader": {
+      "name": "train_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "CustomTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./distill/chnsenticorp/student/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0
+        },
+        {
+          "name": "label",
+          "data_type": "int",
+          "reader": {
+            "type": "ScalarFieldReader"
+          },
+          "tokenizer": null,
+          "need_convert": false,
+          "vocab_path": "",
+          "max_seq_len": 1,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        }
+      ],
+      "config": {
+        "data_path": "./distill/chnsenticorp/student/train/",
+        "shuffle": false,
+        "batch_size": 128,
+        "epoch": 5,
+        "sampling_rate": 1.0,
+        "need_data_distribute": true,
+        "need_generate_examples": false,
+        "key_tag": false
+      }
+    },
+    "dev_reader": {
+      "name": "dev_reader",
+      "type": "BasicDataSetReader",
+      "fields": [
+        {
+          "name": "text_a",
+          "data_type": "string",
+          "reader": {
+            "type": "CustomTextFieldReader"
+          },
+          "tokenizer": {
+            "type": "CustomTokenizer",
+            "split_char": " ",
+            "unk_token": "[UNK]",
+            "params": null
+          },
+          "need_convert": true,
+          "vocab_path": "./distill/chnsenticorp/student/vocab.txt",
+          "max_seq_len": 512,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        },
+        {
+          "name": "label",
+          "data_type": "int",
+          "reader": {
+            "type": "ScalarFieldReader"
+          },
+          "tokenizer": null,
+          "need_convert": false,
+          "vocab_path": "",
+          "max_seq_len": 1,
+          "truncation_type": 0,
+          "padding_id": 0,
+          "embedding": null
+        }
+      ],
+      "config": {
+        "data_path": "./distill/chnsenticorp/student/dev/",
+        "shuffle": false,
+        "batch_size": 128,
+        "epoch": 1,
+        "sampling_rate": 1.0,
+        "need_data_distribute": false,
+        "need_generate_examples": false,
+        "key_tag": false
+      }
+    }
+  },
+  "model": {
+    "type": "BowClassification",
+    "is_dygraph": 1,
+    "optimization": {
+      "learning_rate": 2e-05
+    },
+    "vocab_size": 33261,
+    "num_labels": 2
+  },
+  "trainer": {
+    "type": "CustomDynamicTrainer",
+    "PADDLE_PLACE_TYPE": "gpu",
+    "PADDLE_IS_FLEET": 0,
+    "train_log_step": 100,
+    "is_eval_dev": 1,
+    "is_eval_test": 0,
+    "eval_step": 100,
+    "save_model_step": 10000,
+    "load_parameters": "",
+    "load_checkpoint": "",
+    "pre_train_model": [],
+    "output_path": "./output/cls_bow_ch",
+    "extra_param": {
+      "meta":{
+        "job_type": "data_distillation_text_classification"
+      }
+
+    }
+  }
+}
