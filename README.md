@@ -158,7 +158,7 @@ cd ./wenxin_appzoo/models_hub
 sh downlaod_ernie3.0_base_ch.sh
 ```
 
-- 更多开源模型，见[Research](./Research/readme.md)
+- 更多开源模型，见[Research](./Research/README.md)
 
 # 模型效果评估
 
@@ -174,19 +174,19 @@ sh downlaod_ernie3.0_base_ch.sh
 
 # 应用场景
 
-文本分类（[文本分类](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/readme.md)）
+文本分类（[文本分类](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/README.md)）
 
 文本匹配（[文本匹配](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_matching/README.md)）
 
-系列标注（[序列标注](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/sequence_labeling/readme.md)）
+系列标注（[序列标注](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/sequence_labeling/README.md)）
 
-信息抽取（[信息抽取](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/information_extraction_many_to_many/readme.md)）
+信息抽取（[信息抽取](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/information_extraction_many_to_many/README.md)）
 
-文本生成（[文本生成](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_generation/readme.md)）
+文本生成（[文本生成](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_generation/README.md)）
 
-数据蒸馏（[数据蒸馏](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/data_distillation/readme.md)）
+数据蒸馏（[数据蒸馏](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/data_distillation/README.md)）
 
-工具使用（[工具使用](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tools/readme.md)）
+工具使用（[工具使用](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tools/README.md)）
 
 # 文献引用
 
