@@ -271,7 +271,7 @@ cd ./erniekit_appzoo/tasks/information_extraction_many_to_many
 
 - 基于示例的数据集，可以运行以下命令在训练集（train.txt）上进行模型训练，并在测试集（test.txt）上进行验证；
 
-```shell
+```
 python run_trainer.py --param_path ./examples/many_to_many_ie_attribute_ernie_fc_ch.json
 ```
 
@@ -287,7 +287,7 @@ python run_trainer.py --param_path ./examples/many_to_many_ie_attribute_ernie_fc
 - 配置文件：./examples/many_to_many_ie_attribute_ernie_fc_ch_infer.json
 - 在配置文件./examples/many_to_many_ie_attribute_ernie_fc_ch_infer.json中需要更改 inference.inference_model_path 为上面训练过程中所保存的**预测模型的路径**
 
-```json
+```
 {
   "dataset_reader": {
       "predict_reader": {
@@ -331,7 +331,7 @@ python run_trainer.py --param_path ./examples/many_to_many_ie_attribute_ernie_fc
 
 #### 预测ERNIE模型
 
-```plain
+```
 python run_infer.py --param_path ./examples/many_to_many_ie_relation_ernie_fc_ch_infer.json
 ```
 
