@@ -1,3 +1,11 @@
+ERNIE-SAT是可以同时处理中英文的跨语言的语音-语言跨模态大模型，其在语音编辑、个性化语音合成以及跨语言的语音合成等多个任务取得了领先效果。可以应用于语音编辑、个性化合成、语音克隆、同传翻译等一系列场景，该项目供研究使用。
+
+## 模型框架
+ERNIE-SAT中我们提出了两项创新：
+在预训练过程中将中英双语对应的音素作为输入，实现了跨语言、个性化的软音素映射；
+采用语言和语音的联合掩码学习实现了语言和语音的对齐：
+
+![framework](.meta/framework.png)
 
 ## 使用说明
 
@@ -7,7 +15,7 @@
 
 
 ### 2.预训练模型
-预训练模型ERNIE-SAT的模型如下所示(链接暂无):
+预训练模型ERNIE-SAT的模型如下所示:
 - [ERNIE-SAT_ZH](http://bj.bcebos.com/wenxin-models/model-ernie-sat-base-zh.tar.gz) 
 - [ERNIE-SAT_EN](http://bj.bcebos.com/wenxin-models/model-ernie-sat-base-en.tar.gz)  
 - [ERNIE-SAT_ZH_and_EN](http://bj.bcebos.com/wenxin-models/model-ernie-sat-base-en_zh.tar.gz) 
@@ -41,7 +49,7 @@ unzip fastspeech2_nosil_ljspeech_ckpt_0.5.zip
 ### 4.推理
 
 我们目前只开源了语音编辑、个性化语音合成、跨语言语音合成的推理代码，后续会逐步开源。
-注：当前采用的声码器版本与模型训练时版本（https://github.com/kan-bayashi/ParallelWaveGAN）在英文上存在差异，您可使用模型训练时版本作为您的声码器，模型将在后续更新中升级。
+注：当前采用的声码器版本与[模型训练时版本]（https://github.com/kan-bayashi/ParallelWaveGAN）在英文上存在差异，您可使用模型训练时版本作为您的声码器，模型将在后续更新中升级。
 
 我们提供特定音频文件, 以及其对应的文本、音素相关文件:
 - prompt_wav: 提供的音频文件
