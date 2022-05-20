@@ -1,0 +1,21 @@
+# en --> zh  的 clone
+python sedit_inference_0520.py \
+--task_name cross-lingual_clone \
+--model_name paddle_checkpoint_ench \
+--uid Prompt_003_new \
+--new_str '今天天气很好' \
+--prefix ./prompt/dev/ \
+--clone_prefix ./prompt/dev_aishell3/ \
+--clone_uid SSB07510054 \
+--source_language english \
+--target_language chinese \
+--output_name task_cross_lingual_pred.wav \
+--voc pwgan_aishell3 \
+--voc_config download/pwg_aishell3_ckpt_0.5/default.yaml \
+--voc_ckpt download/pwg_aishell3_ckpt_0.5/snapshot_iter_1000000.pdz \
+--voc_stat download/pwg_aishell3_ckpt_0.5/feats_stats.npy \
+--am fastspeech2_csmsc \
+--am_config download/fastspeech2_conformer_baker_ckpt_0.5/conformer.yaml \
+--am_ckpt download/fastspeech2_conformer_baker_ckpt_0.5/snapshot_iter_76000.pdz \
+--am_stat download/fastspeech2_conformer_baker_ckpt_0.5/speech_stats.npy \
+--phones_dict download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt
