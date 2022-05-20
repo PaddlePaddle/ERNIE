@@ -158,7 +158,7 @@ cd ./erniekit_appzoo/models_hub
 sh downlaod_ernie3.0_base_ch.sh
 ```
 
-- 更多开源模型，见[Research](./Research/README.md)
+- 更多开源模型，见[Research](./Research/)
 
 # 数据集下载
 
