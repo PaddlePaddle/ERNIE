@@ -2,7 +2,7 @@
 
 # ![ERNIE_milestone_20210519_zh](./.metas/ERNIE.png)
 
-文心大模型ERNIE是百度发布的产业级知识增强大模型，涵盖了NLP大模型和跨模态大模型。2019年3月，开源了国内首个开源预训练模型文心ERNIE 1.0，此后在语言与跨模态的理解和生成等领域取得一系列技术突破，并对外开源与开放了系列模型，助力大模型研究与产业化应用发展。文心大模型开发套件ERNIEKit，面向NLP工程师，提供全流程大模型开发与部署工具集，端到端、全方位发挥大模型效能。 提醒: ERNIE老版本代码已经迁移至repro分支，欢迎使用我们全新升级的基于动静结合的新版ERNIE套件进行开发。另外，也欢迎上[EasyDL](https://ai.baidu.com/easydl/pro)、[BML](https://ai.baidu.com/bml/app/overview)体验更丰富的功能。
+文心大模型ERNIE是百度发布的产业级知识增强大模型，涵盖了NLP大模型和跨模态大模型。2019年3月，开源了国内首个开源预训练模型文心ERNIE 1.0，此后在语言与跨模态的理解和生成等领域取得一系列技术突破，并对外开源与开放了系列模型，助力大模型研究与产业化应用发展。提醒: ERNIE老版本代码已经迁移至repro分支，欢迎使用我们全新升级的基于动静结合的新版ERNIE套件进行开发。另外，也欢迎上[EasyDL](https://ai.baidu.com/easydl/pro)、[BML](https://ai.baidu.com/bml/app/overview)体验更丰富的功能。
 [【了解更多】](https://wenxin.baidu.com/)
 
 # 开源Roadmap
