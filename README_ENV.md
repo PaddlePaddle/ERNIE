@@ -78,4 +78,4 @@ export FLAGS_memory_fraction_of_eager_deletion=1
 #alias pip= your pip path
 ```
 
-- 注意：如果需要多卡并行训练，需要先下载NCCL，下载地址：http://bj.bcebos.com/wenxin-models/nccl.tar.gz，然后在LD_LIBRARY_PATH中添加NCCL库的路径
+- 注意：如果需要多卡并行训练，需要先下载NCCL，下载地址：http://bj.bcebos.com/wenxin-models/nccl.tar.gz ，然后在LD_LIBRARY_PATH中添加NCCL库的路径
