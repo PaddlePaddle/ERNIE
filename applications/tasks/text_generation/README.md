@@ -5,7 +5,7 @@
 
 ## 代码结构
 
-- 文本生成任务位于 ./erniekit_appzoo/tasks/text_generation
+- 文本生成任务位于 ./applications/tasks/text_generation
 
 ```shell
 text_generation/
@@ -51,7 +51,7 @@ text_generation/
 
 ### 网络（模型）选择
 
-- 文心预置的可用于生成任务的模型源文件在./erniekit_appzoo/tasks/text_generation/model/目录下
+- 文心预置的可用于生成任务的模型源文件在./applications/tasks/text_generation/model/目录下
 
 | 网络名称（py文件的类型）                                | 简介                                                         | 支持类型             | 备注       |
 | ------------------------------------------------------- | ------------------------------------------------------------ | -------------------- | ---------- |
@@ -59,7 +59,7 @@ text_generation/
 
 ### ERNIE预训练模型下载
 
-- 文心提供的[ERNIE预训练模型](../../models_hub/README.md)的参数文件和配置文件在 erniekit_appzoo/erniekit_appzoo/models_hub目录下，使用对应的sh脚本，即可拉取对应的模型、字典、必要环境等文件。
+- 文心提供的[ERNIE预训练模型](../../models_hub)的参数文件和配置文件在 applications/applications/models_hub目录下，使用对应的sh脚本，即可拉取对应的模型、字典、必要环境等文件。
 
 | 模型名称  | 下载脚本                         | 备注                                                     |
 | --------- | -------------------------------- | -------------------------------------------------------- |
@@ -71,10 +71,10 @@ text_generation/
 
 ## 开始训练
 
-- 进入指定任务的目录：./erniekit_appzoo/tasks/text_generation
+- 进入指定任务的目录：./applications/tasks/text_generation
 
 ```
-cd ./erniekit_appzoo/tasks/text_generation
+cd ./applications/tasks/text_generation
 ```
 
 ### 训练的配置文件

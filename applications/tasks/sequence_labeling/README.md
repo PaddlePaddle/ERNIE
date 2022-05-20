@@ -4,7 +4,7 @@
 
 ## 代码结构
 
-- 序列标注任务位于 ./erniekit_appzoo/tasks/sequence_labeling
+- 序列标注任务位于 ./applications/tasks/sequence_labeling
 
 ```
 .
@@ -40,9 +40,9 @@
 
 ### 数据准备
 
-- 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg/README.md)」进行处理。
-- 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning/README.md)」进行格式转换。
-- 文心中的训练集、测试集、验证集、预测集和词表分别存放在./erniekit_appzoo/tasks/sequence_labeling/data目录下的train_data、test_data、dev_data、predict_data、dict文件夹下。
+- 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg)」进行处理。
+- 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning)」进行格式转换。
+- 文心中的训练集、测试集、验证集、预测集和词表分别存放在./applications/tasks/sequence_labeling/data目录下的train_data、test_data、dev_data、predict_data、dict文件夹下。
 
 #### 训练集/测试集/验证集文件格式
 
@@ -56,7 +56,7 @@
 
 #### 词表
 
-- 词表：./erniekit_appzoo/tasks/sequence_labeling/data/dict/vocab.txt 
+- 词表：./applications/tasks/sequence_labeling/data/dict/vocab.txt 
 - 词表文件：词表分为两列，第一列为词，第二列为id（从0开始），列与列之间用**\t**进行分隔，一般是vocab.txt文件。文心的词表中，[PAD]、[CLS]、[SEP]、[MASK]、[UNK]这5个词是必须要有的，若用户自备词表，需保证这5个词是存在的。
 
 ```plain
@@ -75,7 +75,7 @@
 
 #### 标签词表
 
-- 标签词表：./erniekit_appzoo/tasks/sequence_labeling/data/dict/vocab_label_map.txt
+- 标签词表：./applications/tasks/sequence_labeling/data/dict/vocab_label_map.txt
 - 标签词表文件：标签词表分为两列，第一列为词，第二列为id（从0开始），列与列之间用**\t**进行分隔，一般是vocab_label_map.txt文件。标签顺序需要满足对应的标签体系，比如下面是BIO的标签体系，同一类别的标签B要排在I前面，O排在整个标签词表的最后。
 
 ```plain
@@ -90,7 +90,7 @@ B-PER   0
 
 ### 网络（模型）选择
 
-- 文心预置的可用于序列标注的模型在erniekit_appzoo/tasks/sequence_labeling/model目录下，目前支持模型的特点如下所示：
+- 文心预置的可用于序列标注的模型在applications/tasks/sequence_labeling/model目录下，目前支持模型的特点如下所示：
 
 | 网络名称（py文件的类名）                    | 简介                                                         | 支持类型 | 支持预训练模型                                               | 备注 |
 | ------------------------------------------- | ------------------------------------------------------------ | -------- | ------------------------------------------------------------ | ---- |
@@ -98,7 +98,7 @@ B-PER   0
 
 ### ERNIE预训练模型下载
 
-- 文心提供的[ERNIE预训练模型](../../models_hub/README.md)的参数文件和配置文件在erniekit_appzoo/models_hub目录下，由对应的download_xx.sh文件是下载得到，包括模型的参数文件、配置文件以及词表等。
+- 文心提供的[ERNIE预训练模型](../../models_hub)的参数文件和配置文件在applications/models_hub目录下，由对应的download_xx.sh文件是下载得到，包括模型的参数文件、配置文件以及词表等。
 
 | 模型名称        | 下载脚本                           | 备注                                       |
 | --------------- | ---------------------------------- | ------------------------------------------ |
@@ -119,10 +119,10 @@ B-PER   0
 
 ## 开始训练
 
-- 进入制定任务目录 ./erniekit_appzoo/tasks/sequence_labeling
+- 进入制定任务目录 ./applications/tasks/sequence_labeling
 
 ```
-cd ./erniekit_appzoo/tasks/sequence_labeling
+cd ./applications/tasks/sequence_labeling
 ```
 
 ### 训练的配置文件

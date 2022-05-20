@@ -20,7 +20,7 @@
 
 ## 脚本运行（说明）
 
-开发套件用于数据增强的python脚本位于目录./erniekit_appzoo/tools/data_aug/data_aug.py
+开发套件用于数据增强的python脚本位于目录./applications/tools/data_aug/data_aug.py
 - 运行data_aug.py脚本
 
 ```shell
@@ -64,7 +64,7 @@ shell输出：
 - 进去下游任务（分类任务）
 
 ```java
-cd ./erniekit_appzoo/tasks/text_classification/
+cd ./applications/tasks/text_classification/
 ```
 
 - 一键启动数据增强和训练脚本

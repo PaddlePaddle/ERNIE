@@ -2,7 +2,7 @@
 
 ## 代码结构
 
-- 分类任务位于erniekit_appzoo/tasks/text_classification
+- 分类任务位于applications/tasks/text_classification
 
 ```plain
 .
@@ -79,7 +79,7 @@
 
 - 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg/README.md)」进行处理。
 - 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning/README.md)」进行格式转换。
-- 文心中的训练集、测试集、验证集、预测集和词表分别存放在./erniekit_appzoo/tasks/text_classification/data目录下的train_data、test_data、dev_data、predict_data、dict文件夹下。
+- 文心中的训练集、测试集、验证集、预测集和词表分别存放在./applications/tasks/text_classification/data目录下的train_data、test_data、dev_data、predict_data、dict文件夹下。
 - 在分类任务中，训练集、测试集和验证集的数据格式相同，数据分为两列，列与列之间用**\t**进行分隔。第一列为文本，第二列为标签。以下为示例：
 
 ### 单标签分类
@@ -158,7 +158,7 @@ USB接口 只有 2个 ， 太 少 了 点 ， 不能 接 太多 外 接 设备 �
 
 ## 网络（模型）选择
 
-文心预置的可用于文本分类的模型源文件在./erniekit_appzoo/tasks/text_classification/model目录下，各个模型的特点如下所示（后面章节会依次展示使用方法）：
+文心预置的可用于文本分类的模型源文件在./applications/tasks/text_classification/model目录下，各个模型的特点如下所示（后面章节会依次展示使用方法）：
 
 | 网络名称（py文件的类名）                                | 简介                                                         | 支持类型   | 支持预训练模型                                               | 备注 |
 | ------------------------------------------------------- | ------------------------------------------------------------ | ---------- | ------------------------------------------------------------ | ---- |
@@ -169,7 +169,7 @@ USB接口 只有 2个 ， 太 少 了 点 ， 不能 接 太多 外 接 设备 �
 
 ## ERNIE预训练模型下载
 
-文心提供的ERNIE预训练模型的参数文件和配置文件在./erniekit_appzoo/tasks/models_hub/目录下，由对应的download_xx.sh文件是下载得到。ERNIE部分模型介绍，请详见文档「[ERNIE模型介绍](../../models_hub/README.md)」
+文心提供的ERNIE预训练模型的参数文件和配置文件在./applications/tasks/models_hub/目录下，由对应的download_xx.sh文件是下载得到。ERNIE部分模型介绍，请详见文档「[ERNIE模型介绍](../../models_hub/README.md)」
 
 ## 模型评估指标选择
 

@@ -75,7 +75,7 @@ git clone https://github.com/PaddlePaddle/ERNIE.git
 ```plain
 # ernie_3.0 模型下载
 # 进入models_hub目录
-cd ./erniekit_appzoo/erniekit_appzoo/models_hub
+cd ./applications/models_hub
 # 运行下载脚本
 sh download_ernie_3.0_base_ch.sh
 ```
@@ -87,7 +87,7 @@ sh download_ernie_3.0_base_ch.sh
 
 ```shell
 #进入文本分类任务文件夹
-cd ./erniekit_appzoo/erniekit_appzoo/tasks/text_classification/
+cd ./applications/tasks/text_classification/
 #查看文本分类任务自带数据集
 ls ./data
 ```
@@ -148,12 +148,12 @@ python run_infer.py --param_path ./examples/cls_enrie_fc_ch_infer.json
 
 # 预训练模型介绍
 
-- 参考预训练模型原理介绍:[模型介绍](./erniekit_appzoo/erniekit_appzoo/models_hub/README.md)
-- 预训练模型下载：进入./erniekit_appzoo/models_hub目录下,下载示例：
+- 参考预训练模型原理介绍:[模型介绍](./applications/models_hub)
+- 预训练模型下载：进入./applications/models_hub目录下,下载示例：
 
 ```plain
 #进入预训练模型下载目录
-cd ./erniekit_appzoo/models_hub
+cd ./applications/models_hub
 #下载ERNIE3.0 base模型
 sh downlaod_ernie3.0_base_ch.sh
 ```
@@ -218,19 +218,19 @@ sh downlaod_ernie3.0_base_ch.sh
 
 # 应用场景
 
-文本分类（[文本分类](./erniekit_appzoo/erniekit_appzoo/tasks/text_classification)）
+文本分类（[文本分类](./applications/tasks/text_classification)）
 
-文本匹配（[文本匹配](./erniekit_appzoo/erniekit_appzoo/tasks/text_matching/README.md)）
+文本匹配（[文本匹配](./applications/tasks/text_matching)）
 
-系列标注（[序列标注](./erniekit_appzoo/erniekit_appzoo/tasks/sequence_labeling/README.md)）
+系列标注（[序列标注](./applications/tasks/sequence_labeling)）
 
-信息抽取（[信息抽取](./erniekit_appzoo/erniekit_appzoo/tasks/information_extraction_many_to_many/README.md)）
+信息抽取（[信息抽取](./applications/tasks/information_extraction_many_to_many)）
 
-文本生成（[文本生成](./erniekit_appzoo/erniekit_appzoo/tasks/text_generation/README.md)）
+文本生成（[文本生成](./applications/tasks/text_generation)）
 
-数据蒸馏（[数据蒸馏](./erniekit_appzoo/erniekit_appzoo/tasks/data_distillation/README.md)）
+数据蒸馏（[数据蒸馏](./applications/tasks/data_distillation)）
 
-工具使用（[工具使用](./erniekit_appzoo/erniekit_appzoo/tools/README.md)）
+工具使用（[工具使用](./applications/tools)）
 
 # 文献引用
 

@@ -6,7 +6,7 @@
 
 ## 代码结构
 
-- 数据蒸馏任务位于 erniekit_appzoo/tasks/data_distillation
+- 数据蒸馏任务位于 applications/tasks/data_distillation
 
 ```plain
 data_distillation/
@@ -47,7 +47,7 @@ data_distillation/
 
 ## 数据准备
 
-- 目前采用三种数据增强策略策略，对于不用的任务可以特定的比例混合。三种[数据增强](../../tools/data/data_aug/README.md)策略包括：
+- 目前采用三种数据增强策略策略，对于不用的任务可以特定的比例混合。三种[数据增强](../../tools/data/data_aug)策略包括：
   - 添加噪声：对原始样本中的词，以一定的概率（如0.1）替换为”UNK”标签
   - 同词性词替换：对原始样本中的所有词，以一定的概率（如0.1）替换为本数据集中随机一个同词性的词
   - N-sampling：从原始样本中，随机选取位置截取长度为m的片段作为新的样本，其中片段的长度m为0到原始样本长度之间的随机值
@@ -58,21 +58,21 @@ data_distillation/
 - 使用预置的ERNIE 3.0 base模型
 
 ```plain
-cd erniekit_appzoo/models_hub
+cd applications/models_hub
 bash download_ernie_3.0_base_ch.sh
 ```
 
 - 下载预置的原始数据以及增强数据。
 
 ```plain
-cd erniekit_appzoo/tasks/data_distillation/distill
+cd applications/tasks/data_distillation/distill
 bash download_data.sh
 ```
 
 - 运行以下命令，开始数据蒸馏
 
 ```plain
-cd erniekit_appzoo/tasks/data_distillation 
+cd applications/tasks/data_distillation 
 bash run_distill.sh
 ```
 
