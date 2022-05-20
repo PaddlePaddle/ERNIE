@@ -1,0 +1,14 @@
+nltk==3.4
+numpy==1.15.4
+six==1.15.0
+scikit-learn==0.20.3
+sentencepiece==0.1.83
+LAC==2.0.5
+# nltk_data.tar.gz 解压之后放在/home/work/目录下, 最后把erniekit目录下的nltk_data.tar.gz删掉
+# wget http://pip.baidu.com/root/pypi/+f/03f/f4eb6683374be/bottle-0.12.17-py3-none-any.whl#md5=03ff4eb6683374be97a07986c77914cb
+bottle==0.12.17
+gevent==20.12.0
+tqdm==4.46.0
+gensim==3.8.3
+pandas==1.1.5
+cleanlab==0.1.1
