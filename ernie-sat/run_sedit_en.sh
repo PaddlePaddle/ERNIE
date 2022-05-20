@@ -1,5 +1,7 @@
 # 纯英文的语音编辑
-python sedit_inference_0520.py \
+# 将p243_new对应的原始语音: For that reason cover should not be given. 编辑成'for that reason cover is impossible to be given.'对应的语音
+
+python inference.py \
 --task_name edit \
 --model_name paddle_checkpoint_en \
 --uid p243_new \
@@ -7,7 +9,7 @@ python sedit_inference_0520.py \
 --prefix ./prompt/dev/ \
 --source_language english \
 --target_language english \
---output_name task_edit_pred.wav \
+--output_name pred.wav \
 --voc pwgan_aishell3 \
 --voc_config download/pwg_aishell3_ckpt_0.5/default.yaml \
 --voc_ckpt download/pwg_aishell3_ckpt_0.5/snapshot_iter_1000000.pdz \

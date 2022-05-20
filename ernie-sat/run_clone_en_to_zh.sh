@@ -1,15 +1,15 @@
-# en --> zh  的 clone
-python sedit_inference_0520.py \
+# en --> zh  的 语音合成
+# 根据Prompt_003_new对应的语音: This was not the show for me. 来合成:  '今天天气很好'
+
+python inference.py \
 --task_name cross-lingual_clone \
 --model_name paddle_checkpoint_ench \
 --uid Prompt_003_new \
 --new_str '今天天气很好' \
 --prefix ./prompt/dev/ \
---clone_prefix ./prompt/dev_aishell3/ \
---clone_uid SSB07510054 \
 --source_language english \
 --target_language chinese \
---output_name task_cross_lingual_pred.wav \
+--output_name pred_zh.wav \
 --voc pwgan_aishell3 \
 --voc_config download/pwg_aishell3_ckpt_0.5/default.yaml \
 --voc_ckpt download/pwg_aishell3_ckpt_0.5/snapshot_iter_1000000.pdz \

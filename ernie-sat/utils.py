@@ -70,13 +70,15 @@ def get_voc_out(mel, target_language="chinese"):
     print("current vocoder: ", args.voc)
     with open(args.voc_config) as f:
         voc_config = CfgNode(yaml.safe_load(f))
+    # print(voc_config)
 
     voc_inference = get_voc_inference(args, voc_config)
 
     mel = paddle.to_tensor(mel)
+    # print("masked_mel: ", mel.shape)
     with paddle.no_grad():
         wav = voc_inference(mel)
-    print("shepe of wav (time x n_channels):%s"%wav.shape)   # (31800,1)
+    # print("shepe of wav (time x n_channels):%s"%wav.shape)   
     return np.squeeze(wav)
 
 # dygraph
@@ -134,6 +136,7 @@ def get_am_inference(args, am_config):
 
 def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300):
     args = parse_args()
+    # args = parser.parse_args(args=[])
     if args.ngpu == 0:
         paddle.set_device("cpu")
     elif args.ngpu > 0:
@@ -154,6 +157,7 @@ def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300
     # acoustic model
     am, am_inference, am_name, am_dataset,phn_id = get_am_inference(args, am_config)
     
+
     torch_phns = phns
     vocab_phones = {}
     for tone, id in phn_id:
@@ -165,15 +169,14 @@ def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300
     ]
     phone_ids = [vocab_phones[item] for item in phonemes]
     phone_ids_new = phone_ids
-    
     phone_ids_new.append(vocab_size-1)
     phone_ids_new = paddle.to_tensor(np.array(phone_ids_new, np.int64))
     normalized_mel, d_outs, p_outs, e_outs = am.inference(phone_ids_new, spk_id=None, spk_emb=None)
     pre_d_outs = d_outs
     phoneme_durations_new = pre_d_outs * hop_length / fs
     phoneme_durations_new = phoneme_durations_new.tolist()[:-1]
-
     return phoneme_durations_new
+
 
 
 def sentence2phns(sentence, target_language="en"):
