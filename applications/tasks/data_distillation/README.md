@@ -92,8 +92,8 @@ bash run_distill.sh
     - 使用 python run_trainer.py --param_path ./examples/cls_cnn_ch.json 训练student模型，其训练数据放在 `distill/chnsenticorp/student/train/` 中，part.0 为原监督数据，part.1 为 ERNIE 标注数据。
 
 - **注**：
- -  如果用户已经拥有了无监督数据，则可以将无监督数据放入 `distill/chnsenticorp/student/unsup_train_aug` 即可。
- - 需注意的是：因学生模型训练数据分别为原监督数据part.0和ERNIE标注数据part.1，通常情况下，两份数据文件大小不均衡。
+  - 如果用户已经拥有了无监督数据，则可以将无监督数据放入 `distill/chnsenticorp/student/unsup_train_aug` 即可。
+  - 需注意的是：因学生模型训练数据分别为原监督数据part.0和ERNIE标注数据part.1，通常情况下，两份数据文件大小不均衡。
 
 ## 效果验证
 
