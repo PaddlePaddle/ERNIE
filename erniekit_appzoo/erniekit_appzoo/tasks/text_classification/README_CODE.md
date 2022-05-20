@@ -169,7 +169,7 @@ USB接口 只有 2个 ， 太 少 了 点 ， 不能 接 太多 外 接 设备 �
 
 ## ERNIE预训练模型下载
 
-文心提供的ERNIE预训练模型的参数文件和配置文件在./erniekit_appzoo/tasks/models_hub/目录下，由对应的download_xx.sh文件是下载得到。ERNIE部分模型介绍，请详见文档「[ERNIE模型介绍](../../../../../README_MODEL.md)」
+文心提供的ERNIE预训练模型的参数文件和配置文件在./erniekit_appzoo/tasks/models_hub/目录下，由对应的download_xx.sh文件是下载得到。ERNIE部分模型介绍，请详见文档「[ERNIE模型介绍](../../models_hub/README.md)」
 
 ## 模型评估指标选择
 
