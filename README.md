@@ -1,6 +1,6 @@
 
 
-# ![ERNIE_milestone_20210519_zh](./ERNIE.png)
+# ![ERNIE_milestone_20210519_zh](./.metas/ERNIE.png)
 
 文心大模型ERNIE是百度发布的产业级知识增强大模型，涵盖了NLP大模型和跨模态大模型。知识增强是文心大模型的核心特色，其能够从大规模知识和海量无结构数据中融合学习，学习效率更高、效果更好，具有良好的可解释性。 百度是国内首个在预训练大模型上做出突破性工作的公司，早在2019年3月就发布了国内首个开源预训练模型文心ERNIE 1.0，此后在语言与跨模态的理解和生成等领域取得一系列技术突破，并在 GLUE、SuperGLUE、VCR、XTREME、DocVQA、SROIE、SemEval 等国际权威评测上斩获数十项冠军。文心ERNIE大模型核心技术荣获2021年度国家技术发明二等奖、2020年世界人工智能大会最高荣誉SAIL奖、中国人工智能学会优秀科技成果奖、相关创新成果也被国际顶级学术会议AAAI、ACL、EMNLP、IJCAI、NAACL收录。 文心大模型ERNIE已应用于百度搜索、信息流、智能音箱等互联网产品，显著提升了亿万用户的体验。 文心大模型ERNIE通过百度飞桨平台对外开源与开放，并通过百度智能云赋能工业、能源、金融、通信、媒体、教育等不同行业，促进各行各业的产业智能化升级。
 提醒: ERNIE老版本代码已经迁移至repro分支，欢迎使用我们全新升级的基于动静结合的新版ERNIE套件进行开发。另外，也欢迎上[EasyDL](https://ai.baidu.com/easydl/pro)、[BML](https://ai.baidu.com/bml/app/overview)体验更丰富的功能。
@@ -12,7 +12,7 @@
   - 最新开源ERNIE 3.0系列预训练模型:
     - 110M参数通用模型ERNIE 3.0 Base
     - 280M参数重量级通用模型ERNIE 3.0 XBase
-    - 74M轻量级通用模型ERNIE 3.0 Medium
+    - 24M轻量级通用模型ERNIE 3.0 Medium
   - 新增语音-语言跨模态模型ERNIE-SAT（链接待补充）
   - 新增ERNIE-Gen（中文）预训练模型，支持多类主流生成任务：主要包括摘要、问题生成、对话、问答
   - 动静结合的文心ERNIE开发套件：基于飞桨动态图功能，支持文心ERNIE模型动态图训练。您仅需要在模型训练开启前，修改一个参数配置，即可实现模型训练的动静切换。
@@ -75,7 +75,7 @@ git clone https://github.com/PaddlePaddle/ERNIE.git
 ```plain
 # ernie_3.0 模型下载
 # 进入models_hub目录
-cd ./nlp-ernie/wenxin_appzoo/wenxin_appzoo/models_hub
+cd ./erniekit_appzoo/erniekit_appzoo/models_hub
 # 运行下载脚本
 sh download_ernie_3.0_base_ch.sh
 ```
@@ -87,7 +87,7 @@ sh download_ernie_3.0_base_ch.sh
 
 ```shell
 #进入文本分类任务文件夹
-cd ./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/
+cd ./erniekit_appzoo/erniekit_appzoo/tasks/text_classification/
 #查看文本分类任务自带数据集
 ls ./data
 ```
@@ -148,21 +148,17 @@ python run_infer.py --param_path ./examples/cls_enrie_fc_ch_infer.json
 
 # 预训练模型介绍
 
-- 参考预训练模型原理介绍:[模型介绍](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/models_hub/README.md)
-- 预训练模型下载：进入./wenxin_appzoo/models_hub目录下,下载示例：
+- 参考预训练模型原理介绍:[模型介绍](./erniekit_appzoo/erniekit_appzoo/models_hub/README.md)
+- 预训练模型下载：进入./erniekit_appzoo/models_hub目录下,下载示例：
 
 ```plain
 #进入预训练模型下载目录
-cd ./wenxin_appzoo/models_hub
+cd ./erniekit_appzoo/models_hub
 #下载ERNIE3.0 base模型
 sh downlaod_ernie3.0_base_ch.sh
 ```
 
 - 更多开源模型，见[Research](./Research/README.md)
-
-# 模型效果评估
-
-[模型效果评估](./README_SOCRE.md)
 
 # 数据集下载
 
@@ -172,21 +168,69 @@ sh downlaod_ernie3.0_base_ch.sh
 
 [MSRA_NER数据集](https://ernie-github.cdn.bcebos.com/data-msra_ner.tar.gz)
 
+# 模型效果评估
+
+## 评估数据集
+
+- 分类和匹配采用[CLUE数据集](https://www.cluebenchmarks.com/)。
+
+## CLUE 评测结果:
+
+| 配置     | 模型                  | CLUEWSC2020 | IFLYTEK | TNEWS | AFQMC | CMNLI | CSL   | OCNLI | 平均值 |
+| -------- | --------------------- | ----------- | ------- | ----- | ----- | ----- | ----- | ----- | ------ |
+| 24L1024H | RoBERTa-wwm-ext-large | 90.79       | 62.02   | 59.33 | 76.00 | 83.88 | 83.67 | 78.81 | 76.36  |
+| 20L1024H | ERNIE 3.0-XBase       | 91.12       | 62.22   | 60.34 | 76.95 | 84.98 | 84.27 | 82.07 | 77.42  |
+| 12L768H  | RoBERTa-wwm-ext-base  | 88.55       | 61.22   | 58.08 | 74.75 | 81.66 | 81.63 | 77.25 | 74.73  |
+| 12L768H  | ERNIE 3.0-Base        | 88.18       | 60.72   | 58.73 | 76.53 | 80.31 | 83.30 | 83.65 | 75.63  |
+| 6L768H   | RBT6, Chinese         | 75.00       | 59.68   | 56.62 | 73.15 | 79.26 | 80.04 | 73.15 | 70.99  |
+| 6L768H   | ERNIE 3.0-Medium      | 79.93       | 60.14   | 57.16 | 74.56 | 80.87 | 81.23 | 77.02 | 72.99  |
+
+
+
+## **具体评测方式**
+
+1. 以上所有任务均基于 Grid Search 方式进行超参寻优。分类任务训练每间隔 100 steps 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
+2. 分类任务 Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5；因为 CLUEWSC2020 数据集较小，所以模型在该数据集上的效果对 batch_size 较敏感，所以对 CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索； 因为CLUEWSC2020 和 IFLYTEK 数据集对 dropout 概率值较为敏感，所以对 CLUEWSC2020 和 IFLYTEK 数据集评测时增加dropout_prob = 0.0 的超参搜索。
+
+## 下游任务的固定超参配置
+
+**分类和匹配任务:**
+
+| TASK              | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL  |
+| ----------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ---- |
+| epoch             | 3     | 3     | 3       | 2     | 5     | 50          | 5    |
+| max_seq_length    | 128   | 128   | 128     | 128   | 128   | 128         | 256  |
+| warmup_proportion | 0.1   | 0.1   | 0.1     | 0.1   | 0.1   | 0.1         | 0.1  |
+
+
+
+##  ERNIE模型Grid Search 最优超参
+
+
+
+| Model            | AFQMC           | TNEWS           | IFLYTEK         | CMNLI                           | OCNLI           | CLUEWSC2020                   | CSL             |
+| ---------------- | --------------- | --------------- | --------------- | ------------------------------- | --------------- | ----------------------------- | --------------- |
+| ERNIE 3.0-Medium | bsz_32_lr_2e-05 | bsz_16_lr_3e-05 | bsz_16_lr_5e-05 | bsz_16_lr_1e-05/bsz_64_lr_2e-05 | bsz_64_lr_2e-05 | bsz_8_lr_2e-05                | bsz_32_lr_1e-05 |
+| ERNIE 3.0-Base   | bsz_16_lr_2e-05 | bsz_64_lr_3e-05 | bsz_16_lr_5e-05 | bsz_16_lr_2e-05                 | bsz_16_lr_2e-05 | bsz_8_lr_2e-05(drop_out _0.1) | bsz_16_lr_3e-05 |
+| ERNIE 3.0-XBase  | bsz_16_lr_1e-05 | bsz_16_lr_2e-05 | bsz_16_lr_3e-05 | bsz_16_lr_1e-05                 | bsz_32_lr_2e-05 | bsz_8_lr_2e-05                | bsz_64_lr_1e-05 |
+
+
+
 # 应用场景
 
-文本分类（[文本分类](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/README.md)）
+文本分类（[文本分类](./erniekit_appzoo/erniekit_appzoo/tasks/text_classification/README.md)）
 
-文本匹配（[文本匹配](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_matching/README.md)）
+文本匹配（[文本匹配](./erniekit_appzoo/erniekit_appzoo/tasks/text_matching/README.md)）
 
-系列标注（[序列标注](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/sequence_labeling/README.md)）
+系列标注（[序列标注](./erniekit_appzoo/erniekit_appzoo/tasks/sequence_labeling/README.md)）
 
-信息抽取（[信息抽取](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/information_extraction_many_to_many/README.md)）
+信息抽取（[信息抽取](./erniekit_appzoo/erniekit_appzoo/tasks/information_extraction_many_to_many/README.md)）
 
-文本生成（[文本生成](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_generation/README.md)）
+文本生成（[文本生成](./erniekit_appzoo/erniekit_appzoo/tasks/text_generation/README.md)）
 
-数据蒸馏（[数据蒸馏](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/data_distillation/README.md)）
+数据蒸馏（[数据蒸馏](./erniekit_appzoo/erniekit_appzoo/tasks/data_distillation/README.md)）
 
-工具使用（[工具使用](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tools/README.md)）
+工具使用（[工具使用](./erniekit_appzoo/erniekit_appzoo/tools/README.md)）
 
 # 文献引用
 
@@ -280,3 +324,4 @@ sh downlaod_ernie3.0_base_ch.sh
   year={2020}
 }
 ```
+

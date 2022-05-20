@@ -1,6 +1,6 @@
 # 编码识别及转换工具
 
-文心中的所有文件要求必须是utf-8格式，包括所有的样本集、词表文件、label_map等映射文件。 文心提供了文件格式转换的工具，位置在./wenxin_appzoo/tools/data/data_cleaning
+文心中的所有文件要求必须是utf-8格式，包括所有的样本集、词表文件、label_map等映射文件。 文心提供了文件格式转换的工具，位置在./erniekit_appzoo/tools/data/data_cleaning
 - 识别输入文本的编码格式:
 
 ```plain

@@ -2,15 +2,15 @@
 
 ## 开始训练
 
-- 进入分类任务的目录./wenxin_appzoo/tasks/text_classification
+- 进入分类任务的目录./erniekit_appzoo/tasks/text_classification
 
 ```json
-cd ./wenxin_appzoo/tasks/text_classification
+cd ./erniekit_appzoo/tasks/text_classification
 ```
 
 ### 预训练模型准备
 
-- 模型均存放于wenxin_appzoo/wenxin_appzoo/models_hub文件夹下，进入该文件夹下载对应ERNIE-M模型
+- 模型均存放于./erniekit_appzoo/models_hub文件夹下，进入该文件夹下载对应ERNIE-M模型
 
 ```json
 cd ../../models_hub

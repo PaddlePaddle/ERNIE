@@ -21,7 +21,7 @@
 
 1. 准备数据：数据集的准备与通用的BOW分类任务一致，不再赘述，详细信息请移步[实战演练：使用文心进行模型训练](https://ai.baidu.com/ai-doc/ERNIE-Ultimate/Ekmlrorrp)。
 
-2. 配置参数：以wenxin_appzoo/tasks/text_classification/examples/cls_bow_ch.json为例，交叉验证仅需要在dataset_reader部分进行配置，其余部分与普通的训练任务一致。dataset_reader中k_fold相关参数为K折交叉验证的配置：
+2. 配置参数：以erniekit_appzoo/tasks/text_classification/examples/cls_bow_ch.json为例，交叉验证仅需要在dataset_reader部分进行配置，其余部分与普通的训练任务一致。dataset_reader中k_fold相关参数为K折交叉验证的配置：
 
    - num_fold表示需要将训练集拆成K折，num_fold的取值需要>=2；
 
@@ -64,7 +64,7 @@
     	}
 ```
 
-3. 启动训练：使用交叉验证进行训练的启动脚本与普通训练任务不一样，启动脚本为**run_with_preprocess.py**，该脚本的位置在wenxin_appzoo/tools/run_preprocess/目录下，可以拷贝到wenxin_appzoo/tasks/text_classification目录下使用，入参为上一步骤配置好k_fold参数的json文件，具体如下所示：
+3. 启动训练：使用交叉验证进行训练的启动脚本与普通训练任务不一样，启动脚本为**run_with_preprocess.py**，该脚本的位置在erniekit_appzoo/tools/run_preprocess/目录下，可以拷贝到erniekit_appzoo/tasks/text_classification目录下使用，入参为上一步骤配置好k_fold参数的json文件，具体如下所示：
 
 ```shell
 # BOW 中文文本分类模型

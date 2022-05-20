@@ -2,7 +2,7 @@
 
 ## 分词
 
-开发套件用于分词的python脚本位于目录./wenxin_appzoo/tools/data/wordseg/wordseg_lac.py：
+开发套件用于分词的python脚本位于目录./erniekit_appzoo/tools/data/wordseg/wordseg_lac.py：
 
 - 文心中集成了[LAC](https://www.paddlepaddle.org.cn/modelbasedetail/lac)分词工具，运行该脚本前，需要先下载分词工具[lac](https://github.com/baidu/lac)包，或者直接通过pip命令安装：
 
