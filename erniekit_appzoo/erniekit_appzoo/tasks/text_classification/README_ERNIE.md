@@ -4,7 +4,7 @@
 
 - 进入分类任务的目录./erniekit_appzoo/tasks/text_classification
 
-```json
+```
 cd ./erniekit_appzoo/tasks/text_classification
 ```
 
@@ -22,7 +22,7 @@ cd ../tasks/text_classification
 
 - 配置文件：./examples/cls_ernie_fc_ch.json
 
-```json
+```
 {
   "dataset_reader": {
     "train_reader": {
@@ -170,7 +170,7 @@ cd ../tasks/text_classification
 
 ## 训练ERNIE模型
 
-```json
+```
 python run_trainer.py --param_path ./examples/cls_ernie_fc_ch.json
 ```
 
@@ -184,7 +184,7 @@ python run_trainer.py --param_path ./examples/cls_ernie_fc_ch.json
 - 配置文件 ./examples/cls_ernie_fc_ch_infer.json
 - 在配置文件./examples/cls_ernie_fc_ch_infer.json中需要更改 inference.inference_model_path 为上面训练过程中所保存的**预测模型的路径**
 
-```json
+```
 {
   "dataset_reader": {
     "predict_reader": {
@@ -242,7 +242,7 @@ python run_trainer.py --param_path ./examples/cls_ernie_fc_ch.json
 
 ## ERNIE模型预测
 
-```shell
+```
 python ./run_infer.py  --param_path ./examples/cls_ernie_fc_ch_infer.json
 ```
 
