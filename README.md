@@ -12,7 +12,7 @@
   - 最新开源ERNIE 3.0系列预训练模型:
     - 110M参数通用模型ERNIE 3.0 Base
     - 280M参数重量级通用模型ERNIE 3.0 XBase
-    - 74M轻量级通用模型ERNIE 3.0 Medium
+    - 24M轻量级通用模型ERNIE 3.0 Medium
   - 新增语音-语言跨模态模型ERNIE-SAT（链接待补充）
   - 新增ERNIE-Gen（中文）预训练模型，支持多类主流生成任务：主要包括摘要、问题生成、对话、问答
   - 动静结合的文心ERNIE开发套件：基于飞桨动态图功能，支持文心ERNIE模型动态图训练。您仅需要在模型训练开启前，修改一个参数配置，即可实现模型训练的动静切换。
@@ -75,7 +75,7 @@ git clone https://github.com/PaddlePaddle/ERNIE.git
 ```plain
 # ernie_3.0 模型下载
 # 进入models_hub目录
-cd ./nlp-ernie/wenxin_appzoo/wenxin_appzoo/models_hub
+cd ./erniekit_appzoo/erniekit_appzoo/models_hub
 # 运行下载脚本
 sh download_ernie_3.0_base_ch.sh
 ```
@@ -87,7 +87,7 @@ sh download_ernie_3.0_base_ch.sh
 
 ```shell
 #进入文本分类任务文件夹
-cd ./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/
+cd ./erniekit_appzoo/erniekit_appzoo/tasks/text_classification/
 #查看文本分类任务自带数据集
 ls ./data
 ```
@@ -148,7 +148,7 @@ python run_infer.py --param_path ./examples/cls_enrie_fc_ch_infer.json
 
 # 预训练模型介绍
 
-- 参考预训练模型原理介绍:[模型介绍](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/models_hub/README.md)
+- 参考预训练模型原理介绍:[模型介绍](./erniekit_appzoo/erniekit_appzoo/models_hub/README.md)
 - 预训练模型下载：进入./wenxin_appzoo/models_hub目录下,下载示例：
 
 ```plain
@@ -218,19 +218,19 @@ sh downlaod_ernie3.0_base_ch.sh
 
 # 应用场景
 
-文本分类（[文本分类](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_classification/README.md)）
+文本分类（[文本分类](./erniekit_appzoo/erniekit_appzoo/tasks/text_classification/README.md)）
 
-文本匹配（[文本匹配](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_matching/README.md)）
+文本匹配（[文本匹配](./erniekit_appzoo/erniekit_appzoo/tasks/text_matching/README.md)）
 
-系列标注（[序列标注](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/sequence_labeling/README.md)）
+系列标注（[序列标注](./erniekit_appzoo/erniekit_appzoo/tasks/sequence_labeling/README.md)）
 
-信息抽取（[信息抽取](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/information_extraction_many_to_many/README.md)）
+信息抽取（[信息抽取](./erniekit_appzoo/erniekit_appzoo/tasks/information_extraction_many_to_many/README.md)）
 
-文本生成（[文本生成](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/text_generation/README.md)）
+文本生成（[文本生成](./erniekit_appzoo/erniekit_appzoo/tasks/text_generation/README.md)）
 
-数据蒸馏（[数据蒸馏](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tasks/data_distillation/README.md)）
+数据蒸馏（[数据蒸馏](./erniekit_appzoo/erniekit_appzoo/tasks/data_distillation/README.md)）
 
-工具使用（[工具使用](./nlp-ernie/wenxin_appzoo/wenxin_appzoo/tools/README.md)）
+工具使用（[工具使用](./erniekit_appzoo/erniekit_appzoo/tools/README.md)）
 
 # 文献引用
 
@@ -324,3 +324,4 @@ sh downlaod_ernie3.0_base_ch.sh
   year={2020}
 }
 ```
+
