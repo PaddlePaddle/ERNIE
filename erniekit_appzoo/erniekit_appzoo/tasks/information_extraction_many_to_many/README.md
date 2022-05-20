@@ -10,7 +10,7 @@
 
 - 多对多信息抽取任务位于 ./erniekit_appzoo/tasks/information_extraction_many_to_many
 
-```plain
+```
 information_extraction_many_to_many/
 ├── data
 │   ├── DuIE2.0
@@ -75,7 +75,7 @@ information_extraction_many_to_many/
 
 - 训练集、测试集的数据格式相同，每个样例分为两个部分文本和对应标签
 
-```plain
+```
 {"text": "倪金德，1916年生，奉天省营口（今辽宁省营口市）人", "spo_list": [{"predicate": "出生日期", "subject": [0, 3], "object": [4, 9]}, {"predicate": "出生地", "subject": [0, 3], "object": [11, 16]}]}
 {"text": "基本介绍克里斯蒂娜·塞寇丽（Christina Sicoli）身高163cm，在加拿大安大略出生和长大，毕业于伦道夫学院", "spo_list": [{"predicate": "毕业院校", "subject": [4, 13], "object": [55, 60]}]}
 ```
@@ -84,7 +84,7 @@ information_extraction_many_to_many/
 
 - 预测集只有一个key（"text"）：
 
-```plain
+```
 {"text": "倪金德，1916年生，奉天省营口（今辽宁省营口市）人"}
 {"text": "基本介绍克里斯蒂娜·塞寇丽（Christina Sicoli）身高163cm，在加拿大安大略出生和长大，毕业于伦道夫学院"}
 ```
@@ -93,7 +93,7 @@ information_extraction_many_to_many/
 
 - 标签列表是一个json字符串，key是标签值，value是标签对应id，示例词表采用BIO标注，B表示关系，分为主体（S）与客体（O），如下所示：
 
-```plain
+```
 {
      "O": 0,
      "I": 1,
@@ -119,7 +119,7 @@ information_extraction_many_to_many/
   - 从链接 https://www.luge.ai/#/luge/dataDetail?id=5 下载数据集到 ./data/DuIE2.0 文件夹中，并解压
   - 进入./data/DuIE2.0目录
 
-```json
+```
 cd ./data
 mkdir DuIE2.0
 cd DuIE2.0
@@ -128,7 +128,7 @@ cd DuIE2.0
 
 - - 运行./data/DuIE2.0/convert_data.py 脚本
 
-```json
+```
 python convert_data.py
 ```
 
@@ -160,7 +160,7 @@ python convert_data.py
 
 - 以属性抽取数据集的训练为例，进入指定任务目录./erniekit_appzoo/tasks/information_extraction_many_to_many
 
-```json
+```
 cd ./erniekit_appzoo/tasks/information_extraction_many_to_many
 ```
 
@@ -168,7 +168,7 @@ cd ./erniekit_appzoo/tasks/information_extraction_many_to_many
 
 - 配置文件：./examples/many_to_many_ie_attribute_ernie_fc_ch.json
 
-```json
+```
 {
   "dataset_reader": {
     "train_reader": {
