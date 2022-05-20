@@ -2,10 +2,10 @@
 
 ## 开始训练
 
-- 进入分类任务的目录./wenxin_appzoo/tasks/text_classification
+- 进入分类任务的目录./erniekit_appzoo/tasks/text_classification
 
 ```json
-cd ./wenxin_appzoo/tasks/text_classification
+cd ./erniekit_appzoo/tasks/text_classification
 ```
 
 ### 训练的配置文件
