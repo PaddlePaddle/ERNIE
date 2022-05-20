@@ -64,8 +64,8 @@ class RegisterSet(object):
     embedding = Register("embedding")
     inference = Register("inference")
 
-    package_names = ['wenxin.data.field_reader', 'wenxin.data.data_set_reader', 'wenxin.model',
-                    'wenxin.data.tokenizer', 'wenxin.modules.token_embedding']
+    package_names = ['erniekit.data.field_reader', 'erniekit.data.data_set_reader', 'erniekit.model',
+                    'erniekit.data.tokenizer', 'erniekit.modules.token_embedding']
     ALL_MODULES = []
 
     for package_name in package_names:
@@ -83,7 +83,7 @@ class RegisterSet(object):
 def import_modules_plugin():
     """import ernie 插件版需要的包，结合注册机制用
     """
-    PLUGIN_MODULES = [("wenxin.data.tokenizer", "tokenization_wp"), ("wenxin.modules", "ernie_origin")]
+    PLUGIN_MODULES = [("erniekit.data.tokenizer", "tokenization_wp"), ("erniekit.modules", "ernie_origin")]
 
     for package_name, file_name in PLUGIN_MODULES:
         import_new_module(package_name, file_name)
