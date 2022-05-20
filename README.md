@@ -218,7 +218,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 # 应用场景
 
-文本分类（[文本分类](./erniekit_appzoo/erniekit_appzoo/tasks/text_classification/README.md)）
+文本分类（[文本分类](./erniekit_appzoo/erniekit_appzoo/tasks/text_classification)）
 
 文本匹配（[文本匹配](./erniekit_appzoo/erniekit_appzoo/tasks/text_matching/README.md)）
 
