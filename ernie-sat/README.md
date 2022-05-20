@@ -11,7 +11,7 @@ ERNIE-SAT中我们提出了两项创新：
 
 ### 1.安装飞桨
 
-我们的代码基于 Paddle(version>=2.0)
+本项目的代码基于 Paddle(version>=2.0)
 
 
 ### 2.预训练模型
@@ -23,7 +23,7 @@ ERNIE-SAT中我们提出了两项创新：
 
 ### 3.下载
 
-1. 我们使用parallel wavegan作为声码器(vocoder): 
+1. 本项目使用parallel wavegan作为声码器(vocoder): 
     - [pwg_aishell3_ckpt_0.5.zip](https://paddlespeech.bj.bcebos.com/Parakeet/released_models/pwgan/pwg_aishell3_ckpt_0.5.zip)  
 
 创建download文件夹，下载上述预训练的声码器(vocoder)模型并将其解压
@@ -34,7 +34,7 @@ cd download
 unzip pwg_aishell3_ckpt_0.5.zip
 ```
 
- 2. 我们使用[FastSpeech2](https://arxiv.org/abs/2006.04558) 作为音素(phoneme)的持续时间预测器:
+ 2. 本项目使用[FastSpeech2](https://arxiv.org/abs/2006.04558) 作为音素(phoneme)的持续时间预测器:
     - [fastspeech2_conformer_baker_ckpt_0.5.zip](https://paddlespeech.bj.bcebos.com/Parakeet/released_models/fastspeech2/fastspeech2_conformer_baker_ckpt_0.5.zip)  中文场景下使用 
     - [fastspeech2_nosil_ljspeech_ckpt_0.5.zip](https://paddlespeech.bj.bcebos.com/Parakeet/released_models/fastspeech2/fastspeech2_nosil_ljspeech_ckpt_0.5.zip)  英文场景下使用
 
@@ -48,7 +48,7 @@ unzip fastspeech2_nosil_ljspeech_ckpt_0.5.zip
 
 ### 4.推理
 
-我们目前开源了语音编辑、个性化语音合成、跨语言语音合成的推理代码，后续会逐步开源。
+本项目当前开源了语音编辑、个性化语音合成、跨语言语音合成的推理代码，后续会逐步开源。
 注：当前采用的声码器版本与[模型训练时版本](https://github.com/kan-bayashi/ParallelWaveGAN)在英文上存在差异，您可使用模型训练时版本作为您的声码器，模型将在后续更新中升级。
 
 我们提供特定音频文件, 以及其对应的文本、音素相关文件:
