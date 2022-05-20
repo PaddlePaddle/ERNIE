@@ -9,7 +9,7 @@
 
 2. 参数配置：以erniekit_appzoo/tasks/text_classification/examples/cls_bow_ch.json为例，假如我们需要对学习率这个参数进行网格搜索设置，那么将”model”中的”learning_rate“的值修改为一个数组即可。目前文心的网格搜索的作用范围在optimization和train_reader的config中，用户可设置多个learning_rate、batch_size和epoch等。修改示例如下：
 
-```json
+```
 {
   "dataset_reader": {
     "train_reaer": {
@@ -38,7 +38,7 @@
 
 3. 启动训练：使用网格搜索进行训练的启动脚本与普通训练任务不一样，启动脚本为**run_with_preprocess.py**，该脚本的位置在erniekit_appzoo/tools/run_preprocess/目录下，可以拷贝到当前erniekit_appzoo/tasks/text_classification目录下使用，入参为上一步骤配置好的json文件，具体如下所示：
 
-```shell
+```
 # BOW 中文文本分类模型
 # 基于json实现预置网络训练。其调用了配置文件./examples/cls_bow_ch.json（添加了网格搜索配置的json）
 python run_with_preprocess.py --param_path ./examples/cls_bow_ch.json
