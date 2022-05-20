@@ -6,7 +6,7 @@
 
 ## 代码结构
 
-- 数据蒸馏任务位于 erniekit_appzoo/tasks/data_distillation
+- 数据蒸馏任务位于 applications/tasks/data_distillation
 
 ```plain
 data_distillation/
@@ -58,21 +58,21 @@ data_distillation/
 - 使用预置的ERNIE 3.0 base模型
 
 ```plain
-cd erniekit_appzoo/models_hub
+cd applications/models_hub
 bash download_ernie_3.0_base_ch.sh
 ```
 
 - 下载预置的原始数据以及增强数据。
 
 ```plain
-cd erniekit_appzoo/tasks/data_distillation/distill
+cd applications/tasks/data_distillation/distill
 bash download_data.sh
 ```
 
 - 运行以下命令，开始数据蒸馏
 
 ```plain
-cd erniekit_appzoo/tasks/data_distillation 
+cd applications/tasks/data_distillation 
 bash run_distill.sh
 ```
 

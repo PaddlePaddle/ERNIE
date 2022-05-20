@@ -13,7 +13,7 @@
   - 每次挑选其中1份作为验证集，剩余k-1份作为训练集用于训练模型；
   - 重复第2步k次，在每个训练集上训练后得到一个模型。用这个模型在相应的验证集上测试，计算并保存模型的评估指标。
 
-![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=8e5371445df84ada880543a641dd8c1f)
+![img](./img/1.png)
 
 ## 文心中使用交叉验证
 
@@ -21,7 +21,7 @@
 
 1. 准备数据：数据集的准备与通用的BOW分类任务一致，不再赘述，详细信息请移步[实战演练：使用文心进行模型训练](https://ai.baidu.com/ai-doc/ERNIE-Ultimate/Ekmlrorrp)。
 
-2. 配置参数：以erniekit_appzoo/tasks/text_classification/examples/cls_bow_ch.json为例，交叉验证仅需要在dataset_reader部分进行配置，其余部分与普通的训练任务一致。dataset_reader中k_fold相关参数为K折交叉验证的配置：
+2. 配置参数：以applications/tasks/text_classification/examples/cls_bow_ch.json为例，交叉验证仅需要在dataset_reader部分进行配置，其余部分与普通的训练任务一致。dataset_reader中k_fold相关参数为K折交叉验证的配置：
 
    - num_fold表示需要将训练集拆成K折，num_fold的取值需要>=2；
 
@@ -64,7 +64,7 @@
     	}
 ```
 
-3. 启动训练：使用交叉验证进行训练的启动脚本与普通训练任务不一样，启动脚本为**run_with_preprocess.py**，该脚本的位置在erniekit_appzoo/tools/run_preprocess/目录下，可以拷贝到erniekit_appzoo/tasks/text_classification目录下使用，入参为上一步骤配置好k_fold参数的json文件，具体如下所示：
+3. 启动训练：使用交叉验证进行训练的启动脚本与普通训练任务不一样，启动脚本为**run_with_preprocess.py**，该脚本的位置在applications/tools/run_preprocess/目录下，可以拷贝到applications/tasks/text_classification目录下使用，入参为上一步骤配置好k_fold参数的json文件，具体如下所示：
 
 ```
 # BOW 中文文本分类模型
@@ -78,12 +78,12 @@ python run_with_preprocess.py --param_path ./examples/cls_bow_ch.json
 
 - data_tmp：通过K折交叉验证处理过后的数据，如图所示就是将原始数据分成了4组，每组包含train_data 和 dev_data，如下图所示：
 
-![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=6b520e0e75c94b00bfb22d2a70f9cac6)
+![img](./img/2.png)
 
 - json_tmp：交叉验证处理完成之后生成的新的待运行配置文件，如下图所示：
 
-![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=5cfbc77da7a74f429dc5f6f6ffffb268)
+![img](./img/3.png)
 
 - log：基于交run_with_preprocess.py运行的任务都会生成新的json配置，每个json对应一个独立的trainer，各个trainer按照顺序串行训练，所以日志会分别输出到对应编号的log中。如下图就是串行的4个trainer的日志。日志内容和单独运行run_trainer.py输出到test.log中的日志一样，如下图所示：
 
-![img](http://rte.weiyun.baidu.com/api/imageDownloadAddress?attachId=5c55226559ff4d63aa43720d5f1757bc)
+![img](./img/4.png)
