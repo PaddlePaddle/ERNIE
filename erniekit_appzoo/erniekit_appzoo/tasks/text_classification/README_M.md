@@ -4,7 +4,7 @@
 
 - 进入分类任务的目录./erniekit_appzoo/tasks/text_classification
 
-```json
+```
 cd ./erniekit_appzoo/tasks/text_classification
 ```
 
@@ -12,7 +12,7 @@ cd ./erniekit_appzoo/tasks/text_classification
 
 - 模型均存放于./erniekit_appzoo/models_hub文件夹下，进入该文件夹下载对应ERNIE-M模型
 
-```json
+```
 cd ../../models_hub
 sh download_ernie_m_1.0_base.sh
 cd ../tasks/text_classification
@@ -22,7 +22,7 @@ cd ../tasks/text_classification
 
 - 配置文件：./examples/cls_ernie_m_1.0_base_one_sent.json
 
-```json
+```
 {
   "dataset_reader": {
     "train_reader": {
@@ -242,7 +242,7 @@ cd ../tasks/text_classification
 
 ### 训练ERNIE-M模型
 
-```json
+```
 python run_trainer.py --param_path ./examples/cls_ernie_m_1.0_base_one_sent.json
 ```
 
@@ -256,7 +256,7 @@ python run_trainer.py --param_path ./examples/cls_ernie_m_1.0_base_one_sent.json
 - 配置文件 ./examples/cls_ernie_m_1.0_base_one_sent_infer.json
 - 在配置文件./examples/cls_ernie_m_1.0_base_one_sent_infer.json中需要更改 inference.inference_model_path 为上面训练过程中所保存的**预测模型的路径**
 
-```json
+```
 {
   "dataset_reader": {
     "predict_reader": {
@@ -320,7 +320,7 @@ python run_trainer.py --param_path ./examples/cls_ernie_m_1.0_base_one_sent.json
 
 ### ERNIE-M模型预测
 
-```shell
+```
 python ./run_infer.py  --param_path ./examples/cls_ernie_m_1.0_base_one_sent_infer.json
 ```
 
