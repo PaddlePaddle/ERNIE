@@ -31,7 +31,7 @@
 
    - data_path_split表示使用K折交叉验证拆分完成之后的数据存放路径，必须是个目录。
 
-```json
+```
     	{
     	"dataset_reader": {
     	"k_fold": {
@@ -66,7 +66,7 @@
 
 3. 启动训练：使用交叉验证进行训练的启动脚本与普通训练任务不一样，启动脚本为**run_with_preprocess.py**，该脚本的位置在erniekit_appzoo/tools/run_preprocess/目录下，可以拷贝到erniekit_appzoo/tasks/text_classification目录下使用，入参为上一步骤配置好k_fold参数的json文件，具体如下所示：
 
-```shell
+```
 # BOW 中文文本分类模型
 # 基于json实现预置网络训练。其调用了配置文件./examples/cls_bow_ch.json（添加了交叉验证配置的json）
 python run_with_preprocess.py --param_path ./examples/cls_bow_ch.json
