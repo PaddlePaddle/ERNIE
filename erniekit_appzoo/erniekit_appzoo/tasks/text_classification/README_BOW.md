@@ -4,7 +4,7 @@
 
 - 进入分类任务的目录./erniekit_appzoo/tasks/text_classification
 
-```json
+```
 cd ./erniekit_appzoo/tasks/text_classification
 ```
 
@@ -16,7 +16,7 @@ cd ./erniekit_appzoo/tasks/text_classification
   - model
   - trainer
 
-```json
+```
 {                                        
   "dataset_reader": {                ## 用于配置模型训练或者预测时的数据相关配置，训练任务的dataset_reader中必须有train_reader、test_reader、dev_reader，预测推理任务的dataset_reader仅需要predict_reader。
     "train_reader": {                ## 训练、验证、测试各自基于不同的数据集，数据格式也可能不一样，可以在json中配置不同的reader，此处为训练集的reader。
@@ -200,7 +200,7 @@ cd ./erniekit_appzoo/tasks/text_classification
 
 ### 训练BOW模型
 
-```json
+```
 python run_trainer.py --param_path ./examples/cls_bow_ch.json
 ```
 
@@ -214,7 +214,7 @@ python run_trainer.py --param_path ./examples/cls_bow_ch.json
 - 配置文件 ./examples/cls_bow_ch_infer.json 
 - 在配置文件./examples/cls_bow_ch_infer.json中需要更改 inference.inference_model_path 为上面训练过程中所保存的**预测模型的路径**
 
-```json
+```
 {
   "dataset_reader": {
     "predict_reader": {        ## 如果是预测推理，则必须配置predict_reader，其配置方式与train_reader、test_reader类似，需要注意的是predict_reader不需要label域，shuffle参数必须是false，epoch参数必须是1。
@@ -273,7 +273,7 @@ python run_trainer.py --param_path ./examples/cls_bow_ch.json
 
 ### Bow模型预测
 
-```json
+```
 python run_infer.py --param_path ./examples/cls_bow_ch_infer.json
 ```
 
