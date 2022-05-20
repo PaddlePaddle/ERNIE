@@ -12,7 +12,7 @@ cd ./erniekit_appzoo/tasks/text_classification
 
 - 模型均存放于./erniekit_appzoo/models_hub文件夹下，进入该文件夹下载对应ERNIE模型
 
-```json
+```
 cd ../../models_hub
 sh ./download_ernie_xxx.sh
 cd ../tasks/text_classification
