@@ -60,8 +60,8 @@
 
 ### 数据准备
 
-- 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg/README.md)」进行处理。
-- 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning/README.md)」进行格式转换。
+- 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg)」进行处理。
+- 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning)」进行格式转换。
 - 在文本匹配任务中，根据其训练方式的不同，训练集分为Pointwise和Pairwise两种格式，测试集、验证集和预测集的格式相同。
 - 非ERNIE数据的pointwise训练集、pairwise训练集、测试集、验证集和预测集分别存放在./applications/tasks/text_matching/data目录下的train_data_pointwise_tokenized、train_data_pairwise_tokenized、test_data_tokenized、dev_data_tokenized和predict_data_tokenized文件夹下。
 - ERNIE数据的pointwise训练集、pairwise训练集、测试集、验证集和预测集分别存放在./applications/tasks/text_matching/data目录下的train_data_pointwise、train_data_pairwise、test_data、dev_data和predict_data文件夹下。
@@ -212,7 +212,7 @@
 
 ### ERNIE预训练模型下载
 
-- 文心提供的[ERNIE预训练模型](../../models_hub/README.md)的下载脚本在applications/models_hub目录下，各预训练模型可由对应的download_xx.sh文件下载得到，用户可根据需求自行下载。其中，ernie_config.json为ERNIE预训练模型的配置文件，vocab.txt为ERNIE预训练模型的词表文件，params目录为ERNIE预训练模型的参数文件目录。
+- 文心提供的[ERNIE预训练模型](../../models_hub)的下载脚本在applications/models_hub目录下，各预训练模型可由对应的download_xx.sh文件下载得到，用户可根据需求自行下载。其中，ernie_config.json为ERNIE预训练模型的配置文件，vocab.txt为ERNIE预训练模型的词表文件，params目录为ERNIE预训练模型的参数文件目录。
 
 | 模型名称        | 下载脚本                           | 备注                                       |
 | --------------- | ---------------------------------- | ------------------------------------------ |
