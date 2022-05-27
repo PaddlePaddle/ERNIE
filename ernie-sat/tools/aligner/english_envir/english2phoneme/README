@@ -1,0 +1,39 @@
+	                Final Version of
+                ENGLISH TO PHONEME TRANSLATION
+                           4/15/85
+
+        Here it is one last time.  I have fixed all of the bugs I
+        heard about and added a new feature or two (it now talks
+        money as well as numbers).  I think that this version is
+        good enough for most purposes.  I have proof-read the
+        phoneme rules (found one bug) and made the program more
+        "robust".  I added protection against the "toupper()"
+        problem some people had with earlier versions.
+
+        If you make a major addition (like better abbreviation
+        handling or an exception dictionary) please send me a
+        copy.  As before, this is all public domain and I make
+        no copyright claims on it.  The part derived from the
+        Naval Research Lab should be public anyway.  Sell it
+        if you can!
+
+                -John A. Wasser
+
+Work address:
+ARPAnet:        WASSER%VIKING.DEC@decwrl.ARPA
+Usenet:         {allegra,Shasta,decvax}!decwrl!dec-rhea!dec-viking!wasser
+Easynet:        VIKING::WASSER
+Telephone:      (617)486-2505
+USPS:           Digital Equipment Corp.
+                Mail stop: LJO2/E4
+                30 Porter Rd
+                Littleton, MA  01460
+
+
+   The files that make up this package are:
+
+          english.c       Translation rules.
+          phoneme.c       Translate a single word.
+          parse.c         Split a file into words.
+          spellwor.c      Spell an ASCII character or word.
+          saynum.c        Say a cardinal or ordinal number (long int).

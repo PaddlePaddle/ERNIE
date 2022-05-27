@@ -73,8 +73,8 @@ def parse_args():
 
     parser.add_argument(
         "--ngpu", type=int, default=1, help="if ngpu == 0, use cpu.")
-    parser.add_argument("--test_metadata", type=str, help="test metadata.")
-    parser.add_argument("--output_dir", type=str, help="output dir.")
+    # parser.add_argument("--test_metadata", type=str, help="test metadata.")
+    # parser.add_argument("--output_dir", type=str, help="output dir.")
 
     parser.add_argument("--model_name", type=str, help="model name")
     parser.add_argument("--uid", type=str, help="uid")
@@ -86,7 +86,7 @@ def parse_args():
     parser.add_argument("--target_language", type=str, help="target language")
     parser.add_argument("--output_name", type=str, help="output name")
     parser.add_argument("--task_name", type=str, help="task name")
-    
+    parser.add_argument("--use_pt_vocoder", default=True, help="use pytorch version vocoder or not. [Note: only in english condition.]")
 
     # pre
     args = parser.parse_args()
