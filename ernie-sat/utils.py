@@ -38,6 +38,7 @@ import paddle.nn.functional as F
 from paddlespeech.t2s.modules.nets_utils import make_pad_mask
 from paddlespeech.t2s.exps.syn_utils import get_frontend
 
+from tools.parallel_wavegan_pretrained_vocoder import ParallelWaveGANPretrainedVocoder
 from sedit_arg_parser import parse_args
 
 model_alias = {
@@ -60,14 +61,38 @@ model_alias = {
 
 
 
+def is_chinese(ch):
+    if u'\u4e00' <= ch <= u'\u9fff':
+        return True
+    else:
+        return False
+
+
+def build_vocoder_from_file(
+    vocoder_config_file = None,
+    vocoder_file = None,
+    model = None,
+    device = "cpu",
+    ):
+    # Build vocoder
+    if str(vocoder_file).endswith(".pkl"):
+        # If the extension is ".pkl", the model is trained with parallel_wavegan
+        vocoder = ParallelWaveGANPretrainedVocoder(
+            vocoder_file, vocoder_config_file
+        )
+        return vocoder.to(device)
+
+    else:
+        raise ValueError(f"{vocoder_file} is not supported format.")
+
+
 def get_voc_out(mel, target_language="chinese"):
     # vocoder
     args = parse_args()
-    
 
     assert target_language == "chinese" or target_language == "english", "In get_voc_out function, target_language is illegal..."
         
-    print("current vocoder: ", args.voc)
+    # print("current vocoder: ", args.voc)
     with open(args.voc_config) as f:
         voc_config = CfgNode(yaml.safe_load(f))
     # print(voc_config)
@@ -136,6 +161,23 @@ def get_am_inference(args, am_config):
 
 def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300):
     args = parse_args()
+
+    if target_language == 'english':
+        args.lang='en'
+        args.am = "fastspeech2_ljspeech"
+        args.am_config = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/default.yaml"
+        args.am_ckpt = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/snapshot_iter_100000.pdz"
+        args.am_stat = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/speech_stats.npy"
+        args.phones_dict = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/phone_id_map.txt"
+
+    elif target_language == 'chinese':
+        args.lang='zh'
+        args.am = "fastspeech2_csmsc"
+        args.am_config="download/fastspeech2_conformer_baker_ckpt_0.5/conformer.yaml"
+        args.am_ckpt = "download/fastspeech2_conformer_baker_ckpt_0.5/snapshot_iter_76000.pdz"
+        args.am_stat = "download/fastspeech2_conformer_baker_ckpt_0.5/speech_stats.npy"
+        args.phones_dict ="download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt"
+
     # args = parser.parse_args(args=[])
     if args.ngpu == 0:
         paddle.set_device("cpu")
@@ -167,6 +209,7 @@ def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300
     phonemes = [
         phn if phn in vocab_phones else "sp" for phn in torch_phns
     ]
+
     phone_ids = [vocab_phones[item] for item in phonemes]
     phone_ids_new = phone_ids
     phone_ids_new.append(vocab_size-1)

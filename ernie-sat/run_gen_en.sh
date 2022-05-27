@@ -1,5 +1,5 @@
 # 纯英文的语音合成
-# 根据p299_096对应的语音: This was not the show for me. 来合成:  'I enjoy my life.'
+# 样例为根据p299_096对应的语音作为提示语音: This was not the show for me. 来合成:  'I enjoy my life.'
 
 python inference.py \
 --task_name synthesize \
@@ -9,7 +9,8 @@ python inference.py \
 --prefix ./prompt/dev/ \
 --source_language english \
 --target_language english \
---output_name pred.wav \
+--output_name pred_gen.wav \
+--use_pt_vocoder True \
 --voc pwgan_aishell3 \
 --voc_config download/pwg_aishell3_ckpt_0.5/default.yaml \
 --voc_ckpt download/pwg_aishell3_ckpt_0.5/snapshot_iter_1000000.pdz \

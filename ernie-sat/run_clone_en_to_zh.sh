@@ -1,15 +1,18 @@
 # en --> zh  的 语音合成
-# 根据Prompt_003_new对应的语音: This was not the show for me. 来合成:  '今天天气很好'
+# 根据Prompt_003_new作为提示语音: This was not the show for me. 来合成:  '今天天气很好'
+# 注: 输入的new_str需为中文汉字, 否则会通过预处理只保留中文汉字, 即合成预处理后的中文语音。
+
 
 python inference.py \
 --task_name cross-lingual_clone \
---model_name paddle_checkpoint_ench \
+--model_name paddle_checkpoint_dual_mask_enzh \
 --uid Prompt_003_new \
---new_str '今天天气很好' \
+--new_str '今天天气很好.' \
 --prefix ./prompt/dev/ \
 --source_language english \
 --target_language chinese \
---output_name pred_zh.wav \
+--output_name pred_clone.wav \
+--use_pt_vocoder False \
 --voc pwgan_aishell3 \
 --voc_config download/pwg_aishell3_ckpt_0.5/default.yaml \
 --voc_ckpt download/pwg_aishell3_ckpt_0.5/snapshot_iter_1000000.pdz \

@@ -63,11 +63,7 @@ class LogMelFBank():
             window=self.window,
             center=self.center,
             pad_mode=self.pad_mode)
-        f = open('/mnt/home/xiaoran/projects/wave_summit/espnet_dual_mask/tmp_var_stft.out.1', 'w')
-        print('stft shape is', D.size())
-        # for item in [round(item, 6) for item in output["speech"][0].tolist()]:
-        #     f.write(str(item)+'\n')
-        # f.close()
+
         return D
 
     def _spectrogram(self, wav):
