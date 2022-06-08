@@ -1,28 +1,21 @@
-# Copyright 2021 Tomoki Hayashi
-#  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
-
 """Wrapper class for the vocoder model trained with parallel_wavegan repo."""
-
 import logging
 import os
-
 from pathlib import Path
 from typing import Optional
 from typing import Union
 
-import yaml
-
 import torch
+import yaml
 
 
 class ParallelWaveGANPretrainedVocoder(torch.nn.Module):
     """Wrapper class to load the vocoder trained with parallel_wavegan repo."""
 
     def __init__(
-        self,
-        model_file: Union[Path, str],
-        config_file: Optional[Union[Path, str]] = None,
-    ):
+            self,
+            model_file: Union[Path, str],
+            config_file: Optional[Union[Path, str]]=None, ):
         """Initialize ParallelWaveGANPretrainedVocoder module."""
         super().__init__()
         try:
@@ -30,8 +23,7 @@ class ParallelWaveGANPretrainedVocoder(torch.nn.Module):
         except ImportError:
             logging.error(
                 "`parallel_wavegan` is not installed. "
-                "Please install via `pip install -U parallel_wavegan`."
-            )
+                "Please install via `pip install -U parallel_wavegan`.")
             raise
         if config_file is None:
             dirname = os.path.dirname(str(model_file))
@@ -59,5 +51,4 @@ class ParallelWaveGANPretrainedVocoder(torch.nn.Module):
         """
         return self.vocoder.inference(
             feats,
-            normalize_before=self.normalize_before,
-        ).view(-1)
+            normalize_before=self.normalize_before, ).view(-1)

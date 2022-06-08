@@ -1,9 +1,7 @@
-
-
-
-import paddle
-import numpy as np
 import math
+
+import numpy as np
+import paddle
 
 
 def pad_list(xs, pad_value):
@@ -28,23 +26,25 @@ def pad_list(xs, pad_value):
     """
     n_batch = len(xs)
     max_len = max(paddle.shape(x)[0] for x in xs)
-    pad = paddle.full((n_batch, max_len), pad_value, dtype = xs[0].dtype)
+    pad = paddle.full((n_batch, max_len), pad_value, dtype=xs[0].dtype)
 
     for i in range(n_batch):
-        pad[i, : paddle.shape(xs[i])[0]] = xs[i]
-    
+        pad[i, :paddle.shape(xs[i])[0]] = xs[i]
+
     return pad
 
-def pad_to_longformer_att_window(text, max_len, max_tlen,attention_window):
+
+def pad_to_longformer_att_window(text, max_len, max_tlen, attention_window):
     round = max_len % attention_window
     if round != 0:
         max_tlen += (attention_window - round)
         n_batch = paddle.shape(text)[0]
-        text_pad = paddle.zeros((n_batch, max_tlen, *paddle.shape(text[0])[1:]), dtype=text.dtype)
+        text_pad = paddle.zeros(
+            (n_batch, max_tlen, *paddle.shape(text[0])[1:]), dtype=text.dtype)
         for i in range(n_batch):
-            text_pad[i, : paddle.shape(text[i])[0]] = text[i]
+            text_pad[i, :paddle.shape(text[i])[0]] = text[i]
     else:
-        text_pad = text[:, : max_tlen]
+        text_pad = text[:, :max_tlen]
     return text_pad, max_tlen
 
 
@@ -139,7 +139,6 @@ def make_pad_mask(lengths, xs=None, length_dim=-1):
 
     if not isinstance(lengths, list):
         lengths = list(lengths)
-    # print('lengths', lengths)
     bs = int(len(lengths))
     if xs is None:
         maxlen = int(max(lengths))
@@ -147,10 +146,9 @@ def make_pad_mask(lengths, xs=None, length_dim=-1):
         maxlen = paddle.shape(xs)[length_dim]
 
     seq_range = paddle.arange(0, maxlen, dtype=paddle.int64)
-    seq_range_expand = paddle.expand(paddle.unsqueeze(seq_range, 0), (bs, maxlen))
+    seq_range_expand = paddle.expand(
+        paddle.unsqueeze(seq_range, 0), (bs, maxlen))
     seq_length_expand = paddle.unsqueeze(paddle.to_tensor(lengths), -1)
-    # print('seq_length_expand', paddle.shape(seq_length_expand))
-    # print('seq_range_expand', paddle.shape(seq_range_expand))
     mask = seq_range_expand >= seq_length_expand
 
     if xs is not None:
@@ -160,14 +158,10 @@ def make_pad_mask(lengths, xs=None, length_dim=-1):
             length_dim = len(paddle.shape(xs)) + length_dim
         # ind = (:, None, ..., None, :, , None, ..., None)
         ind = tuple(
-            slice(None) if i in (0, length_dim) else None for i in range(len(paddle.shape(xs)))
-        )
-        # print('0:', paddle.shape(mask))
-        # print('1:', paddle.shape(mask[ind]))
-        # print('2:', paddle.shape(xs))
+            slice(None) if i in (0, length_dim) else None
+            for i in range(len(paddle.shape(xs))))
         mask = paddle.expand(mask[ind], paddle.shape(xs))
     return mask
-
 
 
 def make_non_pad_mask(lengths, xs=None, length_dim=-1):
@@ -259,8 +253,14 @@ def make_non_pad_mask(lengths, xs=None, length_dim=-1):
     return ~make_pad_mask(lengths, xs, length_dim)
 
 
-
-def phones_masking(xs_pad, src_mask, align_start, align_end, align_start_lengths, mlm_prob, mean_phn_span, span_boundary=None):
+def phones_masking(xs_pad,
+                   src_mask,
+                   align_start,
+                   align_end,
+                   align_start_lengths,
+                   mlm_prob,
+                   mean_phn_span,
+                   span_boundary=None):
     bz, sent_len, _ = paddle.shape(xs_pad)
     mask_num_lower = math.ceil(sent_len * mlm_prob)
     masked_position = np.zeros((bz, sent_len))
@@ -273,38 +273,41 @@ def phones_masking(xs_pad, src_mask, align_start, align_end, align_start_lengths
     elif mean_phn_span == 0:
         # only speech 
         length = sent_len
-        mean_phn_span = min(length*mlm_prob//3, 50)
-        masked_phn_indices = random_spans_noise_mask(length,mlm_prob, mean_phn_span).nonzero()
-        masked_position[:,masked_phn_indices]=1
+        mean_phn_span = min(length * mlm_prob // 3, 50)
+        masked_phn_indices = random_spans_noise_mask(length, mlm_prob,
+                                                     mean_phn_span).nonzero()
+        masked_position[:, masked_phn_indices] = 1
     else:
         for idx in range(bz):
             if span_boundary is not None:
-                for s,e in zip(span_boundary[idx][::2], span_boundary[idx][1::2]):
+                for s, e in zip(span_boundary[idx][::2],
+                                span_boundary[idx][1::2]):
                     masked_position[idx, s:e] = 1
 
                     # y_masks[idx, :, s:e] = tril_masks[idx, :, s:e]
                     # y_masks[idx, e:, s:e ] = 0
             else:
                 length = align_start_lengths[idx].item()
-                if length<2:
+                if length < 2:
                     continue
-                masked_phn_indices = random_spans_noise_mask(length,mlm_prob, mean_phn_span).nonzero()
+                masked_phn_indices = random_spans_noise_mask(
+                    length, mlm_prob, mean_phn_span).nonzero()
                 masked_start = align_start[idx][masked_phn_indices].tolist()
                 masked_end = align_end[idx][masked_phn_indices].tolist()
-                for s,e in zip(masked_start, masked_end):
+                for s, e in zip(masked_start, masked_end):
                     masked_position[idx, s:e] = 1
                     # y_masks[idx, :, s:e] = tril_masks[idx, :, s:e]
                     # y_masks[idx, e:, s:e ] = 0
-    non_eos_mask = np.array(paddle.reshape(src_mask, paddle.shape(xs_pad)[:2]).float().cpu())
+    non_eos_mask = np.array(
+        paddle.reshape(src_mask, paddle.shape(xs_pad)[:2]).float().cpu())
     masked_position = masked_position * non_eos_mask
     # y_masks = src_mask & y_masks.bool()
 
     return paddle.cast(paddle.to_tensor(masked_position), paddle.bool), y_masks
 
 
-
-
-def get_segment_pos(speech_pad, text_pad, align_start, align_end, align_start_lengths,sega_emb):
+def get_segment_pos(speech_pad, text_pad, align_start, align_end,
+                    align_start_lengths, sega_emb):
     bz, speech_len, _ = speech_pad.size()
     _, text_len = text_pad.size()
 
@@ -313,7 +316,6 @@ def get_segment_pos(speech_pad, text_pad, align_start, align_end, align_start_le
     text_segment_pos = np.zeros((bz, text_len)).astype('int64')
     speech_segment_pos = np.zeros((bz, speech_len)).astype('int64')
 
-
     if not sega_emb:
         text_segment_pos = paddle.to_tensor(text_segment_pos)
         speech_segment_pos = paddle.to_tensor(speech_segment_pos)
@@ -321,10 +323,10 @@ def get_segment_pos(speech_pad, text_pad, align_start, align_end, align_start_le
     for idx in range(bz):
         align_length = align_start_lengths[idx].item()
         for j in range(align_length):
-            s,e = align_start[idx][j].item(), align_end[idx][j].item()
-            speech_segment_pos[idx][s:e] = j+1
-            text_segment_pos[idx][j] = j+1
-    
+            s, e = align_start[idx][j].item(), align_end[idx][j].item()
+            speech_segment_pos[idx][s:e] = j + 1
+            text_segment_pos[idx][j] = j + 1
+
     text_segment_pos = paddle.to_tensor(text_segment_pos)
     speech_segment_pos = paddle.to_tensor(speech_segment_pos)
 
