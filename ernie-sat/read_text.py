@@ -5,7 +5,6 @@ from typing import List
 from typing import Union
 
 
-
 def read_2column_text(path: Union[Path, str]) -> Dict[str, str]:
     """Read a text file having 2 column as dict object.
 
@@ -33,9 +32,8 @@ def read_2column_text(path: Union[Path, str]) -> Dict[str, str]:
     return data
 
 
-def load_num_sequence_text(
-    path: Union[Path, str], loader_type: str = "csv_int"
-) -> Dict[str, List[Union[float, int]]]:
+def load_num_sequence_text(path: Union[Path, str], loader_type: str="csv_int"
+                           ) -> Dict[str, List[Union[float, int]]]:
     """Read a text file indicating sequences of number
 
     Examples:
@@ -73,6 +71,7 @@ def load_num_sequence_text(
         try:
             retval[k] = [dtype(i) for i in v.split(delimiter)]
         except TypeError:
-            logging.error(f'Error happened with path="{path}", id="{k}", value="{v}"')
+            logging.error(
+                f'Error happened with path="{path}", id="{k}", value="{v}"')
             raise
     return retval

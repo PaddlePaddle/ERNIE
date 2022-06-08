@@ -1,45 +1,15 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-import os 
-import argparse
-import logging
-from pathlib import Path
-
-import jsonlines
 import numpy as np
 import paddle
-import soundfile as sf
 import yaml
-from timer import timer
-from yacs.config import CfgNode
-from paddlespeech.s2t.utils.dynamic_import import dynamic_import
-
-from paddlespeech.t2s.exps.syn_utils import get_test_dataset
-from paddlespeech.t2s.exps.syn_utils import get_voc_inference
-from paddlespeech.t2s.utils import str2bool
-from paddlespeech.t2s.frontend.zh_frontend import Frontend
-from paddlespeech.t2s.models.fastspeech2 import FastSpeech2
-from paddlespeech.t2s.models.fastspeech2 import FastSpeech2Inference
-from paddlespeech.t2s.modules.normalizer import ZScore
-from yacs.config import CfgNode
-# new add
-import paddle.nn.functional as F
-from paddlespeech.t2s.modules.nets_utils import make_pad_mask
-from paddlespeech.t2s.exps.syn_utils import get_frontend
-
-from tools.parallel_wavegan_pretrained_vocoder import ParallelWaveGANPretrainedVocoder
 from sedit_arg_parser import parse_args
+from yacs.config import CfgNode
+
+from paddlespeech.s2t.utils.dynamic_import import dynamic_import
+from paddlespeech.t2s.exps.syn_utils import get_frontend
+from paddlespeech.t2s.exps.syn_utils import get_voc_inference
+from paddlespeech.t2s.modules.normalizer import ZScore
+from tools.parallel_wavegan_pretrained_vocoder import ParallelWaveGANPretrainedVocoder
+# new add
 
 model_alias = {
     # acoustic model
@@ -58,9 +28,6 @@ model_alias = {
 }
 
 
-
-
-
 def is_chinese(ch):
     if u'\u4e00' <= ch <= u'\u9fff':
         return True
@@ -69,17 +36,15 @@ def is_chinese(ch):
 
 
 def build_vocoder_from_file(
-    vocoder_config_file = None,
-    vocoder_file = None,
-    model = None,
-    device = "cpu",
-    ):
+        vocoder_config_file=None,
+        vocoder_file=None,
+        model=None,
+        device="cpu", ):
     # Build vocoder
     if str(vocoder_file).endswith(".pkl"):
         # If the extension is ".pkl", the model is trained with parallel_wavegan
-        vocoder = ParallelWaveGANPretrainedVocoder(
-            vocoder_file, vocoder_config_file
-        )
+        vocoder = ParallelWaveGANPretrainedVocoder(vocoder_file,
+                                                   vocoder_config_file)
         return vocoder.to(device)
 
     else:
@@ -91,7 +56,7 @@ def get_voc_out(mel, target_language="chinese"):
     args = parse_args()
 
     assert target_language == "chinese" or target_language == "english", "In get_voc_out function, target_language is illegal..."
-        
+
     # print("current vocoder: ", args.voc)
     with open(args.voc_config) as f:
         voc_config = CfgNode(yaml.safe_load(f))
@@ -105,6 +70,7 @@ def get_voc_out(mel, target_language="chinese"):
         wav = voc_inference(mel)
     # print("shepe of wav (time x n_channels):%s"%wav.shape)   
     return np.squeeze(wav)
+
 
 # dygraph
 def get_am_inference(args, am_config):
@@ -159,11 +125,14 @@ def get_am_inference(args, am_config):
     return am, am_inference, am_name, am_dataset, phn_id
 
 
-def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300):
+def evaluate_durations(phns,
+                       target_language="chinese",
+                       fs=24000,
+                       hop_length=300):
     args = parse_args()
 
     if target_language == 'english':
-        args.lang='en'
+        args.lang = 'en'
         args.am = "fastspeech2_ljspeech"
         args.am_config = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/default.yaml"
         args.am_ckpt = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/snapshot_iter_100000.pdz"
@@ -171,12 +140,12 @@ def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300
         args.phones_dict = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/phone_id_map.txt"
 
     elif target_language == 'chinese':
-        args.lang='zh'
+        args.lang = 'zh'
         args.am = "fastspeech2_csmsc"
-        args.am_config="download/fastspeech2_conformer_baker_ckpt_0.5/conformer.yaml"
+        args.am_config = "download/fastspeech2_conformer_baker_ckpt_0.5/conformer.yaml"
         args.am_ckpt = "download/fastspeech2_conformer_baker_ckpt_0.5/snapshot_iter_76000.pdz"
         args.am_stat = "download/fastspeech2_conformer_baker_ckpt_0.5/speech_stats.npy"
-        args.phones_dict ="download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt"
+        args.phones_dict = "download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt"
 
     # args = parser.parse_args(args=[])
     if args.ngpu == 0:
@@ -186,8 +155,6 @@ def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300
     else:
         print("ngpu should >= 0 !")
 
-
-    
     assert target_language == "chinese" or target_language == "english", "In evaluate_durations function, target_language is illegal..."
 
     # Init body.
@@ -197,8 +164,8 @@ def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300
     # print(am_config)
     # print("---------------------")
     # acoustic model
-    am, am_inference, am_name, am_dataset,phn_id = get_am_inference(args, am_config)
-    
+    am, am_inference, am_name, am_dataset, phn_id = get_am_inference(args,
+                                                                     am_config)
 
     torch_phns = phns
     vocab_phones = {}
@@ -206,33 +173,31 @@ def evaluate_durations(phns, target_language="chinese", fs=24000, hop_length=300
         vocab_phones[tone] = int(id)
     # print("vocab_phones: ", len(vocab_phones))
     vocab_size = len(vocab_phones)
-    phonemes = [
-        phn if phn in vocab_phones else "sp" for phn in torch_phns
-    ]
+    phonemes = [phn if phn in vocab_phones else "sp" for phn in torch_phns]
 
     phone_ids = [vocab_phones[item] for item in phonemes]
     phone_ids_new = phone_ids
-    phone_ids_new.append(vocab_size-1)
+    phone_ids_new.append(vocab_size - 1)
     phone_ids_new = paddle.to_tensor(np.array(phone_ids_new, np.int64))
-    normalized_mel, d_outs, p_outs, e_outs = am.inference(phone_ids_new, spk_id=None, spk_emb=None)
+    normalized_mel, d_outs, p_outs, e_outs = am.inference(
+        phone_ids_new, spk_id=None, spk_emb=None)
     pre_d_outs = d_outs
     phoneme_durations_new = pre_d_outs * hop_length / fs
     phoneme_durations_new = phoneme_durations_new.tolist()[:-1]
     return phoneme_durations_new
 
 
-
 def sentence2phns(sentence, target_language="en"):
     args = parse_args()
     if target_language == 'en':
-        args.lang='en'
+        args.lang = 'en'
         args.phones_dict = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/phone_id_map.txt"
     elif target_language == 'zh':
-        args.lang='zh'
-        args.phones_dict="download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt" 
+        args.lang = 'zh'
+        args.phones_dict = "download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt"
     else:
         print("target_language should in {'zh', 'en'}!")
-    
+
     frontend = get_frontend(args)
     merge_sentences = True
     get_tone_ids = False
@@ -246,10 +211,8 @@ def sentence2phns(sentence, target_language="en"):
         phone_ids = input_ids["phone_ids"]
 
         phonemes = frontend.get_phonemes(
-            sentence, 
-            merge_sentences=merge_sentences,
-            print_info=False)
-            
+            sentence, merge_sentences=merge_sentences, print_info=False)
+
         return phonemes[0], input_ids["phone_ids"][0]
 
     elif target_language == 'en':
@@ -270,16 +233,11 @@ def sentence2phns(sentence, target_language="en"):
         phones = [phn for phn in phones if not phn.isspace()]
         # replace unk phone with sp
         phones = [
-            phn
-            if (phn in vocab_phones and phn not in punc) else "sp"
+            phn if (phn in vocab_phones and phn not in punc) else "sp"
             for phn in phones
         ]
         phones_list.append(phones)
-        return phones_list[0], input_ids["phone_ids"][0] 
+        return phones_list[0], input_ids["phone_ids"][0]
 
     else:
         print("lang should in {'zh', 'en'}!")
-
-    
-
-
