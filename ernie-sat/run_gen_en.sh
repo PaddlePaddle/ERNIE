@@ -9,8 +9,8 @@ python inference.py \
     --uid=p299_096 \
     --new_str='I enjoy my life, do you?' \
     --prefix='./prompt/dev/' \
-    --source_language=english \
-    --target_language=english \
+    --source_lang=english \
+    --target_lang=english \
     --output_name=pred_gen.wav \
     --use_pt_vocoder=False \
     --voc=pwgan_aishell3 \

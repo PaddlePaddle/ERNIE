@@ -113,8 +113,8 @@ prompt/dev
 8. ` --uid` 特定提示(prompt)语音的 id
 9. ` --new_str` 输入的文本(本次开源暂时先设置特定的文本)
 10. ` --prefix` 特定音频对应的文本、音素相关文件的地址
-11. ` --source_language` , 源语言
-12. ` --target_language` , 目标语言
+11. ` --source_lang` , 源语言
+12. ` --target_lang` , 目标语言
 13. ` --output_name` , 合成语音名称
 14. ` --task_name` , 任务名称, 包括：语音编辑任务、个性化语音合成任务、跨语言语音合成任务
 15. ` --use_pt_vocoder`, 英文场景下是否使用 torch 版本的 vocoder, 默认情况下为 False; 设置为 False 则在英文场景下使用 paddle 版本 vocoder

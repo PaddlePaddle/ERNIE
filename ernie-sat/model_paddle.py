@@ -121,12 +121,10 @@ class NewMaskInputLayer(nn.Layer):
             default_initializer=paddle.nn.initializer.Assign(
                 paddle.normal(shape=(1, 1, out_features))))
 
-    def forward(self, input: paddle.Tensor,
-                masked_position=None) -> paddle.Tensor:
-        masked_position = paddle.expand_as(
-            paddle.unsqueeze(masked_position, -1), input)
-        masked_input = masked_fill(input, masked_position, 0) + masked_fill(
-            paddle.expand_as(self.mask_feature, input), ~masked_position, 0)
+    def forward(self, input: paddle.Tensor, masked_pos=None) -> paddle.Tensor:
+        masked_pos = paddle.expand_as(paddle.unsqueeze(masked_pos, -1), input)
+        masked_input = masked_fill(input, masked_pos, 0) + masked_fill(
+            paddle.expand_as(self.mask_feature, input), ~masked_pos, 0)
         return masked_input
 
 
@@ -443,37 +441,34 @@ class MLMEncoder(nn.Layer):
     def forward(self,
                 speech_pad,
                 text_pad,
-                masked_position,
+                masked_pos,
                 speech_mask=None,
                 text_mask=None,
-                speech_segment_pos=None,
-                text_segment_pos=None):
+                speech_seg_pos=None,
+                text_seg_pos=None):
         """Encode input sequence.
 
         """
-        if masked_position is not None:
-            speech_pad = self.speech_embed(speech_pad, masked_position)
+        if masked_pos is not None:
+            speech_pad = self.speech_embed(speech_pad, masked_pos)
         else:
             speech_pad = self.speech_embed(speech_pad)
         # pure speech input
         if -2 in np.array(text_pad):
             text_pad = text_pad + 3
             text_mask = paddle.unsqueeze(bool(text_pad), 1)
-            text_segment_pos = paddle.zeros_like(text_pad)
+            text_seg_pos = paddle.zeros_like(text_pad)
             text_pad = self.text_embed(text_pad)
-            text_pad = (text_pad[0] + self.segment_emb(text_segment_pos),
+            text_pad = (text_pad[0] + self.segment_emb(text_seg_pos),
                         text_pad[1])
-            text_segment_pos = None
+            text_seg_pos = None
         elif text_pad is not None:
             text_pad = self.text_embed(text_pad)
-        segment_emb = None
-        if speech_segment_pos is not None and text_segment_pos is not None and self.segment_emb:
-            speech_segment_emb = self.segment_emb(speech_segment_pos)
-            text_segment_emb = self.segment_emb(text_segment_pos)
-            text_pad = (text_pad[0] + text_segment_emb, text_pad[1])
-            speech_pad = (speech_pad[0] + speech_segment_emb, speech_pad[1])
-            segment_emb = paddle.concat(
-                [speech_segment_emb, text_segment_emb], axis=1)
+        if speech_seg_pos is not None and text_seg_pos is not None and self.segment_emb:
+            speech_seg_emb = self.segment_emb(speech_seg_pos)
+            text_seg_emb = self.segment_emb(text_seg_pos)
+            text_pad = (text_pad[0] + text_seg_emb, text_pad[1])
+            speech_pad = (speech_pad[0] + speech_seg_emb, speech_pad[1])
         if self.pre_speech_encoders:
             speech_pad, _ = self.pre_speech_encoders(speech_pad, speech_mask)
 
@@ -493,11 +488,11 @@ class MLMEncoder(nn.Layer):
         if self.normalize_before:
             xs = self.after_norm(xs)
 
-        return xs, masks  #, segment_emb
+        return xs, masks
 
 
 class MLMDecoder(MLMEncoder):
-    def forward(self, xs, masks, masked_position=None, segment_emb=None):
+    def forward(self, xs, masks, masked_pos=None, segment_emb=None):
         """Encode input sequence.
 
         Args:
@@ -509,9 +504,8 @@ class MLMDecoder(MLMEncoder):
             paddle.Tensor: Mask tensor (#batch, time).
 
         """
-        emb, mlm_position = None, None
         if not self.training:
-            masked_position = None
+            masked_pos = None
         xs = self.embed(xs)
         if segment_emb:
             xs = (xs[0] + segment_emb, xs[1])
@@ -632,18 +626,18 @@ class MLMModel(nn.Layer):
 
     def collect_feats(self,
                       speech,
-                      speech_lengths,
+                      speech_lens,
                       text,
-                      text_lengths,
-                      masked_position,
+                      text_lens,
+                      masked_pos,
                       speech_mask,
                       text_mask,
-                      speech_segment_pos,
-                      text_segment_pos,
+                      speech_seg_pos,
+                      text_seg_pos,
                       y_masks=None) -> Dict[str, paddle.Tensor]:
-        return {"feats": speech, "feats_lengths": speech_lengths}
+        return {"feats": speech, "feats_lens": speech_lens}
 
-    def forward(self, batch, speech_segment_pos, y_masks=None):
+    def forward(self, batch, speech_seg_pos, y_masks=None):
         # feats: (Batch, Length, Dim)
         # -> encoder_out: (Batch, Length2, Dim2)
         speech_pad_placeholder = batch['speech_pad']
@@ -654,7 +648,7 @@ class MLMModel(nn.Layer):
         if self.decoder is not None:
             zs, _ = self.decoder(ys_in, y_masks, encoder_out,
                                  bool(h_masks),
-                                 self.encoder.segment_emb(speech_segment_pos))
+                                 self.encoder.segment_emb(speech_seg_pos))
             speech_hidden_states = zs
         else:
             speech_hidden_states = encoder_out[:, :paddle.shape(batch[
@@ -672,21 +666,21 @@ class MLMModel(nn.Layer):
         else:
             after_outs = None
         return before_outs, after_outs, speech_pad_placeholder, batch[
-            'masked_position']
+            'masked_pos']
 
     def inference(
             self,
             speech,
             text,
-            masked_position,
+            masked_pos,
             speech_mask,
             text_mask,
-            speech_segment_pos,
-            text_segment_pos,
-            span_boundary,
+            speech_seg_pos,
+            text_seg_pos,
+            span_bdy,
             y_masks=None,
-            speech_lengths=None,
-            text_lengths=None,
+            speech_lens=None,
+            text_lens=None,
             feats: Optional[paddle.Tensor]=None,
             spembs: Optional[paddle.Tensor]=None,
             sids: Optional[paddle.Tensor]=None,
@@ -699,24 +693,24 @@ class MLMModel(nn.Layer):
         batch = dict(
             speech_pad=speech,
             text_pad=text,
-            masked_position=masked_position,
+            masked_pos=masked_pos,
             speech_mask=speech_mask,
             text_mask=text_mask,
-            speech_segment_pos=speech_segment_pos,
-            text_segment_pos=text_segment_pos, )
+            speech_seg_pos=speech_seg_pos,
+            text_seg_pos=text_seg_pos, )
 
         # # inference with teacher forcing
         # hs, h_masks = self.encoder(**batch)
 
-        outs = [batch['speech_pad'][:, :span_boundary[0]]]
+        outs = [batch['speech_pad'][:, :span_bdy[0]]]
         z_cache = None
         if use_teacher_forcing:
             before, zs, _, _ = self.forward(
-                batch, speech_segment_pos, y_masks=y_masks)
+                batch, speech_seg_pos, y_masks=y_masks)
             if zs is None:
                 zs = before
-            outs += [zs[0][span_boundary[0]:span_boundary[1]]]
-            outs += [batch['speech_pad'][:, span_boundary[1]:]]
+            outs += [zs[0][span_bdy[0]:span_bdy[1]]]
+            outs += [batch['speech_pad'][:, span_bdy[1]:]]
             return dict(feat_gen=outs)
         return None
 
@@ -733,7 +727,7 @@ class MLMModel(nn.Layer):
 
 
 class MLMEncAsDecoderModel(MLMModel):
-    def forward(self, batch, speech_segment_pos, y_masks=None):
+    def forward(self, batch, speech_seg_pos, y_masks=None):
         # feats: (Batch, Length, Dim)
         # -> encoder_out: (Batch, Length2, Dim2)
         speech_pad_placeholder = batch['speech_pad']
@@ -756,7 +750,7 @@ class MLMEncAsDecoderModel(MLMModel):
         else:
             after_outs = None
         return before_outs, after_outs, speech_pad_placeholder, batch[
-            'masked_position']
+            'masked_pos']
 
 
 class MLMDualMaksingModel(MLMModel):
@@ -767,9 +761,9 @@ class MLMDualMaksingModel(MLMModel):
                        batch):
         xs_pad = batch['speech_pad']
         text_pad = batch['text_pad']
-        masked_position = batch['masked_position']
-        text_masked_position = batch['text_masked_position']
-        mlm_loss_position = masked_position > 0
+        masked_pos = batch['masked_pos']
+        text_masked_pos = batch['text_masked_pos']
+        mlm_loss_pos = masked_pos > 0
         loss = paddle.sum(
             self.l1_loss_func(
                 paddle.reshape(before_outs, (-1, self.odim)),
@@ -782,19 +776,17 @@ class MLMDualMaksingModel(MLMModel):
                     paddle.reshape(xs_pad, (-1, self.odim))),
                 axis=-1)
         loss_mlm = paddle.sum((loss * paddle.reshape(
-            mlm_loss_position, [-1]))) / paddle.sum((mlm_loss_position) + 1e-10)
+            mlm_loss_pos, [-1]))) / paddle.sum((mlm_loss_pos) + 1e-10)
 
         loss_text = paddle.sum((self.text_mlm_loss(
             paddle.reshape(text_outs, (-1, self.vocab_size)),
             paddle.reshape(text_pad, (-1))) * paddle.reshape(
-                text_masked_position,
-                (-1)))) / paddle.sum((text_masked_position) + 1e-10)
+                text_masked_pos, (-1)))) / paddle.sum((text_masked_pos) + 1e-10)
         return loss_mlm, loss_text
 
-    def forward(self, batch, speech_segment_pos, y_masks=None):
+    def forward(self, batch, speech_seg_pos, y_masks=None):
         # feats: (Batch, Length, Dim)
         # -> encoder_out: (Batch, Length2, Dim2)
-        speech_pad_placeholder = batch['speech_pad']
         encoder_out, h_masks = self.encoder(**batch)  # segment_emb
         if self.decoder is not None:
             zs, _ = self.decoder(encoder_out, h_masks)
@@ -819,7 +811,7 @@ class MLMDualMaksingModel(MLMModel):
                 [0, 2, 1])
         else:
             after_outs = None
-        return before_outs, after_outs, text_outs, None  #, speech_pad_placeholder, batch['masked_position'],batch['text_masked_position']
+        return before_outs, after_outs, text_outs, None  #, speech_pad_placeholder, batch['masked_pos'],batch['text_masked_pos']
 
 
 def build_model_from_file(config_file, model_file):

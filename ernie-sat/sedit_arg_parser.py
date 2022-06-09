@@ -80,10 +80,8 @@ def parse_args():
     parser.add_argument("--uid", type=str, help="uid")
     parser.add_argument("--new_str", type=str, help="new string")
     parser.add_argument("--prefix", type=str, help="prefix")
-    parser.add_argument("--clone_prefix", type=str, default=None, help="clone prefix")
-    parser.add_argument("--clone_uid", type=str, default=None, help="clone uid")
-    parser.add_argument("--source_language", type=str, help="source language")
-    parser.add_argument("--target_language", type=str, help="target language")
+    parser.add_argument("--source_lang", type=str, default="english", help="source language")
+    parser.add_argument("--target_lang", type=str, default="english", help="target language")
     parser.add_argument("--output_name", type=str, help="output name")
     parser.add_argument("--task_name", type=str, help="task name")
     parser.add_argument(
