@@ -10,8 +10,8 @@ python inference.py \
     --uid=Prompt_003_new \
     --new_str='今天天气很好.' \
     --prefix='./prompt/dev/' \
-    --source_language=english \
-    --target_language=chinese \
+    --source_lang=english \
+    --target_lang=chinese \
     --output_name=pred_clone.wav \
     --use_pt_vocoder=False \
     --voc=pwgan_aishell3 \

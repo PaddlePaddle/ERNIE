@@ -10,8 +10,8 @@ python inference.py \
     --uid=p243_new \
     --new_str='for that reason cover is impossible to be given.' \
     --prefix='./prompt/dev/' \
-    --source_language=english \
-    --target_language=english \
+    --source_lang=english \
+    --target_lang=english \
     --output_name=pred_edit.wav \
     --use_pt_vocoder=False \
     --voc=pwgan_aishell3 \

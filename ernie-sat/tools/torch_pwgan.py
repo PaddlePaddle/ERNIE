@@ -9,7 +9,7 @@ import torch
 import yaml
 
 
-class ParallelWaveGANPretrainedVocoder(torch.nn.Module):
+class TorchPWGAN(torch.nn.Module):
     """Wrapper class to load the vocoder trained with parallel_wavegan repo."""
 
     def __init__(
