@@ -11,11 +11,7 @@ import paddle
 import soundfile as sf
 import torch
 from paddle import nn
-from sedit_arg_parser import parse_args
-from utils import build_vocoder_from_file
-from utils import evaluate_durations
-from utils import get_voc_out
-from utils import is_chinese
+from ParallelWaveGAN.parallel_wavegan.utils.utils import download_pretrained_model
 
 from align import alignment
 from align import alignment_zh
@@ -25,20 +21,24 @@ from collect_fn import build_collate_fn
 from mlm import build_model_from_file
 from read_text import load_num_sequence_text
 from read_text import read_2col_text
-# from ParallelWaveGAN.parallel_wavegan.utils.utils import download_pretrained_model
+from sedit_arg_parser import parse_args
+from utils import build_vocoder_from_file
+from utils import eval_durs
+from utils import get_voc_out
+from utils import is_chinese
 
 random.seed(0)
 np.random.seed(0)
 
 
-def plot_mel_and_vocode_wav(wav_path: str,
-                            source_lang: str='english',
-                            target_lang: str='english',
-                            model_name: str="paddle_checkpoint_en",
-                            old_str: str="",
-                            new_str: str="",
-                            use_pt_vocoder: bool=False,
-                            non_autoreg: bool=True):
+def get_wav(wav_path: str,
+            source_lang: str='english',
+            target_lang: str='english',
+            model_name: str="paddle_checkpoint_en",
+            old_str: str="",
+            new_str: str="",
+            use_pt_vocoder: bool=False,
+            non_autoreg: bool=True):
     wav_org, output_feat, old_span_bdy, new_span_bdy, fs, hop_length = get_mlm_output(
         source_lang=source_lang,
         target_lang=target_lang,
@@ -50,41 +50,23 @@ def plot_mel_and_vocode_wav(wav_path: str,
 
     masked_feat = output_feat[new_span_bdy[0]:new_span_bdy[1]]
 
-    if target_lang == 'english':
-        if use_pt_vocoder:
-            output_feat = output_feat.cpu().numpy()
-            output_feat = torch.tensor(output_feat, dtype=torch.float)
-            vocoder = load_vocoder('vctk_parallel_wavegan.v1.long')
-            replaced_wav = vocoder(output_feat).cpu().numpy()
-        else:
-            replaced_wav = get_voc_out(output_feat)
+    if target_lang == 'english' and use_pt_vocoder:
+        masked_feat = masked_feat.cpu().numpy()
+        masked_feat = torch.tensor(masked_feat, dtype=torch.float)
+        vocoder = load_vocoder('vctk_parallel_wavegan.v1.long')
+        alt_wav = vocoder(masked_feat).cpu().numpy()
 
-    elif target_lang == 'chinese':
-        replaced_wav_only_mask_fst2_voc = get_voc_out(masked_feat)
+    else:
+        alt_wav = get_voc_out(masked_feat)
 
     old_time_bdy = [hop_length * x for x in old_span_bdy]
-    new_time_bdy = [hop_length * x for x in new_span_bdy]
 
-    if target_lang == 'english':
-        wav_org_replaced_paddle_voc = np.concatenate([
-            wav_org[:old_time_bdy[0]],
-            replaced_wav[new_time_bdy[0]:new_time_bdy[1]],
-            wav_org[old_time_bdy[1]:]
-        ])
+    wav_replaced = np.concatenate(
+        [wav_org[:old_time_bdy[0]], alt_wav, wav_org[old_time_bdy[1]:]])
 
-        data_dict = {"origin": wav_org, "output": wav_org_replaced_paddle_voc}
+    data_dict = {"origin": wav_org, "output": wav_replaced}
 
-    elif target_lang == 'chinese':
-        wav_org_replaced_only_mask_fst2_voc = np.concatenate([
-            wav_org[:old_time_bdy[0]], replaced_wav_only_mask_fst2_voc,
-            wav_org[old_time_bdy[1]:]
-        ])
-        data_dict = {
-            "origin": wav_org,
-            "output": wav_org_replaced_only_mask_fst2_voc,
-        }
-
-    return data_dict, old_span_bdy
+    return data_dict
 
 
 def load_vocoder(vocoder_tag: str="vctk_parallel_wavegan.v1.long"):
@@ -323,9 +305,9 @@ def get_phns_and_spans(wav_path: str,
 
 # mfa 获得的 duration 和 fs2 的 duration_predictor 获取的 duration 可能不同
 # 此处获得一个缩放比例, 用于预测值和真实值之间的缩放
-def duration_adjust_factor(orig_dur: List[int],
-                           pred_dur: List[int],
-                           phns: List[str]):
+def get_dur_adj_factor(orig_dur: List[int],
+                       pred_dur: List[int],
+                       phns: List[str]):
     length = 0
     factor_list = []
     for orig, pred, phn in zip(orig_dur, pred_dur, phns):
@@ -376,7 +358,7 @@ def prep_feats_with_dur(wav_path: str,
             new_phns = new_phns + ['sp']
     # 中文的 phns 不一定都在 fastspeech2 的字典里, 用 sp 代替
     if target_lang == "english" or target_lang == "chinese":
-        old_durs = evaluate_durations(old_phns, target_lang=source_lang)
+        old_durs = eval_durs(old_phns, target_lang=source_lang)
     else:
         assert target_lang == "chinese" or target_lang == "english", \
             "calculate duration_predict is not support for this language..."
@@ -385,11 +367,11 @@ def prep_feats_with_dur(wav_path: str,
     if '[MASK]' in new_str:
         new_phns = old_phns
         span_to_add = span_to_repl
-        d_factor_left = duration_adjust_factor(
+        d_factor_left = get_dur_adj_factor(
             orig_dur=orig_old_durs[:span_to_repl[0]],
             pred_dur=old_durs[:span_to_repl[0]],
             phns=old_phns[:span_to_repl[0]])
-        d_factor_right = duration_adjust_factor(
+        d_factor_right = get_dur_adj_factor(
             orig_dur=orig_old_durs[span_to_repl[1]:],
             pred_dur=old_durs[span_to_repl[1]:],
             phns=old_phns[span_to_repl[1]:])
@@ -397,15 +379,14 @@ def prep_feats_with_dur(wav_path: str,
         new_durs_adjusted = [d_factor * i for i in old_durs]
     else:
         if duration_adjust:
-            d_factor = duration_adjust_factor(
+            d_factor = get_dur_adj_factor(
                 orig_dur=orig_old_durs, pred_dur=old_durs, phns=old_phns)
-            print("d_factor:", d_factor)
             d_factor = d_factor * 1.25
         else:
             d_factor = 1
 
         if target_lang == "english" or target_lang == "chinese":
-            new_durs = evaluate_durations(new_phns, target_lang=target_lang)
+            new_durs = eval_durs(new_phns, target_lang=target_lang)
         else:
             assert target_lang == "chinese" or target_lang == "english", \
                 "calculate duration_predict is not support for this language..."
@@ -616,7 +597,7 @@ def evaluate(uid: str,
 
     print('new_str is ', new_str)
 
-    results_dict, old_span = plot_mel_and_vocode_wav(
+    results_dict = get_wav(
         source_lang=source_lang,
         target_lang=target_lang,
         model_name=model_name,

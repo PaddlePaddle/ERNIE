@@ -1,5 +1,4 @@
 import os
-from typing import List
 from typing import Optional
 
 import numpy as np
@@ -32,6 +31,7 @@ model_alias = {
     "paddlespeech.t2s.models.parallel_wavegan:PWGInference",
 }
 
+
 def is_chinese(ch):
     if u'\u4e00' <= ch <= u'\u9fff':
         return True
@@ -61,7 +61,7 @@ def get_voc_out(mel):
     # print("current vocoder: ", args.voc)
     with open(args.voc_config) as f:
         voc_config = CfgNode(yaml.safe_load(f))
-    voc_inference = voc_inference = get_voc_inference(
+    voc_inference = get_voc_inference(
         voc=args.voc,
         voc_config=voc_config,
         voc_ckpt=args.voc_ckpt,
@@ -164,7 +164,7 @@ def get_voc_inference(
     return voc_inference
 
 
-def evaluate_durations(phns, target_lang="chinese", fs=24000, hop_length=300):
+def eval_durs(phns, target_lang="chinese", fs=24000, hop_length=300):
     args = parse_args()
 
     if target_lang == 'english':
@@ -176,10 +176,10 @@ def evaluate_durations(phns, target_lang="chinese", fs=24000, hop_length=300):
 
     elif target_lang == 'chinese':
         args.am = "fastspeech2_csmsc"
-        args.am_config="download/fastspeech2_conformer_baker_ckpt_0.5/conformer.yaml"
+        args.am_config = "download/fastspeech2_conformer_baker_ckpt_0.5/conformer.yaml"
         args.am_ckpt = "download/fastspeech2_conformer_baker_ckpt_0.5/snapshot_iter_76000.pdz"
         args.am_stat = "download/fastspeech2_conformer_baker_ckpt_0.5/speech_stats.npy"
-        args.phones_dict ="download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt"
+        args.phones_dict = "download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt"
 
     if args.ngpu == 0:
         paddle.set_device("cpu")
@@ -211,11 +211,10 @@ def evaluate_durations(phns, target_lang="chinese", fs=24000, hop_length=300):
     phonemes = [phn if phn in vocab_phones else "sp" for phn in phns]
 
     phone_ids = [vocab_phones[item] for item in phonemes]
-    phone_ids_new = phone_ids
-    phone_ids_new.append(vocab_size - 1)
-    phone_ids_new = paddle.to_tensor(np.array(phone_ids_new, np.int64))
-    _, d_outs, _, _ = am.inference(phone_ids_new, spk_id=None, spk_emb=None)
+    phone_ids.append(vocab_size - 1)
+    phone_ids = paddle.to_tensor(np.array(phone_ids, np.int64))
+    _, d_outs, _, _ = am.inference(phone_ids, spk_id=None, spk_emb=None)
     pre_d_outs = d_outs
-    phoneme_durations_new = pre_d_outs * hop_length / fs
-    phoneme_durations_new = phoneme_durations_new.tolist()[:-1]
-    return phoneme_durations_new
+    phu_durs_new = pre_d_outs * hop_length / fs
+    phu_durs_new = phu_durs_new.tolist()[:-1]
+    return phu_durs_new
