@@ -7,7 +7,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-import numpy as np
 import paddle
 import yaml
 from paddle import nn
@@ -395,13 +394,13 @@ class MLM(nn.Layer):
             use_teacher_forcing: bool=False, ) -> Dict[str, paddle.Tensor]:
         '''
         Args:
-            speech (paddle.Tensor): input speech (B, Tmax, D).
-            text (paddle.Tensor): input text (B, Tmax2).
-            masked_pos (paddle.Tensor): masked position of input speech (B, Tmax)
-            speech_mask (paddle.Tensor): mask of speech (B, 1, Tmax).
-            text_mask (paddle.Tensor): mask of text (B, 1, Tmax2).
-            speech_seg_pos (paddle.Tensor): n-th phone of each mel, 0<=n<=Tmax2 (B, Tmax).
-            text_seg_pos (paddle.Tensor): n-th phone of each phone, 0<=n<=Tmax2 (B, Tmax2).
+            speech (paddle.Tensor): input speech (1, Tmax, D).
+            text (paddle.Tensor): input text (1, Tmax2).
+            masked_pos (paddle.Tensor): masked position of input speech (1, Tmax)
+            speech_mask (paddle.Tensor): mask of speech (1, 1, Tmax).
+            text_mask (paddle.Tensor): mask of text (1, 1, Tmax2).
+            speech_seg_pos (paddle.Tensor): n-th phone of each mel, 0<=n<=Tmax2 (1, Tmax).
+            text_seg_pos (paddle.Tensor): n-th phone of each phone, 0<=n<=Tmax2 (1, Tmax2).
             span_bdy (List[int]): masked mel boundary of input speech (2,)
             use_teacher_forcing (bool): whether to use teacher forcing
         Returns:
@@ -410,7 +409,6 @@ class MLM(nn.Layer):
                 [Tensor(shape=[1, 181, 80]), Tensor(shape=[80, 80]), Tensor(shape=[1, 67, 80])]
         '''
 
-        outs = [speech[:, :span_bdy[0]]]
         z_cache = None
         if use_teacher_forcing:
             before_outs, zs, *_ = self.forward(
@@ -423,8 +421,11 @@ class MLM(nn.Layer):
                 text_seg_pos=text_seg_pos)
             if zs is None:
                 zs = before_outs
+
+            speech = speech.squeeze(0)
+            outs = [speech[:span_bdy[0]]]
             outs += [zs[0][span_bdy[0]:span_bdy[1]]]
-            outs += [speech[:, span_bdy[1]:]]
+            outs += [speech[span_bdy[1]:]]
             return outs
         return None
 

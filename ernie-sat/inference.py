@@ -546,19 +546,9 @@ def decode_with_model(mlm_model: nn.Layer,
         text_seg_pos=feats['text_seg_pos'],
         span_bdy=new_span_bdy,
         use_teacher_forcing=use_teacher_forcing)
-    if 0 in output[0].shape and 0 not in output[-1].shape:
-        output_feat = paddle.concat(
-            output[1:-1] + [output[-1].squeeze()], axis=0)
-    elif 0 not in output[0].shape and 0 in output[-1].shape:
-        output_feat = paddle.concat(
-            [output[0].squeeze()] + output[1:-1], axis=0)
-    elif 0 in output[0].shape and 0 in output[-1].shape:
-        output_feat = paddle.concat(output[1:-1], axis=0)
-    else:
-        output_feat = paddle.concat(
-            [output[0].squeeze(0)] + output[1:-1] + [output[-1].squeeze(0)],
-            axis=0)
 
+    # 拼接音频
+    output_feat = paddle.concat(x=output, axis=0)
     wav_org, _ = librosa.load(wav_path, sr=fs)
     return wav_org, output_feat, old_span_bdy, new_span_bdy, fs, hop_length
 
