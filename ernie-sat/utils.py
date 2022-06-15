@@ -32,7 +32,6 @@ model_alias = {
     "paddlespeech.t2s.models.parallel_wavegan:PWGInference",
 }
 
-
 def is_chinese(ch):
     if u'\u4e00' <= ch <= u'\u9fff':
         return True
@@ -55,11 +54,9 @@ def build_vocoder_from_file(
         raise ValueError(f"{vocoder_file} is not supported format.")
 
 
-def get_voc_out(mel, target_lang: str="chinese"):
+def get_voc_out(mel):
     # vocoder
     args = parse_args()
-
-    assert target_lang == "chinese" or target_lang == "english", "In get_voc_out function, target_lang is illegal..."
 
     # print("current vocoder: ", args.voc)
     with open(args.voc_config) as f:
@@ -167,27 +164,29 @@ def get_voc_inference(
     return voc_inference
 
 
-def evaluate_durations(phns: List[str],
-                       target_lang: str="chinese",
-                       fs: int=24000,
-                       hop_length: int=300):
+def evaluate_durations(phns, target_lang="chinese", fs=24000, hop_length=300):
     args = parse_args()
 
     if target_lang == 'english':
-        args.lang = 'en'
+        args.am = "fastspeech2_ljspeech"
+        args.am_config = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/default.yaml"
+        args.am_ckpt = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/snapshot_iter_100000.pdz"
+        args.am_stat = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/speech_stats.npy"
+        args.phones_dict = "download/fastspeech2_nosil_ljspeech_ckpt_0.5/phone_id_map.txt"
 
     elif target_lang == 'chinese':
-        args.lang = 'zh'
+        args.am = "fastspeech2_csmsc"
+        args.am_config="download/fastspeech2_conformer_baker_ckpt_0.5/conformer.yaml"
+        args.am_ckpt = "download/fastspeech2_conformer_baker_ckpt_0.5/snapshot_iter_76000.pdz"
+        args.am_stat = "download/fastspeech2_conformer_baker_ckpt_0.5/speech_stats.npy"
+        args.phones_dict ="download/fastspeech2_conformer_baker_ckpt_0.5/phone_id_map.txt"
 
-    # args = parser.parse_args(args=[])
     if args.ngpu == 0:
         paddle.set_device("cpu")
     elif args.ngpu > 0:
         paddle.set_device("gpu")
     else:
         print("ngpu should >= 0 !")
-
-    assert target_lang == "chinese" or target_lang == "english", "In evaluate_durations function, target_lang is illegal..."
 
     # Init body.
     with open(args.am_config) as f:
@@ -203,21 +202,19 @@ def evaluate_durations(phns: List[str],
         speaker_dict=args.speaker_dict,
         return_am=True)
 
-    torch_phns = phns
     vocab_phones = {}
     with open(args.phones_dict, "r") as f:
         phn_id = [line.strip().split() for line in f.readlines()]
     for tone, id in phn_id:
         vocab_phones[tone] = int(id)
     vocab_size = len(vocab_phones)
-    phonemes = [phn if phn in vocab_phones else "sp" for phn in torch_phns]
+    phonemes = [phn if phn in vocab_phones else "sp" for phn in phns]
 
     phone_ids = [vocab_phones[item] for item in phonemes]
     phone_ids_new = phone_ids
     phone_ids_new.append(vocab_size - 1)
     phone_ids_new = paddle.to_tensor(np.array(phone_ids_new, np.int64))
-    normalized_mel, d_outs, p_outs, e_outs = am.inference(
-        phone_ids_new, spk_id=None, spk_emb=None)
+    _, d_outs, _, _ = am.inference(phone_ids_new, spk_id=None, spk_emb=None)
     pre_d_outs = d_outs
     phoneme_durations_new = pre_d_outs * hop_length / fs
     phoneme_durations_new = phoneme_durations_new.tolist()[:-1]

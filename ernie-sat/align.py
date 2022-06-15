@@ -1,18 +1,150 @@
-#!/usr/bin/env python
 """ Usage:
     align.py wavfile trsfile outwordfile outphonefile
 """
-import multiprocessing as mp
 import os
 import sys
-
-from tqdm import tqdm
 
 PHONEME = 'tools/aligner/english_envir/english2phoneme/phoneme'
 MODEL_DIR_EN = 'tools/aligner/english'
 MODEL_DIR_ZH = 'tools/aligner/mandarin'
 HVITE = 'tools/htk/HTKTools/HVite'
 HCOPY = 'tools/htk/HTKTools/HCopy'
+
+
+def get_unk_phns(word_str: str):
+    tmpbase = '/tmp/tp.'
+    f = open(tmpbase + 'temp.words', 'w')
+    f.write(word_str)
+    f.close()
+    os.system(PHONEME + ' ' + tmpbase + 'temp.words' + ' ' + tmpbase +
+              'temp.phons')
+    f = open(tmpbase + 'temp.phons', 'r')
+    lines2 = f.readline().strip().split()
+    f.close()
+    phns = []
+    for phn in lines2:
+        phons = phn.replace('\n', '').replace(' ', '')
+        seq = []
+        j = 0
+        while (j < len(phons)):
+            if (phons[j] > 'Z'):
+                if (phons[j] == 'j'):
+                    seq.append('JH')
+                elif (phons[j] == 'h'):
+                    seq.append('HH')
+                else:
+                    seq.append(phons[j].upper())
+                j += 1
+            else:
+                p = phons[j:j + 2]
+                if (p == 'WH'):
+                    seq.append('W')
+                elif (p in ['TH', 'SH', 'HH', 'DH', 'CH', 'ZH', 'NG']):
+                    seq.append(p)
+                elif (p == 'AX'):
+                    seq.append('AH0')
+                else:
+                    seq.append(p + '1')
+                j += 2
+        phns.extend(seq)
+    return phns
+
+
+def words2phns(line: str):
+    '''
+    Args:
+        line (str): input text.
+        eg: for that reason cover is impossible to be given.
+    Returns:
+        List[str]: phones of input text.
+            eg:
+            ['F', 'AO1', 'R', 'DH', 'AE1', 'T', 'R', 'IY1', 'Z', 'AH0', 'N', 'K', 'AH1', 'V', 'ER0',
+            'IH1', 'Z', 'IH2', 'M', 'P', 'AA1', 'S', 'AH0', 'B', 'AH0', 'L', 'T', 'UW1', 'B', 'IY1', 
+            'G', 'IH1', 'V', 'AH0', 'N']
+
+        Dict(str, str): key - idx_word
+                        value - phones
+            eg:
+            {'0_FOR': ['F', 'AO1', 'R'], '1_THAT': ['DH', 'AE1', 'T'], '2_REASON': ['R', 'IY1', 'Z', 'AH0', 'N'],
+            '3_COVER': ['K', 'AH1', 'V', 'ER0'], '4_IS': ['IH1', 'Z'], '5_IMPOSSIBLE': ['IH2', 'M', 'P', 'AA1', 'S', 'AH0', 'B', 'AH0', 'L'],
+            '6_TO': ['T', 'UW1'], '7_BE': ['B', 'IY1'], '8_GIVEN': ['G', 'IH1', 'V', 'AH0', 'N']}
+    '''
+    dictfile = MODEL_DIR_EN + '/dict'
+    line = line.strip()
+    words = []
+    for pun in [',', '.', ':', ';', '!', '?', '"', '(', ')', '--', '---']:
+        line = line.replace(pun, ' ')
+    for wrd in line.split():
+        if (wrd[-1] == '-'):
+            wrd = wrd[:-1]
+        if (wrd[0] == "'"):
+            wrd = wrd[1:]
+        if wrd:
+            words.append(wrd)
+    ds = set([])
+    word2phns_dict = {}
+    with open(dictfile, 'r') as fid:
+        for line in fid:
+            word = line.split()[0]
+            ds.add(word)
+            if word not in word2phns_dict.keys():
+                word2phns_dict[word] = " ".join(line.split()[1:])
+
+    phns = []
+    wrd2phns = {}
+    for index, wrd in enumerate(words):
+        if wrd == '[MASK]':
+            wrd2phns[str(index) + "_" + wrd] = [wrd]
+            phns.append(wrd)
+        elif (wrd.upper() not in ds):
+            wrd2phns[str(index) + "_" + wrd.upper()] = get_unk_phns(wrd)
+            phns.extend(get_unk_phns(wrd))
+        else:
+            wrd2phns[str(index) +
+                     "_" + wrd.upper()] = word2phns_dict[wrd.upper()].split()
+            phns.extend(word2phns_dict[wrd.upper()].split())
+    return phns, wrd2phns
+
+
+def words2phns_zh(line: str):
+    dictfile = MODEL_DIR_ZH + '/dict'
+    line = line.strip()
+    words = []
+    for pun in [
+            ',', '.', ':', ';', '!', '?', '"', '(', ')', '--', '---', u'，',
+            u'。', u'：', u'；', u'！', u'？', u'（', u'）'
+    ]:
+        line = line.replace(pun, ' ')
+    for wrd in line.split():
+        if (wrd[-1] == '-'):
+            wrd = wrd[:-1]
+        if (wrd[0] == "'"):
+            wrd = wrd[1:]
+        if wrd:
+            words.append(wrd)
+
+    ds = set([])
+    word2phns_dict = {}
+    with open(dictfile, 'r') as fid:
+        for line in fid:
+            word = line.split()[0]
+            ds.add(word)
+            if word not in word2phns_dict.keys():
+                word2phns_dict[word] = " ".join(line.split()[1:])
+
+    phns = []
+    wrd2phns = {}
+    for index, wrd in enumerate(words):
+        if wrd == '[MASK]':
+            wrd2phns[str(index) + "_" + wrd] = [wrd]
+            phns.append(wrd)
+        elif (wrd.upper() not in ds):
+            print("出现非法词错误,请输入正确的文本...")
+        else:
+            wrd2phns[str(index) + "_" + wrd] = word2phns_dict[wrd].split()
+            phns.extend(word2phns_dict[wrd].split())
+
+    return phns, wrd2phns
 
 
 def prep_txt_zh(line: str, tmpbase: str, dictfile: str):
@@ -82,7 +214,7 @@ def prep_txt_en(line: str, tmpbase, dictfile):
     try:
         os.system(PHONEME + ' ' + tmpbase + '_unk.words' + ' ' + tmpbase +
                   '_unk.phons')
-    except:
+    except Exception:
         print('english2phoneme error!')
         sys.exit(1)
 
@@ -148,19 +280,22 @@ def _get_user():
 
 
 def alignment(wav_path: str, text: str):
+    '''
+    intervals: List[phn, start, end]
+    '''
     tmpbase = '/tmp/' + _get_user() + '_' + str(os.getpid())
 
     #prepare wav and trs files
     try:
         os.system('sox ' + wav_path + ' -r 16000 ' + tmpbase + '.wav remix -')
-    except:
+    except Exception:
         print('sox error!')
         return None
 
     #prepare clean_transcript file
     try:
-        prep_txt_en(text, tmpbase, MODEL_DIR_EN + '/dict')
-    except:
+        prep_txt_en(line=text, tmpbase=tmpbase, dictfile=MODEL_DIR_EN + '/dict')
+    except Exception:
         print('prep_txt error!')
         return None
 
@@ -169,7 +304,7 @@ def alignment(wav_path: str, text: str):
         with open(tmpbase + '.txt', 'r') as fid:
             txt = fid.readline()
         prep_mlf(txt, tmpbase)
-    except:
+    except Exception:
         print('prep_mlf error!')
         return None
 
@@ -177,7 +312,7 @@ def alignment(wav_path: str, text: str):
     try:
         os.system(HCOPY + ' -C ' + MODEL_DIR_EN + '/16000/config ' + tmpbase +
                   '.wav' + ' ' + tmpbase + '.plp')
-    except:
+    except Exception:
         print('HCopy error!')
         return None
 
@@ -188,7 +323,7 @@ def alignment(wav_path: str, text: str):
                   + '/16000/hmmdefs -i ' + tmpbase + '.aligned ' + tmpbase +
                   '.dict ' + MODEL_DIR_EN + '/monophones ' + tmpbase +
                   '.plp 2>&1 > /dev/null')
-    except:
+    except Exception:
         print('HVite error!')
         return None
 
@@ -200,7 +335,7 @@ def alignment(wav_path: str, text: str):
     with open(tmpbase + '.aligned', 'r') as fid:
         lines = fid.readlines()
     i = 2
-    times2 = []
+    intervals = []
     word2phns = {}
     current_word = ''
     index = 0
@@ -210,7 +345,7 @@ def alignment(wav_path: str, text: str):
             phn = splited_line[2]
             pst = (int(splited_line[0]) / 1000 + 125) / 10000
             pen = (int(splited_line[1]) / 1000 + 125) / 10000
-            times2.append([phn, pst, pen])
+            intervals.append([phn, pst, pen])
             # splited_line[-1]!='sp'
             if len(splited_line) == 5:
                 current_word = str(index) + '_' + splited_line[-1]
@@ -219,10 +354,10 @@ def alignment(wav_path: str, text: str):
             elif len(splited_line) == 4:
                 word2phns[current_word] += ' ' + phn
         i += 1
-    return times2, word2phns
+    return intervals, word2phns
 
 
-def alignment_zh(wav_path, text_string):
+def alignment_zh(wav_path: str, text: str):
     tmpbase = '/tmp/' + _get_user() + '_' + str(os.getpid())
 
     #prepare wav and trs files
@@ -230,18 +365,19 @@ def alignment_zh(wav_path, text_string):
         os.system('sox ' + wav_path + ' -r 16000 -b 16 ' + tmpbase +
                   '.wav remix -')
 
-    except:
+    except Exception:
         print('sox error!')
         return None
 
     #prepare clean_transcript file
     try:
-        unk_words = prep_txt_zh(text_string, tmpbase, MODEL_DIR_ZH + '/dict')
+        unk_words = prep_txt_zh(
+            line=text, tmpbase=tmpbase, dictfile=MODEL_DIR_ZH + '/dict')
         if unk_words:
             print('Error! Please add the following words to dictionary:')
             for unk in unk_words:
                 print("非法words: ", unk)
-    except:
+    except Exception:
         print('prep_txt error!')
         return None
 
@@ -250,7 +386,7 @@ def alignment_zh(wav_path, text_string):
         with open(tmpbase + '.txt', 'r') as fid:
             txt = fid.readline()
         prep_mlf(txt, tmpbase)
-    except:
+    except Exception:
         print('prep_mlf error!')
         return None
 
@@ -258,7 +394,7 @@ def alignment_zh(wav_path, text_string):
     try:
         os.system(HCOPY + ' -C ' + MODEL_DIR_ZH + '/16000/config ' + tmpbase +
                   '.wav' + ' ' + tmpbase + '.plp')
-    except:
+    except Exception:
         print('HCopy error!')
         return None
 
@@ -270,7 +406,7 @@ def alignment_zh(wav_path, text_string):
                   + '/dict ' + MODEL_DIR_ZH + '/monophones ' + tmpbase +
                   '.plp 2>&1 > /dev/null')
 
-    except:
+    except Exception:
         print('HVite error!')
         return None
 
@@ -283,7 +419,7 @@ def alignment_zh(wav_path, text_string):
         lines = fid.readlines()
 
     i = 2
-    times2 = []
+    intervals = []
     word2phns = {}
     current_word = ''
     index = 0
@@ -293,7 +429,7 @@ def alignment_zh(wav_path, text_string):
             phn = splited_line[2]
             pst = (int(splited_line[0]) / 1000 + 125) / 10000
             pen = (int(splited_line[1]) / 1000 + 125) / 10000
-            times2.append([phn, pst, pen])
+            intervals.append([phn, pst, pen])
             # splited_line[-1]!='sp'
             if len(splited_line) == 5:
                 current_word = str(index) + '_' + splited_line[-1]
@@ -302,4 +438,4 @@ def alignment_zh(wav_path, text_string):
             elif len(splited_line) == 4:
                 word2phns[current_word] += ' ' + phn
         i += 1
-    return times2, word2phns
+    return intervals, word2phns

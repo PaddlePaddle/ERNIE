@@ -39,9 +39,9 @@ ERNIE-SAT 中我们提出了两项创新：
 
 ### 2.预训练模型
 预训练模型 ERNIE-SAT 的模型如下所示:
-- [ERNIE-SAT_ZH](http://bj.bcebos.com/wenxin-models/model-ernie-sat-base-zh.tar.gz) 
-- [ERNIE-SAT_EN](http://bj.bcebos.com/wenxin-models/model-ernie-sat-base-en.tar.gz)  
-- [ERNIE-SAT_ZH_and_EN](http://bj.bcebos.com/wenxin-models/model-ernie-sat-base-en_zh.tar.gz) 
+- [ERNIE-SAT_ZH](https://paddlespeech.bj.bcebos.com/Parakeet/released_models/ernie_sat/old/model-ernie-sat-base-zh.tar.gz) 
+- [ERNIE-SAT_EN](https://paddlespeech.bj.bcebos.com/Parakeet/released_models/ernie_sat/old/model-ernie-sat-base-en.tar.gz)  
+- [ERNIE-SAT_ZH_and_EN](https://paddlespeech.bj.bcebos.com/Parakeet/released_models/ernie_sat/old/model-ernie-sat-base-en_zh.tar.gz) 
 
 
 创建 pretrained_model 文件夹，下载上述 ERNIE-SAT 预训练模型并将其解压: 
@@ -108,7 +108,7 @@ prompt/dev
 3. `--voc` 声码器(vocoder)格式是否符合 {model_name}_{dataset}
 4. `--voc_config`, `--voc_checkpoint`, `--voc_stat` 是声码器的参数，对应于 parallel wavegan 预训练模型中的 3 个文件。
 5. `--lang` 对应模型的语言可以是 `zh` 或 `en` 。
-6. `--ngpu` 要使用的GPU数，如果 ngpu==0，则使用 cpu。
+6. `--ngpu` 要使用的 GPU 数，如果 ngpu==0，则使用 cpu。
 7. ` --model_name` 模型名称
 8. ` --uid` 特定提示(prompt)语音的 id
 9. ` --new_str` 输入的文本(本次开源暂时先设置特定的文本)
@@ -125,4 +125,3 @@ sh run_sedit_en.sh       # 语音编辑任务(英文)
 sh run_gen_en.sh         # 个性化语音合成任务(英文)
 sh run_clone_en_to_zh.sh # 跨语言语音合成任务(英文到中文的语音克隆)
 ```
-

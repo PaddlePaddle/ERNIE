@@ -5,7 +5,7 @@ from typing import List
 from typing import Union
 
 
-def read_2column_text(path: Union[Path, str]) -> Dict[str, str]:
+def read_2col_text(path: Union[Path, str]) -> Dict[str, str]:
     """Read a text file having 2 column as dict object.
 
     Examples:
@@ -13,7 +13,7 @@ def read_2column_text(path: Union[Path, str]) -> Dict[str, str]:
             key1 /some/path/a.wav
             key2 /some/path/b.wav
 
-        >>> read_2column_text('wav.scp')
+        >>> read_2col_text('wav.scp')
         {'key1': '/some/path/a.wav', 'key2': '/some/path/b.wav'}
 
     """
