@@ -66,12 +66,6 @@ def parse_args():
     )
     # other
     parser.add_argument(
-        '--lang',
-        type=str,
-        default='en',
-        help='Choose model language. zh or en')
-
-    parser.add_argument(
         "--ngpu", type=int, default=1, help="if ngpu == 0, use cpu.")
     # parser.add_argument("--test_metadata", type=str, help="test metadata.")
     # parser.add_argument("--output_dir", type=str, help="output dir.")

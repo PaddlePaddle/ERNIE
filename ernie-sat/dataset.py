@@ -4,6 +4,68 @@ import numpy as np
 import paddle
 
 
+# mask phones
+def phones_masking(xs_pad: paddle.Tensor,
+                   src_mask: paddle.Tensor,
+                   align_start: paddle.Tensor,
+                   align_end: paddle.Tensor,
+                   align_start_lens: paddle.Tensor,
+                   mlm_prob: float=0.8,
+                   mean_phn_span: int=8,
+                   span_bdy: paddle.Tensor=None):
+    '''
+    Args:
+        xs_pad (paddle.Tensor): input speech (B, Tmax, D).
+        src_mask (paddle.Tensor): mask of speech (B, 1, Tmax).
+        align_start (paddle.Tensor): frame level phone alignment start (B, Tmax2).
+        align_end (paddle.Tensor): frame level phone alignment end (B, Tmax2).
+        align_start_lens (paddle.Tensor): length of align_start (B, ).
+        mlm_prob (float):
+        mean_phn_span (int):
+        span_bdy (paddle.Tensor): masked mel boundary of input speech (B, 2).
+    Returns:
+        paddle.Tensor[bool]: masked position of input speech (B, Tmax).
+    '''
+    bz, sent_len, _ = paddle.shape(xs_pad)
+    masked_pos = paddle.zeros((bz, sent_len))
+    if mlm_prob == 1.0:
+        masked_pos += 1
+    elif mean_phn_span == 0:
+        # only speech
+        length = sent_len
+        mean_phn_span = min(length * mlm_prob // 3, 50)
+        masked_phn_idxs = random_spans_noise_mask(
+            length=length, mlm_prob=mlm_prob,
+            mean_phn_span=mean_phn_span).nonzero()
+        masked_pos[:, masked_phn_idxs] = 1
+    else:
+        for idx in range(bz):
+            # for inference
+            if span_bdy is not None:
+                for s, e in zip(span_bdy[idx][::2], span_bdy[idx][1::2]):
+                    masked_pos[idx, s:e] = 1
+            # for training
+            else:
+                length = align_start_lens[idx]
+                if length < 2:
+                    continue
+                masked_phn_idxs = random_spans_noise_mask(
+                    length=length,
+                    mlm_prob=mlm_prob,
+                    mean_phn_span=mean_phn_span).nonzero()
+                masked_start = align_start[idx][masked_phn_idxs].tolist()
+                masked_end = align_end[idx][masked_phn_idxs].tolist()
+
+                for s, e in zip(masked_start, masked_end):
+                    masked_pos[idx, s:e] = 1
+    non_eos_mask = paddle.reshape(src_mask, paddle.shape(xs_pad)[:2])
+    masked_pos = masked_pos * non_eos_mask
+    masked_pos = paddle.cast(masked_pos, 'bool')
+
+    return masked_pos
+
+
+# mask speech and phones
 def phones_text_masking(xs_pad: paddle.Tensor,
                         src_mask: paddle.Tensor,
                         text_pad: paddle.Tensor,
@@ -11,37 +73,56 @@ def phones_text_masking(xs_pad: paddle.Tensor,
                         align_start: paddle.Tensor,
                         align_end: paddle.Tensor,
                         align_start_lens: paddle.Tensor,
-                        mlm_prob: float,
-                        mean_phn_span: float,
+                        mlm_prob: float=0.8,
+                        mean_phn_span: int=8,
                         span_bdy: paddle.Tensor=None):
+    '''
+    Args:
+        xs_pad (paddle.Tensor): input speech (B, Tmax, D).
+        src_mask (paddle.Tensor): mask of speech (B, 1, Tmax).
+        text_pad (paddle.Tensor): input text (B, Tmax2).
+        text_mask (paddle.Tensor): mask of text (B, 1, Tmax2).
+        align_start (paddle.Tensor): frame level phone alignment start (B, Tmax2).
+        align_end (paddle.Tensor): frame level phone alignment end (B, Tmax2).
+        align_start_lens (paddle.Tensor): length of align_start (B, ).
+        mlm_prob (float):
+        mean_phn_span (int):
+        span_bdy (paddle.Tensor): masked mel boundary of input speech (B, 2).
+    Returns:
+        paddle.Tensor[bool]: masked position of input speech (B, Tmax).
+        paddle.Tensor[bool]: masked position of input text (B, Tmax2).
+    '''
     bz, sent_len, _ = paddle.shape(xs_pad)
     masked_pos = paddle.zeros((bz, sent_len))
     _, text_len = paddle.shape(text_pad)
     text_mask_num_lower = math.ceil(text_len * (1 - mlm_prob) * 0.5)
     text_masked_pos = paddle.zeros((bz, text_len))
-    y_masks = None
 
     if mlm_prob == 1.0:
         masked_pos += 1
-        # y_masks = tril_masks
     elif mean_phn_span == 0:
         # only speech 
         length = sent_len
         mean_phn_span = min(length * mlm_prob // 3, 50)
-        masked_phn_idxs = random_spans_noise_mask(length, mlm_prob,
-                                                  mean_phn_span).nonzero()
+        masked_phn_idxs = random_spans_noise_mask(
+            length=length, mlm_prob=mlm_prob,
+            mean_phn_span=mean_phn_span).nonzero()
         masked_pos[:, masked_phn_idxs] = 1
     else:
         for idx in range(bz):
+            # for inference
             if span_bdy is not None:
                 for s, e in zip(span_bdy[idx][::2], span_bdy[idx][1::2]):
                     masked_pos[idx, s:e] = 1
+            # for training
             else:
                 length = align_start_lens[idx]
                 if length < 2:
                     continue
                 masked_phn_idxs = random_spans_noise_mask(
-                    length, mlm_prob, mean_phn_span).nonzero()
+                    length=length,
+                    mlm_prob=mlm_prob,
+                    mean_phn_span=mean_phn_span).nonzero()
                 unmasked_phn_idxs = list(
                     set(range(length)) - set(masked_phn_idxs[0].tolist()))
                 np.random.shuffle(unmasked_phn_idxs)
@@ -58,60 +139,76 @@ def phones_text_masking(xs_pad: paddle.Tensor,
     masked_pos = paddle.cast(masked_pos, 'bool')
     text_masked_pos = paddle.cast(text_masked_pos, 'bool')
 
-    return masked_pos, text_masked_pos, y_masks
+    return masked_pos, text_masked_pos
 
 
-def get_seg_pos_reduce_duration(
-        speech_pad: paddle.Tensor,
-        text_pad: paddle.Tensor,
-        align_start: paddle.Tensor,
-        align_end: paddle.Tensor,
-        align_start_lens: paddle.Tensor,
-        sega_emb: bool,
-        masked_pos: paddle.Tensor,
-        feats_lens: paddle.Tensor, ):
+def get_seg_pos(speech_pad: paddle.Tensor,
+                text_pad: paddle.Tensor,
+                align_start: paddle.Tensor,
+                align_end: paddle.Tensor,
+                align_start_lens: paddle.Tensor,
+                seg_emb: bool=False):
+    '''
+    Args:
+        speech_pad (paddle.Tensor): input speech (B, Tmax, D).
+        text_pad (paddle.Tensor): input text (B, Tmax2).
+        align_start (paddle.Tensor): frame level phone alignment start (B, Tmax2).
+        align_end (paddle.Tensor): frame level phone alignment end (B, Tmax2).
+        align_start_lens (paddle.Tensor): length of align_start (B, ).
+        seg_emb (bool): whether to use segment embedding.
+    Returns:
+        paddle.Tensor[int]: n-th phone of each mel, 0<=n<=Tmax2 (B, Tmax).
+            eg: 
+            Tensor(shape=[1, 328], dtype=int64, place=Place(gpu:0), stop_gradient=True,
+            [[0 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+            1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+            1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+            1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+            1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 2 , 2 , 2 , 3 , 3 , 3 , 4 , 4 , 4 ,
+            5 , 5 , 5 , 6 , 6 , 6 , 6 , 6 , 6 , 6 , 6 , 7 , 7 , 7 , 7 , 7 , 7 , 7 ,
+            7 , 8 , 8 , 8 , 8 , 9 , 9 , 9 , 9 , 9 , 9 , 9 , 9 , 10, 10, 10, 10, 10,
+            10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13,
+            13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15,
+            15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17,
+            17, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20,
+            20, 20, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 23, 23,
+            23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25,
+            25, 26, 26, 26, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 29,
+            29, 29, 29, 29, 29, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31, 31, 31, 32,
+            32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 34, 34, 34, 34, 35, 35,
+            35, 35, 35, 35, 35, 35, 36, 36, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+            37, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
+            38, 38, 0 , 0 ]])
+        paddle.Tensor[int]: n-th phone of each phone, 0<=n<=Tmax2 (B, Tmax2).
+            eg: 
+            Tensor(shape=[1, 38], dtype=int64, place=Place(gpu:0), stop_gradient=True,
+                [[1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10, 11, 12, 13, 14, 15, 16, 17, 
+                18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 
+                36, 37, 38]])
+    '''
+
     bz, speech_len, _ = paddle.shape(speech_pad)
-    text_seg_pos = paddle.zeros(paddle.shape(text_pad))
-    speech_seg_pos = paddle.zeros((bz, speech_len), dtype=text_pad.dtype)
+    _, text_len = paddle.shape(text_pad)
 
-    reordered_idx = paddle.zeros((bz, speech_len), dtype=align_start_lens.dtype)
+    text_seg_pos = paddle.zeros((bz, text_len), dtype='int64')
+    speech_seg_pos = paddle.zeros((bz, speech_len), dtype='int64')
 
-    durations = paddle.ones((bz, speech_len), dtype=align_start_lens.dtype)
-    max_reduced_length = 0
-    if not sega_emb:
-        return speech_pad, masked_pos, speech_seg_pos, text_seg_pos, durations
+    if not seg_emb:
+        return speech_seg_pos, text_seg_pos
     for idx in range(bz):
-        first_idx = []
-        last_idx = []
         align_length = align_start_lens[idx]
         for j in range(align_length):
             s, e = align_start[idx][j], align_end[idx][j]
-            if j == 0:
-                if paddle.sum(masked_pos[idx][0:s]) == 0:
-                    first_idx.extend(range(0, s))
-                else:
-                    first_idx.extend([0])
-                    last_idx.extend(range(1, s))
-            if paddle.sum(masked_pos[idx][s:e]) == 0:
-                first_idx.extend(range(s, e))
-            else:
-                first_idx.extend([s])
-                last_idx.extend(range(s + 1, e))
-                durations[idx][s] = e - s
-            speech_seg_pos[idx][s:e] = j + 1
-            text_seg_pos[idx][j] = j + 1
-        max_reduced_length = max(
-            len(first_idx) + feats_lens[idx] - e, max_reduced_length)
-        first_idx.extend(range(e, speech_len))
-        reordered_idx[idx] = paddle.to_tensor(
-            (first_idx + last_idx), dtype=align_start_lens.dtype)
-        feats_lens[idx] = len(first_idx)
-    reordered_idx = reordered_idx[:, :max_reduced_length]
+            speech_seg_pos[idx, s:e] = j + 1
+            text_seg_pos[idx, j] = j + 1
 
-    return reordered_idx, speech_seg_pos, text_seg_pos, durations, feats_lens
+    return speech_seg_pos, text_seg_pos
 
 
-def random_spans_noise_mask(length: int, mlm_prob: float, mean_phn_span: float):
+# randomly select the range of speech and text to mask during training
+def random_spans_noise_mask(length: int,
+                            mlm_prob: float=0.8,
+                            mean_phn_span: float=8):
     """This function is copy of `random_spans_helper 
     <https://github.com/google-research/text-to-text-transfer-transformer/blob/84f8bcc14b5f2c03de51bd3587609ba8f6bbd1cd/t5/data/preprocessors.py#L2682>`__ .
     Noise mask consisting of random spans of noise tokens.
@@ -126,7 +223,7 @@ def random_spans_noise_mask(length: int, mlm_prob: float, mean_phn_span: float):
         noise_density: a float - approximate density of output mask
         mean_noise_span_length: a number
     Returns:
-        a boolean tensor with shape [length]
+        np.ndarray: a boolean tensor with shape [length]
     """
 
     orig_length = length
@@ -171,87 +268,3 @@ def random_spans_noise_mask(length: int, mlm_prob: float, mean_phn_span: float):
     is_noise = np.equal(span_num % 2, 1)
 
     return is_noise[:orig_length]
-
-
-def pad_to_longformer_att_window(text: paddle.Tensor,
-                                 max_len: int,
-                                 max_tlen: int,
-                                 attention_window: int=0):
-
-    round = max_len % attention_window
-    if round != 0:
-        max_tlen += (attention_window - round)
-        n_batch = paddle.shape(text)[0]
-        text_pad = paddle.zeros(
-            (n_batch, max_tlen, *paddle.shape(text[0])[1:]), dtype=text.dtype)
-        for i in range(n_batch):
-            text_pad[i, :paddle.shape(text[i])[0]] = text[i]
-    else:
-        text_pad = text[:, :max_tlen]
-    return text_pad, max_tlen
-
-
-def phones_masking(xs_pad: paddle.Tensor,
-                   src_mask: paddle.Tensor,
-                   align_start: paddle.Tensor,
-                   align_end: paddle.Tensor,
-                   align_start_lens: paddle.Tensor,
-                   mlm_prob: float,
-                   mean_phn_span: int,
-                   span_bdy: paddle.Tensor=None):
-    bz, sent_len, _ = paddle.shape(xs_pad)
-    masked_pos = paddle.zeros((bz, sent_len))
-    y_masks = None
-    if mlm_prob == 1.0:
-        masked_pos += 1
-    elif mean_phn_span == 0:
-        # only speech 
-        length = sent_len
-        mean_phn_span = min(length * mlm_prob // 3, 50)
-        masked_phn_idxs = random_spans_noise_mask(length, mlm_prob,
-                                                  mean_phn_span).nonzero()
-        masked_pos[:, masked_phn_idxs] = 1
-    else:
-        for idx in range(bz):
-            if span_bdy is not None:
-                for s, e in zip(span_bdy[idx][::2], span_bdy[idx][1::2]):
-                    masked_pos[idx, s:e] = 1
-            else:
-                length = align_start_lens[idx]
-                if length < 2:
-                    continue
-                masked_phn_idxs = random_spans_noise_mask(
-                    length, mlm_prob, mean_phn_span).nonzero()
-                masked_start = align_start[idx][masked_phn_idxs].tolist()
-                masked_end = align_end[idx][masked_phn_idxs].tolist()
-                for s, e in zip(masked_start, masked_end):
-                    masked_pos[idx, s:e] = 1
-    non_eos_mask = paddle.reshape(src_mask, paddle.shape(xs_pad)[:2])
-    masked_pos = masked_pos * non_eos_mask
-    masked_pos = paddle.cast(masked_pos, 'bool')
-
-    return masked_pos, y_masks
-
-
-def get_seg_pos(speech_pad: paddle.Tensor,
-                text_pad: paddle.Tensor,
-                align_start: paddle.Tensor,
-                align_end: paddle.Tensor,
-                align_start_lens: paddle.Tensor,
-                sega_emb: bool):
-    bz, speech_len, _ = paddle.shape(speech_pad)
-    _, text_len = paddle.shape(text_pad)
-
-    text_seg_pos = paddle.zeros((bz, text_len), dtype='int64')
-    speech_seg_pos = paddle.zeros((bz, speech_len), dtype='int64')
-
-    if not sega_emb:
-        return speech_seg_pos, text_seg_pos
-    for idx in range(bz):
-        align_length = align_start_lens[idx]
-        for j in range(align_length):
-            s, e = align_start[idx][j], align_end[idx][j]
-            speech_seg_pos[idx, s:e] = j + 1
-            text_seg_pos[idx, j] = j + 1
-
-    return speech_seg_pos, text_seg_pos
