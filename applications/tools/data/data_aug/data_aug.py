@@ -288,27 +288,26 @@ if __name__ == "__main__":
 
         
         if six.PY3: 
-            with open(input_file_path, encoding='UTF-8') as input_file:
-                with open(input_file_path) as input_file:
-                    with open(output_file_path, 'w') as output_file:
-                        for i, l in enumerate(input_file.readlines()):
-                            parser = choose_parser()
-                            #print(parser.__name__ == "pos_replace_parser")
-                            if i % 1000 == 0:
-                                log.debug('parsing line %d' % i)
-                            print(l.strip(), file=output_file)
+            with open(input_file_path, 'r', encoding='UTF-8') as input_file:
+                with open(output_file_path, 'w', encoding='UTF-8') as output_file:
+                    for i, l in enumerate(input_file.readlines()):
+                        parser = choose_parser()
+                        #print(parser.__name__ == "pos_replace_parser")
+                        if i % 1000 == 0:
+                            log.debug('parsing line %d' % i)
+                        print(l.strip(), file=output_file)
 
-                            for k in range(args.aug_times):
-                                cols = l.strip().split('\t')
-                                for j in col_nums:
-                                    if parser.__name__ == "pos_replace_parser":
-                                        cols[j - 1] = parser(cols[j - 1], pos_dict[j - 1])
-                                        counter[parser.__name__] += 1
-                                    else:
-                                        cols[j - 1] = parser(cols[j - 1])
-                                        counter[parser.__name__] += 1
-                                    new_line = '\t'.join(cols)
-                                    print(new_line, file=output_file)
+                        for k in range(args.aug_times):
+                            cols = l.strip().split('\t')
+                            for j in col_nums:
+                                if parser.__name__ == "pos_replace_parser":
+                                    cols[j - 1] = parser(cols[j - 1], pos_dict[j - 1])
+                                    counter[parser.__name__] += 1
+                                else:
+                                    cols[j - 1] = parser(cols[j - 1])
+                                    counter[parser.__name__] += 1
+                                new_line = '\t'.join(cols)
+                                print(new_line, file=output_file)
 
         elif six.PY2:
             with open(input_file_path) as input_file:
