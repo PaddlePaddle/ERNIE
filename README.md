@@ -6,7 +6,8 @@
 [【了解更多】](https://wenxin.baidu.com/)
 
 # 开源Roadmap
-
+- 2022.8.18:
+  - 图文跨模态预训练模型`ERNIE-Vil2(base)` [正式开源](https://github.com/PaddlePaddle/ERNIE/tree/ernie-kit-open-v1.0/Research/ERNIE-ViL2)
 - 2022.5.20:
   - 最新开源ERNIE 3.0系列预训练模型:
     - 110M参数通用模型ERNIE 3.0 Base
@@ -226,6 +227,8 @@ sh downlaod_ernie3.0_base_ch.sh
 信息抽取（[信息抽取](./applications/tasks/information_extraction_many_to_many)）
 
 文本生成（[文本生成](./applications/tasks/text_generation)）
+
+图文匹配（[图文匹配](./Research/ERNIE-ViL2)）
 
 数据蒸馏（[数据蒸馏](./applications/tasks/data_distillation)）
 
