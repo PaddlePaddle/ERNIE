@@ -1,0 +1,8 @@
+opencv-python==4.6.0.66
+attrdict
+multiprocess
+numpy
+PyYAML==5.3.1
+six
+collections
+tabulate
