@@ -222,7 +222,7 @@ sh downlaod_ernie3.0_base_ch.sh
 
 文本匹配（[文本匹配](./applications/tasks/text_matching)）
 
-系列标注（[序列标注](./applications/tasks/sequence_labeling)）
+序列标注（[序列标注](./applications/tasks/sequence_labeling)）
 
 信息抽取（[信息抽取](./applications/tasks/information_extraction_many_to_many)）
 
