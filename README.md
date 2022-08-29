@@ -7,7 +7,7 @@
 
 # 开源Roadmap
 - 2022.8.18:
-  - 图文跨模态预训练模型`ERNIE-Vil2(base)` [正式开源](https://github.com/PaddlePaddle/ERNIE/tree/ernie-kit-open-v1.0/Research/ERNIE-ViL2)
+  - 图文跨模态预训练模型`ERNIE-ViL 2.0 (base)` [正式开源](https://github.com/PaddlePaddle/ERNIE/tree/ernie-kit-open-v1.0/Research/ERNIE-ViL2)
 - 2022.5.20:
   - 最新开源ERNIE 3.0系列预训练模型:
     - 110M参数通用模型ERNIE 3.0 Base
