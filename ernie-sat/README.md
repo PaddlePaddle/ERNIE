@@ -1,3 +1,22 @@
+## ERNIE-SAT: Speech and Text Joint Pretraining for Cross-Lingual Multi-Speaker Text-to-Speech
+
+- [模型框架](#模型框架)
+- [使用说明](#使用说明)
+  * [安装飞桨与环境依赖](#安装飞桨与环境依赖)
+  * [预训练模型](#预训练模型)
+  * [下载](#下载)
+  * [推理](#推理)
+
+关于算法的详细描述，请参见我们的论文：
+>[_**ERNIE-SAT: Speech and Text Joint Pretraining for Cross-Lingual Multi-Speaker Text-to-Speech**_](https://arxiv.org/abs/2211.03545)
+>
+>Xiaoran Fan, Chao Pang, Tian Yuan, He Bai, Renjie Zheng, Pengfei Zhu, Shuohuan Wang, Junkun Chen, Zeyu Chen, Liang Huang, Yu Sun, Hua Wu
+>
+>Preprint November 2022
+
+![ERNIE-SAT](https://img.shields.io/badge/预训练-跨模态-green) 
+
+---
 ERNIE-SAT 是可以同时处理中英文的跨语言的语音-语言跨模态大模型，其在语音编辑、个性化语音合成以及跨语言的语音合成等多个任务取得了领先效果。可以应用于语音编辑、个性化合成、语音克隆、同传翻译等一系列场景，该项目供研究使用。
 
 ## 模型框架
