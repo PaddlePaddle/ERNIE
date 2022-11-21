@@ -141,7 +141,7 @@ fleetrun --gpus=x,y run_trainer.py./examples/cls_ernie_fc_ch.json
 - 运行run_infer.py ，选择对应的参数配置文件即可。如下所示：
 
 ```plain
-python run_infer.py --param_path ./examples/cls_enrie_fc_ch_infer.json
+python run_infer.py --param_path ./examples/cls_ernie_fc_ch_infer.json
 ```
 
 - 预测过程中的日志自动保存在./output/predict_result.txt文件中。
@@ -155,7 +155,7 @@ python run_infer.py --param_path ./examples/cls_enrie_fc_ch_infer.json
 #进入预训练模型下载目录
 cd ./applications/models_hub
 #下载ERNIE3.0 base模型
-sh downlaod_ernie3.0_base_ch.sh
+sh downlaod_ernie_3.0_base_ch.sh
 ```
 
 - 更多开源模型，见[Research](./Research/)
