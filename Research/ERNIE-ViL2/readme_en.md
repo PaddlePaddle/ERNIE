@@ -34,7 +34,7 @@ The following is the zero shot results of Chinese and English models in Flickr30
 Here, ERNIE-ViL 2.0 base (ViT) (open source)（chinese model） is used as an example to perform the text retrieval task of zero-shot on COCO-CN:  
 
 * Model Download:
-[ERNIE-ViL 2.0 Base（ViT)]( http://bj.bcebos.com/wenxin-models/ERNIE_VIL2_BASE_ViT.pdparams)
+[ERNIE-ViL 2.0 Base（ViT)](http://bj.bcebos.com/wenxin-models/OPEN_ERNIE_VIL2_BASE_ViT.pdparams)
 * Data preparation: we have built in a [COCO-CN](https://github.com/li-xirong/coco-cn) test set. The data format (UTF-8 encoding by default) is three columns separated by \t. The first column is text, the second column is the image ID in coco, and the third column is the image encoded by Base64.
 * First, install the environment and install [paddle>=2.1.3](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.HTML) and [requirements.txt](requirements.txt),
 * Then, for ./packages/configs/ernie_vil_base.yaml performs various configurations. For details, please refer to the notes in the configuration (including input/output path location and model parameter path).
