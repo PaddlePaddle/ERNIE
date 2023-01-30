@@ -37,7 +37,7 @@ ERNIE-ViL 2.0 的多视角对比学习包括：
 ## 例子
 这里以ERNIE-ViL 2.0 Base（ViT）（开源）,在COCO-CN上进行ZERO-SHOT的图文检索任务为例子：
 * 模型下载:
-[ERNIE-ViL 2.0 Base（ViT)](http://bj.bcebos.com/wenxin-models/ERNIE_VIL2_BASE_ViT.pdparams)
+[ERNIE-ViL 2.0 Base（ViT)](http://bj.bcebos.com/wenxin-models/OPEN_ERNIE_VIL2_BASE_ViT.pdparams)
 * 数据准备：下载[COCO-CN的测试集](https://github.com/li-xirong/coco-cn),然后在配置文件设置输入路径,处理数据格式(默认为UTF-8编码), 为三列，由\t分开，第一列是文本，第二列是coco中的图像ID, 第三列是由base64编码的图片。
 * 首先安装环境, 安装 [paddle>=2.1.3](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.html), 以及[requirements.txt](requirements.txt) 要求的包，  
 * 然后，对 ./packages/configs/ernie_vil_base.yaml 进行各项配置，具体请参考配置中的各项注释(包括输入/输出路径位置和模型参数路径)。
