@@ -5,11 +5,11 @@
 [中英双语文生图评测集BCE-300](./data/BCE-300.csv)
 
 更多技术细节请参考 我们的论文：
->[_**ERNIE-ViLG 2.0: Improving Text-to-Image Diffusion Model with Knowledge-Enhanced Mixture-of-Denoising-Experts**_](https://arxiv.org/pdf/2210.15257.pdf)
+>[_**ERNIE-ViLG 2.0: Improving Text-to-Image Diffusion Model with Knowledge-Enhanced Mixture-of-Denoising-Experts**_](https://arxiv.org/abs/2210.15257)
 >
 >Zhida Feng*, Zhenyu Zhang*, Xintong Yu*, Yewei Fang, Lanxin Li, Xuyi Chen, Yuxiang Lu, Jiaxiang Liu, Weichong Yin, Shikun Feng, Yu Sun, Li Chen, Hao Tian, Hua Wu, Haifeng Wang
 >
->
+>CVPR 2023, Highlight
 
 ## 模型概述
 
