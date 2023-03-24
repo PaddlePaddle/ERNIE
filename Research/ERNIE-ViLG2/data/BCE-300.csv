@@ -1,0 +1,349 @@
+﻿Prompt,文本,类别,来源
+A red colored car.,一辆红色的汽车。,颜色,DrawBench
+A black colored car.,一辆黑色的汽车。,颜色,DrawBench
+A pink colored car.,一辆粉红色的汽车。,颜色,DrawBench
+A black colored dog.,一只黑色的狗。,颜色,DrawBench
+A red colored dog.,一只红色的狗。,颜色,DrawBench
+A blue colored dog.,一只蓝色的狗。,颜色,DrawBench
+A green colored banana.,一个绿色的香蕉。,颜色,DrawBench
+A red colored banana.,一个红色的香蕉。,颜色,DrawBench
+A black colored banana.,一个黑色的香蕉。,颜色,DrawBench
+A black colored sandwich.,一个黑色的三明治。,颜色,DrawBench
+An orange colored sandwich.,一个橙色的三明治。,颜色,DrawBench
+A pink colored giraffe.,一只粉红色的长颈鹿。,颜色,DrawBench
+A yellow colored giraffe.,一只黄色的长颈鹿。,颜色,DrawBench
+A red car and a white sheep.,一辆红色的汽车和一只白色的羊。,颜色,DrawBench
+A green apple and a black backpack.,一个绿色的苹果和一个黑色的背包。,颜色,DrawBench
+A green cup and a blue cell phone.,一个绿色的杯子和一个蓝色的手机。,颜色,DrawBench
+A yellow book and a red vase.,一本黄色的书和一个红色的花瓶。,颜色,DrawBench
+A white car and a red sheep.,一辆白色的汽车和一只红色的羊。,颜色,DrawBench
+A brown bird and a blue bear.,一只棕色的鸟和一只蓝色的熊。,颜色,DrawBench
+A black apple and a green backpack.,一个黑色的苹果和一个绿色的背包。,颜色,DrawBench
+A blue cup and a green cell phone.,一个蓝色的杯子和一个绿色的手机。,颜色,DrawBench
+A red book and a yellow vase.,一本红色的书和一个黄色的花瓶。,颜色,DrawBench
+A horse riding an astronaut.,一匹马骑着一个宇航员。,矛盾,DrawBench
+A pizza cooking an oven.,一块披萨烤着一个烤箱。,矛盾,DrawBench
+A bird scaring a scarecrow.,一只正在吓唬稻草人的鸟。,矛盾,DrawBench
+A blue coloured pizza.,一块蓝色的披萨。,矛盾,DrawBench
+Hovering cow abducting aliens.,盘旋的奶牛正在绑架外星人。,矛盾,DrawBench
+A panda making latte art.,一只正在制作拿铁拉花的熊猫。,矛盾,DrawBench
+A shark in the desert.,一只沙漠中的鲨鱼。,矛盾,DrawBench
+An elephant under the sea.,一只海底的大象。,矛盾,DrawBench
+Rainbow coloured penguin.,彩虹色的企鹅。,矛盾,DrawBench
+A fish eating a pelican.,一只正在吃鹈鹕的鱼。,矛盾,DrawBench
+One car on the street.,街上有一辆车。,计数,DrawBench
+Two cars on the street.,街上有两辆车。,计数,DrawBench
+Four cars on the street.,街上有四辆车。,计数,DrawBench
+Five cars on the street.,街上有五辆车。,计数,DrawBench
+One dog on the street.,街上有一条狗。,计数,DrawBench
+Two dogs on the street.,街上有两条狗。,计数,DrawBench
+Three dogs on the street.,街上有三条狗。,计数,DrawBench
+Four dogs on the street.,街上有四条狗。,计数,DrawBench
+Five dogs on the street.,街上有五条狗。,计数,DrawBench
+One cat and one dog sitting on the grass.,一只猫和一只狗坐在草地上。,计数,DrawBench
+One cat and two dogs sitting on the grass.,一只猫和两只狗坐在草地上。,计数,DrawBench
+One cat and three dogs sitting on the grass.,一只猫和三只狗坐在草地上。,计数,DrawBench
+Two cats and one dog sitting on the grass.,两只猫和一只狗坐在草地上。,计数,DrawBench
+Two cats and two dogs sitting on the grass.,两只猫和两只狗坐在草地上。,计数,DrawBench
+Two cats and three dogs sitting on the grass.,两只猫和三只狗坐在草地上。,计数,DrawBench
+Three cats and one dog sitting on the grass.,三只猫和一只狗坐在草地上。,计数,DrawBench
+Three cats and two dogs sitting on the grass.,三只猫和两只狗坐在草地上。,计数,DrawBench
+Three cats and three dogs sitting on the grass.,三只猫和三只狗坐在草地上。,计数,DrawBench
+A triangular purple flower pot. A purple flower pot in the shape of a triangle.,一个三角形的紫色花盆。一个三角形的紫色花盆。,DALL-E图像生成器,DrawBench
+"A triangular orange picture frame. An orange picture frame in the shape of a
+triangle.",一个三角形的橙色相框。一个三角形的橙色相框。,DALL-E图像生成器,DrawBench
+A triangular pink stop sign. A pink stop sign in the shape of a triangle.,一个三角形的粉色停车标志。一个三角形的粉红色停车标志。,DALL-E图像生成器,DrawBench
+A cube made of denim. A cube with the texture of denim.,一个牛仔布制成的立方体。一个具有牛仔布纹理的立方体。,DALL-E图像生成器,DrawBench
+A sphere made of kitchen tile. A sphere with the texture of kitchen tile.,一个厨房瓷砖制成的球体。一个具有厨房瓷砖纹理的球体。,DALL-E图像生成器,DrawBench
+A cube made of brick. A cube with the texture of brick.,一个用砖制成的立方体。一个具有砖块纹理的立方体。,DALL-E图像生成器,DrawBench
+A collection of nail is sitting on a table.,桌子上放着一堆钉子。,DALL-E图像生成器,DrawBench
+A single clock is sitting on a table.,桌子上放着一只钟。,DALL-E图像生成器,DrawBench
+A couple of glasses are sitting on a table.,桌子上放着两个玻璃杯。,DALL-E图像生成器,DrawBench
+An illustration of a large red elephant sitting on a small blue mouse.,一只红色的大象坐在一只蓝色的小老鼠上面的插图。,DALL-E图像生成器,DrawBench
+An illustration of a small green elephant standing behind a large red mouse.,一只绿色的小象站在一只红色的大老鼠后面的插画。,DALL-E图像生成器,DrawBench
+A small blue book sitting on a large red book.,一本蓝色的小书放在一本红色的大书上。,DALL-E图像生成器,DrawBench
+"A stack of 3 plates. A blue plate is on the top, sitting on a blue plate. The blue
+plate is in the middle, sitting on a green plate. The green plate is on the
+bottom.",三只盘子叠放。一只蓝色的盘子在上面，放在另一只蓝色的盘子上。这只蓝色的盘子在中间，放在另一只绿色的盘子上。这只绿色盘子在底部。,DALL-E图像生成器,DrawBench
+"A stack of 3 cubes. A red cube is on the top, sitting on a red cube. The red cube is
+in the middle, sitting on a green cube. The green cube is on the bottom.",三个立方体叠放。一个红色的立方体在上面，放在另一个红色立方体上，这个红色的立方体在中间，放在另一个绿色的立方体上。这个绿色立方体在底部。,DALL-E图像生成器,DrawBench
+"A stack of 3 books. A green book is on the top, sitting on a red book. The red book
+is in the middle, sitting on a blue book. The blue book is on the bottom.",三本书叠放。一本绿皮书在上面，放在另一本红皮书上。这本红皮书在中间，放在另一本蓝皮书上。这本蓝皮书在底部。,DALL-E图像生成器,DrawBench
+"An emoji of a baby panda wearing a red hat, green gloves, red shirt, and green pants.",熊猫宝宝戴着红帽子、绿手套，穿着红衬衫和绿裤子的表情符号。,DALL-E图像生成器,DrawBench
+"An emoji of a baby panda wearing a red hat, blue gloves, green shirt, and blue pants.",熊猫宝宝戴着红帽子、蓝手套，穿着绿衬衫和蓝裤子的表情符号。,DALL-E图像生成器,DrawBench
+A fisheye lens view of a turtle sitting in a forest.,一只海龟坐在森林里的鱼眼镜头。,DALL-E图像生成器,DrawBench
+A cross-section view of a brain.,大脑的横截面图。,DALL-E图像生成器,DrawBench
+"A vehicle composed of two wheels held in a frame one behind the other,
+propelled by pedals and steered with handlebars attached to the front wheel.",一种由两个轮子组成的交通工具，一个轮子在另一个轮子后面，它们固定在一个框架内，由踏板推动，可以用连接在前轮上的把手操纵。,描述,DrawBench
+"A large motor vehicle carrying passengers by road, typically one serving the public
+on a fixed route and for a fare.",一种通过公路载客的大型机动车辆，通常在固定路线上为公众服务并收取一定费用。,描述,DrawBench
+"A small vessel propelled on water by oars, sails, or an engine.",一种用桨、帆或引擎在水上推进的小船。,描述,DrawBench
+A connection point by which firefighters can tap into a water supply.,供消防员接入给水系统的连接点。,描述,DrawBench
+"A machine next to a parking space in a street, into which the driver puts money
+so as to be authorized to park the vehicle for a particular length of time.",路边停车位旁的一种机器，司机将钱投入其中，以便获得在某段时间内停车的授权。,描述,DrawBench
+"A device consisting of a circular canopy of cloth on a folding metal frame supported
+by a central rod, used as protection against rain or sometimes sun.",一种由一个圆形布篷和一个中心杆支撑的折叠金属框架组成的装置，用于防雨或者防晒。,描述,DrawBench
+"A separate seat for one person, typically with a back and four legs.",一个人的单独座位，通常有一个靠背和四条腿。,描述,DrawBench
+"An appliance or compartment which is artificially kept cool and used to store
+food and drink.",一种人工保持低温并用于储存食物和饮料的器具或隔间。,描述,DrawBench
+A mechanical or electrical device for measuring time.,一种用于测量时间的机械或电气装置。,描述,DrawBench
+"An instrument used for cutting cloth, paper, and other thin material, consisting
+of two blades laid one on top of the other and fastened in the middle so as
+to allow them to be opened and closed by a thumb and finger inserted through
+rings on the end of their handles.",一种用于切割布、纸和其他薄材料的工具，由两个刀片组成，一个放在另一个上面，它们在中间固定，以便用拇指和手指插入手柄末端的环来进行开闭操作。,描述,DrawBench
+"A large plant-eating domesticated mammal with solid hoofs and a flowing mane and
+tail, used for riding, racing, and to carry and pull loads.",一种大型食草驯养哺乳动物，有坚实的蹄子以及飘动的鬃毛和尾巴，用于骑乘、赛跑、搬运和拉重物。,描述,DrawBench
+"A long curved fruit which grows in clusters and has soft pulpy flesh and yellow skin
+when ripe.",一种长而弯曲的果实，成簇生长，成熟时果肉柔软多汁，果皮呈黄色。,描述,DrawBench
+"A small domesticated carnivorous mammal with soft fur, a short snout, and retractable
+claws. It is widely kept as a pet or for catching mice, and many breeds have been developed.",一种小型家养食肉哺乳动物，有柔软的皮毛，短鼻子和可伸缩的爪子，被广泛用作宠物或捕鼠，并且已经培育出许多品种。,描述,DrawBench
+"A domesticated carnivorous mammal that typically has a long snout, an acute
+sense of smell, nonretractable claws, and a barking, howling, or whining
+voice.",一种家养食肉哺乳动物，通常有长鼻子、敏锐的嗅觉、不可收缩的爪子，会吠叫、嚎叫或发出呜咽的声音。,描述,DrawBench
+"An organ of soft nervous tissue contained in the skull of vertebrates, functioning as
+the coordinating center of sensation and intellectual and nervous activity.",脊椎动物头骨中的一种软神经组织器官，是感觉、智力和神经活动的协调中心。,描述,DrawBench
+"An American multinational technology company that focuses on artificial
+intelligence, search engine, online advertising, cloud computing, computer
+software, quantum computing, e-commerce, and consumer electronics.",一家专注于人工智能、搜索引擎、在线广告、云计算、计算机软件、量子计算、电子商务和消费电子产品的美国跨国科技公司。,描述,DrawBench
+"A large keyboard musical instrument with a wooden case enclosing a soundboard and
+metal strings, which are struck by hammers when the keys are depressed. The
+strings' vibration is stopped by dampers when the keys are released and can
+be regulated for length and volume by two or three pedals.",一种大型键盘乐器，有一个木箱，里面有音板和金属弦，当键盘被按下时，锤子会敲击它们，当键盘被松开时，弦的振动由阻尼器停止，可以通过两个或三个踏板调节弦的长度和音量。,描述,DrawBench
+"A type of digital currency in which a record of transactions is maintained and new
+units of currency are generated by the computational solution of mathematical
+problems, and which operates independently of a central bank.",一种数字货币，其中保存交易记录，通过数学问题的计算解生成新的货币单位，独立于中央银行运行。,描述,DrawBench
+"A large thick-skinned semiaquatic African mammal, with massive jaws and large tusks.",非洲一种大型厚皮半水栖哺乳动物，具有巨大的颚和长牙。,描述,DrawBench
+"A machine resembling a human being and able to replicate certain human
+movements and functions automatically.",一种类似人的机器，能够自动复制人的特定动作和功能。,描述,DrawBench
+Paying for a quarter-sized pizza with a pizza-sized quarter.,用四分之一披萨大小的25分硬币来支付四分之一个披萨。,加里·马库斯等人。,DrawBench
+"An oil painting of a couple in formal evening wear going home get caught in a heavy
+downpour with no umbrellas.",一幅油画，描述的是一对夫妇穿着正式的晚礼服回家，遇上倾盆大雨，他们没有带雨伞。,加里·马库斯等人。,DrawBench
+"A grocery store refrigerator has pint cartons of milk on the top shelf, quart
+cartons on the middle shelf, and gallon plastic jugs on the bottom shelf.",杂货店冰箱的顶部架子上放着一品脱的牛奶，中间架子上放着一夸脱的牛奶，底部架子上放着一加仑的塑料瓶。,加里·马库斯等人。,DrawBench
+"In late afternoon in January in New England, a man stands in the shadow of a maple
+tree.",在新英格兰一月份的傍晚，一名男子站在一棵枫树的阴影中。,加里·马库斯等人。,DrawBench
+"An elephant is behind a tree. You can see the trunk on one side and the back
+legs on the other.",一头大象在一棵树的后面。你可以看到一边是象鼻，另一边是后腿。,加里·马库斯等人。,DrawBench
+A pear cut into seven pieces arranged in a ring.,一个梨子被切成七块，排列成一个环。,加里·马库斯等人。,DrawBench
+"A donkey and an octopus are playing a game. The donkey is holding a rope on one end,
+the octopus is holding onto the other. The donkey holds the rope in its
+mouth. A cat is jumping over the rope.",一头驴和一只章鱼在玩游戏。驴子在一端拿着绳子，章鱼在另一端拿着绳子。驴子把绳子叼在嘴里。一只猫正在跳过绳子。,加里·马库斯等人。,DrawBench
+"Supreme Court Justices play a baseball game with the FBI. The FBI is at bat, the
+justices are on the field.",最高法院法官与联邦调查局进行棒球比赛。轮到联邦调查局击球了，法官们在运动场上。,加里·马库斯等人。,DrawBench
+"Abraham Lincoln touches his toes while George Washington does chin-ups. Lincoln is
+barefoot. Washington is wearing boots.",亚伯拉罕·林肯触摸他的脚趾，乔治·华盛顿做引体向上。林肯光着脚。华盛顿穿着靴子。,加里·马库斯等人。,DrawBench
+A wine glass on top of a dog.,一个红酒杯放在一条狗上面。,位置,DrawBench
+A bicycle on top of a boat.,一辆自行车放在一条小船上面。,位置,DrawBench
+An umbrella on top of a spoon.,一把伞放在一个勺子上面。,位置,DrawBench
+A laptop on top of a teddy bear.,一个笔记本放在一只泰迪熊上面。,位置,DrawBench
+A giraffe underneath a microwave.,一只长颈鹿藏在一个微波炉下面。,位置,DrawBench
+A donut underneath a toilet.,一个甜甜圈放在一个厕所下面。,位置,DrawBench
+A tennis racket underneath a traffic light.,一个网球拍放在一个红绿灯下面。,位置,DrawBench
+A zebra underneath a broccoli.,一只斑马藏在一只花椰菜下面。,位置,DrawBench
+A banana on the left of an apple.,一个香蕉在一个苹果左边。,位置,DrawBench
+A car on the left of a bus.,一辆公共汽车左边有一辆汽车。,位置,DrawBench
+A cat on the left of a dog.,一只猫在一条狗的右边。,位置,DrawBench
+A pizza on the right of a suitcase.,一个披萨在一个皮箱右边。,位置,DrawBench
+A cat on the right of a tennis racket.,一只猫在一个网球拍右边。,位置,DrawBench
+A stop sign on the right of a refrigerator.,一个冰箱右侧有一个停车标志。,位置,DrawBench
+A sheep to the right of a wine glass.,一只羊在一个红酒杯右边。,位置,DrawBench
+A zebra to the right of a fire hydrant.,一只斑马在一个消防栓右边。,位置,DrawBench
+A church with stained glass windows depicting a hamburger and french fries.,一个带有彩色玻璃窗的教堂，窗上有汉堡包和炸薯条的图案。,Reddit论坛,DrawBench
+"Painting of the orange cat Otto von Garfield, Count of Bismarck-Schönhausen, Duke of
+Lauenburg, Minister-President of Prussia.
+Depicted wearing a Prussian Pickelhaube and eating his favorite meal - lasagna.",橘猫奥托·冯·加菲尔德，俾斯麦·舍恩豪森伯爵，劳恩堡公爵，普鲁士部长兼总统的画像。被描绘成穿着普鲁士皮克豪布，吃着它最喜欢的食物-千层面。,Reddit论坛,DrawBench
+"A baby fennec sneezing onto a strawberry, detailed, macro, studio light, droplets,
+backlit ears.",一个婴儿冲着草莓打喷嚏，细节，宏观，工作室灯光，水滴，背光耳朵。,Reddit论坛,DrawBench
+A photo of a confused grizzly bear in calculus class.,微积分课上一只迷惑不解的灰熊的照片。,Reddit论坛,DrawBench
+"An ancient Egyptian painting depicting an argument over whose turn it is to take
+out the trash.",一幅古埃及绘画，描绘了一场关于轮到谁倒垃圾的争论。,Reddit论坛,DrawBench
+"A fluffy baby sloth with a knitted hat trying to figure out a laptop, close up, highly
+detailed, studio lighting, screen reflecting in its eyes.",一只毛茸茸的小树懒，戴着一顶针织帽子，试图搞定一台笔记本电脑，特写，非常细致，工作室灯光，屏幕反射在眼睛里。,Reddit论坛,DrawBench
+"A tiger in a lab coat with a 1980s Miami vibe, turning a well oiled science content
+machine, digital art.",一只穿着实验服的老虎，带着80年代迈阿密的气息，开启了一台运转良好的科学内容机器，数字艺术。,Reddit论坛,DrawBench
+Lego Arnold Schwarzenegger.,乐高·阿诺德·施瓦辛格。,Reddit论坛,DrawBench
+A yellow and black bus cruising through the rainforest.,一辆黄黑色的巴士在雨林中穿梭。,Reddit论坛,DrawBench
+A medieval painting of the wifi not working.,一幅描绘wifi坏掉的中世纪画作。,Reddit论坛,DrawBench
+"An IT-guy trying to fix hardware of a PC tower is being tangled by the PC cables
+like Laokoon. Marble, copy after Hellenistic original from ca. 200 BC. Found
+in the Baths of Trajan, 1506.",一个IT人员试图修复PC塔的硬件，却被像Laokoon这样的PC电缆缠住了。大理石，仿照约公元前200年的希腊原作。1506年在图拉真的浴场发现。,Reddit论坛,DrawBench
+"35mm macro shot a kitten licking a baby duck, studio lighting.",35毫米微距拍摄一只小猫舔一只小鸭子，工作室灯光。,Reddit论坛,DrawBench
+McDonalds Church.,麦当劳教堂。,Reddit论坛,DrawBench
+"Photo of an athlete cat explaining it's latest scandal at a press conference to
+journalists.",一只运动员猫在记者招待会上解释其最新丑闻的照片。,Reddit论坛,DrawBench
+Greek statue of a man tripping over a cat.,一座男人被猫绊倒的希腊雕像。,Reddit论坛,DrawBench
+"An old photograph of a 1920s airship shaped like a pig, floating over a wheat field.",一张20世纪20年代的飞艇的旧照片，形状像一头猪，漂浮在麦田上。,Reddit论坛,DrawBench
+Photo of a cat singing in a barbershop quartet.,一只猫在理发店四重奏中唱歌的照片。,Reddit论坛,DrawBench
+"A painting by Grant Wood of an astronaut couple, american gothic style.",一幅格兰特·伍德的宇航员夫妇的画作，美国哥特式风格。,Reddit论坛,DrawBench
+An oil painting portrait of the regal Burger King posing with a Whopper.,一幅皇家汉堡王与皇堡合影的油画肖像。,Reddit论坛,DrawBench
+"A keyboard made of water, the water is made of light, the light is turned off.",一个由水制成的键盘，水是由灯光制成的，灯光是关闭的。,Reddit论坛,DrawBench
+Hyper-realistic photo of an abandoned industrial site during a storm.,风暴中废弃工业场地的超现实照片。,Reddit论坛,DrawBench
+A screenshot of an iOS app for ordering different types of milk.,用于订购不同种类牛奶的iOS应用程序的屏幕截图。,Reddit论坛,DrawBench
+"A real life photography of super mario, 8k Ultra HD.",超级马里奥的真实生活照片，8k超高清。,Reddit论坛,DrawBench
+Colouring page of large cats climbing the eifel tower in a cyberpunk future.,在赛博朋克的未来，大型猫科动物们爬上埃菲尔铁塔的彩色页面。,Reddit论坛,DrawBench
+Photo of a mega Lego space station inside a kid's bedroom.,孩子卧室里的巨型乐高空间站照片。,Reddit论坛,DrawBench
+"A spider with a moustache bidding an equally gentlemanly grasshopper a good day during
+his walk to work.",一只长着胡子的蜘蛛在去上班的路上向一只同样绅士的蚱蜢问好。,Reddit论坛,DrawBench
+A photocopy of a photograph of a painting of a sculpture of a giraffe.,一幅长颈鹿雕塑画的照片复印件。,Reddit论坛,DrawBench
+"A bridge connecting Europe and North America on the Atlantic Ocean, bird's eye view.",大西洋上连接欧洲和北美的桥梁，鸟瞰图。,Reddit论坛,DrawBench
+"A maglev train going vertically downward in high speed, New York Times
+photojournalism.",一辆垂直向下高速行驶的磁悬浮列车，《纽约时报》摄影新闻。,Reddit论坛,DrawBench
+A magnifying glass over a page of a 1950s batman comic.,一个放在50年代蝙蝠侠漫画上的放大镜。,Reddit论坛,DrawBench
+"A car playing soccer, digital art.",一辆踢足球的汽车，数字艺术。,Reddit论坛,DrawBench
+Darth Vader playing with raccoon in Mars during sunset.,日落时分，达斯·维德在火星上与浣熊玩耍。,Reddit论坛,DrawBench
+A 1960s poster warning against climate change.,一张20世纪60年代警示气候变化的海报。,Reddit论坛,DrawBench
+Illustration of a mouse using a mushroom as an umbrella.,一张老鼠把蘑菇作为雨伞的插图。,Reddit论坛,DrawBench
+"A realistic photo of a Pomeranian dressed up like a 1980s professional wrestler
+with neon green and neon orange face paint and bright green wrestling tights
+with bright orange boots.",一张打扮成20世纪80年代职业摔跤手的博美犬的写实照片，脸上涂有霓虹绿和霓虹橙色的颜料，穿着亮绿色的摔跤紧身裤和亮橙色的靴子。,Reddit论坛,DrawBench
+A pyramid made of falafel with a partial solar eclipse in the background.,一个炸鹰嘴豆丸子做成的金字塔，背景是日偏食。,Reddit论坛,DrawBench
+Bears playing football,踢足球的熊,拟人化动物/卡通形象,ERNIE-VILG
+Dolphins spinning a hula hoop,转呼啦圈的海豚,拟人化动物/卡通形象,ERNIE-VILG
+Wolf in a suit,穿西服的狼,拟人化动物/卡通形象,ERNIE-VILG
+Rabbit in a skirt,穿裙子的兔子,拟人化动物/卡通形象,ERNIE-VILG
+Cat in a tuxedo,穿燕尾服的猫,拟人化动物/卡通形象,ERNIE-VILG
+Crocodile in a sweater,穿毛衣的鳄鱼,拟人化动物/卡通形象,ERNIE-VILG
+Horse in skates,穿滑冰鞋的马,拟人化动物/卡通形象,ERNIE-VILG
+Fox with wine cup,拿酒杯的狐狸,拟人化动物/卡通形象,ERNIE-VILG
+Peacock on the phone,打电话的孔雀,拟人化动物/卡通形象,ERNIE-VILG
+Giraffe playing basketball,打篮球的长颈鹿,拟人化动物/卡通形象,ERNIE-VILG
+Parrot in a navy suit,海军装鹦鹉,拟人化动物/卡通形象,ERNIE-VILG
+Dog with sunglasses,戴墨镜的小狗,拟人化动物/卡通形象,ERNIE-VILG
+Little witch,小魔女,拟人化动物/卡通形象,ERNIE-VILG
+Totoro with an umbrella,打伞的龙猫,拟人化动物/卡通形象,ERNIE-VILG
+Snake playing harmonica,吹口琴的蛇,拟人化动物/卡通形象,ERNIE-VILG
+Orangutan playing the piano,弹钢琴的猩猩,拟人化动物/卡通形象,ERNIE-VILG
+The Chicago Spire,芝加哥尖塔,地理类,ERNIE-VILG
+Guizhou Huangguoshu Waterfall,贵州黄果树瀑布,地理类,ERNIE-VILG
+Thousand Miao Households in Guizhou,贵州千户苗寨,地理类,ERNIE-VILG
+International Commerce Centre,环球贸易广场,地理类,ERNIE-VILG
+Buckingham Palace,白金汉宫,地理类,ERNIE-VILG
+Matterhorn of the Disneyland in California,加州迪士尼乐园的马特洪峰,地理类,ERNIE-VILG
+Field of Mars,战神广场,地理类,ERNIE-VILG
+Maisons-Laffitte Castle,拉斐特之家城堡,地理类,ERNIE-VILG
+Hangzhou West Lake,杭州西湖,地理类,ERNIE-VILG
+"The New Tokyo City Hall, Japan",日本东京都厅,地理类,ERNIE-VILG
+"Tokyo Tower, Japan",日本东京塔,地理类,ERNIE-VILG
+Lingyin Temple in Hangzhou,杭州灵隐寺,地理类,ERNIE-VILG
+Pantheon in Italy,意大利万神殿,地理类,ERNIE-VILG
+Vancouver House,温哥华一号公馆,地理类,ERNIE-VILG
+The Potala Palace,布达拉宫,地理类,ERNIE-VILG
+Bird Nest in Beijing,北京鸟巢,地理类,ERNIE-VILG
+Forbidden City in Beijing,北京故宫,地理类,ERNIE-VILG
+Temple of Heaven in Beijing,北京天坛,地理类,ERNIE-VILG
+Shanghai World Financial Center,上海环球金融中心,地理类,ERNIE-VILG
+Holy Brasilia Cathedral,圣巴西利亚大教堂,地理类,ERNIE-VILG
+Palace of Versailles,凡尔赛宫,地理类,ERNIE-VILG
+The Oriental Pearl,东方明珠,地理类,ERNIE-VILG
+Little Triumphal Arch,小凯旋门,地理类,ERNIE-VILG
+Bar Street in Shichahai,什刹海的酒吧街,地理类,ERNIE-VILG
+Zongzi and corn boiled in the pot,锅里煮着粽子和玉米,多物+属性描述+关系描述,ERNIE-VILG
+A red vacuum cup on the left of the black laptop,黑色笔记本电脑左边有一个红色保温杯,多物+属性描述+关系描述,ERNIE-VILG
+A pouting little boy is standing in front of the supermarket shelf,超市货架前站着一个撅着嘴的小男孩,多物+属性描述+关系描述,ERNIE-VILG
+A puppet cat jumping on the table to play with cups,跳上桌子玩杯子的布偶猫,多物+属性描述+关系描述,ERNIE-VILG
+The teacher is lecturing on the platform,讲台上老师在讲课,多物+属性描述+关系描述,ERNIE-VILG
+A woman in black picks up hardware tools in front of the shelf,穿黑衣服的女人在货架前挑五金工具,多物+属性描述+关系描述,ERNIE-VILG
+The lotus in the pond is in bloom,池塘里的莲花开了,多物+属性描述+关系描述,ERNIE-VILG
+Antique vases on mahogany shelves,古董花瓶摆在红木架子上,多物+属性描述+关系描述,ERNIE-VILG
+The cashier is standing next to the counter,收银员站在柜台旁边,多物+属性描述+关系描述,ERNIE-VILG
+The express bill is stuck on the parcel,快递盒上贴着快递单,多物+属性描述+关系描述,ERNIE-VILG
+Beef cut on the chopping board,案板上切好的牛肉,多物+属性描述+关系描述,ERNIE-VILG
+Audiences holding fluorescent sticks in the auditorium,在观众席举着荧光棒的观众,多物+属性描述+关系描述,ERNIE-VILG
+There is a fill light on the display,显示器上面有个补光灯,多物+属性描述+关系描述,ERNIE-VILG
+A man making faces in the setting sun,在夕阳下做鬼脸的男人,多物+属性描述+关系描述,ERNIE-VILG
+A cat fell down the stairs,在楼梯上摔倒的猫,多物+属性描述+关系描述,ERNIE-VILG
+There is a wooden tea table in front of the sofa in the living room,客厅的沙发前有一张木质茶几,多物+属性描述+关系描述,ERNIE-VILG
+A dog is reading a thick book,一只狗在看书，很厚的书,多物+属性描述+关系描述,ERNIE-VILG
+A cat is on the left of a dog,一只猫在一只狗左边,多物+属性描述+关系描述,ERNIE-VILG
+A white dove is standing on the green grass,一只白鸽站在绿色的草地上,多物+属性描述+关系描述,ERNIE-VILG
+A man is standing on the moon,一个人站在月球上,多物+属性描述+关系描述,ERNIE-VILG
+A small red ball in a big green block,一个小红球在一个大绿块内部,多物+属性描述+关系描述,ERNIE-VILG
+A man and a woman play billiards face to face,一对男女面对面打桌球,多物+属性描述+关系描述,ERNIE-VILG
+The bookshelf is full of books,书架上摆满了书,多物+属性描述+关系描述,ERNIE-VILG
+A new tent,一顶新帐篷,单物+属性描述,ERNIE-VILG
+A line of egrets in the air,一行在空中的白鹭,单物+属性描述,ERNIE-VILG
+A full moon,一轮满月,单物+属性描述,ERNIE-VILG
+An open ink bottle,一瓶打开的墨水瓶,单物+属性描述,ERNIE-VILG
+A tank of clean water,一缸清水,单物+属性描述,ERNIE-VILG
+A snowy mountain,一座雪山,单物+属性描述,ERNIE-VILG
+A colorful snake,一条色彩斑斓的蛇,单物+属性描述,ERNIE-VILG
+A glass of bubbling soda,一杯冒泡的汽水,单物+属性描述,ERNIE-VILG
+A roll of wet toilet paper,一卷打湿的卫生纸,单物+属性描述,ERNIE-VILG
+An ignited kitchen sink,一个点火的灶台,单物+属性描述,ERNIE-VILG
+A spotted cat,一只斑点花猫,单物+属性描述,ERNIE-VILG
+A dorkable husky,一只呆萌哈士奇,单物+属性描述,ERNIE-VILG
+A Puppet Cat,一只布偶猫,单物+属性描述,ERNIE-VILG
+A kitten,一只小奶猫,单物+属性描述,ERNIE-VILG
+A crying girl,一个大哭女孩,单物+属性描述,ERNIE-VILG
+An open packet of potato chips,一包开封的薯片,单物+属性描述,ERNIE-VILG
+A pancake,一张烙饼,单物+属性描述,ERNIE-VILG
+A fireman fighting a fire,一位正在救火的消防员,单物+属性描述,ERNIE-VILG
+A burning fish,身上着火的鱼,反事实,ERNIE-VILG
+The chicken head grows on the cow,鸡头长在奶牛身上,反事实,ERNIE-VILG
+A jellyfish riding a rocket,骑着火箭的水母,反事实,ERNIE-VILG
+"Eagle head, lion body and horse tail",鹰头狮身马尾巴,反事实,ERNIE-VILG
+A lion with a dragon's head,龙头狮子,反事实,ERNIE-VILG
+A sweet potato is flying the plane,红薯开飞机,反事实,ERNIE-VILG
+A rabbit with a fox's head,狐狸脑袋的兔子,反事实,ERNIE-VILG
+A owl with a lion's face,狮子脸的猫头鹰,反事实,ERNIE-VILG
+A quail looks like a frog,像青蛙的鹌鹑,反事实,ERNIE-VILG
+A goat spitting spider silk,吐蜘蛛丝的山羊,反事实,ERNIE-VILG
+A frog looks like a tomato,像西红柿的青蛙,反事实,ERNIE-VILG
+A lobster with a helmet riding a motorcycle,戴头盔骑摩托的龙虾,反事实,ERNIE-VILG
+A parrot looks like a shar pei,沙皮鹦鹉,反事实,ERNIE-VILG
+A car without doors,没有门的汽车,反事实,ERNIE-VILG
+A motorcycle without wheels,没有轮子的摩托车,反事实,ERNIE-VILG
+A water bottle without cover,没有盖的水瓶,反事实,ERNIE-VILG
+A pair of shoes without soles,没有底的鞋子,反事实,ERNIE-VILG
+A door without a handle,没有把手的门,反事实,ERNIE-VILG
+A hanger without hooks,没有勾的衣架,反事实,ERNIE-VILG
+Six winged chicken,六翅鸡,反事实,ERNIE-VILG
+A goblet full of thorns,全是刺的高脚杯,反事实,ERNIE-VILG
+Green rain in the sky,天上下绿色的雨,反事实,ERNIE-VILG
+A giraffe like a turtle,像乌龟的长颈鹿,反事实,ERNIE-VILG
+Microgram of iris japonica,蝴蝶花微距图,不同视角,ERNIE-VILG
+The front view of a Gundam model,高达模型正面,不同视角,ERNIE-VILG
+The close-up of a chip,芯片近距离特写,不同视角,ERNIE-VILG
+Top view of Xizhimen Interchange,西直门立交俯视图,不同视角,ERNIE-VILG
+The shadow of a black cat lying on its stomach,趴着的黑猫背影,不同视角,ERNIE-VILG
+The aerial view of Bird's Nest,鸟巢鸟瞰图,不同视角,ERNIE-VILG
+The front view of tea cup,茶杯正面图,不同视角,ERNIE-VILG
+The top View of an apple,苹果俯视图,不同视角,ERNIE-VILG
+The close-up of a corn,玉米近景特写,不同视角,ERNIE-VILG
+The upward view of the LED,仰视LED灯,不同视角,ERNIE-VILG
+The top view of the seal,海豹俯视图,不同视角,ERNIE-VILG
+The close-up of a chameleon,变色龙特写,不同视角,ERNIE-VILG
+side face of a puppet cat,布偶猫侧脸,不同视角,ERNIE-VILG
+The bottom view of Canton Tower,广州塔仰视图,不同视角,ERNIE-VILG
+The head up view of a star poster,平视明星海报,不同视角,ERNIE-VILG
+The close-up of miniature bonsai,微缩盆景特写,不同视角,ERNIE-VILG
+Scratch painting of butterfly,蝴蝶刮画,不同风格,ERNIE-VILG
+Crayon painting of potted plants,蜡笔画盆栽,不同风格,ERNIE-VILG
+Green Landscape Painting of Mountain,青绿山水画山,不同风格,ERNIE-VILG
+Bicycle painted by the marker,马克笔画自行车,不同风格,ERNIE-VILG
+Apple painted by colored pencil,苹果彩铅画,不同风格,ERNIE-VILG
+Leather shoes painted by pen,皮鞋钢笔画,不同风格,ERNIE-VILG
+Cherry Blossom Digital Oil Painting,樱花数字油画,不同风格,ERNIE-VILG
+Watercolor painting of plant,植物水彩,不同风格,ERNIE-VILG
+Gouache of the sky,水粉画天空,不同风格,ERNIE-VILG
+Impressionist painting of the elephant,印象派大象,不同风格,ERNIE-VILG
+Futurist painting of the building,未来派大厦,不同风格,ERNIE-VILG
+Rose in watercolor style,水彩风格玫瑰,不同风格,ERNIE-VILG
+Watercolor of sunset,水彩日落,不同风格,ERNIE-VILG
+Boundary painting of the gate tower,城楼界画,不同风格,ERNIE-VILG
+Classical oil painting of the lion,古典油画狮子,不同风格,ERNIE-VILG
+Chinese painting of grapes,国画葡萄,不同风格,ERNIE-VILG
+A photographer who is following the actors,跟拍演员的摄影师,不同时间/场景,ERNIE-VILG
+A statue in the middle of the rainy day square,雨天广场中间的雕像,不同时间/场景,ERNIE-VILG
+There is a boat on the foggy lake,雾蒙蒙的湖面上有一艘船,不同时间/场景,ERNIE-VILG
+A farmyard surrounded by beautiful flowers,美丽的鲜花围绕的农家小院,不同时间/场景,ERNIE-VILG
+A man shooting a basketball,投篮的男人,不同时间/场景,ERNIE-VILG
+A farmer sowing seeds,播种的农民,不同时间/场景,ERNIE-VILG
+A cashier of milk tea shop,奶茶店收银员,不同时间/场景,ERNIE-VILG
+A tallyman who is tallying,正在理货的理货员,不同时间/场景,ERNIE-VILG
+A nurse is changing the intravenous fluids,换吊瓶的护士,不同时间/场景,ERNIE-VILG
+Paper boats on the lake,湖面上的纸船,不同时间/场景,ERNIE-VILG
+Farmers working in the sun,太阳下正在耕作的农民,不同时间/场景,ERNIE-VILG
+A woman typing in the office,在办公室打字的女人,不同时间/场景,ERNIE-VILG
+Audiences making bullet comments,发弹幕的观众,不同时间/场景,ERNIE-VILG
+The singer who is having a concert,开演唱会的歌手,不同时间/场景,ERNIE-VILG
