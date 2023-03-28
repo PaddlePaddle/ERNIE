@@ -2,7 +2,7 @@
 
 [调用API体验](https://wenxin.baidu.com/ernie-vilg)
 
-[中英双语文生图评测集BCE-300](./data/BCE-300.csv)
+[中英双语文生图评测集ViLG-300](./data/ViLG-300.csv)
 
 更多技术细节请参考 我们的论文：
 >[_**ERNIE-ViLG 2.0: Improving Text-to-Image Diffusion Model with Knowledge-Enhanced Mixture-of-Denoising-Experts**_](https://arxiv.org/abs/2210.15257)
@@ -59,10 +59,10 @@
 |Parti|7.23|
 |**ERNIE-ViLG 2.0**|**6.75**|
 
-由于ERNIE-ViLG 2.0以中文为输入，为了与仅支持英文输入的文生图模型进行公平的对比，我们提出了文生图双语评测集[BCE-300](./data/BCE-300.csv)，可以对中文和英文的文生图模型进行系统的评估和对比。
-BCE-300从两个现有的文生图评测集DrawBench和ERNIE-ViLG采集了共16个大类、300条prompt，每条prompt均包含中文、英文两个版本。
+由于ERNIE-ViLG 2.0以中文为输入，为了与仅支持英文输入的文生图模型进行公平的对比，我们提出了文生图双语评测集[ViLG-300](./data/ViLG-300.csv)，可以对中文和英文的文生图模型进行系统的评估和对比。
+ViLG-300从两个现有的文生图评测集DrawBench和ERNIE-ViLG采集了共16个大类、300条prompt，每条prompt均包含中文、英文两个版本。
 
-基于BCE-300，在图文相关性和图像保真度两个维度的人工评估上，ERNIE-ViLG 2.0 相对 DALL-E 2 和 Stable Diffusion （调用日期：2022-10-25）具有较大优势。
+基于ViLG-300，在图文相关性和图像保真度两个维度的人工评估上，ERNIE-ViLG 2.0 相对 DALL-E 2 和 Stable Diffusion （调用日期：2022-10-25）具有较大优势。
 
 <div align=center>
 <img width="650" src="imgs/eval.jpeg">
