@@ -70,7 +70,7 @@ git clone https://github.com/PaddlePaddle/ERNIE.git
 ## 下载模型
 
 - 使用ERNIE3.0预训练模型进行文本分类任务
-- ERNNIE3.0预训练模型的下载与配置
+- ERNIE3.0预训练模型的下载与配置
 
 ```plain
 # ernie_3.0 模型下载

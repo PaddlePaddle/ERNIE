@@ -65,7 +65,7 @@
 │   ├── categorical_field_reader.py
 │   └── multi_label_field_reader.py
 ├── run_infer_dy.py   #ernie_doc 动态图预测的py文件
-├── run_infer.py      # 除enrie_doc外的预测文件入口文件，只依靠json进行模型训练的入口脚本
+├── run_infer.py      # 除ernie_doc外的预测文件入口文件，只依靠json进行模型训练的入口脚本
 ├── run_trainer.py.   # 训练文件入口文件，只依靠json进行模型训练的入口脚本
 ├── run_with_data_aug.sh
 └── trainer
@@ -78,7 +78,7 @@
 ## 数据准备
 
 - 在文心中，基于ERNIE的模型都不需要用户自己分词和生成词表文件，非ERNIE的模型需要用户自己提前切好词，词之间以空格分隔，并生成词表文件。切词和词表生成可以使用「[分词工具与词表生成工具](../../tools/data/wordseg/README.md)」进行处理。
-- 文心中的所有数据集、包含词表文件、label_map文件等都必须为为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning/README.md)」进行格式转换。
+- 文心中的所有数据集、包含词表文件、label_map文件等都必须为utf-8格式，如果你的数据是其他格式，请使用「[编码识别及转换工具](../../tools/data/data_cleaning/README.md)」进行格式转换。
 - 文心中的训练集、测试集、验证集、预测集和词表分别存放在./applications/tasks/text_classification/data目录下的train_data、test_data、dev_data、predict_data、dict文件夹下。
 - 在分类任务中，训练集、测试集和验证集的数据格式相同，数据分为两列，列与列之间用**\t**进行分隔。第一列为文本，第二列为标签。以下为示例：
 
