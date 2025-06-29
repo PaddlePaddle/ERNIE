@@ -1,0 +1,163 @@
+
+{
+  "demo_sft_train": {
+    "path": "examples/data/sft-train.jsonl",
+    "prob": 1.0,
+    "type": "erniekit"
+  },
+  "demo_sft_eval": {
+    "path": "examples/data/sft-eval.jsonl",
+    "prob": 1.0,
+    "type": "erniekit"
+  },
+  "demo_dpo_train": {
+    "path": "examples/data/dpo-train.jsonl",
+    "prob": 1.0,
+    "type": "erniekit"
+  },
+  "demo_dpo_eval": {
+    "path": "examples/data/dpo-eval.jsonl",
+    "prob": 1.0,
+    "type": "erniekit"
+  },
+  "alpaca_en": {
+    "path": "llamafactory/alpaca_en",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "alpaca_zh": {
+    "path": "llamafactory/alpaca_zh",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "alpaca_gpt4_en": {
+    "path": "llamafactory/alpaca_gpt4_en",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "alpaca_gpt4_zh": {
+    "path": "llamafactory/alpaca_gpt4_zh",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "train_2M_CN": {
+    "path": "BelleGroup/train_2M_CN",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "train_1M_CN": {
+    "path": "BelleGroup/train_1M_CN",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "train_0.5M_CN": {
+    "path": "BelleGroup/train_0.5M_CN",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "generated_chat_0.4M": {
+    "path": "BelleGroup/generated_chat_0.4M",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "school_math_0.25M": {
+    "path": "BelleGroup/school_math_0.25M",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "CodeAlpaca-20k": {
+    "path": "sahil2801/CodeAlpaca-20k",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "MathInstruct": {
+    "path": "TIGER-Lab/MathInstruct",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "firefly-train-1.1M": {
+    "path": "YeungNLP/firefly-train-1.1M",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "webqa": {
+    "path": "suolyer/webqa",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "webnovel_cn": {
+    "path": "zxbsmk/webnovel_cn",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "SFT-Nectar": {
+    "path": "AstraMindAI/SFT-Nectar",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "stem_zh_instruction": {
+    "path": "hfl/stem_zh_instruction",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "OpenO1-SFT": {
+    "path": "llamafactory/OpenO1-SFT",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "Chinese-DeepSeek-R1-Distill-data-110k-SFT": {
+    "path": "Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "oasst_de": {
+    "path": "mayflowergmbh/oasst_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "dolly-15k_de": {
+    "path": "mayflowergmbh/dolly-15k_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "alpaca-gpt4_de": {
+    "path": "mayflowergmbh/alpaca-gpt4_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "openschnabeltier_de": {
+    "path": "mayflowergmbh/openschnabeltier_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "evol-instruct_de": {
+    "path": "mayflowergmbh/evol-instruct_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "dolphin_de": {
+    "path": "mayflowergmbh/dolphin_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "booksum_de": {
+    "path": "mayflowergmbh/booksum_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "airoboros-3.0_de": {
+    "path": "mayflowergmbh/airoboros-3.0_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "ultra-chat_de": {
+    "path": "mayflowergmbh/ultra-chat_de",
+    "prob": 1.0,
+    "type": "alpaca"
+  },
+  "wikipedia-cn-20230720-filterede": {
+    "path": "pleisto/wikipedia-cn-20230720-filtered",
+    "prob": 1.0,
+    "type": "alpaca"
+  }
+}

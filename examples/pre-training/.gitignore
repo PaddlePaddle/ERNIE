@@ -1,0 +1,9 @@
+.idea
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+output
+demo_data/index-cache
+log

@@ -1,0 +1,114 @@
+[
+    {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    },
+        {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    },
+        {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    },
+        {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    },
+        {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    },
+        {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    },
+        {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    },
+        {
+        "id": 2,
+        "name": "数据集_002",
+        "description": "这是第2号数据集，用于测试和演示",
+        "samples": [
+            {
+                "instruction": "介绍一下你自己",
+                "input": "",
+                "output": "我是数据集2号的AI助手，很高兴见到你。"
+            }
+        ],
+        "created_at": "2025-05-29",
+        "total_samples": 31
+    }
+]

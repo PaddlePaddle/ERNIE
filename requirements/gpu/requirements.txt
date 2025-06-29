@@ -1,0 +1,11 @@
+paddleformers
+setuptools==50.3.2
+decord
+moviepy
+GPUtil
+openai
+gradio
+opencv-python==4.5.5.64
+imgaug==0.4.0
+triton==3.3
+use-triton-in-paddle
