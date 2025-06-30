@@ -16,8 +16,6 @@ Each parameter is documented with its type, default value and detailed descripti
 
 ## 1. General Configuration
 
-## 1. General Configuration
-
 ### 1.1 Basic Configuration
 
 | Parameter | Type | Default | Description |
@@ -144,7 +142,7 @@ Each parameter is documented with its type, default value and detailed descripti
 
 ## 2. Specialized Configurations
 
-### 2.1 SFT Configuration
+### 2.1 SFT
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
