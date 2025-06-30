@@ -135,8 +135,8 @@ Supervised Fine-Tuning (SFT) adapts pre-trained language models using labeled da
 - Ideal for precision-critical specialized tasks
 
 For configuration details:
-⚙️ [General Training Settings](./training_eval_args.md#1-general-configuration)
-⚙️ [SFT Settings](./training_eval_args.md#21-sft-configuration)
+⚙️ [General Training Settings](./training_eval_args.md#1-General-configuration)
+⚙️ [SFT Settings](./training_eval_args.md#21-SFT)
 
 **Example 1: Full-Parameter Supervised Fine-tuning**
 
@@ -160,7 +160,7 @@ erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_32k.yaml
 
 LoRA (Low-Rank Adaptation) leverages matrix low-rank decomposition techniques to achieve model fine-tuning by only adjusting a small number of new parameters. LoRA training reduces resource requirements while often delivering comparable or even superior performance to full-parameter fine-tuning on small datasets.
 
-Compared to standard SFT, enabling LoRA training simply requires adding `fine_tuning: LoRA` to the training configuration. For more training parameters, refer to [LoRA configurations](./training_eval_args.md#22-lora专用配置).
+Compared to standard SFT, enabling LoRA training simply requires adding `fine_tuning: LoRA` to the training configuration. For more training parameters, refer to [LoRA configurations](./training_eval_args.md#22-LoRA).
 
 The following example requires training on a single 80GB A/H GPU card.
 
@@ -187,7 +187,7 @@ Alignment Training is a crucial technique for ensuring the behavior of Large Lan
 
 Direct Preference Optimization (DPO) is a representative method for achieving human preference alignment. It directly fine-tunes model parameters on annotated preference data. Compared to RLHF, DPO offers higher training stability and lower computational overhead, establishing itself as a mainstream preference alignment approach.
 
-For more training configurations, refer to [Training configuration](./training_eval_args.md#1-通用配置) and [DPO configuration](./training_eval_args.md#23-dpo专用配置).
+For more training configurations, refer to [Training configuration](./training_eval_args.md#1-General-configuration) and [DPO configuration](./training_eval_args.md#23-DPO).
 
 
 **Example 1: Full-Parameter Direct Preference Optimization**
