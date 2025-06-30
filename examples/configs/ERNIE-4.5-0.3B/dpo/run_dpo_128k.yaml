@@ -9,8 +9,7 @@ max_seq_len: 131072
 num_samples_each_epoch: 6000000
 
 ### model
-#model_name_or_path: baidu/ERNIE-4.5-0.3B-Paddle
-model_name_or_path: /root/paddlejob/workspace/env_run/liuting/baidu/paddle_internal/ernie-4_5-0_3b-bf16-paddle
+model_name_or_path: baidu/ERNIE-4.5-0.3B-Paddle
 fine_tuning: Full
 fuse_rope: True
 
