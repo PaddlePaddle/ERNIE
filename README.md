@@ -7,7 +7,7 @@
 
 <div align="center">
 
-[ERNIE Bot](https://ernie.baidu.com/) | [AI Studio](https://aistudio.baidu.com/index) | [Hugging Face](https://huggingface.co/baidu)
+[ERNIE Bot](https://ernie.baidu.com/) | [AI Studio](https://aistudio.baidu.com/modelsoverview) | [Hugging Face](https://huggingface.co/baidu)
 
 📑 [Blog](https://yiyan.baidu.com/blog/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
 
