@@ -9,7 +9,7 @@
 
 [ERNIE Bot](https://ernie.baidu.com/) | [AI Studio](https://aistudio.baidu.com/index) | [Hugging Face](https://huggingface.co/baidu)
 
-📑 [Blog](https://yiyan.baidu.com/blog/publication/) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
+📑 [Blog](https://yiyan.baidu.com/blog/) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
 
 </div>
 
