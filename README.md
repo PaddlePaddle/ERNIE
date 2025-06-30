@@ -15,7 +15,7 @@
 
 ## Introduction to ERNIE 4.5
 
-We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising 10 distinct variants. The model family consist of Mixture-of-Experts (MoE) models with 47B and 3B active parameters, with the largest model having 424B total parameters, as well as a 0.3B dense model. For the MoE architecture, we propose a novel heterogeneous modality structure, which supports parameter sharing across modalities while also allowing dedicated parameters for each individual modality.  This MoE architecture has the advantage to enhance multimodal understanding without compromising, and even improving, performance on text-related tasks. All of our models are trained with optimal efficiency using the [PaddlePaddle](https://github.com/PaddlePaddle/Paddle) deep learning framework, which also enables high-performance inference and streamlined deployment for them. We achieve 47% Model FLOPs Utilization (MFU) in our largest ERNIE 4.5 language model pre-training. Experimental results show that our models achieve state-of-the-art performance across multiple text and multimodal benchmarks, especially in instruction following, world knowledge memorization, visual understanding and multimodal reasoning. Additionally, we open-source the development toolkits for ERNIE 4.5, featuring industrial-grade capabilities, low-barrier and efficient training and inference workflows, and multi-hardware compatibility.
+We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising 10 distinct variants. The model family consist of Mixture-of-Experts (MoE) models with 47B and 3B active parameters, with the largest model having 424B total parameters, as well as a 0.3B dense model. For the MoE architecture, we propose a novel heterogeneous modality structure, which supports parameter sharing across modalities while also allowing dedicated parameters for each individual modality.  This MoE architecture has the advantage to enhance multimodal understanding without compromising, and even improving, performance on text-related tasks. All of our models are trained with optimal efficiency using the [PaddlePaddle](https://github.com/PaddlePaddle/Paddle) deep learning framework, which also enables high-performance inference and streamlined deployment for them. We achieve 47% Model FLOPs Utilization (MFU) in our largest ERNIE 4.5 language model pre-training. Experimental results show that our models achieve state-of-the-art performance across multiple text and multimodal benchmarks, especially in instruction following, world knowledge memorization, visual understanding and multimodal reasoning. All models are publicly accessible under Apache 2.0 to support future research and development in the field. Additionally, we open source the development toolkits for ERNIE 4.5, featuring industrial-grade capabilities, resource-efficient training and inference workflows, and multi-hardware compatibility.
 
 </br>
 
@@ -195,7 +195,7 @@ erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
 
 For detailed guides on installation, CLI usage, WebUI, multi-node training, and advanced features, please refer to [ERNIEKit Training Document](./docs/erniekit.md).
 
-**erniekit webui demo:**
+**ERNIEKit WebUI demo:**
 
 https://github.com/user-attachments/assets/6d44cb92-0826-42df-aa80-7656445e0f73
 
