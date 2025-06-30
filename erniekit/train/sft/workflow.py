@@ -139,6 +139,10 @@ def run_sft(
 
     paddle.set_device(finetuning_args.device)
 
+    # Initialize distributed training environment if needed
+    if finetuning_args.local_rank != -1:
+        paddle.distributed.init_parallel_env()
+
     set_seed(finetuning_args.seed)
 
     logger.warning(
