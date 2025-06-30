@@ -151,18 +151,18 @@ In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visua
 ERNIE 4.5 models are trained and deployed for inference using the [PaddlePaddle]((https://github.com/PaddlePaddle/Paddle)) framework. The full workflow of training, compression, and inference for ERNIE 4.5 is supported through the [ERNIEKit](./docs/erniekit.md) and [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) toolkit. The table below details the feature matrix of the ERNIE 4.5 model family for training and inference.
 <div align="center">
 
-| Model             |  Training      |  Inference              |
-| ------------------------------ | ------------------------- | -------------------------------- |
-| ERNIE-4.5-300B-A47B-Base       | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-300B-A47B            | SFT/SFT-LoRA/DPO/DPO-LoRA/QAT | BF16 / W4A16C16 / W8A16C16 / W4A8C8 / FP8  / 2Bits |
-| ERNIE-4.5-21B-A3B-Base         | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-21B-A3B              | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-424B-A47B-Base    | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-424B-A47B         | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-28B-A3B-Base      | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-28B-A3B           | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-0.3B-Base            | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W8A16C16 / FP8            |
-| ERNIE-4.5-0.3B                 | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W8A16C16 / FP8            |
+| Model             | Training                                   |  Inference              |
+| ------------------------------ |--------------------------------------------| -------------------------------- |
+| ERNIE-4.5-300B-A47B-Base       | SFT/SFT-LoRA/DPO/DPO-LoRA                  | BF16 / W4A16C16 / W8A16C16 / FP8 |
+| ERNIE-4.5-300B-A47B            | Pre-Training/SFT/SFT-LoRA/DPO/DPO-LoRA/QAT | BF16 / W4A16C16 / W8A16C16 / W4A8C8 / FP8  / 2Bits |
+| ERNIE-4.5-21B-A3B-Base         | SFT/SFT-LoRA/DPO/DPO-LoRA                  | BF16 / W4A16C16 / W8A16C16 / FP8 |
+| ERNIE-4.5-21B-A3B              | SFT/SFT-LoRA/DPO/DPO-LoRA                  | BF16 / W4A16C16 / W8A16C16 / FP8 |
+| ERNIE-4.5-VL-424B-A47B-Base    | Coming Soon                                | BF16 / W4A16C16 / W8A16C16 / FP8 |
+| ERNIE-4.5-VL-424B-A47B         | Coming Soon                                | BF16 / W4A16C16 / W8A16C16 / FP8 |
+| ERNIE-4.5-VL-28B-A3B-Base      | Coming Soon                                | BF16 / W4A16C16 / W8A16C16 / FP8 |
+| ERNIE-4.5-VL-28B-A3B           | Coming Soon                                | BF16 / W4A16C16 / W8A16C16 / FP8 |
+| ERNIE-4.5-0.3B-Base            | SFT/SFT-LoRA/DPO/DPO-LoRA                  | BF16 / W8A16C16 / FP8            |
+| ERNIE-4.5-0.3B                 | SFT/SFT-LoRA/DPO/DPO-LoRA                  | BF16 / W8A16C16 / FP8            |
 
 </div>
 
