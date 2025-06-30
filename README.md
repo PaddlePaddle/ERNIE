@@ -101,7 +101,7 @@ Our model family is characterized by three key innovations:
 All released models (including pretrained weights and inference code) are now fully open source. For relationships between different model architectures, see the diagram below. Additional technical details are available in the technical report.
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/44060b7a-6dbe-442b-80e8-b399cab1ce84" width="1080" height="630" >
+<img src="https://github.com/user-attachments/assets/44060b7a-6dbe-442b-80e8-b399cab1ce84" width="1080" height="636" >
 </div>
 
 </br>
