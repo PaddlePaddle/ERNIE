@@ -40,7 +40,7 @@ We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising
   </thead>
   <tbody class="ant-table-tbody">
     <tr>
-      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;">Large Language Model (LLMs)</td>
+      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;">Large Language Models (LLMs)</td>
       <td style="border: 1px solid #ddd;">ERNIE-4.5-300B-A47B-Base</td>
       <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
       <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
