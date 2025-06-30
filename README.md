@@ -9,7 +9,7 @@
 
 [ERNIE Bot](https://ernie.baidu.com/) | [AI Studio](https://aistudio.baidu.com/modelsoverview) | [Hugging Face](https://huggingface.co/baidu)
 
-📑 [Blog](https://yiyan.baidu.com/blog/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
+📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
 
 </div>
 
@@ -83,8 +83,7 @@ We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising
 </table>
 </div>
 
-_Note:All models (including pre-trained weights and inference code) have been released on [Hugging Face](https://huggingface.co/baidu), and [AI Studio](https://aistudio.baidu.com/index). Check our [blog](https://yiyan.baidu.com/blog/publication/) for more details._
-
+_Note:All models (including pre-trained weights and inference code) have been released on [Hugging Face](https://huggingface.co/baidu), and [AI Studio](https://aistudio.baidu.com/index). Check our [blog](https://yiyan.baidu.com/blog/posts/ernie4.5) for more details.
 
 </br>
 
@@ -195,7 +194,7 @@ erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
 
 For detailed guides on installation, CLI usage, WebUI, multi-node training, and advanced features, please refer to [ERNIEKit Training Document](./docs/erniekit.md).
 
-**erniekit webui demo:**
+**ERNIEKit WebUI demo:**
 
 https://github.com/user-attachments/assets/6d44cb92-0826-42df-aa80-7656445e0f73
 
