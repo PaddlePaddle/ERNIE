@@ -1,6 +1,3 @@
-<!-- filepath: [README.md](http://_vscodecontentref_/0) -->
-
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/9ad1ffce-2310-4f80-a3cd-7a117bfb4f17" width="300px"></a>
 </p>
