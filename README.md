@@ -116,31 +116,31 @@ In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visua
 ### Performace of ERNIE-4.5 pre-trained models
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/a31a0101-4d47-4e76-97f6-332a0cff7098" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/base_model_benchmark.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained model ERNIE-4.5-300B-A47B
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/2b5657ef-b61f-44c2-a945-106cf919d5bf" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/chat_model_benchmark1.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained model ERNIE-4.5-21B-A3B
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/a89d9414-16ea-4afa-8888-bbc1ca51f509" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/chat_model_benchmark2.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained multimodal models in thinking mode
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/d91f898d-3b5c-4628-ad3a-c1d231ae415a" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/vl_model_thinking_benchmark.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained multimodal models in non-thinking mode
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/4874712f-47b0-413a-b51c-f9536ca03d51" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/vl_model_nonthinking_benchmark.png" style="max-width: 80%; height: auto;">
 </div>
 
 </br>
