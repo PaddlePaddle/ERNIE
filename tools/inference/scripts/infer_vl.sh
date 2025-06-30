@@ -26,9 +26,9 @@ unset FLAGS_START_PORT
 unset PADDLE_ELASTIC_TIMEOUT
 
 
-python ./examples/inference/infer_vl.py \
+python ./tools/inference/infer_vl.py \
     --model_name_or_path ./ernie-4_5-vl-28b-a3b-bf16-paddle/ \
     --batch_size 1 \
-    --input_file ./examples/inference/data/multimodal-query-answers-list-small.jsonl \
+    --input_file ./tools/inference/data/multimodal-query-answers-list-small.jsonl \
     --output_file ./predict_out.json \
     --max_seq_length 8182 \
