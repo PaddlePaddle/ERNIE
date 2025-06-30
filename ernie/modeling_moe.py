@@ -1695,7 +1695,7 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
         mtp_outputs = outputs.mtp_outputs
 
         if isinstance(self.criterion, ErnieDPOCriterion):
-            logits = (hidden_states, self.lm_head.weight, None, True)
+            logits = (hidden_states, self.lm_head.weight, None, self.config.tie_word_embeddings)
             chosen_labels = kwargs.get("chosen_labels", None)
             rejected_labels = kwargs.get("rejected_labels", None)
             response_indexs = kwargs.get("response_indexs", None)
