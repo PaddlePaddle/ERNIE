@@ -1,13 +1,10 @@
-<!-- filepath: [README.md](http://_vscodecontentref_/0) -->
-
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/9ad1ffce-2310-4f80-a3cd-7a117bfb4f17" width="300px"></a>
 </p>
 
 <div align="center">
 
-[ERNIE Bot](https://ernie.baidu.com/) | [AI Studio](https://aistudio.baidu.com/modelsoverview) | [Hugging Face](https://huggingface.co/baidu)
+[ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview) 
 
 📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
 
@@ -40,7 +37,7 @@ We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising
   </thead>
   <tbody class="ant-table-tbody">
     <tr>
-      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;">Large Language Model (LLMs)</td>
+      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;">Large Language Models (LLMs)</td>
       <td style="border: 1px solid #ddd;">ERNIE-4.5-300B-A47B-Base</td>
       <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
       <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
@@ -83,7 +80,7 @@ We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising
 </table>
 </div>
 
-_Note:All models (including pre-trained weights and inference code) have been released on [Hugging Face](https://huggingface.co/baidu), and [AI Studio](https://aistudio.baidu.com/index). Check our [blog](https://yiyan.baidu.com/blog/posts/ernie4.5) for more details.
+_Note: All models (including pre-trained weights and inference code) have been released on [🤗Hugging Face](https://huggingface.co/baidu), and [AI Studio](https://aistudio.baidu.com/index). Check our [blog](https://yiyan.baidu.com/blog/posts/ernie4.5) for more details._
 
 </br>
 
@@ -116,31 +113,31 @@ In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visua
 ### Performace of ERNIE-4.5 pre-trained models
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/a31a0101-4d47-4e76-97f6-332a0cff7098" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/base_model_benchmark.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained model ERNIE-4.5-300B-A47B
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/2b5657ef-b61f-44c2-a945-106cf919d5bf" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/chat_model_benchmark1.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained model ERNIE-4.5-21B-A3B
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/a89d9414-16ea-4afa-8888-bbc1ca51f509" style="max-width: 80%; height: auto;">
+<img src="https://github.com/user-attachments/assets/5bacaae8-ef27-494d-8c65-589ba187a084" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained multimodal models in thinking mode
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/d91f898d-3b5c-4628-ad3a-c1d231ae415a" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/vl_model_thinking_benchmark.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained multimodal models in non-thinking mode
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/4874712f-47b0-413a-b51c-f9536ca03d51" style="max-width: 80%; height: auto;">
+<img src="https://github.com/user-attachments/assets/e0299715-eb40-4930-8bee-b5f9dd8fc010" style="max-width: 80%; height: auto;">
 </div>
 
 </br>
