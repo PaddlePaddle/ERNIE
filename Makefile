@@ -5,6 +5,9 @@
 #
 
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # # 
+install:
+	pip install pre-commit
+	pre-commit install
 
 .PHONY: lint
 lint:
