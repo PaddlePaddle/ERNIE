@@ -8,6 +8,17 @@ ERNIEKit currently supports reading local datasets and downloading specified Hug
   - Set `train_dataset_path`/`eval_dataset_path` to the absolute or relative path of your local dataset file
   - Set `train_dataset_type`/`eval_dataset_type` to the dataset format (erniekit/alpaca)
   - Set `train_dataset_prob`/`eval_dataset_prob` for multi-source dataset mixing probabilities
+```yaml
+# single-source
+train_dataset_type: "erniekit"
+train_dataset_path: "./examples/data/sft-train.jsonl"
+train_dataset_prob: "1.0"
+
+# multi-source
+train_dataset_type: "erniekit,erniekit"
+train_dataset_path: "./examples/data/sft-train1.jsonl,./examples/data/sft-train2.jsonl"
+train_dataset_prob: "0.8,0.2"
+```
 
 - **WebUI**:
   - Under `Set Custom Dataset`, input the local file path in `Dataset Path`
@@ -19,7 +30,17 @@ ERNIEKit currently supports reading local datasets and downloading specified Hug
   - Set `train_dataset_path`/`eval_dataset_path` to the Hugging Face repo ID
   - Set `train_dataset_type`/`eval_dataset_type` to alpaca
   - Set `train_dataset_prob`/`eval_dataset_prob` for multi-source dataset mixing probabilities
+```yaml
+# single-source
+train_dataset_type: "alpaca"
+train_dataset_path: "BelleGroup/train_2M_CN"
+train_dataset_prob: "1.0"
 
+# multi-source
+train_dataset_type: "alpaca,alpaca"
+train_dataset_path: "llamafactory/alpaca_gpt4_zh,BelleGroup/train_2M_CN"
+train_dataset_prob: "0.8,0.2"
+```
 - **WebUI**:
   - Under `Set Built-in Dataset`, select the dataset name in `Dataset Selection`
   - The system will automatically configure the path and type, then download and read from Hugging Face
