@@ -244,6 +244,12 @@ Discover best-practice guides showcasing ERNIE’s capabilities across multiple 
 
 </br>
 
+## Community
+
+| PaddlePaddle WeChat official account |  Join the tech discussion group |
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/864a45ec-0773-44b2-a2f1-c0e21e157792" width="150"> | <img src="https://github.com/user-attachments/assets/52e05674-7143-4207-8b19-67247fe88f55" width="150"> |
+
 ## License
 
 The ERNIE 4.5 models are provided under the Apache License 2.0. This license permits commercial use, subject to its terms and conditions.
