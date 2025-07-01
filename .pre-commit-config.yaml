@@ -42,6 +42,6 @@ repos:
     hooks:
     -   id: copyright_checker
         name: copyright_checker
-        entry: python .copyright.hook
+        entry: python ./scripts/.copyright.hook
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|sh)$

@@ -1,14 +1,17 @@
 # Makefile for ERNIEKit
 #
-# 	GitHb: https://github.com/PaddlePaddle/ERNIE
+# 	GitHub: https://github.com/PaddlePaddle/ERNIE
 # 	Author: Paddle Team https://github.com/PaddlePaddle
 #
 
-# # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # Install # # # # # # # # # # # # # # # 
 install:
 	pip install pre-commit
 	pre-commit install
 
+
+
+# # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # # 
 .PHONY: lint
 lint:
 	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
