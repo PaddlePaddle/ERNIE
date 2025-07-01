@@ -69,6 +69,7 @@ PaddlePaddle is installed successfully! Let's start deep learning with PaddlePad
 
 ```bash
 git clone https://github.com/PaddlePaddle/ERNIE
+cd ERNIE
 python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e . # We recommend install in editable mode
 ```
