@@ -1,0 +1,35 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  Lint:
+    name: Lint
+    runs-on: [self-hosted, 4gpu]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: checkout develop
+        run: |
+          if ! git show-ref --quiet refs/heads/develop; then \
+              echo "local develop branch is missing, creating local develop branch that tracks remote develop branch"
+              git fetch origin develop
+              git branch develop --track origin/develop
+          else
+            echo "local develop branch exist, skipping"
+          fi
+      - name: Start container
+        run: |
+          if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
+            echo "Starting container ERNIE_CI_Container"
+            docker start ERNIE_CI_Container
+          else
+            echo "ERNIE_CI_Container already running"
+          fi
+      - name: Install dependencies
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+         make install'
+      - name: Runing case
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+         make test'
