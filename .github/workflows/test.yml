@@ -9,7 +9,9 @@ jobs:
     steps:
       - name: Get Repo
         env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+          ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
+          ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+          ACTIONS_ALLOW_UNSECURE_NODE_VERSION: true
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
