@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   Lint:
-    name: Lint
+    name: Test
     runs-on: [self-hosted, 4gpu]
     steps:
       - uses: actions/checkout@v3
