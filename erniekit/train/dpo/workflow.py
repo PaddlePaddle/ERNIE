@@ -282,6 +282,12 @@ def run_dpo(
         else:
             ref_model = None
     model.config.dpo_config = None
+
+    if model.config.head_dim is None:
+        del model.config.head_dim
+    if ref_model is not None and ref_model.config.head_dim is None:
+        del ref_model.config.head_dim
+
     if model_args.lora:
         logger.info("Start to wrap model with LoRA config ...")
         if model_args.lora_path is None:

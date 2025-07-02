@@ -589,6 +589,9 @@ def main():
     else:
         model = model_class.from_config(model_config, dtype=dtype)
 
+    if model.config.head_dim is None:
+        del model.config.head_dim
+
     paddle.device.cuda.empty_cache()
     logger.info("Loading model successfully !")
     logger.debug(f"Model config: {model.config}")

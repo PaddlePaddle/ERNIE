@@ -557,7 +557,7 @@ class Ernie4_5_Attention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
         self.num_key_value_heads = config.num_key_value_heads
-        if config.head_dim is None:
+        if getattr(config, "head_dim", None) is None:
             self.head_dim = self.hidden_size // self.num_heads
         else:
             self.head_dim = config.head_dim
@@ -587,7 +587,7 @@ class Ernie4_5_Attention(nn.Layer):
             assert (
                 self.num_heads % self.num_key_value_heads == 0
             ), f"num_heads: {self.num_heads}, num_key_value_heads: {self.num_key_value_heads}"
-            if config.head_dim is None:
+            if getattr(config, "head_dim", None) is None:
                 kv_hidden_size = self.hidden_size // self.num_heads * self.num_key_value_heads
             else:
                 kv_hidden_size = self.head_dim * config.num_key_value_heads
@@ -607,7 +607,7 @@ class Ernie4_5_Attention(nn.Layer):
                 ColumnLN = RRColumnSequenceParallelLinear
                 column_ln_configs = {"use_rr": True}
 
-            if config.head_dim is None:
+            if getattr(config, "head_dim", None) is None:
                 qkv_hidden_size = self.hidden_size * 3 if not self.is_gqa else self.hidden_size + kv_hidden_size * 2
             else:
                 qkv_hidden_size = q_hidden_size + kv_hidden_size * 2
@@ -621,7 +621,7 @@ class Ernie4_5_Attention(nn.Layer):
             )
         else:
             LinearFN = paddle.incubate.nn.FusedLinear if config.fuse_linear else Linear
-            if config.head_dim is None:
+            if getattr(config, "head_dim", None) is None:
                 qkv_hidden_size = self.hidden_size * 3 if not self.is_gqa else self.hidden_size + kv_hidden_size * 2
             else:
                 qkv_hidden_size = q_hidden_size + kv_hidden_size * 2
@@ -642,7 +642,7 @@ class Ernie4_5_Attention(nn.Layer):
                 row_ln_configs = {"use_rr": True}
 
             self.o_proj = RowLN(
-                self.hidden_size if config.head_dim is None else q_hidden_size,
+                self.hidden_size if getattr(config, "head_dim", None) is None else q_hidden_size,
                 self.hidden_size,
                 has_bias=config.use_bias,
                 input_is_parallel=True,
@@ -652,7 +652,7 @@ class Ernie4_5_Attention(nn.Layer):
         else:
             LinearFN = paddle.incubate.nn.FusedLinear if config.fuse_linear else Linear
             self.o_proj = LinearFN(
-                self.hidden_size if config.head_dim is None else q_hidden_size,
+                self.hidden_size if getattr(config, "head_dim", None) is None else q_hidden_size,
                 self.hidden_size,
                 bias_attr=config.use_bias,
             )
