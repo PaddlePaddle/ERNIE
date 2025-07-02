@@ -1281,7 +1281,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         """
 
         if self.config.use_sparse_head_and_loss_fn:
-            hidden_states, outlinear_weight, outlinear_bias = prediction_scores
+            hidden_states, outlinear_weight, outlinear_bias, _ = prediction_scores
 
             if self.config.sequence_parallel:
                 masked_lm_labels, sparse_label_idx = sequence_parallel_sparse_mask_labels(
@@ -1542,13 +1542,11 @@ class Ernie4_5_LMHead(nn.Layer):
                     Logits tensor of shape [batch_size, seq_len, vocab_size]
             ]
         """
+        #  will enter this branch when:
+        # 1. use_recompute_loss_fn or use_sparse_head_and_loss_fn
+        # 2. dpo training
         if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
-            out_tensors = (
-                (hidden_states, self.weight, self.bias)
-                if tensor_parallel_output is None
-                else (hidden_states, self.weight, self.bias, tensor_parallel_output)
-            )
-            return out_tensors
+            return (hidden_states, self.weight, self.bias, self.config.tie_word_embeddings)
 
         return calc_lm_head_logits(
             self.config, hidden_states, self.weight, self.bias, tensor_parallel_output, training=self.training

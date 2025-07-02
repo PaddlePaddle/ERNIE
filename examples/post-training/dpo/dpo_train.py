@@ -77,11 +77,6 @@ def main():
         logger.warning(
             "Dpo training requires use_sparse_head_and_loss_fn=True. Set use_sparse_head_and_loss_fn to True"
         )
-    if model_args.use_fused_head_and_loss_fn:
-        model_args.use_fused_head_and_loss_fn = False
-        logger.warning(
-            "Dpo training does not support use_fused_head_and_loss_fn=True. Set use_fused_head_and_loss_fn to False"
-        )
 
     if data_args.max_seq_len < 16:
         data_args.max_seq_len = 16

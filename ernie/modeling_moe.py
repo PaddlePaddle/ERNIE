@@ -1693,13 +1693,9 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
 
         hidden_states = outputs.last_hidden_state
         mtp_outputs = outputs.mtp_outputs
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
-        logits = self.lm_head(hidden_states)
-        mtp_logits = []
-        if len(mtp_outputs) > 0:
-            mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs]
+
         if isinstance(self.criterion, ErnieDPOCriterion):
+            logits = (hidden_states, self.lm_head.weight, None, self.config.tie_word_embeddings)
             chosen_labels = kwargs.get("chosen_labels", None)
             rejected_labels = kwargs.get("rejected_labels", None)
             response_indexs = kwargs.get("response_indexs", None)
@@ -1718,6 +1714,13 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
                 logits,
                 labels,
             )
+
+        # if labels is None，means we need full output, instead of tensor_parallel_output
+        # tensor_parallel_output is togather with ParallelCrossEntropy
+        logits = self.lm_head(hidden_states)
+        mtp_logits = []
+        if len(mtp_outputs) > 0:
+            mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs]
 
         if return_dict:  # aka Generate Decoding
             if labels is not None:

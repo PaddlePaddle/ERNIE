@@ -6,7 +6,7 @@
 
 [ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview) 
 
-📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
+📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)  | 🛠️ [Toolkit](./docs/erniekit.md)
 
 </div>
 
@@ -94,12 +94,6 @@ Our model family is characterized by three key innovations:
 
 3. **Modality-Specific Post-Training:** To meet the diverse requirements of real-world applications, we fine-tuned variants of the pre-trained model for specific modalities. Our LLMs are optimized for general-purpose language understanding and generation. The VLMs focuses on visuallanguage understanding and supports both thinking and non-thinking modes. Each model employed a combination of *Supervised Fine-tuning (SFT)*, *Direct Preference Optimization (DPO)* or a modified reinforcement learning method named *Unified Preference Optimization (UPO)* for post-training.
 
-All released models (including pretrained weights and inference code) are now fully open source. For relationships between different model architectures, see the diagram below. Additional technical details are available in the technical report.
-
-<div align="center">
-<img src="https://github.com/user-attachments/assets/44060b7a-6dbe-442b-80e8-b399cab1ce84" width="1080" height="636" >
-</div>
-
 </br>
 
 ## Performance and Benchmark Results
@@ -137,7 +131,7 @@ In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visua
 ### Performance of post-trained multimodal models in non-thinking mode
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/e0299715-eb40-4930-8bee-b5f9dd8fc010" style="max-width: 80%; height: auto;">
+<img src="https://github.com/user-attachments/assets/3ad69a9d-1233-48be-a7c4-b816d3aa17ca" style="max-width: 80%; height: auto;">
 </div>
 
 </br>
@@ -249,6 +243,12 @@ Discover best-practice guides showcasing ERNIE’s capabilities across multiple 
 </div>
 
 </br>
+
+## Community
+
+| PaddlePaddle WeChat official account |  Join the tech discussion group |
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/864a45ec-0773-44b2-a2f1-c0e21e157792" width="150"> | <img src="https://github.com/user-attachments/assets/52e05674-7143-4207-8b19-67247fe88f55" width="150"> |
 
 ## License
 
