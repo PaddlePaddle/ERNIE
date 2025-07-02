@@ -4,13 +4,6 @@
 # 	Author: Paddle Team https://github.com/PaddlePaddle
 #
 
-# # # # # # # # # # # # # # # Install # # # # # # # # # # # # # # # 
-install:
-	pip install pre-commit
-	pre-commit install
-
-
-
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # # 
 .PHONY: lint
 lint:
