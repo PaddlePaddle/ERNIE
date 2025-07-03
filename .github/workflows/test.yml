@@ -17,12 +17,15 @@ jobs:
           fetch-depth: 0
       - name: Start container
         run: |
-          if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
+          if [ ! "$(sudo docker ps -q -f name=ERNIE_CI_Container)" ]; then
             echo "Starting container ERNIE_CI_Container"
             docker start ERNIE_CI_Container
           else
             echo "ERNIE_CI_Container already running"
           fi
+      - name: Install ernikit
+        run: sudo docker exec -t ERNIE_CI_Container /bin/bash -c '
+          pip install -e.'
       - name: Runing case
-        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-         make test'
+        run: sudo docker exec -t ERNIE_CI_Container /bin/bash -c '
+          make test'

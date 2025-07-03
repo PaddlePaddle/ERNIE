@@ -4,7 +4,7 @@
 
 .PHONY: all
 all : lint test
-check_dirs := cookbook data_processor ernie erniekit examples tools test
+check_dirs := cookbook data_processor ernie erniekit examples tools test requirements
 
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # #
 .PHONY: lint
@@ -20,13 +20,14 @@ lint:
 # # # # # # # # # # # # # # # Install Requirements Block # # # # # # # # # # # # # # #
 .PHONY: install
 install:
+	pip unistall paddlepaddle-gpu -y
 	pip install paddlepaddle-gpu==3.1.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
-	pip install -r requirements/gpu/requirements.txt
-	pip install -e .
+	pip install --upgrade --force-reinstall -r requirements/gpu/requirements.txt
 	pip install pytest
 	pip install allure
 
 # # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # #
 .PHONY: test
 test:
+	pip install -e .
 	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/
