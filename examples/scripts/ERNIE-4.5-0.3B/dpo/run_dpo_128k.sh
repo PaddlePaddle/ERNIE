@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PADDLE_MODEL_PATH=${1:-}
-TORCH_MODEL_PATH=${2:-}
+# download model from huggingface
+huggingface-cli download baidu/ERNIE-4.5-0.3B-Paddle --local-dir baidu/ERNIE-4.5-0.3B-Paddle
 
-python tools/paddle2torch/tran_4_5t.py \
-    --src_dir $PADDLE_MODEL_PATH \
-    --dest_dir $TORCH_MODEL_PATH \
-    --src_prefix "ernie." \
-    --dst_prefix "model." \
-    --use_moe
+# # download model from aistudio
+# aistudio download --model PaddlePaddle/ERNIE-4.5-0.3B-Paddle --local_dir baidu/ERNIE-4.5-0.3B-Paddle
+# # download model from modelscope
+# modelscope download --model PaddlePaddle/ERNIE-4.5-0.3B-Paddle --local_dir baidu/ERNIE-4.5-0.3B-Paddle
+
+CUDA_VISIBLE_DEVICES=0 erniekit train examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_128k.yaml

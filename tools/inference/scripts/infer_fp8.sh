@@ -32,10 +32,10 @@ rm -rf log
 python -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir ./log \
-    ./examples/inference/infer.py \
+    ./tools/inference/infer.py \
     --model_name_or_path "./new-4p5-model/" \
     --batch_size 1 \
-    --input_file ./examples/inference/data/query-demo.jsonl \
+    --input_file ./tools/inference/data/query-demo.jsonl \
     --output_file ./predict_sft_out.txt \
     --max_seq_len 4096 \
     --min_dec_len 1 \
