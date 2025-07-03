@@ -37,4 +37,4 @@ jobs:
           pip install pre-commit
           pre-commit install
       - name: Test
-        run: make -f scripts/Makefile lint
+        run: make -f tools/codestyle/Makefile lint
