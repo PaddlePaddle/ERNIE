@@ -15,17 +15,30 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          path: ${{ github.sha }}
       - name: Start container
         run: |
-          if [ ! "$(sudo docker ps -q -f name=ERNIE_CI_Container)" ]; then
+          if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
             echo "Starting container ERNIE_CI_Container"
             docker start ERNIE_CI_Container
           else
             echo "ERNIE_CI_Container already running"
           fi
-      - name: Install ernikit
-        run: sudo docker exec -t ERNIE_CI_Container /bin/bash -c '
+      - name: Prepare Model
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+          if [ ! -e "/workspace/eb45_random_model" ]; then
+            echo "Copying ERNIE_Model to /workspace"
+            cp -r /home/ERNIE_Model/* /workspace/
+          fi'
+      - name: Install erniekit
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
           pip install -e.'
       - name: Runing case
-        run: sudo docker exec -t ERNIE_CI_Container /bin/bash -c '
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
           make test'
+      - name: Generate report
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+          if [ ! -e "/workspace/result" ]; then
+            echo "Generating report"
+            /workspace/allure-2.19.0/bin generate result -o report
+          fi'

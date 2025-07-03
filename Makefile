@@ -20,14 +20,14 @@ lint:
 # # # # # # # # # # # # # # # Install Requirements Block # # # # # # # # # # # # # # #
 .PHONY: install
 install:
-	pip unistall paddlepaddle-gpu -y
+	pip uninstall paddlepaddle-gpu -y
 	pip install paddlepaddle-gpu==3.1.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
-	pip install --upgrade --force-reinstall -r requirements/gpu/requirements.txt
+	pip install -r requirements/gpu/requirements.txt
 	pip install pytest
-	pip install allure
+	pip install allure-pytest
+	pip install -e.
 
 # # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # #
 .PHONY: test
 test:
-	pip install -e .
 	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/
