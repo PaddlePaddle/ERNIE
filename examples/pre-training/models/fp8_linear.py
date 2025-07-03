@@ -30,7 +30,10 @@ incubate APIs for low-precision training. Key features include:
 
 import numpy
 import paddle
-from paddle.incubate.fp8 import deep_gemm
+try:
+    from paddle.incubate.fp8 import deep_gemm
+except ImportError:
+    deep_gemm = None
 from paddle.incubate.nn.functional import swiglu
 
 # Keep reference to original linear op for fallback if needed
@@ -176,6 +179,7 @@ class Fp8FusedMlpFunc(paddle.autograd.PyLayer):
             output_scale_transpose=False,
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
+        assert deep_gemm is not None, "Cude version >= 129 is required for using fp8."
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
 
         o2 = swiglu(o1)
@@ -251,6 +255,7 @@ class Fp8FusedMlpFunc(paddle.autograd.PyLayer):
             output_scale_transpose=False,
         )
         do2 = paddle.empty([do3_fp8.shape[0], w2_fp8.shape[0]], do3.dtype)
+        assert deep_gemm is not None, "Cude version >= 129 is required for using fp8."
         deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale.T), (w2_fp8, w2_scale), do2)
 
         o2 = padding(o2, 0)
@@ -362,6 +367,7 @@ class MemEfficientFp8FusedMlpFunc(paddle.autograd.PyLayer):
             output_scale_transpose=False,
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
+        assert deep_gemm is not None, "Cude version >= 129 is required for using fp8."
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
 
         o2 = swiglu(o1)
@@ -404,6 +410,7 @@ class MemEfficientFp8FusedMlpFunc(paddle.autograd.PyLayer):
             output_scale_transpose=False,
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=do3.dtype)
+        assert deep_gemm is not None, "Cude version >= 129 is required for using fp8."
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale.T), (w1_fp8, w1_scale), o1)
 
         x_dequant_fp16 = paddle.incubate.nn.functional.fused_act_dequant(x_fp8, x_scale.T.contiguous())

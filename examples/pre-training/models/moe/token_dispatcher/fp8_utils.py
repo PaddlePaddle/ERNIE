@@ -31,7 +31,10 @@ additional optimizations specific to MoE workloads.
 import numpy
 import paddle
 from models.fp8_linear import fp8_gemm
-from paddle.incubate.fp8 import deep_gemm
+try:
+    from paddle.incubate.fp8 import deep_gemm
+except ImportError:
+    deep_gemm = None
 from paddle.incubate.nn.functional import swiglu
 
 __all__ = [
@@ -60,6 +63,7 @@ def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out
         and handles the case where tokens may be unevenly distributed across experts.
     """
     start_idx = 0
+    assert deep_gemm is not None, "Cude version >= 129 is required for using fp8."
     for i, token_num in enumerate(tokens_per_expert):
         if token_num == 0:
             continue
@@ -118,6 +122,7 @@ class ExpertsGroupGemmNode:
         self.unzipped_probs = None
         self.tokens_per_expert = None
         self.fp8_fused_ops_configs = custom_map.config.fp8_fused_ops_configs
+        assert deep_gemm is not None, "Cude version >= 129 is required for using fp8."
 
     def reset_status(self):
         self.o1 = None
@@ -789,6 +794,7 @@ class ExpertsGroupGemmContiguousNode:
         self.o1 = None
         self.fp8_fused_ops_configs = custom_map.config.fp8_fused_ops_configs
         self.is_split_group_gemm = has_config(self.fp8_fused_ops_configs, "split_group_gemm")
+        assert deep_gemm is not None, "Cude version >= 129 is required for using fp8."
 
     def reset_status(self):
         self.tokens_per_expert = None
