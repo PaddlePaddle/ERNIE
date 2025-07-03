@@ -23,9 +23,6 @@ jobs:
           else
             echo "ERNIE_CI_Container already running"
           fi
-      - name: Install dependencies
-        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-         make install'
       - name: Runing case
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
          make test'
