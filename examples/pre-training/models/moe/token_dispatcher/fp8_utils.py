@@ -39,6 +39,37 @@ __all__ = [
     "ExpertsGroupGemmContiguousNode",
 ]
 
+def _get_fp8_weight_and_scale(weight, stacked=False, transpose=False):
+    if stacked:
+        if transpose:
+            fp8_weight, fp8_scale = weight.fp8_weight_stacked_transpose, weight.fp8_scale_stacked_transpose
+        else:
+            fp8_weight, fp8_scale = weight.fp8_weight_stacked, weight.fp8_scale_stacked
+    else:
+        if transpose:
+            fp8_weight, fp8_scale = weight.fp8_weight_transpose, weight.fp8_scale_transpose
+        else:
+            fp8_weight, fp8_scale = weight.fp8_weight, weight.fp8_scale
+    return fp8_weight, fp8_scale
+
+
+def fused_stack_transpose_quant(weight_list, transpose=False):
+    """
+    Quant BF16 weight to FP8
+
+    Args:
+        weight_list (List[Tensor]): Input tensor list in BF16 format
+        transpose (Boolean): Transpose operation flag
+
+    Returns:
+        Tuple[Tensor, Tensor]: The weight and scale after quant in FP8 format
+    """
+    if hasattr(weight_list[0], "fp8_weight_stacked"):
+        w, scale = _get_fp8_weight_and_scale(weight_list[0], stacked=True, transpose=transpose)
+    else:
+        w, scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(weight_list, transpose)
+    return w, scale
+
 
 def split_group_gemm(x_fp8, x_scale, w_fp8, w_scale, tokens_per_expert, gemm_out):
     """
@@ -144,7 +175,7 @@ class ExpertsGroupGemmNode:
             - Maintains intermediate results for backward pass
         """
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            w1_t_quant, w1_t_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            w1_t_quant, w1_t_scale = fused_stack_transpose_quant(
                 expert_w1, transpose=True
             )
         else:
@@ -222,7 +253,7 @@ class ExpertsGroupGemmNode:
         """
         expert_w2 = [x.down_proj.weight for x in self.custom_map.experts if x is not None]
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            w2_quant, w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2, transpose=True)
+            w2_quant, w2_scale = fused_stack_transpose_quant(expert_w2, transpose=True)
         else:
             stacked_w2 = paddle.stack(expert_w2, axis=0)
             stacked_w2_t = paddle.transpose(stacked_w2, [0, 2, 1]).contiguous()
@@ -280,7 +311,7 @@ class ExpertsGroupGemmNode:
         """
         expert_w2 = [x.down_proj.weight for x in self.custom_map.experts if x is not None]
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            w2_quant, w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2, transpose=True)
+            w2_quant, w2_scale = fused_stack_transpose_quant(expert_w2, transpose=True)
         else:
             stacked_w2 = paddle.stack(expert_w2, axis=0)
             stacked_w2_t = paddle.transpose(stacked_w2, [0, 2, 1]).contiguous()
@@ -340,7 +371,7 @@ class ExpertsGroupGemmNode:
             - Computes gradients for SwiGLU activation and probability weighting
         """
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            bw_w2_quant, bw_w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            bw_w2_quant, bw_w2_scale = fused_stack_transpose_quant(
                 expert_w2, transpose=False
             )
         else:
@@ -396,7 +427,7 @@ class ExpertsGroupGemmNode:
         o2_s = o2
 
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            bw_w2_quant, bw_w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            bw_w2_quant, bw_w2_scale = fused_stack_transpose_quant(
                 expert_w2, transpose=False
             )
         else:
@@ -468,7 +499,7 @@ class ExpertsGroupGemmNode:
             - Handles both standard and fused quantization paths
         """
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            bw_w1_quant, bw_w1_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            bw_w1_quant, bw_w1_scale = fused_stack_transpose_quant(
                 expert_w1, transpose=False
             )
         else:
@@ -843,7 +874,7 @@ class ExpertsGroupGemmContiguousNode:
         if not self.is_split_group_gemm:
             self.m_indices = self.gen_m_indices(tokens_per_expert)
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            w1_t_quant, w1_t_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            w1_t_quant, w1_t_scale = fused_stack_transpose_quant(
                 expert_w1, transpose=True
             )
         else:
@@ -914,7 +945,7 @@ class ExpertsGroupGemmContiguousNode:
             - Handles both split and non-split group GEMM variants
         """
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            w2_quant, w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2, transpose=True)
+            w2_quant, w2_scale = fused_stack_transpose_quant(expert_w2, transpose=True)
         else:
             stacked_w2 = paddle.stack(expert_w2, axis=0)
             stacked_w2_t = paddle.transpose(stacked_w2, [0, 2, 1]).contiguous()
@@ -980,7 +1011,7 @@ class ExpertsGroupGemmContiguousNode:
             - Handles split group GEMM when configured
         """
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            bw_w2_quant, bw_w2_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            bw_w2_quant, bw_w2_scale = fused_stack_transpose_quant(
                 expert_w2, transpose=False
             )
         else:
@@ -1057,7 +1088,7 @@ class ExpertsGroupGemmContiguousNode:
             - Handles split group GEMM when configured
         """
         if has_config(self.fp8_fused_ops_configs, "stack_quant"):
-            bw_w1_quant, bw_w1_scale = paddle.incubate.nn.functional.fused_stack_transpose_quant(
+            bw_w1_quant, bw_w1_scale = fused_stack_transpose_quant(
                 expert_w1, transpose=False
             )
         else:

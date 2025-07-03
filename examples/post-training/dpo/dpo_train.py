@@ -18,6 +18,7 @@ import importlib.util
 import os
 import sys
 import time
+import json
 from functools import partial
 
 if importlib.util.find_spec("triton") is not None:
@@ -76,11 +77,6 @@ def main():
         model_args.use_sparse_head_and_loss_fn = True
         logger.warning(
             "Dpo training requires use_sparse_head_and_loss_fn=True. Set use_sparse_head_and_loss_fn to True"
-        )
-    if model_args.use_fused_head_and_loss_fn:
-        model_args.use_fused_head_and_loss_fn = False
-        logger.warning(
-            "Dpo training does not support use_fused_head_and_loss_fn=True. Set use_fused_head_and_loss_fn to False"
         )
 
     if data_args.max_seq_len < 16:
@@ -170,6 +166,13 @@ def main():
             dtype = "bfloat16"
 
     logger.info("Start to load model ...")
+
+    # Detect torch model.
+    config_path = os.path.join(model_args.model_name_or_path, "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_dict = json.load(f)
+    if "torch_dtype" in config_dict:
+        raise ValueError("Unsupported weight format: Torch weights are not compatible with Paddle model currently.")
 
     # fuse_softmax_mask only support for rocm.
     if not paddle.is_compiled_with_rocm():
@@ -273,6 +276,12 @@ def main():
         else:
             ref_model = None
     model.config.dpo_config = None
+
+    if model.config.head_dim is None:
+        del model.config.head_dim
+    if ref_model is not None and ref_model.config.head_dim is None:
+        del ref_model.config.head_dim
+
     if dpo_config.lora:
         logger.info("Start to wrap model with LoRA config ...")
         if model_args.lora_path is None:

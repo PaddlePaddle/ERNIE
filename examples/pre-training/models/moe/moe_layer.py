@@ -386,6 +386,13 @@ class MOELayer(nn.Layer):
             if self.is_mp_moe or self.is_ep_moe:
                 p.is_distributed = True
 
+        expert_color = None
+        if self.is_ep_moe:
+            moe_grad_group = fleet.get_hybrid_communicate_group().get_moe_sharding_parallel_group()
+            expert_color = {"color": "moe_expert", "group": moe_grad_group}
+        elif self.config.offline_quant_expert_weight and self.config.clear_origin_weight_when_offline_quant:
+            expert_color = {"color": "moe_expert"}
+
         self.world_size = dist.get_world_size(self.group)
         self.rank = dist.get_rank(self.group)
         if self.world_size < 1:
@@ -447,6 +454,30 @@ class MOELayer(nn.Layer):
                 expert_outputs += chunks
                 expert_output = paddle.stack(expert_outputs, axis=1)
         return expert_output
+
+    def fp8_quant_weight(self):
+        expert_w1_list = [expert.up_gate_proj.weight for expert in self.experts if expert is not None]
+        expert_w2_list = [expert.down_proj.weight for expert in self.experts if expert is not None]
+
+        expert_w1 = expert_w1_list[0]
+        expert_w2 = expert_w2_list[0]
+
+        fp8_weight_stacked_w1, fp8_scale_stacked_w1 = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w1_list, transpose=False)
+        setattr(expert_w1, "fp8_weight_stacked", fp8_weight_stacked_w1)
+        setattr(expert_w1, "fp8_scale_stacked", fp8_scale_stacked_w1)
+
+        fp8_weight_stacked_w1_t, fp8_scale_stacked_w1_t = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w1_list, transpose=True)
+        setattr(expert_w1, "fp8_weight_stacked_transpose", fp8_weight_stacked_w1_t)
+        setattr(expert_w1, "fp8_scale_stacked_transpose", fp8_scale_stacked_w1_t)
+
+        fp8_weight_stacked_w2, fp8_scale_stacked_w2 = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2_list, transpose=False)
+        setattr(expert_w2, "fp8_weight_stacked", fp8_weight_stacked_w2)
+        setattr(expert_w2, "fp8_scale_stacked", fp8_scale_stacked_w2)
+
+        fp8_weight_stacked_w2_t, fp8_scale_stacked_w2_t = paddle.incubate.nn.functional.fused_stack_transpose_quant(expert_w2_list, transpose=True)
+        setattr(expert_w2, "fp8_weight_stacked_transpose", fp8_weight_stacked_w2_t)
+        setattr(expert_w2, "fp8_scale_stacked_transpose", fp8_scale_stacked_w2_t)
+
 
     def fused_gate_logits_process(self, gate_logits, token_type_ids, offload_helper=None):
         k = self.k

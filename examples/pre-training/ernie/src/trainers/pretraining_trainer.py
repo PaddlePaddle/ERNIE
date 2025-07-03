@@ -90,6 +90,7 @@ from src.callbacks import (
     LoggingCallback,
     SPGradSyncCallback,
     TensorBoardCallback,
+    FP8QuantWeightCallback,
 )
 from src.callbacks.moe_logging_callback import MoeLoggingCallback
 from src.clip import ClipGradForMOEByGlobalNorm
@@ -625,6 +626,7 @@ class DummySampler(PaddleNLPDistributedBatchSampler):
 class PretrainingTrainer(Trainer):
     def __init__(self, args=None, model=None, callbacks=[], **kwargs):
         callbacks = [
+            FP8QuantWeightCallback(),
             LoggingCallback(),
             TensorBoardCallback(args, model=model, log_tokens_per_step=True, log_flops_per_step=False),
             GCCallback(),
