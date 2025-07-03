@@ -40,3 +40,19 @@ jobs:
           CLASSPATH: /home/jdk1.8.0_351/lib
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
            /workspace/allure-2.19.0/bin/allure generate result -o report'
+      - name: Get Allure history
+        uses: actions/checkout@v2
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages
+      - name: Check report
+        uses: ./allure-report-action
+        if: always()
+        id: allure-report
+        with:
+          allure_results: ./results
+          gh_pages: gh-pages
+          allure_report: ./report
+          allure_history: ./
