@@ -26,10 +26,7 @@ jobs:
           fi
       - name: Prepare Model
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-          if [ ! -e "/workspace/eb45_random_model" ]; then
-            echo "Copying ERNIE_Model to /workspace"
-            cp -r /home/ERNIE_Model/* /workspace/
-          fi'
+            cp -r /home/ERNIE_Model/* /workspace/ '
       - name: Install erniekit
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
           pip install -e.'
@@ -37,8 +34,9 @@ jobs:
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
           make test'
       - name: Generate report
+        env:
+          JRE_HOME: /home/jdk1.8.0_351/jre
+          JAVA_HOME: /home/jdk1.8.0_351
+          CLASSPATH: /home/jdk1.8.0_351/lib
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-          if [ ! -e "/workspace/result" ]; then
-            echo "Generating report"
-            /workspace/allure-2.19.0/bin generate result -o report
-          fi'
+           /workspace/allure-2.19.0/bin/allure generate result -o report'
