@@ -21,6 +21,7 @@ import allure
 import yaml
 
 OUTPUT_DIR = "./output/"
+LOG_DIR = "./erniekit_dist_log/"
 MODEL_PATH = "./ERNIE-4.5-0.3B-Paddle-dummy-dense"
 SFT_CONFIG_PATH = "./examples/configs/ERNIE-4.5-0.3B/sft/"
 DPO_CONFIG_PATH = "./examples/configs/ERNIE-4.5-0.3B/dpo/"
@@ -54,12 +55,13 @@ def run_update_config_training(config, steps="train"):
     )
 
     os.remove(temp_config_path)
-    return result.returncode
+    return result.returncode, result.stdout
 
 
-def assert_result(ret_code):
+def assert_result(ret_code, log_output):
     """assert result"""
     if ret_code != 0:
+        print("\n".join(log_output.strip().splitlines()[-30:]))
         raise AssertionError("Training Failed")
 
 
@@ -85,9 +87,10 @@ def test_sft_default_args():
     config["save_steps"] = 2
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
-    ret_code = run_update_config_training(config)
+
+    ret_code, err_log = run_update_config_training(config)
     attach_log_file()
-    assert_result(ret_code)
+    assert_result(ret_code, err_log)
 
 
 def test_sft_lora_default_args():
@@ -99,9 +102,9 @@ def test_sft_lora_default_args():
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
 
-    ret_code = run_update_config_training(config)
+    ret_code, err_log = run_update_config_training(config)
     attach_log_file()
-    assert_result(ret_code)
+    assert_result(ret_code, err_log)
 
 
 def test_sft_lora_merge():
@@ -110,9 +113,9 @@ def test_sft_lora_merge():
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
 
-    ret_code = run_update_config_training(config, steps="export")
+    ret_code, err_log = run_update_config_training(config)
     attach_log_file()
-    assert_result(ret_code)
+    assert_result(ret_code, err_log)
 
 
 def test_dpo_default_args():
@@ -123,9 +126,10 @@ def test_dpo_default_args():
     config["save_steps"] = 2
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
-    ret_code = run_update_config_training(config)
+
+    ret_code, err_log = run_update_config_training(config)
     attach_log_file()
-    assert_result(ret_code)
+    assert_result(ret_code, err_log)
 
 
 def test_dpo_lora_default_args():
@@ -137,9 +141,9 @@ def test_dpo_lora_default_args():
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
 
-    ret_code = run_update_config_training(config)
+    ret_code, err_log = run_update_config_training(config)
     attach_log_file()
-    assert_result(ret_code)
+    assert_result(ret_code, err_log)
 
 
 def test_dpo_lora_merge():
@@ -148,6 +152,6 @@ def test_dpo_lora_merge():
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
 
-    ret_code = run_update_config_training(config, steps="export")
+    ret_code, err_log = run_update_config_training(config, steps="export")
     attach_log_file()
-    assert_result(ret_code)
+    assert_result(ret_code, err_log)

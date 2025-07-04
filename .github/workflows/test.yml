@@ -7,6 +7,17 @@ jobs:
     name: Test
     runs-on: [self-hosted, 4gpu]
     steps:
+       - name: Start Docker 
+        run: |
+          if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
+            echo "Starting container ERNIE_CI_Container"
+            docker start ERNIE_CI_Container
+          else
+            echo "ERNIE_CI_Container already running"
+          fi
+      - name: Cleanup Environment Cache
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+          rm -rf /workspace/* /workspace/.[!.]* /workspace/..?*'
       - name: Get Repo
         env:
           ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
@@ -15,14 +26,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Start container
-        run: |
-          if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
-            echo "Starting container ERNIE_CI_Container"
-            docker start ERNIE_CI_Container
-          else
-            echo "ERNIE_CI_Container already running"
-          fi
       - name: Prepare Model
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
             cp -r /home/ERNIE_Model/* /workspace/ '
@@ -32,8 +35,7 @@ jobs:
       - name: Runing case
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
           make test'
-      - name: Cleanup
+      - name: logs save
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-          mkdir /home/${{ github.sha }}
-          mv results/ /home/${{ github.sha }}
-          rm -rf /workspace/*'
+          mkdir /home/ernie_logs/${{ github.sha }}
+          mv results/ /home/ernie_logs/${{ github.sha }}'
