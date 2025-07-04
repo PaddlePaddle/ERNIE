@@ -32,3 +32,8 @@ jobs:
       - name: Runing case
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
           make test'
+      - name: Cleanup
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+          mkdir /home/${{ github.sha }}
+          mv results/ /home/${{ github.sha }}
+          rm -rf /workspace/*'

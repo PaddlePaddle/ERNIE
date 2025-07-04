@@ -16,12 +16,14 @@ import os
 import shutil
 import subprocess
 import tempfile
-import yaml
+
 import allure
+import yaml
 
 OUTPUT_DIR = "./output/"
-LOG_DIR = "./erniekit_dist_log/"
-DPO_CONFIG_PATH = "./examples/configs/ERNIE-4.5-300B-A47B/dpo/"
+MODEL_PATH = "./ERNIE-4.5-21B-A3B-Paddle-dummy-moe"
+SFT_CONFIG_PATH = "./examples/configs/ERNIE-4.5-21B-A3B/sft/"
+DPO_CONFIG_PATH = "./examples/configs/ERNIE-4.5-21B-A3B/dpo/"
 
 
 def clean_output_dir():
@@ -75,12 +77,65 @@ def attach_log_file():
         )
 
 
+def test_sft_default_args_multigpu():
+    clean_output_dir()
+    yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_lora_8k.yaml")
+    config = default_args(yaml_path).copy()
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
+    config["pipeline_parallel_degree"] = 1
+    ret_code = run_update_config_training(config)
+    attach_log_file()
+    assert_result(ret_code)
+
+
+def test_sft_lora_default_args_multigpu():
+    clean_output_dir()
+    yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_lora_8k.yaml")
+    config = default_args(yaml_path).copy()
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
+    config["pipeline_parallel_degree"] = 1
+
+    ret_code = run_update_config_training(config)
+    attach_log_file()
+    assert_result(ret_code)
+
+
+def test_sft_lora_merge():
+    yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_wint8mix_lora_8k.yaml")
+    config = default_args(yaml_path).copy()
+    config["model_name_or_path"] = MODEL_PATH
+    config["pipeline_parallel_degree"] = 1
+
+    ret_code = run_update_config_training(config, steps="export")
+    attach_log_file()
+    assert_result(ret_code)
+
+
+def test_sft_wint8mix_lora_default_args_multigpu():
+    clean_output_dir()
+    yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_wint8mix_lora_8k.yaml")
+    config = default_args(yaml_path).copy()
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
+    config["pipeline_parallel_degree"] = 1
+
+    ret_code = run_update_config_training(config)
+    attach_log_file()
+    assert_result(ret_code)
+
+
 def test_dpo_default_args_multigpu():
+    clean_output_dir()
     yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_lora_8k.yaml")
     config = default_args(yaml_path).copy()
-    config["max_steps"] = 10
-    config["save_steps"] = 8
-    config["model_name_or_path"] = "./eb45t_random_model"
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
     ret_code = run_update_config_training(config)
     attach_log_file()
@@ -91,23 +146,9 @@ def test_dpo_lora_default_args_multigpu():
     clean_output_dir()
     yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_lora_8k.yaml")
     config = default_args(yaml_path).copy()
-    config["max_steps"] = 10
-    config["save_steps"] = 8
-    config["model_name_or_path"] = "./eb45t_random_model"
-    config["pipeline_parallel_degree"] = 1
-
-    ret_code = run_update_config_training(config)
-    attach_log_file()
-    assert_result(ret_code)
-
-
-def test_dpo_wint8mix_lora_default_args_multigpu():
-    clean_output_dir()
-    yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_wint8mix_lora_8k.yaml")
-    config = default_args(yaml_path).copy()
-    config["max_steps"] = 10
-    config["save_steps"] = 8
-    config["model_name_or_path"] = "./eb45t_random_model"
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
 
     ret_code = run_update_config_training(config)
@@ -118,9 +159,23 @@ def test_dpo_wint8mix_lora_default_args_multigpu():
 def test_dpo_lora_merge():
     yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_wint8mix_lora_8k.yaml")
     config = default_args(yaml_path).copy()
-    config["model_name_or_path"] = "./eb45t_random_model"
+    config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
 
     ret_code = run_update_config_training(config, steps="export")
+    # 更新配置并导出
+    assert_result(ret_code)
+
+
+def test_dpo_wint8mix_lora_default_args_multigpu():
+    clean_output_dir()
+    yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_wint8mix_lora_8k.yaml")
+    config = default_args(yaml_path).copy()
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
+    config["pipeline_parallel_degree"] = 1
+
+    ret_code = run_update_config_training(config)
     attach_log_file()
     assert_result(ret_code)
