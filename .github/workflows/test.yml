@@ -7,7 +7,7 @@ jobs:
     name: Test
     runs-on: [self-hosted, 4gpu]
     steps:
-       - name: Start Docker 
+      - name: Start Docker 
         run: |
           if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
             echo "Starting container ERNIE_CI_Container"
