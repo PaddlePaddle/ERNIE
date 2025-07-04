@@ -35,7 +35,3 @@ jobs:
       - name: Runing case
         run: docker exec -t ERNIE_CI_Container /bin/bash -c '
           make test'
-      - name: logs save
-        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-          mkdir /home/ernie_logs/${{ github.sha }}
-          mv results/ /home/ernie_logs/${{ github.sha }}'
