@@ -23,8 +23,9 @@ import yaml
 OUTPUT_DIR = "./output/"
 LOG_DIR = "./erniekit_dist_log/"
 MODEL_PATH = "./ERNIE-4.5-21B-A3B-Paddle-dummy-moe"
-SFT_CONFIG_PATH = "./examples/configs/ERNIE-4.5-21B-A3B/sft/"
-DPO_CONFIG_PATH = "./examples/configs/ERNIE-4.5-21B-A3B/dpo/"
+CONFIG_PATH = "./examples/configs/ERNIE-4.5-21B-A3B/"
+SFT_CONFIG_PATH = CONFIG_PATH + "sft/"
+DPO_CONFIG_PATH = CONFIG_PATH + "dpo/"
 
 
 def clean_output_dir():
@@ -81,7 +82,7 @@ def attach_log_file():
 
 def test_sft_default_args_multigpu():
     clean_output_dir()
-    yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_lora_8k.yaml")
+    yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_8k.yaml")
     config = default_args(yaml_path).copy()
     config["max_steps"] = 3
     config["save_steps"] = 2
@@ -108,7 +109,7 @@ def test_sft_lora_default_args_multigpu():
 
 
 def test_sft_lora_merge():
-    yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_wint8mix_lora_8k.yaml")
+    yaml_path = os.path.join(CONFIG_PATH + "run_export.yaml")
     config = default_args(yaml_path).copy()
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
@@ -134,7 +135,7 @@ def test_sft_wint8mix_lora_default_args_multigpu():
 
 def test_dpo_default_args_multigpu():
     clean_output_dir()
-    yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_lora_8k.yaml")
+    yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_8k.yaml")
     config = default_args(yaml_path).copy()
     config["max_steps"] = 3
     config["save_steps"] = 2
@@ -161,7 +162,7 @@ def test_dpo_lora_default_args_multigpu():
 
 
 def test_dpo_lora_merge():
-    yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_wint8mix_lora_8k.yaml")
+    yaml_path = os.path.join(CONFIG_PATH + "run_export.yaml")
     config = default_args(yaml_path).copy()
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
