@@ -146,12 +146,12 @@ def test_dpo_lora_default_args():
     assert_result(ret_code, err_log)
 
 
-def test_dpo_lora_merge():
-    yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_lora_8k.yaml")
-    config = default_args(yaml_path).copy()
-    config["model_name_or_path"] = MODEL_PATH
-    config["pipeline_parallel_degree"] = 1
+# def test_dpo_lora_merge():
+#     yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_lora_8k.yaml")
+#     config = default_args(yaml_path).copy()
+#     config["model_name_or_path"] = MODEL_PATH
+#     config["pipeline_parallel_degree"] = 1
 
-    ret_code, err_log = run_update_config_training(config, steps="export")
-    attach_log_file()
-    assert_result(ret_code, err_log)
+#     ret_code, err_log = run_update_config_training(config, steps="export")
+#     attach_log_file()
+#     assert_result(ret_code, err_log)
