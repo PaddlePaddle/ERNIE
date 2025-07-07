@@ -151,9 +151,13 @@ class Ernie4_5_Tokenizer(PretrainedTokenizer):
         """
         return self.sp_model.id_to_piece(id)
 
-    def spec_init(self):
-        if not hasattr(self, "all_spec_tok"):
-            self.all_spec_tok = set(self.all_special_tokens)
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        tokenizer = super().from_pretrained(*args, **kwargs)
+
+        # pre-process map type all_special_tokens
+        tokenizer.all_spec_tok = set(tokenizer.all_special_tokens)
+        return tokenizer
 
     def convert_tokens_to_string(self, tokens):
         """Convert a sequence of tokens back to a single string.
@@ -164,7 +168,6 @@ class Ernie4_5_Tokenizer(PretrainedTokenizer):
         Returns:
             str: The reconstructed string.
         """
-        self.spec_init()
         current_sub_tokens = []
         out_string = ""
         # prev_is_special = False
@@ -232,7 +235,6 @@ class Ernie4_5_Tokenizer(PretrainedTokenizer):
             `List[str]`: The list of tokens.
         """
 
-        self.spec_init()
         text, kwargs = self.prepare_for_tokenization(text, **kwargs)
 
         # TODO: should this be in the base class?
