@@ -903,7 +903,7 @@ class ExpertsGroupGemmContiguousNode:
             )
         else:
             x_fp8, x_scale = paddle.incubate.nn.functional.fp8.fp8_quant_blockwise(
-                x_bf16,
+                x,
                 quant_method="1x128",
                 input_transpose=False,
                 output_scale_transpose=True,
