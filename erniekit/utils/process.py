@@ -55,3 +55,12 @@ def terminate_process_tree(pid: int) -> None:
 def is_env_enabled(env_var: str, default: str = "0") -> bool:
     r"""Check if the environment variable is enabled."""
     return os.getenv(env_var, default).lower() in ["true", "y", "1"]
+
+
+def is_valid_model_dir(directory: str) -> bool:
+    for item in os.listdir(directory):
+        item_path = os.path.join(directory, item)
+        if os.path.isfile(item_path):
+            if item.lower().endswith(('.safetensors', '.pdparams')):
+                return True
+    return False

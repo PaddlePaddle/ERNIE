@@ -22,6 +22,7 @@ from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.log import logger
 
 from ..hparams import get_export_args, read_args
+from ..utils.process import is_valid_model_dir
 
 
 def logger_merge_config(merge_config, lora_merge):
@@ -69,12 +70,16 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
     tensor_type = "np" if finetuning_args.device == "cpu" else "pd"
 
     last_checkpoint = None
-    if os.path.isdir(finetuning_args.output_dir):
+    # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
+    if is_valid_model_dir(finetuning_args.output_dir):
+        last_checkpoint = finetuning_args.output_dir
+    # If not a model directory but still a valid path, try to find the latest checkpoint
+    elif os.path.isdir(finetuning_args.output_dir):
         last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
-        if last_checkpoint is not None:
-            logger.info(f"Checkpoint detected, beginning export {last_checkpoint}.")
-        else:
-            raise FileNotFoundError(f"No checkpoint detected in {finetuning_args.output_dir}.")
+    if last_checkpoint is not None:
+        logger.info(f"Starting model export from checkpoint: {last_checkpoint}")
+    else:
+        raise FileNotFoundError(f"No valid checkpoint found in: {finetuning_args.output_dir}")
 
     if model_args.lora:
         start = time.time()

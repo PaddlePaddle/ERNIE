@@ -40,6 +40,7 @@ from ernie.utils.common_utils import (
 
 from ..hparams import get_eval_args, read_args
 from ..train.sft.trainer import ErnieMoETrainer
+from ..utils.process import is_valid_model_dir
 
 
 def run_eval(args: Optional[dict[str, Any]] = None) -> None:
@@ -107,20 +108,14 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     )
 
     last_checkpoint = None
-    if os.path.isdir(finetuning_args.output_dir) and not finetuning_args.overwrite_output_dir:
-        uc_async_save = (
-            finetuning_args.unified_checkpoint and "async_save" in finetuning_args.unified_checkpoint_config
-        )
-        last_checkpoint = get_last_checkpoint(
-            finetuning_args.output_dir,
-            signal_folder=finetuning_args.output_signal_dir,
-            uc_async_save=uc_async_save,
-        )
-        if last_checkpoint is not None and finetuning_args.resume_from_checkpoint is None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
+    # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
+    if is_valid_model_dir(finetuning_args.output_dir):
+        last_checkpoint = finetuning_args.output_dir
+    # If not a model directory but still a valid path, try to find the latest checkpoint
+    elif os.path.isdir(finetuning_args.output_dir):
+        last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
+    if last_checkpoint is not None:
+        logger.info(f"Checkpoint detected, starting model eval from checkpoint: {last_checkpoint}")
 
     if last_checkpoint is not None and model_args.continue_training and not model_args.lora:
         model_args.continue_training = False
