@@ -15,6 +15,7 @@
 """ Eval Ernie Model. """
 
 import os
+import json
 from functools import partial
 from typing import Any, Optional
 
@@ -131,6 +132,14 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             dtype = "bfloat16"
 
     logger.info("Start to load model ...")
+
+    # Detect torch model.
+    config_path = os.path.join(model_args.model_name_or_path, "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_dict = json.load(f)
+    if "torch_dtype" in config_dict:
+        raise ValueError("Unsupported weight format: Torch weights are not compatible with Paddle model currently.")
+
     model_class = Ernie4_5_MoeForCausalLM
     if finetuning_args.pipeline_parallel_degree > 1:
         model_class = Ernie4_5_MoeForCausalLMPipe
@@ -228,6 +237,8 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
+    if model_config.moe_num_experts is None or model_config.moe_num_experts == 0:
+        model_config.moe_group = "dummy" if model_args.moe_group == "mp" else model_args.moe_group
 
     if model_args.continue_training or finetuning_args.weight_quantize_algo is not None:
         model = model_class.from_pretrained(
@@ -237,11 +248,13 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     else:
         model = model_class.from_config(model_config, dtype=dtype)
 
+    if model.config.head_dim is None:
+        del model.config.head_dim
+
     paddle.device.cuda.empty_cache()
     logger.info("Loading model successfully !")
     logger.debug(f"Model config: {model.config}")
     logger.info(f"{runtime_timer.log()}")
-
     if (
         finetuning_args.pipeline_parallel_degree > 1
         and finetuning_args.weight_quantize_algo is not None
