@@ -33,13 +33,15 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
     server_model_path = model_args.model_name_or_path
 
     last_checkpoint = None
-    # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
-    if is_valid_model_dir(finetuning_args.output_dir):
-        last_checkpoint = finetuning_args.output_dir
-    # If not a model directory but still a valid path, try to find the latest checkpoint
-    elif os.path.isdir(finetuning_args.output_dir):
-        last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
+    if os.path.isdir(finetuning_args.output_dir):
+        # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
+        if is_valid_model_dir(finetuning_args.output_dir):
+            last_checkpoint = finetuning_args.output_dir
+        # If not a model directory but still a valid path, try to find the latest checkpoint
+        else:
+            last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
     if last_checkpoint is not None:
+        server_model_path = last_checkpoint
         logger.info(f"Checkpoint detected, launch server from {last_checkpoint} \
                     (Only Full checkpoint is supported)")
     else:
