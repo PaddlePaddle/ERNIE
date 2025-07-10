@@ -98,8 +98,6 @@ class Ernie4_5_Tokenizer(PretrainedTokenizer):
         self.vocab_file = vocab_file
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
-        # pre-process map-type all spec token for decode accelerate.
-        self.all_spec_tok = set(self.all_special_tokens)
 
     @property
     def vocab_size(self):
@@ -152,6 +150,14 @@ class Ernie4_5_Tokenizer(PretrainedTokenizer):
             str: The corresponding token.
         """
         return self.sp_model.id_to_piece(id)
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        tokenizer = super().from_pretrained(*args, **kwargs)
+
+        # pre-process map type all_special_tokens
+        tokenizer.all_spec_tok = set(tokenizer.all_special_tokens)
+        return tokenizer
 
     def convert_tokens_to_string(self, tokens):
         """Convert a sequence of tokens back to a single string.

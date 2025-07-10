@@ -1048,6 +1048,12 @@ class ErnieDecoderLayer(nn.Layer):
                 c.training = new
         self._training = new
 
+
+    def fp8_quant_weight(self):
+        if isinstance(self.mlp, MOELayer):
+            logger.info(f"fp8 quant weight for mlp {type(self.mlp)}")
+            self.mlp.fp8_quant_weight()
+
     def _init_gate_and_experts(self, layer_idx):
         cfg = deepcopy(self.config)
         fc_cls = ErnieMoeMLPFused if cfg.moe_fuse_experts and not cfg.use_fp8_mlp else ErnieMoeMLP

@@ -750,8 +750,6 @@ def update_dataset_paths(config_dict, manager, is_preview=False):
             eval_config["eval_customize_dataset_prob"], eval_config["eval_existed_dataset_prob"]
         )
 
-        eval_config["eval_customize_dataset_type"] = None
-
         eval_config["eval_dataset_type"] = merge_values(
             eval_config["eval_customize_dataset_type"], eval_config["eval_existed_dataset_type"]
         )

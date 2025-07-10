@@ -876,7 +876,7 @@ class Ernie4_5_PretrainedModel(PretrainedModel):
                     num_key_value_heads=config.num_key_value_heads,
                     head_dim=(
                         config.hidden_size // config.num_attention_heads
-                        if config.head_dim is None
+                        if getattr(config, "head_dim", None) is None
                         else config.head_dim
                     ),
                     is_quant=False,
@@ -889,7 +889,7 @@ class Ernie4_5_PretrainedModel(PretrainedModel):
                     num_key_value_heads=config.num_key_value_heads,
                     head_dim=(
                         config.hidden_size // config.num_attention_heads
-                        if config.head_dim is None
+                        if getattr(config, "head_dim", None) is None
                         else config.head_dim
                     ),
                     is_quant=False,
@@ -966,7 +966,7 @@ class Ernie4_5_PretrainedModel(PretrainedModel):
                             moe_num_experts = (
                                 sum(config.moe_num_experts) if config.multimodel_experts else config.moe_num_experts
                             )
-                            if moe_num_experts > 0 and "shared_experts" not in key:
+                            if moe_num_experts and moe_num_experts > 0 and "shared_experts" not in key:
                                 for expert_id in range(moe_num_experts):
                                     _key = key.replace("layers.0.mlp", f"layers.{i}.mlp.experts.{expert_id}")
                                     if not moe_in_mp:

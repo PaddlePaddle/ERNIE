@@ -19,6 +19,7 @@ import math
 import os
 import sys
 import time
+import json
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Optional
@@ -481,6 +482,14 @@ def main():
             dtype = "bfloat16"
 
     logger.info("Start to load model ...")
+
+    # Detect torch model.
+    config_path = os.path.join(model_args.model_name_or_path, "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_dict = json.load(f)
+    if "torch_dtype" in config_dict:
+        raise ValueError("Unsupported weight format: Torch weights are not compatible with Paddle model currently.")
+
     model_class = Ernie4_5_MoeForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         model_class = Ernie4_5_MoeForCausalLMPipe
@@ -588,6 +597,9 @@ def main():
         )
     else:
         model = model_class.from_config(model_config, dtype=dtype)
+
+    if model.config.head_dim is None:
+        del model.config.head_dim
 
     paddle.device.cuda.empty_cache()
     logger.info("Loading model successfully !")

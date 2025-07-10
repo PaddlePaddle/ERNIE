@@ -22,7 +22,7 @@ from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.log import logger
 
 from ..hparams import get_server_args, read_args
-from ..utils.process import terminate_process_tree
+from ..utils.process import terminate_process_tree, is_valid_model_dir
 
 
 def run_server(args: Optional[dict[str, Any]] = None) -> None:
@@ -34,15 +34,18 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
 
     last_checkpoint = None
     if os.path.isdir(finetuning_args.output_dir):
-        last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
-        if last_checkpoint is not None:
-            server_model_path = last_checkpoint
-            logger.info(
-                f"Checkpoint detected, launch server from {last_checkpoint} \
-                (Only Full checkpoint is supported)"
-            )
+        # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
+        if is_valid_model_dir(finetuning_args.output_dir):
+            last_checkpoint = finetuning_args.output_dir
+        # If not a model directory but still a valid path, try to find the latest checkpoint
         else:
-            logger.info(f"No Checkpoint detected, launch server from {model_args.model_name_or_path}.")
+            last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
+    if last_checkpoint is not None:
+        server_model_path = last_checkpoint
+        logger.info(f"Checkpoint detected, launch server from {last_checkpoint} \
+                    (Only Full checkpoint is supported)")
+    else:
+        logger.info(f"No Checkpoint detected, launch server from {model_args.model_name_or_path}.")
 
     env = deepcopy(os.environ)
     command = (

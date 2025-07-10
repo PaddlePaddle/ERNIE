@@ -47,13 +47,19 @@ Expected output:
 ```
 
 **GPU Configuration**
-Set CUDA_VISIBLE_DEVICES before running CLI/WebUI:
+
+By default, all available gpus are used in CLI/WebUI.
+If you wan to specify certain gpus, please set CUDA_VISIBLE_DEVICES before running CLI/WebUI:
+
 ```bash
 # Single GPU
 export CUDA_VISIBLE_DEVICES=0
 # Multi GPUs
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 ```
+
+* Note: In `Chat` module, the number of gpus configured by CUDA_VISIBLE_DEVICES should be equal to `tensor_parallel_degree` in the config.
+Alternatively, you can also unset CUDA_VISIBLE_DEVICES.
 
 # 1. CLI Usage
 

@@ -95,6 +95,20 @@ Required fields for SFT:
 Notes:
 * `src` and `tgt` are List objects supporting multi-turn conversations
 * Each training sample is in JSON format, with multiple samples separated by newlines
+```json
+{
+    "system": "你是一个生活小助理",
+    "src": [
+        "我们如何在日常生活中减少用水？",
+        "还有别的建议吗？"
+    ],
+    "tgt": [
+        "1. 使用节水装置，如节水淋浴喷头和水龙头。",
+        "2. 使用水箱或水桶收集家庭废水，例如洗碗和洗浴。 \n3. 在社区中提高节水意识。 \n4. 检查水管和灌溉系统的漏水情况，并及时修复它们。 \n5. 洗澡时间缩短，使用低流量淋浴头节约用水。 \n6. 收集雨水，用于园艺或其他非饮用目的。 \n7. 刷牙或擦手时关掉水龙头。 \n8. 减少浇水草坪的时间。 \n9. 尽可能多地重复使用灰水（来自洗衣机、浴室水槽和淋浴的水）。 \n10. 只购买能源效率高的洗碗机和洗衣机。"
+    ],
+    "label": [0, 1],
+}
+```
 
 ### DPO Dataset
 
@@ -108,6 +122,28 @@ Required fields for DPO:
 * `response`: Contains chosen/rejected responses (must contain odd number of strings)
 * `sort`: Differentiates chosen/rejected (lower value=rejected, higher=chosen)
 * Each training sample is in JSON format, with multiple samples separated by newlines
+```json
+{
+    "system": "你是一个生活小助理",
+    "src": [
+        "你好。",
+        "哪一个富含蛋白质，床还是墙？"
+    ],
+    "tgt": ["你好呀，我是你的生活小助理。"],
+    "response": [
+        [
+            "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。"
+        ],
+        [
+            "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"
+        ]
+    ],
+    "sort": [
+        1,
+        0
+    ]
+}
+```
 
 ## alpaca Format
 
