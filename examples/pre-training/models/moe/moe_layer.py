@@ -43,8 +43,14 @@ from paddle.incubate.nn.functional import (
     moe_combine,
     moe_gate_dispatch,
     moe_gate_dispatch_permute,
-    moe_gate_dispatch_and_quant,
 )
+
+try:
+    from paddle.incubate.nn.functional import (
+        moe_gate_dispatch_and_quant,
+    )
+except ImportError:
+    moe_gate_dispatch_and_quant = None
 
 try:
     from src.utils.misc import global_training_logs
@@ -77,6 +83,7 @@ class Fp8MoeGateDispatchAndQuant(paddle.autograd.PyLayer):
         use_pow2_scale=True,
     ):
         """forward"""
+        assert moe_gate_dispatch_and_quant is not None, "Please use new version Paddle."
         with paddle.amp.auto_cast(enable=False):
             (
                 out_fp8,

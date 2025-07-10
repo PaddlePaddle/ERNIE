@@ -31,30 +31,18 @@ model_args:
         moe_logging: True
         moe_use_aux_free: true
         use_recompute: false
-        # use_fp8_mlp: true
-        # use_fp8_fuse_node: true
-        # fp8_mem_configs:
-        #     shared_expert: false
-        #     recompute_fwd_gate_up: [4, 5, 6, 7, 8, 10, 11, 12, 13, 16, 17, 18]
-        #     dequant_input: true
-        # fp8_fused_ops_configs:
-        #     stack_quant: true
-        #     swiglu_probs_bwd: true
-        #     split_group_gemm: false
-        #     spaq: true
-        #     transpose_split_quant: true
-        use_fp8_mlp: false
-        use_fp8_fuse_node: false
+        use_fp8_mlp: true
+        use_fp8_fuse_node: true
         fp8_mem_configs:
             shared_expert: false
-            recompute_fwd_gate_up: false
-            dequant_input: false
+            recompute_fwd_gate_up: [4, 5, 6, 7, 8, 10, 11, 12, 13, 16, 17, 18]
+            dequant_input: true
         fp8_fused_ops_configs:
-            stack_quant: false
-            swiglu_probs_bwd: false
+            stack_quant: true
+            swiglu_probs_bwd: true
             split_group_gemm: false
-            spaq: false
-            transpose_split_quant: false
+            spaq: true
+        transpose_split_quant: true
 
         moe_gate: top2_fused
 
