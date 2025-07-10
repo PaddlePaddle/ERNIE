@@ -9,7 +9,7 @@ concurrency:
 jobs:
   Lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ernie-cpu]
     steps:
       - name: Download Code
         uses: actions/checkout@v3
@@ -37,4 +37,4 @@ jobs:
           pip install pre-commit
           pre-commit install
       - name: Test
-        run: make -f tools/codestyle/Makefile lint
+        run: make lint

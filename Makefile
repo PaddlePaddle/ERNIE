@@ -9,7 +9,7 @@ check_dirs := cookbook data_processor ernie erniekit examples tools test require
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # #
 .PHONY: lint
 lint:
-	$(eval modified_py_files := $(shell python tests/codestyle/get_modified_files.py $(check_dirs)))
+	$(eval modified_py_files := $(shell python tools/codestyle/get_modified_files.py $(check_dirs)))
 	@if test -n "$(modified_py_files)"; then \
 		echo ${modified_py_files}; \
 		pre-commit run --files ${modified_py_files}; \
