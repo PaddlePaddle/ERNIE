@@ -270,11 +270,15 @@ def run_dpo(
         model_class = Ernie4_5_MoeForCausalLMPipe
     else:
         model_class = Ernie4_5_MoeForCausalLM
-    if model_args.continue_training and finetuning_args.weight_quantize_algo is not None:
+
+    if model_args.continue_training:
         model = model_class.from_pretrained(model_args.model_name_or_path, config=config)
         # for DPO save
         if not finetuning_args.reference_free and not model_args.lora:
-            ref_model = model_class._from_config(config, dtype=dtype)
+            # (LiuTing): config.moe_group will change in `model_class.from_pretrained`
+            # so need to re-create new ref_config.
+            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+            ref_model = model_class._from_config(ref_config, dtype=dtype)
             ref_model.set_state_dict(model.state_dict())
         else:
             ref_model = None
