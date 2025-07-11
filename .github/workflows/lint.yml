@@ -10,6 +10,8 @@ env:
   PR_ID: ${{ github.event.pull_request.number }}
   BRANCH: ${{ github.event.pull_request.base.ref }}
   TASK: ERNIE-Codestyle-${{ github.event.pull_request.number }}
+  container_name: ${TASK}-$(date +%Y%m%d-%H%M%S)
+  docker_image: "iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu20.04-gcc12.2-cuda12.3-cudnn9.0-nccl2.20.3.1-openmpi4.1.5"
 
 jobs:
   codestyle:
@@ -25,22 +27,28 @@ jobs:
           work_dir: ${{ github.workspace }}
           python_version: "3.10"
         run: |
-          container_name=${TASK}-$(date +%Y%m%d-%H%M%S)
-          echo "container_name=${container_name}" >> "$GITHUB_ENV"
-          docker_image="iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu20.04-gcc12.2-cuda12.3-cudnn9.0-nccl2.20.3.1-openmpi4.1.5"
           docker run -d -t --name ${container_name} \
             -v $work_dir:/workspace \
             -e BRANCH \
             -e PR_ID \
             -w /workspace ${docker_image}
+      - name: Get Repo
+        env:
+          ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
+          ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+          ACTIONS_ALLOW_UNSECURE_NODE_VERSION: true
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Get Repository
         env:
           work_dir: ${{ github.workspace }}
         run: |
           docker exec -t ${container_name} /bin/bash -c '
-          rm -rf tmp && mkdir tmp && cd tmp && \
-          git clone https://github.com/PaddlePaddle/ERNIE.git  && \
-          cd ERNIE  && \
+          cd ERNIE
+          git config --global user.name "PaddleCI"
+          git config --global user.email "paddle_ci@example.com"
+          git pull
           git fetch origin pull/${PR_ID}/head  && \
           git checkout -b PR_${PR_ID} FETCH_HEAD  && \
           git remote add upstream https://github.com/PaddlePaddle/ERNIE.git  && \
