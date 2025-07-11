@@ -17,3 +17,7 @@ sh examples/paddle2torch/scripts/export_dense.sh /paddle_models/ERNIE-4.5-0.3B /
 # ERNIE-4.5-21B-A3B 和 ERNIE-4.5-300B-A47B
 sh examples/paddle2torch/scripts/export_moe.sh /paddle_models/ERNIE-4.5-21B-A3B /torch_models/ERNIE-4.5-21B-A3B-torch
 ```
+
+# ERNIE-4.5-vl-28B-A3B 和 ERNIE-4.5-vl-424B-A47B
+sh examples/paddle2torch/scripts/export_vl.sh /paddle_models/ERNIE-4.5-vl-28B-A3B /torch_models/ERNIE-4.5-vl-28B-A3B-torch
+```

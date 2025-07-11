@@ -74,6 +74,8 @@ python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e . # We recommend install in editable mode
 ```
 
+You can also build docker image yourself which includes all the dependencies listed in `requirements.txt`. Please refer to [build docker](../docker/docker-cuda/README.md) for more details.
+
 ### 2.4 Install FastDeploy
 
 Please refer to [FastDeploy installation](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/get_started/installation/).
