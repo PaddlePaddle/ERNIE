@@ -1,4 +1,4 @@
-name: Codestyle Check
+name: Container Check
 
 on: [push, pull_request]
 
@@ -14,19 +14,19 @@ env:
 jobs:
   Lint:
     name: Lint
-    runs-on: [self-hosted, ernie-cpu]
+    runs-on: [self-hosted, 4gpu]
     steps:
       - name: Start Docker 
         run: |
-          if [ ! "$(docker ps -q -f name=ERNIE_CI_Codestyle)" ]; then
-            echo "Starting container ERNIE_CI_Codestyle"
-            docker start ERNIE_CI_Codestyle
+          if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
+            echo "Starting container ERNIE_CI_Container"
+            docker start ERNIE_CI_Container
           else
-            echo "ERNIE_CI_Codestyle already running"
+            echo "ERNIE_CI_Container already running"
           fi
-      - name: Check Codestyle
+      - name: Check Container
         run: 
-          docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
+          docker exec -t ERNIE_CI_Container /bin/bash -c '
           rm -rf ERNIE/ && \
           git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
           cd ERNIE && \
