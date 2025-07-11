@@ -16,10 +16,6 @@ jobs:
     name: Lint
     runs-on: [self-hosted, ernie-cpu]
     steps:
-      - name: Cleanup Environment Cache
-        run: 
-          source ~/.bashrc
-          rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
       - name: Start Docker 
         run: |
           if [ ! "$(docker ps -q -f name=ERNIE_CI_Codestyle)" ]; then
@@ -28,6 +24,9 @@ jobs:
           else
             echo "ERNIE_CI_Codestyle already running"
           fi
+      - name: Cleanup Environment Cache
+        run: docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
+          rm -rf /workspace/*'
       - name: Check Codestyle
         run: 
           docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
