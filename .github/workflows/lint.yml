@@ -48,7 +48,7 @@ jobs:
           git checkout -b PR_${PR_ID} FETCH_HEAD
           git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
           git fetch upstream ${BRANCH}
-          git merge ${BRANCH}
+          git merge ${BRANCH} --no-edit
           git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
           '
 
@@ -61,4 +61,5 @@ jobs:
       - name: Terminate And Delete the Container
         if: always()
         run: |
+          docker stop $container_name 2>/dev/null || true
           docker rm -f $container_name 2>/dev/null || true
