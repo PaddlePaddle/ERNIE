@@ -14,7 +14,7 @@ env:
 jobs:
   Lint:
     name: Lint
-    runs-on: [self-hosted, 4gpu]
+    runs-on: [self-hosted, ernie-cpu]
     steps:
       - name: Start Docker 
         run: |
@@ -24,6 +24,8 @@ jobs:
           else
             echo "ERNIE_CI_Container already running"
           fi
+      - name: Prepare Environment
+        run: source ~/.bashrc
       - name: Check Container
         run: 
           docker exec -t ERNIE_CI_Container /bin/bash -c '
