@@ -30,11 +30,12 @@ jobs:
       - name: Check Codestyle
         run: 
           docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
-          git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git
-          cd ERNIE/
-          git fetch origin pull/${PR_ID}/head
-          git checkout -b PR_${PR_ID} FETCH_HEAD
-          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
-          git fetch upstream ${BRANCH}
-          git merge ${BRANCH}
+          mkdir check_codestyle && cd check_codestyle && \
+          git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
+          cd ERNIE && \
+          git fetch origin pull/${PR_ID}/head && \
+          git checkout -b PR_${PR_ID} FETCH_HEAD && \
+          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git && \
+          git fetch upstream ${BRANCH} && \
+          git merge ${BRANCH} && \
           make lint'
