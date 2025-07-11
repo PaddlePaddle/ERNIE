@@ -10,9 +10,6 @@ env:
   PR_ID: ${{ github.event.pull_request.number }}
   BRANCH: ${{ github.event.pull_request.base.ref }}
   TASK: ERNIE-Codestyle-${{ github.event.pull_request.number }}
-  container_name: ${TASK}-$(date +%Y%m%d-%H%M%S)
-  docker_image: "iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu20.04-gcc12.2-cuda12.3-cudnn9.0-nccl2.20.3.1-openmpi4.1.5"
-
 jobs:
   codestyle:
     name: run-codestyle
@@ -27,12 +24,16 @@ jobs:
           work_dir: ${{ github.workspace }}
           python_version: "3.10"
         run: |
-          docker run -d -t --name ${container_name} \
+          container_name=${TASK}-$(date +%Y%m%d-%H%M%S)
+          docker_image="iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu20.04-gcc12.2-cuda12.3-cudnn9.0-nccl2.20.3.1-openmpi4.1.5"
+          docker run -d -t --name ${container_name} --net=host -v /dev/shm:/dev/shm --shm-size=32G \
+            -v $work_dir/../../..:$work_dir/../../.. \
             -v $work_dir:/workspace \
+            -v /home/.cache/pip:/home/.cache/pip \
             -e BRANCH \
             -e PR_ID \
+            -e work_dir \
             -w /workspace ${docker_image}
-
       - name: Get Repo
         env:
           ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
@@ -41,8 +42,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          
-      - name: Get Repository
+      - name: Get Diff
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -62,5 +62,5 @@ jobs:
         - name: Check Codestyle
         run: |
           docker exec -t ERNIE_CI_Container /bin/bash -c '
-          cd tmp/ERNIE 
+          cd ERNIE 
           make lint'
