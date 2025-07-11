@@ -22,7 +22,9 @@ jobs:
           rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
       - name: Check Codestyle
         run: 
-          yum install git -y
+          yum install git -y && \
+          git config --global user.name "Paddle CI" && \
+          git config --global user.email "paddle_ci@example.com" && \
           git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
           cd ERNIE/ && \
           git fetch origin pull/${PR_ID}/head && \
