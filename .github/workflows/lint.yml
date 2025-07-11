@@ -9,12 +9,16 @@ concurrency:
 env:
   PR_ID: ${{ github.event.pull_request.number }}
   COMMIT_ID: ${{ github.event.pull_request.head.sha }}
-  WorkPath: /home/paddle-1/actions-runner/_work/ERNIE/
+  work_dir: ${{ github.workspace }}
 
 jobs:
   Lint:
     name: Lint
     runs-on: [self-hosted, ernie-cpu]
+    permissions:
+      pull-requests: write
+      contents: read
+      id-token: write
     steps:
       - name: Start Docker 
         run: |
@@ -24,17 +28,17 @@ jobs:
           else
             echo "ERNIE_CI_Container already running"
           fi
-      - name: Prepare Environment
-        run: source ~/.bashrc
       - name: Check Container
         run: 
           docker exec -t ERNIE_CI_Container /bin/bash -c '
-          rm -rf ERNIE/ && \
-          git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
-          cd ERNIE && \
-          git fetch origin pull/${PR_ID}/head && \
-          git checkout -b PR_${PR_ID} FETCH_HEAD && \
-          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git && \
-          git fetch upstream ${BRANCH} && \
-          git merge ${BRANCH} && \
+          rm -rf tmp && mkdir tmp && cd tmp 
+          git config --global user.name "PaddleCI"
+          git config --global user.email "paddle_ci@example.com"
+          git clone https://github.com/PaddlePaddle/ERNIE.git
+          cd ERNIE
+          git fetch origin pull/${PR_ID}/head 
+          git checkout -b PR_${PR_ID} FETCH_HEAD
+          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
+          git fetch upstream ${BRANCH}
+          git merge ${BRANCH}
           make lint'
