@@ -23,6 +23,14 @@ DEFAULT_DOC_FORMATTING = "json"
 
 DEFAULT_ALPACA_COLUMNS_MAPPING = {"prompt": "instruction", "query": "input", "response": "output", "system": "system"}
 DEFAULT_COLUMN_VALUE_MAPPING = {"prompt": "", "query": "", "response": ""}
+DEFAULT_ALPACA_DPO_COLUMNS_MAPPING = {
+    "prompt": "instruction",
+    "query": "input",
+    "chosen": "chosen",
+    "rejected": "rejected",
+    "system": "system",
+}
+DEFAULT_ALPACA_DPO_COLUMNS_VALUE_MAPPING = {"prompt": "", "query": "", "chosen": "", "rejected": ""}
 DEFAULT_DATASET_COLUMNS_MAPPING = {"alpaca": DEFAULT_ALPACA_COLUMNS_MAPPING}
 
 DEFAULT_OUTPUT_JSON_INDENT = 2
