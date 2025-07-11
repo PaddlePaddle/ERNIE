@@ -16,7 +16,7 @@ docker build -f ./Dockerfile \
 
 # Run the container
 docker run --gpus all --name ernie-work \ 
-    -v $(pwd):/work  -w=/work --shm-size=256G \
+    -v $(pwd):/work  -w=/work --shm-size=512G \
     --network=host -it my_ernie_docker:latest bash
 
 # Enter the container
