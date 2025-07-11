@@ -8,7 +8,7 @@ concurrency:
 
 env:
   PR_ID: ${{ github.event.pull_request.number }}
-  COMMIT_ID: ${{ github.event.pull_request.head.sha }
+  COMMIT_ID: ${{ github.event.pull_request.head.sha }}
   WorkPath: /home/paddle-1/actions-runner/_work/ERNIE/
 
 jobs:
