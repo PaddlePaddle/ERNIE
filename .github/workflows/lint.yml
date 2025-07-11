@@ -22,6 +22,8 @@ jobs:
           rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
       - name: Check Codestyle
         run: 
+          git config --global user.name "Paddle CI"
+          git config --global user.email "paddle_ci@example.com"
           git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git 
           cd ERNIE/
           git fetch origin pull/${PR_ID}/head
@@ -29,5 +31,4 @@ jobs:
           git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
           git fetch upstream ${BRANCH}
           git merge ${BRANCH}
-          git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
           make lint
