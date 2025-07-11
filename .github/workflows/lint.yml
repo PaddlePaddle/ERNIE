@@ -37,7 +37,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          docker exec -t ERNIE_CI_Container /bin/bash -c '
+          docker exec -t ${container_name} /bin/bash -c '
           python -m pip install --upgrade pip
           python -m pip install pre-commit
           '
