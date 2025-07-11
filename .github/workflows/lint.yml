@@ -20,15 +20,18 @@ jobs:
         run: 
           source ~/.bashrc
           rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
+      - name: Prepare Python Environment 
+        run: 
+          source ~/.bashrc
       - name: Check Codestyle
         run: 
-          git config --global user.name "Paddle CI"
-          git config --global user.email "paddle_ci@example.com"
-          git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git 
-          cd ERNIE/
-          git fetch origin pull/${PR_ID}/head
-          git checkout -b PR_${PR_ID} FETCH_HEAD
-          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
-          git fetch upstream ${BRANCH}
-          git merge ${BRANCH}
+          git config user.name "Paddle CI" && \
+          git config user.email "paddle_ci@example.com" && \
+          git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
+          cd ERNIE/ && \
+          git fetch origin pull/${PR_ID}/head && \
+          git checkout -b PR_${PR_ID} FETCH_HEAD && \
+          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git && \
+          git fetch upstream ${BRANCH} && \
+          git merge ${BRANCH} && \
           make lint
