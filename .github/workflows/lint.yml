@@ -23,14 +23,11 @@ jobs:
             docker start ERNIE_CI_Codestyle
           else
             echo "ERNIE_CI_Codestyle already running"
-          fi
-      - name: Cleanup Environment Cache
-        run: docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
-          rm -rf /workspace/ERNIE/* '
+          fi'
       - name: Check Codestyle
         run: 
           docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
-          cd ERNIE && \
+          rm -rf ERNIE/ && \
           git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
           cd ERNIE && \
           git fetch origin pull/${PR_ID}/head && \
