@@ -11,8 +11,8 @@ env:
   BRANCH: ${{ github.event.pull_request.base.ref }}
   TASK: ERNIE-Codestyle-${{ github.event.pull_request.number }}
 jobs:
-  codestyle:
-    name: run-codestyle
+  Lint:
+    name: Lint
     runs-on: [self-hosted, ernie-cpu]
     permissions:
       pull-requests: write
@@ -22,18 +22,18 @@ jobs:
       - name: Run Container
         env:
           work_dir: ${{ github.workspace }}
-          python_version: "3.10"
         run: |
           container_name=${TASK}-$(date +%Y%m%d-%H%M%S)
+          echo "container_name=${container_name}" >> "$GITHUB_ENV"
           docker_image="iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu20.04-gcc12.2-cuda12.3-cudnn9.0-nccl2.20.3.1-openmpi4.1.5"
           docker run -d -t --name ${container_name} --net=host -v /dev/shm:/dev/shm --shm-size=32G \
             -v $work_dir/../../..:$work_dir/../../.. \
             -v $work_dir:/workspace \
-            -v /home/.cache/pip:/home/.cache/pip \
             -e BRANCH \
             -e PR_ID \
             -e work_dir \
             -w /workspace ${docker_image}
+
       - name: Get Diff
         env:
           work_dir: ${{ github.workspace }}
@@ -49,8 +49,14 @@ jobs:
           git merge ${BRANCH}  && \
           git diff --numstat ${BRANCH} -- | awk "{print \$NF}" && \
           '
-        - name: Check Codestyle
+
+      - name: Check Codestyle
         run: |
           docker exec -t ERNIE_CI_Container /bin/bash -c '
           cd ERNIE 
           make lint'
+
+      - name: Terminate And Delete the Container
+        if: always()
+        run: |
+          docker rm -f $container_name 2>/dev/null || true
