@@ -23,7 +23,7 @@ jobs:
             docker start ERNIE_CI_Codestyle
           else
             echo "ERNIE_CI_Codestyle already running"
-          fi'
+          fi
       - name: Check Codestyle
         run: 
           docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
