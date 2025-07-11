@@ -42,12 +42,12 @@ jobs:
           source $work_dir/../../../proxy
           git clone https://github.com/PaddlePaddle/ERNIE.git
           cd ERNIE
-          git fetch origin pull/${PR_ID}/head  && \
-          git checkout -b PR_${PR_ID} FETCH_HEAD  && \
-          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git  && \
-          git fetch upstream ${BRANCH}  && \
-          git merge ${BRANCH}  && \
-          git diff --numstat ${BRANCH} -- | awk "{print \$NF}" && \
+          git fetch origin pull/${PR_ID}/head
+          git checkout -b PR_${PR_ID} FETCH_HEAD
+          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
+          git fetch upstream ${BRANCH}
+          git merge ${BRANCH}
+          git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
           '
 
       - name: Check Codestyle
