@@ -12,8 +12,8 @@ env:
   TASK: ERNIE-Codestyle-${{ github.event.pull_request.number }}
 
 jobs:
-  unittest-cpu-ci:
-    name: unittest-cpu-ci
+  codestyle:
+    name: run-codestyle
     runs-on: [self-hosted, ernie-cpu]
     permissions:
       pull-requests: write
@@ -33,7 +33,7 @@ jobs:
             -e BRANCH \
             -e PR_ID \
             -w /workspace ${docker_image}
-      - name: Check Codestyle
+      - name: Get Repository
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -46,5 +46,9 @@ jobs:
           git remote add upstream https://github.com/PaddlePaddle/ERNIE.git  && \
           git fetch upstream ${BRANCH}  && \
           git merge ${BRANCH}  && \
-          make lint
+          git diff --numstat ${BRANCH} -- | awk "{print \$NF}" && \
           '
+        - name: Check Codestyle
+        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+          cd tmp/ERNIE 
+          make lint'
