@@ -40,7 +40,7 @@ jobs:
           docker exec -t ERNIE_CI_Container /bin/bash -c '
           python -m pip install --upgrade pip
           python -m pip install pre-commit
-          pre-commit install'
+          '
 
       - name: Get Diff
         env:
