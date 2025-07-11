@@ -26,11 +26,11 @@ jobs:
           fi
       - name: Cleanup Environment Cache
         run: docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
-          rm -rf /workspace/tmp '
+          rm -rf /workspace/ERNIE/* '
       - name: Check Codestyle
         run: 
           docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
-          mkdir tmp && cd tmp && \
+          cd ERNIE && \
           git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
           cd ERNIE && \
           git fetch origin pull/${PR_ID}/head && \
