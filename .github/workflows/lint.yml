@@ -18,13 +18,13 @@ jobs:
     steps:
       - name: Cleanup Environment Cache
         run: 
-          source ~/.bashrc
           rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
-      - name: Prepare Python Environment 
+      - name: Prepare Python3 Environment 
         run: 
           source ~/.bashrc
       - name: Check Codestyle
         run: 
+          git init && \
           git config --global user.name "Paddle CI" && \
           git config --global user.email "paddle_ci@example.com" && \
           git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git && \
