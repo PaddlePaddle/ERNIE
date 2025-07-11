@@ -18,10 +18,8 @@ jobs:
     steps:
       - name: Cleanup Environment Cache
         run: 
-          rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
-      - name: Prepare Python3 Environment 
-        run: 
           source ~/.bashrc
+          rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
       - name: Check Codestyle
         run: 
           git init && \
