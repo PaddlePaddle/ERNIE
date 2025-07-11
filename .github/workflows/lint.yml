@@ -39,7 +39,7 @@ jobs:
         run: |
           docker exec -t ${container_name} /bin/bash -c '
           python -m pip install --upgrade pip
-          python -m pip uninstall pre-commit
+          python -m pip uninstall pre-commit -y
           python -m pip install pre-commit
           '
 
