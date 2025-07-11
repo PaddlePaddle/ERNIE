@@ -26,7 +26,7 @@ jobs:
           fi
       - name: Cleanup Environment Cache
         run: docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
-          rm -rf /workspace/*'
+          rm -rf /workspace/ERNIE/*'
       - name: Check Codestyle
         run: 
           docker exec -t ERNIE_CI_Codestyle /bin/bash -c '
