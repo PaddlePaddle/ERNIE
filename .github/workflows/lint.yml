@@ -50,13 +50,8 @@ jobs:
           git fetch upstream ${BRANCH}
           git merge ${BRANCH} --no-edit
           git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
+          make lint
           '
-
-      - name: Check Codestyle
-        run: |
-          docker exec -t ERNIE_CI_Container /bin/bash -c '
-          cd ERNIE 
-          make lint'
 
       - name: Terminate And Delete the Container
         if: always()
