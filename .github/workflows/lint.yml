@@ -6,35 +6,28 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  PR_ID: ${{ github.event.pull_request.number }}
+  COMMIT_ID: ${{ github.event.pull_request.head.sha }
+  WorkPath: /home/paddle-1/actions-runner/_work/ERNIE/
+
 jobs:
   Lint:
     name: Lint
     runs-on: [self-hosted, ernie-cpu]
     steps:
-      - name: Download Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Checkout Develop
-        run: |
-          if ! git show-ref --quiet refs/heads/develop; then \
-              echo "local develop branch is missing, creating local develop branch that tracks remote develop branch"
-              git fetch origin develop
-              git branch develop --track origin/develop
-          else
-            echo "local develop branch exist, skipping"
-          fi
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          cache: 'pip' # caching pip dependencies
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pre-commit
-          pre-commit install
-      - name: Test
-        run: make lint
+      - name: Cleanup Environment Cache
+        run: 
+          source ~/.bashrc
+          rm -rf $WorkPath* $WorkPath.[!.]* $WorkPath..?*
+      - name: Check Codestyle
+        run: 
+          git clone --depth=1000 https://github.com/PaddlePaddle/ERNIE.git 
+          cd ERNIE/
+          git fetch origin pull/${PR_ID}/head
+          git checkout -b PR_${PR_ID} FETCH_HEAD
+          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
+          git fetch upstream ${BRANCH}
+          git merge ${BRANCH}
+          git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
+          make lint

@@ -4,7 +4,7 @@
 
 .PHONY: all
 all : lint test
-check_dirs := cookbook data_processor ernie erniekit examples tools test requirements
+check_dirs := cookbook data_processor ernie erniekit examples tools tests requirements
 
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # #
 .PHONY: lint
