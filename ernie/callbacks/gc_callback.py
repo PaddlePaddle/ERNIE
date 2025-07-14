@@ -1,5 +1,3 @@
-# !/usr/bin/env python3
-
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,21 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-ImageModificationProcessorArguments
+""" GCCallback"""
 
-"""
+import gc
 
-from dataclasses import dataclass, field
+from paddleformers.trainer.trainer_callback import TrainerCallback
 
 
-@dataclass
-class ImageModificationProcessorArguments:
+class GCCallback(TrainerCallback):
     """
-    args for ImageModificationProcessor
+    GCCallback
     """
 
-    image_token_len: int = field(default=64, metadata={"help": "image placeholder num per frame"})
-    image_dtype: str = field(default="uint8", metadata={"help": "image dtype"})
-    render_timestamp: bool = field(default=False, metadata={"help": "render timestamp"})
-    sft_shift_by_one: bool = field(default=False, metadata={"help": "SFT data_processor shift-by-one"})
+    def on_train_begin(self, args, state, control, **kwargs):
+        """on_train_begin"""
+        if args.gc_interval > 0:
+            gc.disable()
+
+    def on_step_end(self, args, state, control, **kwargs):
+        """on_step_end"""
+        if args.gc_interval > 0 and (state.global_step % args.gc_interval == 0):
+            gc.collect()

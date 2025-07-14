@@ -1,0 +1,914 @@
+[
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000516931.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What do you think is going on in this snapshot?",
+          "tag": "mask"
+        },
+        {
+          "text": "In this snapshot, it appears to be a playful moment between two children outdoors. The child in the foreground is sitting on a skateboard, possibly taking a break or having fallen off. The child in the background is running towards the first child, holding a toy in one hand. They seem to be in a park or a wooded area, enjoying a sunny day. The overall atmosphere suggests they are having fun and playing together.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000423424.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you tell me how many people are in the photo?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are two people in the photo.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What are they doing?",
+          "tag": "mask"
+        },
+        {
+          "text": "The two people in the photo are playing a video game using motion controllers. They appear to be engaged and having fun.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What are the expressions on their faces?",
+          "tag": "mask"
+        },
+        {
+          "text": "The expressions on their faces suggest that they are enjoying themselves. The person on the left looks focused and excited, while the person on the right is smiling and appears to be having a good time.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any items or objects that they are holding?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, both individuals are holding motion controllers, which are likely part of a video game console setup. The person on the left is holding a white controller, while the person on the right is holding a pink controller.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe their attire?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! The person on the left is wearing an orange short-sleeved polo shirt and khaki shorts. The person on the right is wearing a sleeveless black top and dark blue jeans.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any furniture or items in the background?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, in the background, there is a fireplace with a brick surround and a white mantel. On the mantel, there are a few decorative items, including a candle and some other small objects. Additionally, there is a wall with a doorway leading to another room.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the position of the man relative to the woman?",
+          "tag": "mask"
+        },
+        {
+          "text": "The man is positioned to the left of the woman in the photo. They are both facing forward, engaged in playing the video game.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any notable color scheme in the photo?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are a few notable color schemes in the photo:\n\n1. **Clothing**: The man is wearing an orange shirt and khaki shorts, while the woman is wearing a black top and dark blue jeans. The controllers they are holding are white and pink.\n2. **Background**: The fireplace has a brick surround with a white mantel. The walls are a neutral color, possibly light beige or gray.\n3. **Decor**: The items on the mantel, such as the candle, add subtle accents to the background.\n\nOverall, the colors are a mix of warm and neutral tones, with the bright colors of the controllers and the man's shirt standing out.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on the image, can you infer the possible event or occasion?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the image, it appears that the individuals are engaged in a casual and fun activity, likely playing a video game at home. The setting and their attire suggest a relaxed and informal occasion, possibly a social gathering or a leisure activity among friends or family. There are no specific decorations or elements that indicate a formal event or special occasion, so it seems to be a regular, enjoyable moment.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000575929.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What type of room can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a hospital room. It appears to be a patient room, likely in a maternity or general care unit, given the presence of medical equipment, a hospital bed, and healthcare professionals attending to a patient. The room is equipped with an IV stand, a clock, and other medical supplies, indicating it is used for patient care.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many people are in the image and what are they doing?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are three people in the image. Two of them appear to be sitting on or near the hospital bed, possibly the patient and a visitor. The third person, who is wearing a white coat or uniform, is likely a healthcare professional and seems to be attending to or interacting with the patient, possibly providing care or information.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the items placed around the room?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! Here are the items placed around the room:\n\n1. **Hospital Bed**: Positioned in the center of the room, with a patient and possibly a visitor seated on or near it.\n2. **IV Stand**: Located to the left of the bed, equipped with medical fluids or medications.\n3. **Clock**: Mounted on the wall to the left, indicating the time.\n4. **Wall Art**: A framed picture or poster is hanging on the wall to the left.\n5. **Television**: Positioned on a stand or cabinet against the wall, slightly to the left of the center.\n6. **Cabinet/Stand**: Below the television, likely used for storage or placing additional items.\n7. **Medical Equipment**: Various medical supplies and equipment are visible, including what appears to be a monitor or infusion pump attached to the IV stand.\n8. **Documents and Supplies**: On a table or counter near the door, there are papers, folders, and possibly other medical supplies.\n9. **Decorative Banner**: Above the double doors, there is a decorative banner with floral designs and text.\n10. **Double Doors**: At the back of the room, likely leading to a hallway or another area of the hospital.\n\nThe room is well-equipped for patient care, with a mix of medical and personal items to ensure comfort and functionality.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any eyeglasses in the image? If so, where are they located?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are eyeglasses in the image. They are being worn by the person in the white coat or uniform, who is likely a healthcare professional attending to the patient.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any sort of audio equipment in the room?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there appears to be a piece of audio equipment in the room. On the wall to the left, above the framed picture, there is a small speaker or intercom system mounted. This type of equipment is commonly used in hospital rooms for communication purposes.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What might be the possible reason for having such equipment in this room?",
+          "tag": "mask"
+        },
+        {
+          "text": "The audio equipment, such as a speaker or intercom system, in the hospital room likely serves several important purposes:\n\n1. **Communication**: It allows healthcare staff to communicate with the patient without needing to enter the room, which can be useful for quick updates or instructions.\n2. **Emergency Alerts**: It can be used to alert the patient or staff in case of an emergency, ensuring a rapid response.\n3. **Announcements**: Hospital-wide announcements or important information can be broadcasted directly into the room.\n4. **Patient Monitoring**: It may be part of a monitoring system to check on the patient's status and needs.\n5. **Entertainment**: In some cases, it might be used to provide audio for television or other entertainment systems to improve the patient's comfort.\n\nOverall, such equipment enhances the efficiency of care and ensures better communication and safety within the hospital environment.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the interaction between the medical staff and the patient?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, the medical staff member, who is wearing a white coat or uniform, appears to be interacting closely with the patient. The staff member is leaning over the bed, possibly examining or discussing something with the patient. This interaction suggests that the staff member is providing care, support, or information to the patient. The patient and possibly a visitor are seated on or near the bed, engaged in the interaction, which indicates a moment of attentive care or consultation. The overall scene portrays a typical healthcare setting where medical staff are attending to a patient's needs.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If there was a window in this room, where do you think it would be located?",
+          "tag": "mask"
+        },
+        {
+          "text": "If there were a window in this room, it would most likely be located on the wall opposite the double doors or on one of the side walls. Given the layout of the room and the positioning of the bed and medical equipment, a window on the wall opposite the doors would provide natural light and a view for the patient, which is common in hospital rooms to enhance the patient's comfort and well-being. Alternatively, a window on one of the side walls could also serve the same purpose without interfering with the placement of medical equipment and furniture.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000143874.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you elaborate on the elements of the picture provided?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! The picture provided features several distinct elements:\n\n1. **Food Truck**: The central focus of the image is a shiny, metallic food truck. The truck has a sleek, streamlined design, reminiscent of an Airstream trailer. The exterior is reflective and polished, giving it a modern and clean appearance.\n\n2. **Logo**: On the side of the food truck, there is a circular logo with the text \"gastroPod\" written inside. This likely indicates the name or brand of the food truck.\n\n3. **Chairs**: In front of the food truck, there are four metal chairs arranged in a row. These chairs are likely provided for customers to sit and enjoy their food.\n\n4. **Open Window**: The food truck has an open service window on the left side, where customers can place their orders and receive their food. There are some items visible inside the window, possibly condiments or utensils.\n\n5. **Palm Tree**: In the background, there is a tall palm tree, suggesting that the location might be in a warm or tropical climate.\n\n6. **Trees and Foliage**: Besides the palm tree, there are other trees and foliage in the background, adding to the outdoor setting.\n\n7. **Paved Area**: The food truck is parked on a paved area, which appears to be part of a plaza or a similar public space.\n\n8. **Buildings**: There are some buildings visible in the background, indicating that the food truck is located in an urban or suburban area.\n\nThe overall tone of the image is sepia, giving it a vintage or nostalgic feel. The combination of the modern food truck with the sepia tone creates an interesting contrast between contemporary and retro elements.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000511070.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What are the main objects in this image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The main objects in the image are a cat lying on a cushioned chair. The chair has a white cushion and is placed on a wooden floor.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many cats are in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There is one cat in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the cat located?",
+          "tag": "mask"
+        },
+        {
+          "text": "The cat is located on a cushioned chair.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is the cat lying down or standing up?",
+          "tag": "mask"
+        },
+        {
+          "text": "The cat is lying down on the chair.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you tell the position of the cushion in relation to the cat?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, the cat is lying on top of the cushion, which is placed on the chair. The cushion is directly underneath the cat.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What other objects are near the cat?",
+          "tag": "mask"
+        },
+        {
+          "text": "Near the cat, there is a chair with a white cushion, and the chair is placed on a wooden floor. There are no other distinct objects immediately near the cat in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on the setting, can you deduce where this image might have been taken?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the setting, which includes a wooden floor and a cushioned chair, it is likely that this image was taken indoors, possibly in a home or apartment. The environment suggests a living space such as a dining room or kitchen area.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you explain why the cat might choose to lie on the cushion?",
+          "tag": "mask"
+        },
+        {
+          "text": "Cats often choose to lie on cushions for several reasons:\n\n1. **Comfort**: Cushions provide a soft and comfortable surface, which is more pleasant for resting compared to harder surfaces like the floor or a wooden chair.\n\n2. **Warmth**: Cushions can retain heat, making them a warm spot for a cat to lie on, which is especially appealing in cooler environments.\n\n3. **Elevation**: Being on a chair elevates the cat off the ground, which can make them feel safer and give them a better vantage point to observe their surroundings.\n\n4. **Familiarity**: If the cushion or chair is a familiar spot, the cat might feel more secure and relaxed there.\n\n5. **Scent**: Cats are attracted to areas that have their scent or the scent of their owners, which can make the cushion a preferred resting place.\n\nOverall, the combination of comfort, warmth, and security makes a cushioned chair an attractive spot for a cat to lie down.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the overall mood or atmosphere of the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The overall mood or atmosphere of the image appears to be calm and relaxed. The cat is lying comfortably on the cushioned chair, suggesting a sense of contentment and tranquility. The setting, with its warm wooden floor and simple, cozy furniture, adds to the peaceful and homey feel of the scene.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If the cushion wasn't there, where might the cat have chosen to lie?",
+          "tag": "mask"
+        },
+        {
+          "text": "If the cushion wasn't there, the cat might have chosen to lie in several alternative places, depending on its preferences and the environment:\n\n1. **Directly on the Chair**: The cat might still lie on the chair, even without the cushion, as it provides an elevated and secure spot.\n\n2. **On the Floor**: The cat could choose to lie on the wooden floor, especially if it finds a warm or sunny spot.\n\n3. **On a Sofa or Bed**: If there is a sofa or bed nearby, the cat might prefer these soft and comfortable surfaces.\n\n4. **In a Cat Bed**: If the cat has a designated bed or blanket, it might choose that spot for comfort and familiarity.\n\n5. **Near a Heat Source**: Cats often seek warmth, so the cat might lie near a radiator, heater, or in a sunny spot by a window.\n\n6. **On a Rug or Carpet**: If there is a rug or carpet in the room, the cat might find it a comfortable alternative to the cushion.\n\nCats often seek out comfortable, warm, and secure spots to rest, so the cat would likely find another suitable place within the environment.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000028273.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What objects can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, there is a small black kitten sitting inside an open black bag. The bag appears to have a zipper and some text on it. The kitten is looking towards the camera.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many kittens are there in the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "There is one kitten in the picture.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the kitten's expression or state?",
+          "tag": "mask"
+        },
+        {
+          "text": "The kitten appears to be alert and curious. Its eyes are wide open, suggesting that it is attentive and possibly exploring its surroundings. The kitten's ears are also perked up, which is another sign of attentiveness.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the handbag located?",
+          "tag": "mask"
+        },
+        {
+          "text": "The handbag is placed on a flat surface, likely a table or a bed. The kitten is inside the open handbag, which is positioned in such a way that the kitten is visible and looking out from it.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the color of the kitten?",
+          "tag": "mask"
+        },
+        {
+          "text": "The kitten is black in color.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How does the handbag's design appear?",
+          "tag": "mask"
+        },
+        {
+          "text": "The handbag is black with a zipper and a handle at the top. It has a rectangular shape and appears to have some text on it, though the text is not fully legible. The interior of the bag is light-colored, which contrasts with the black exterior. The bag seems to be made of a fabric material.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any other animal in the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, there is no other animal in the picture. The only animal present is the black kitten inside the handbag.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you speculate why the kitten might be inside the handbag?",
+          "tag": "mask"
+        },
+        {
+          "text": "Kittens are naturally curious and often explore their surroundings. The kitten might be inside the handbag for several reasons:\n\n1. **Curiosity**: Kittens love to explore new and interesting places, and the handbag might have seemed like a cozy and intriguing spot.\n2. **Comfort**: The handbag might provide a sense of security and comfort, similar to a small enclosed space that cats often seek out.\n3. **Playfulness**: The kitten might be playing and found the handbag to be an interesting object to investigate.\n4. **Warmth**: The interior of the handbag might be warm and inviting, making it an appealing place for the kitten to rest.\n\nWithout more context, it's hard to determine the exact reason, but these are common behaviors for kittens.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If I were to narrate a story based on this image, what could be a potential plot?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! Here’s a potential plot for a story based on the image:\n\n---\n\n**Title: The Adventure of Shadow the Kitten**\n\nOnce upon a time, in a cozy little house, there lived a curious black kitten named Shadow. Shadow loved to explore every nook and cranny of the house, always on the lookout for new adventures.\n\nOne sunny afternoon, while Shadow’s human was busy preparing for a trip, a mysterious black handbag was left open on the bed. Shadow’s eyes sparkled with curiosity as she noticed the inviting, dark interior of the bag. With a playful leap, she jumped inside, her tiny paws sinking into the soft fabric.\n\nAs Shadow nestled into the handbag, she imagined herself embarking on a grand adventure. In her mind, the handbag transformed into a magical ship sailing across vast oceans. She was the brave captain, navigating through waves and storms, discovering hidden islands filled with treasures.\n\nSuddenly, the handbag began to move! Shadow’s human had picked it up, not realizing the little stowaway inside. Shadow’s heart raced with excitement as she peeked out, seeing the world from a new perspective. The handbag was placed in the car, and soon they were off on a real journey.\n\nThe car ride was bumpy, but Shadow felt safe and secure in her cozy hideout. When they arrived at their destination, Shadow’s human opened the bag to find the little explorer peeking out with wide, curious eyes. Surprised but amused, they gently lifted Shadow out and gave her a loving pat.\n\nShadow’s adventure didn’t end there. The new place was filled with exciting sights and smells. She explored every corner, making new friends and discovering hidden spots to nap. Her human watched with a smile, knowing that Shadow’s adventurous spirit would always lead her to new and wonderful experiences.\n\nAnd so, Shadow the kitten continued to find magic and adventure in the most unexpected places, always ready for the next journey that awaited her.\n\n---\n\nThis story captures the curiosity and adventurous spirit of the kitten, turning a simple moment into a grand adventure.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000329004.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What is the main subject of this image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The main subject of this image is a dish of pasta with broccoli and pieces of chicken, likely in a creamy sauce.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many types of food items can you identify in the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the picture, I can identify three types of food items:\n\n1. Pasta (likely linguine or fettuccine)\n2. Broccoli\n3. Chicken\n\nAdditionally, there appears to be a creamy sauce and possibly some grated cheese or breadcrumbs on top.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you count the number of broccoli florets visible?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are approximately six broccoli florets visible in the dish.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the largest broccoli floret located?",
+          "tag": "mask"
+        },
+        {
+          "text": "The largest broccoli floret is located near the center of the dish, slightly towards the left side.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What action or event is taking place in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a prepared dish of pasta with broccoli and chicken in a creamy sauce. There is no specific action or event taking place; it is simply a presentation of the food.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What can you tell about the pasta in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The pasta in the image appears to be a type of long, flat noodle, such as fettuccine or linguine. It is mixed with broccoli florets and pieces of chicken, and it is coated in a creamy sauce. The pasta looks well-cooked and integrated with the other ingredients in the dish.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you explain the significance of the topping on the chicken and pasta?",
+          "tag": "mask"
+        },
+        {
+          "text": "The topping on the chicken and pasta appears to be grated cheese or breadcrumbs. This topping can add several elements to the dish:\n\n1. **Flavor**: Cheese or breadcrumbs can enhance the overall taste, adding a rich, savory element.\n2. **Texture**: Breadcrumbs, especially if toasted, can add a crunchy texture, providing a contrast to the creamy sauce and tender pasta and chicken.\n3. **Visual Appeal**: The topping can make the dish look more appetizing by adding color and texture.\n4. **Aromatics**: Cheese, when melted, can release a pleasant aroma, making the dish more enticing.\n\nOverall, the topping contributes to the dish's flavor, texture, and visual appeal, making it more enjoyable to eat.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on the image, can you deduce if the dish is vegetarian or non-vegetarian?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the image, the dish is non-vegetarian. This deduction is made because the dish contains pieces of chicken, which is a meat product.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any drink or beverage visible in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, there is no drink or beverage visible in the image. The focus is solely on the dish of pasta with broccoli and chicken.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you discuss the potential cultural or culinary significance of this dish based on its visual presentation?",
+          "tag": "mask"
+        },
+        {
+          "text": "The dish in the image appears to be a pasta dish with broccoli and chicken in a creamy sauce, which can have several cultural and culinary significances:\n\n1. **Italian Influence**: The use of pasta, particularly long, flat noodles like fettuccine or linguine, and a creamy sauce suggests an Italian culinary influence. Dishes like Fettuccine Alfredo or Chicken Alfredo are classic Italian-American dishes that are popular worldwide.\n\n2. **Comfort Food**: Creamy pasta dishes are often considered comfort food due to their rich, hearty nature. They are commonly enjoyed in many households and restaurants for their satisfying and indulgent qualities.\n\n3. **Balanced Meal**: The combination of pasta (carbohydrates), chicken (protein), and broccoli (vegetables) makes this a balanced meal, providing a variety of nutrients. This balance is often sought after in many cuisines to ensure a nutritious and complete meal.\n\n4. **Adaptability**: Such dishes are highly adaptable and can be customized with different vegetables, proteins, and sauces to suit various tastes and dietary preferences. This versatility makes it a popular choice in many cultures.\n\n5. **Western Cuisine**: The dish reflects elements commonly found in Western cuisine, particularly in North America and Europe, where pasta dishes with creamy sauces are a staple in many households and restaurants.\n\nOverall, the dish represents a fusion of flavors and ingredients that are widely appreciated in many parts of the world, highlighting the global influence of Italian cuisine and the universal appeal of comfort food.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000166972.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you elaborate on the elements of the picture provided?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! The picture provided shows the Palace of Westminster, also known as the Houses of Parliament, located in London, United Kingdom. Here are the key elements of the image:\n\n1. **Palace of Westminster**: The large, iconic building in the background is the Palace of Westminster. It is the meeting place of the House of Commons and the House of Lords, the two houses of the Parliament of the United Kingdom. The architecture is Gothic Revival style.\n\n2. **Big Ben**: On the right side of the Palace of Westminster, you can see the Elizabeth Tower, commonly known as Big Ben. Big Ben is actually the nickname for the Great Bell of the clock at the north end of the Palace of Westminster, but it is often extended to refer to both the clock and the clock tower.\n\n3. **River Thames**: In the foreground, there is the River Thames, which flows through southern England including London. The river is a significant feature of the city and is often seen in images of London landmarks.\n\n4. **Boat**: There is a boat on the River Thames in the foreground of the image. The boat appears to be a working vessel, possibly used for maintenance or transport on the river.\n\n5. **Sky**: The sky is clear with a light blue color, indicating a sunny day.\n\nThese elements together create a classic view of one of London's most famous landmarks.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000093793.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Analyze the image in a comprehensive and detailed manner.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a well-arranged dinner plate with a variety of foods, placed on a table with a red tablecloth. Here is a detailed analysis of the image:\n\n1. **Main Components on the Plate:**\n   - **Protein:** There is a piece of grilled or baked fish, seasoned with spices. The fish appears to be a fillet, likely a white fish such as cod or tilapia.\n   - **Vegetables:**\n     - **Carrots:** A portion of baby carrots, which appear to be steamed or boiled, is placed on the left side of the plate.\n     - **Greens:** A serving of sautéed or steamed spinach is located on the right side of the plate.\n   - **Grains:** A portion of yellow rice, possibly seasoned with turmeric or saffron, is positioned at the top left of the plate.\n\n2. **Table Setting:**\n   - **Glassware:** There is a wine glass in the background, suggesting that this meal may be part of a formal or semi-formal dining setting.\n   - **Cutlery:** A fork is visible to the right of the plate, partially obscured by a white cup or mug.\n   - **Additional Items:** There is a piece of paper or a napkin to the left of the plate, which could be a menu, a note, or a napkin.\n\n3. **Background and Ambiance:**\n   - The table is covered with a red tablecloth, adding a touch of elegance and warmth to the setting.\n   - The lighting appears to be soft and warm, contributing to a cozy and inviting atmosphere.\n\n4. **Food Presentation:**\n   - The food is neatly arranged on the plate, with each component clearly separated.\n   - The colors of the food items are vibrant, with the orange of the carrots, the green of the spinach, the yellow of the rice, and the golden-brown of the fish creating a visually appealing contrast.\n\n5. **Possible Context:**\n   - The presence of the wine glass and the formal arrangement of the food suggest that this meal might be part of a special occasion, a dinner party, or a restaurant setting.\n\nOverall, the image portrays a balanced and nutritious meal, presented in an aesthetically pleasing manner, suitable for a formal or semi-formal dining experience.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000233439.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What's happening in the scene?",
+          "tag": "mask"
+        },
+        {
+          "text": "The scene depicts a cluttered desk in a home office or study. There are various items on the desk, including a stack of papers, a book titled \"National Geographic Photography,\" a printer, a desk lamp, a cordless phone, and some small decorative items like a teddy bear. A black and white cat is lying on top of the stack of papers, appearing to be asleep. The desk is positioned against a wall with horizontal paneling, and there is a window to the left, allowing natural light to illuminate the space.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000454695.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Analyze the image in a comprehensive and detailed manner.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image appears to be taken inside a train or subway car. Here is a detailed analysis:\n\n1. **Foreground:**\n   - A man is standing inside the train, wearing a face mask and glasses. He is reading a piece of paper or a map, which suggests he might be checking directions or information.\n   - The man is dressed in formal attire, indicating he might be a commuter or a professional.\n\n2. **Background:**\n   - Through the open door of the train, another train car is visible. This car is crowded with people, indicating it is likely rush hour or a busy time of day.\n   - The people in the other train car are standing closely together, some holding onto the overhead handrails. This suggests the train is quite full.\n   - The individuals in the other car are dressed in a mix of formal and casual attire, indicating a diverse group of commuters.\n\n3. **Environment:**\n   - The interior of the train is clean and well-maintained, typical of many urban subway systems.\n   - The signage above the door is partially visible, with some text that is not fully readable. This could be indicating the next station or destination.\n   - The design and layout of the train suggest it might be in an East Asian country, possibly Japan, given the style of the train and the cultural context (e.g., the use of face masks).\n\n4. **Lighting and Color:**\n   - The lighting inside the train is bright and artificial, typical of subway lighting.\n   - The image has a high contrast with a slightly greenish tint, giving it a somewhat dramatic and stylized appearance.\n\n5. **Mood and Atmosphere:**\n   - The image conveys a sense of busyness and the hustle and bustle of urban life.\n   - The man in the foreground appears focused and possibly stressed, which is common in a busy commuting environment.\n   - The crowded train car in the background emphasizes the density and fast pace of city life.\n\nOverall, the image captures a typical scene of daily commuting in a busy urban environment, highlighting the crowded conditions and the focused demeanor of the commuters.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000007506.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Describe the following image.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image shows a giraffe standing in an enclosure with a brick building in the background. The giraffe is in a unique posture, with its front legs spread wide apart and its head lowered towards the ground, possibly to drink water or eat something from the ground. The enclosure has a grassy area with patches of dirt, and there is a wooden fence in the foreground. The building behind the giraffe has a sloped roof and a door or gate on the left side.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000018670.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Write a detailed description of the given image.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a table set for a meal, featuring a variety of food items and utensils. The table is covered with a colorful tablecloth that has a floral pattern, and on top of it, there are newspapers spread out, possibly to protect the tablecloth or for easy cleanup.\n\nIn the center of the table, there is a large plate with a round, flat, brownish food item that appears to be cut into sections. This item looks like a traditional dish, possibly made from grains or rice.\n\nTo the right of the central dish, there is a bowl containing a reddish-brown condiment or side dish, which appears to be a spicy mixture, possibly made from chili and other spices. A spoon is placed in the bowl for serving.\n\nBehind the central dish, there is a bunch of ripe yellow bananas, neatly arranged and ready to be eaten.\n\nTo the left and right of the central dish, there are two colorful plates with floral designs, one with a blue flower and the other with a red flower. These plates are likely intended for serving the food.\n\nIn the background, there is a cutting board with a knife and a folded cloth, indicating that some food preparation might have taken place.\n\nOverall, the table is set in a simple yet inviting manner, with traditional and possibly homemade food items ready to be enjoyed.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000103393.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you describe the main elements present in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! The image contains the following main elements:\n\n1. **Bicycle**: A red bicycle is mounted on a bike rack attached to the back of a vehicle. The bike has drop handlebars and appears to be a road bike.\n\n2. **Bus**: A city bus is visible in the background, moving along the street. The bus has a silver and blue color scheme.\n\n3. **Traffic Cone**: An orange traffic cone is placed on the street, indicating some sort of construction or caution area.\n\n4. **Truck**: A blue and white truck is parked on the side of the street, possibly related to construction or maintenance work.\n\n5. **Street**: The scene takes place on a city street, with buildings and trees visible in the background.\n\n6. **Buildings and Trees**: There are buildings and trees lining the street, suggesting an urban environment.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many cones can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There is one orange traffic cone visible in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the position of the bicycle in relation to the bus?",
+          "tag": "mask"
+        },
+        {
+          "text": "The bicycle is positioned in front of the bus. It is mounted on a bike rack attached to the back of a vehicle, which is ahead of the bus on the street.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you explain the likely reason for the presence of the cones?",
+          "tag": "mask"
+        },
+        {
+          "text": "The presence of the orange traffic cone in the image likely indicates a construction or maintenance area, or it could be used to signal caution to drivers and pedestrians. Traffic cones are commonly used to:\n\n1. **Mark Construction Zones**: Indicate areas where roadwork or building construction is taking place.\n2. **Direct Traffic**: Guide vehicles and pedestrians around obstacles or through detours.\n3. **Ensure Safety**: Warn of potential hazards on the road, such as uneven surfaces, open manholes, or other dangers.\n\nGiven the urban setting and the presence of a truck that might be related to construction or maintenance work, it is reasonable to assume that the cone is being used to mark a work zone or to ensure safety in that area.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any signs of construction or roadwork in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are no explicit signs of construction or roadwork visible in the image, such as construction barriers, workers, or heavy machinery. However, the presence of the orange traffic cone and the blue and white truck parked on the side of the street could suggest that some form of maintenance or construction activity might be taking place nearby. Additionally, the buildings in the background appear to be under construction or renovation, as indicated by the scaffolding and protective netting.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the motion or action of the bicycle?",
+          "tag": "mask"
+        },
+        {
+          "text": "The bicycle appears to be stationary and securely mounted on a bike rack attached to the back of a vehicle. The vehicle itself seems to be in motion, as indicated by the slight blur in the image, particularly of the bus in the background. This suggests that the photo was taken while the vehicle with the bike rack was moving. The bicycle is not being ridden; it is being transported on the bike rack.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any other notable features or events happening in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "In addition to the main elements already described, here are a few other notable features and events happening in the image:\n\n1. **Motion Blur**: The bus in the background appears slightly blurred, indicating that it is in motion. This adds a sense of movement to the scene.\n\n2. **Urban Environment**: The presence of buildings, trees, and a busy street suggests that the scene is set in an urban environment.\n\n3. **Vehicle Types**: The image includes a variety of vehicles, such as the bus, the truck, and the vehicle with the bike rack, indicating a busy street with diverse traffic.\n\n4. **Safety Measures**: The orange traffic cone suggests that safety measures are in place, possibly due to construction, maintenance, or another reason requiring caution.\n\n5. **Bicycle Rack**: The bike rack itself is a notable feature, designed to securely hold the bicycle during transport. It appears to be a hitch-mounted rack, commonly used for carrying bikes on the back of vehicles.\n\nThese elements together create a dynamic urban scene with a focus on transportation and safety.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000355270.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What is this photo about'?",
+          "tag": "mask"
+        },
+        {
+          "text": "This photo features a piece of wall art that combines a painted element with a real object. The artwork consists of a red rectangular panel mounted on a wall. At the top of the panel, there is a painted eye. Below the eye, there is a clear glass vase containing a single yellow-orange flower with a green stem. The vase is placed on a small wooden shelf attached to the bottom of the red panel. The combination of the painted eye and the real flower creates an interesting and visually engaging piece of art.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000050562.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Explain the visual content of the image in great detail.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a young woman playing tennis. She is captured in a candid moment, seemingly in the midst of a game or practice session. Here are the detailed observations:\n\n1. **Subject**: The woman is the central focus of the image. She has long, dark hair tied back in a high ponytail, which is slightly fanned out, suggesting movement. Her skin tone is light, and she appears to be in good physical shape, indicative of an athlete.\n\n2. **Attire**: She is dressed in athletic wear suitable for tennis. She wears a sleeveless, fitted black tank top with a small logo on the left side of her chest, which appears to be from the Under Armour brand. She also has a silver necklace with a pendant and a bracelet on her left wrist.\n\n3. **Equipment**: She holds a tennis racket in her right hand. The racket is predominantly yellow and black, with the brand name \"Babolat\" visible on the frame. The strings of the racket are taut and well-maintained, suitable for professional or serious amateur play.\n\n4. **Setting**: The background suggests an outdoor tennis court. The surface is green, typical of many tennis courts, and there is a dark, mesh-like fence or netting behind her, which is common around tennis courts to keep balls within the playing area.\n\n5. **Action**: The woman appears to be in a ready stance, possibly preparing to receive a serve or hit a ball. Her posture is slightly angled, with her left arm bent and her right arm holding the racket in front of her. Her expression is focused and concentrated, indicating her engagement in the game.\n\n6. **Lighting and Environment**: The lighting suggests it is daytime, with natural sunlight illuminating the scene. The light highlights her hair and the contours of her body, creating a dynamic and vibrant atmosphere.\n\nOverall, the image captures the intensity and focus of a tennis player in action, highlighting her athleticism and the environment of the sport.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000559090.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What's the main subject in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The main subject in the image is a television placed on a wooden stand in a room, likely a hotel room. The TV is turned on and displaying a scene with a person on the screen. The image is taken from the perspective of someone lying on a bed, as the bed and its rumpled sheets are visible in the foreground.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many distinct objects can you see?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, I can see several distinct objects:\n\n1. Television\n2. Wooden stand/cabinet\n3. Bed with rumpled sheets\n4. Curtains\n5. Lamp (on top of the wooden stand)\n6. Clothes or items on top of the wooden stand\n7. Towel or cloth hanging on the right side\n8. Bags or items on the floor near the bed\n\nThese are the main distinct objects visible in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the location of the television?",
+          "tag": "mask"
+        },
+        {
+          "text": "The television is located in the center of the image, positioned on a wooden stand or cabinet. The stand has a couple of drawers beneath the TV. The TV is placed inside a recessed area of the stand, which appears to be designed to house it. The stand is situated against the wall, with curtains to the left and what seems to be a closet or wardrobe to the right. The TV is turned on and displaying a scene.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any objects placed on top of the television?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are objects placed on top of the wooden stand that holds the television. Specifically, there is a lamp and some clothes or items on top of the stand. However, there are no objects placed directly on top of the television itself.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Describe the scene displayed on the television screen.",
+          "tag": "mask"
+        },
+        {
+          "text": "The television screen displays a scene featuring a person with light-colored hair. The person appears to be in a setting with other people, as there are blurred figures and lights in the background. The scene seems to be from a show or movie, but the details are not clear enough to identify the specific content. The person on the screen is facing slightly to the right and appears to be engaged in conversation or interaction.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What can you infer about the setting from the contents of the room?",
+          "tag": "mask"
+        },
+        {
+          "text": "From the contents of the room, it can be inferred that the setting is likely a hotel room or a similar type of temporary accommodation. Here are some clues that lead to this inference:\n\n1. **Television on a Stand**: The TV is placed on a wooden stand, which is common in hotel rooms.\n2. **Bed with Rumpled Sheets**: The bed with rumpled sheets suggests that the room is being used for sleeping, typical of a hotel room.\n3. **Curtains**: The presence of curtains indicates a window, which is common in hotel rooms for privacy and light control.\n4. **Lamp**: The lamp on top of the stand is a typical hotel room feature for additional lighting.\n5. **Clothes and Personal Items**: The presence of clothes or personal items on the stand and other areas suggests that someone is staying in the room temporarily.\n6. **Towel or Cloth Hanging**: The towel or cloth hanging on the right side indicates that the room is being used for personal activities, such as drying off after a shower, which is common in hotel rooms.\n\nThese elements collectively suggest that the setting is a hotel room or a similar type of temporary living space.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the layout of the bed in relation to the television?",
+          "tag": "mask"
+        },
+        {
+          "text": "The bed is positioned directly in front of the television, suggesting that it is oriented for comfortable viewing. The perspective of the image is from someone lying on the bed, looking towards the TV. The bed's headboard is not visible, indicating that the photo is taken from the foot of the bed or from a side angle. The rumpled sheets and blankets on the bed are in the foreground of the image, leading the eye towards the television on the wooden stand against the wall. This layout is typical in hotel rooms, where the bed is often placed to allow easy viewing of the TV from a lying or sitting position.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Given the objects and their placements, what could one infer about the activities or behaviors of the room's occupant?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the objects and their placements in the room, one can infer several activities or behaviors of the room's occupant:\n\n1. **Watching Television**: The television is turned on, suggesting that the occupant has been watching TV, possibly for entertainment or relaxation.\n\n2. **Resting or Sleeping**: The bed is rumpled, indicating that the occupant has been lying down or sleeping. The perspective of the photo suggests it was taken from the bed, reinforcing this idea.\n\n3. **Unpacking or Settling In**: Clothes or personal items are placed on top of the wooden stand, indicating that the occupant has unpacked some belongings and is making use of the room's storage spaces.\n\n4. **Using the Bathroom**: A towel or cloth is hanging on the right side, suggesting that the occupant has used the bathroom, possibly for showering or washing up.\n\n5. **Temporary Stay**: The overall setup, including the presence of personal items and the use of the bed and TV, suggests that the occupant is staying temporarily, likely in a hotel room.\n\n6. **Relaxation or Leisure**: The combination of watching TV and lying on the bed indicates that the occupant is engaging in leisure activities, possibly to unwind or relax.\n\nThese inferences paint a picture of someone who is using the room for rest, relaxation, and personal care, typical behaviors of someone staying in a hotel room.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000227520.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What's happening in the scene?",
+          "tag": "mask"
+        },
+        {
+          "text": "The scene shows a man sitting in what appears to be a private jet. He is seated at a table with a Dell laptop in front of him. In the left image, he is holding something to his mouth, possibly eating or drinking. In the right image, he is looking forward with a slight smile. There is a bottle of water and some other items on the table. In the background, a flight attendant is seen preparing something. The setting suggests a comfortable and possibly luxurious travel experience.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000147924.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What do you see happening in this image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a marina with several yachts and boats docked in calm water. The water is very still, creating clear reflections of the boats and surrounding buildings. In the background, there are modern high-rise buildings, suggesting that the marina is located in an urban area. The sky is clear and blue, indicating good weather. The overall scene is serene and picturesque.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000470174.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Describe the following image.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image shows a cozy living room with a warm and inviting atmosphere. The room features wooden flooring and light-colored walls. There are two brown leather recliner sofas positioned opposite each other, creating a comfortable seating area. \n\nIn the center of the room, there is a wooden coffee table with a few items on it, including a blue laptop, a bowl, and some other small objects. Behind the coffee table, there is a stone fireplace with a wood-burning stove, and a vase with flowers is placed on top of it. Above the fireplace, there are several framed pictures and decorations on the wall.\n\nTo the right of the fireplace, there is a flat-screen TV mounted on a stand, with various electronic devices and DVDs or games stored underneath. On the left side of the room, there is a wooden shelf with baskets and other items, as well as a pet crate with a blanket inside. \n\nThe room has a door with a window, and there are additional framed pictures and decorations on the walls, adding to the homely feel of the space.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000060688.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What is this photo about'?",
+          "tag": "mask"
+        },
+        {
+          "text": "This photo shows a bear walking in a naturalistic enclosure, likely in a zoo or wildlife sanctuary. The bear appears to be a sun bear, identifiable by its relatively small size, short black fur, and lighter-colored muzzle. The enclosure is surrounded by rocks and greenery, providing a habitat that mimics the bear's natural environment.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000036473.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What are the main objects in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The main objects in the image are:\n\n1. A child wearing a helmet, elbow pads, and knee pads.\n2. A skateboard.\n3. A brick wall in the background.\n4. A window.\n5. A small table.\n6. A chair.\n7. Some plants or bushes in the background.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the child's posture?",
+          "tag": "mask"
+        },
+        {
+          "text": "The child is balancing on a skateboard with one foot on the board and the other foot lifted off the ground. Their arms are extended out to the sides for balance. The child is wearing protective gear, including a helmet, elbow pads, and knee pads, indicating they are practicing skateboarding. The posture suggests they are in the middle of performing a trick or maneuver on the skateboard.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many wheels of the skateboard can be seen?",
+          "tag": "mask"
+        },
+        {
+          "text": "Two wheels of the skateboard can be seen in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any objects in the background?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are several objects in the background of the image:\n\n1. A small table.\n2. A chair.\n3. A brick wall.\n4. A window.\n5. Some plants or bushes.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How does the child seem to feel based on the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the image, the child appears to be focused and possibly enjoying the activity. Their expression and body language suggest concentration as they balance on the skateboard. The protective gear indicates they are prepared and taking the activity seriously, which often accompanies a sense of enjoyment and engagement in the activity.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are the knee pads worn correctly?",
+          "tag": "mask"
+        },
+        {
+          "text": "The knee pads appear to be worn correctly. They are positioned over the child's knees, providing protection in case of a fall. The straps seem to be fastened securely, ensuring that the pads stay in place during the skateboarding activity. Properly worn knee pads are crucial for safety, and in this image, they seem to be correctly fitted.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What can you infer about the importance of safety while skateboarding?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image emphasizes the importance of safety while skateboarding through the child's use of protective gear. The child is wearing a helmet, elbow pads, and knee pads, which are essential for reducing the risk of injury. Here are some key points about the importance of safety while skateboarding:\n\n1. **Helmet**: Protects the head from serious injuries in case of falls or collisions.\n2. **Elbow Pads**: Protect the elbows from scrapes, cuts, and fractures.\n3. **Knee Pads**: Shield the knees from impacts, reducing the risk of bruises, cuts, and more severe injuries.\n4. **Proper Gear**: Wearing the correct size and type of protective gear ensures maximum protection and comfort.\n5. **Preparedness**: Using safety gear indicates that the child is prepared and aware of the potential risks involved in skateboarding.\n\nOverall, the image highlights that safety is a priority, and using appropriate protective equipment is crucial for minimizing injuries and ensuring a safer skateboarding experience.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000485172.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What do you think is going on in this snapshot?",
+          "tag": "mask"
+        },
+        {
+          "text": "This snapshot appears to be from a wedding. The individuals in the photo are likely the bride and groom. The bride is wearing a white wedding gown and holding a bouquet of flowers, while the groom is dressed in a light-colored suit with a tie. They are standing close together, smiling, and posing for the photograph. The background features a stone structure, which could be part of a venue or a scenic outdoor location.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000519625.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What is this photo about'?",
+          "tag": "mask"
+        },
+        {
+          "text": "This photo shows a person skateboarding at a skatepark. The skateboarder is performing a trick on a curved concrete structure, wearing a helmet and protective gear. The skatepark appears to be outdoors, with trees and a grassy area in the background.",
+          "tag": "no_mask"
+        }
+      ]
+    }
+  ]

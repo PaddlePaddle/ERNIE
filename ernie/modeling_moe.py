@@ -447,7 +447,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
             )
 
             if config.multimodel_experts and config.moe_use_hard_gate:  # VL model
-                _mlp_text = MOELayer(
+                _mlp_text = MOEAllGatherLayerV2(
                     gate=lm_gate,
                     experts=lm_experts,
                     layer_idx=layer_idx,

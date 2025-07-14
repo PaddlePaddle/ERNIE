@@ -1,0 +1,1314 @@
+[
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000143132.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you elaborate on the elements of the picture provided?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! The picture shows a young boy standing on a mechanical surfboard simulator. Here are the key elements:\n\n1. **Boy**: The boy is wearing a black t-shirt and blue shorts. He appears to be balancing on the surfboard simulator.\n\n2. **Surfboard Simulator**: The surfboard is mounted on a mechanical base that likely moves to simulate the experience of surfing. The board is yellow with red stripes.\n\n3. **Inflatable Surrounding**: The surfboard simulator is placed within an inflatable structure that resembles waves. This is likely for safety, to cushion any falls.\n\n4. **Outdoor Setting**: The scene is outdoors, with green grass, trees, and a clear blue sky indicating a sunny day.\n\n5. **People**: In the background, there are several people, including adults and children, who appear to be enjoying the event. Some are sitting on the grass, while others are standing or walking around.\n\n6. **Recreational Area**: The area seems to be a park or a recreational ground with open spaces and some infrastructure like fences and pathways.\n\nThe overall atmosphere suggests a fun, family-friendly event, possibly a fair or a community gathering.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000111017.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What is the main activity captured in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The main activity captured in the image is a skier performing an aerial trick or jump. The skier is upside down in mid-air, indicating they are likely engaged in freestyle skiing or a similar extreme sport.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the position of the person in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The person in the image is upside down in mid-air, performing a backflip or similar aerial maneuver. Their body is arched backward, with their head facing downward and their skis pointing upward.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many skis and ski boots can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, you can see two skis and two ski boots.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any straps visible? If so, how many?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are straps visible in the image. There are two straps, one on each ski boot.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What are the skis doing in relation to the structure?",
+          "tag": "mask"
+        },
+        {
+          "text": "The skis are positioned above the structure, with the skier in mid-air performing a trick. The skier appears to have launched off the structure, which is likely a ramp or jump used for performing aerial maneuvers.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the background of the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The background of the image features a clear sky with some clouds, indicating it is likely a sunny day. There are also some trees visible, and in the distance, you can see mountains or hills. The overall setting appears to be an outdoor environment, possibly a ski resort or a training facility for skiing.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on what you see, what might be the purpose of the straps?",
+          "tag": "mask"
+        },
+        {
+          "text": "The straps visible in the image are likely part of a harness system used for safety during aerial maneuvers. They appear to be attached to the skier and connected to the structure, which suggests that they are intended to prevent the skier from falling or to assist in controlling their movements while performing tricks. This setup is commonly used in training environments to help athletes practice complex aerial skills safely.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If there were a crowd watching, where might they be positioned relative to the skier?",
+          "tag": "mask"
+        },
+        {
+          "text": "If there were a crowd watching, they would likely be positioned at a safe distance from the skier, possibly on the ground near the base of the structure or ramp from which the skier launched. They might be standing or seated in designated viewing areas, such as bleachers or a spectator zone, that provide a clear view of the skier's aerial maneuvers while ensuring their safety. The crowd would be positioned to the side or in front of the skier's trajectory to have the best vantage point without obstructing the skier's path.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000448174.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image appears to be a virtual or digital environment, possibly from a video game or virtual world. It depicts an outdoor amphitheater-like setting with several rows of benches arranged in a semi-circle. The benches are occupied by various avatars, which are digital representations of people. The avatars are diverse in appearance, with some resembling humans and others resembling animals or fantastical creatures.\n\nIn the center of the amphitheater, there is a circular stage with a podium or lectern. Above the stage, there are two vintage-style airplanes suspended in the air. The background shows a vast expanse of blue, suggesting that the amphitheater is located in an elevated or open area, possibly near the sea or sky.\n\nOverall, the scene seems to be a gathering or event within a virtual world, with avatars attending and airplanes as part of the display or theme.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many airplanes are in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are two airplanes in the image. They are vintage-style planes and are suspended in the air above the stage area.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where are the airplanes located?",
+          "tag": "mask"
+        },
+        {
+          "text": "The two airplanes in the image are located above the stage area in the center of the amphitheater. They are suspended in the air, positioned prominently for visibility to the audience seated on the benches.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any notable actions or events taking place?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, there doesn't appear to be any specific notable actions or events taking place. The scene shows a gathering of avatars seated on benches in an amphitheater-like setting, facing a central stage with a podium. The presence of the two vintage-style airplanes suspended above the stage suggests that they might be part of a display or presentation, but there is no visible action or event occurring at the moment the image was captured. The avatars seem to be in a state of observation or waiting.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What's the overall mood or atmosphere of the scene?",
+          "tag": "mask"
+        },
+        {
+          "text": "The overall mood or atmosphere of the scene appears to be one of anticipation or attentiveness. The avatars are seated and facing the central stage, suggesting they are gathered for a presentation, lecture, or event. The presence of the vintage-style airplanes suspended above the stage adds an element of interest or spectacle, indicating that the event might be related to aviation or a historical theme. The setting is orderly, with the avatars seated in rows, contributing to a sense of organized gathering. The virtual environment, with its diverse avatars and imaginative elements, also adds a playful and creative vibe to the scene.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the seating arrangement?",
+          "tag": "mask"
+        },
+        {
+          "text": "The seating arrangement in the image is organized in a semi-circular, amphitheater-like layout. The benches are arranged in several rows, curving around the central stage area. Here are some key details:\n\n1. **Semi-Circular Layout**: The benches are positioned in a semi-circle around the central stage, allowing all seated avatars to have a clear view of the stage and the suspended airplanes.\n\n2. **Multiple Rows**: There are multiple rows of benches, with each subsequent row positioned slightly higher than the one in front, similar to stadium or theater seating. This tiered arrangement ensures better visibility for all attendees.\n\n3. **Occupied Benches**: The benches are occupied by various avatars, which are digital representations of people. The avatars are diverse in appearance, including human-like figures and fantastical or animal-like characters.\n\n4. **Central Stage**: In the middle of the seating arrangement is a circular stage with a podium or lectern, which appears to be the focal point of the gathering.\n\nOverall, the seating arrangement is designed to accommodate a large number of avatars, providing them with a good view of the central stage and any presentations or displays taking place there.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any objects near the central area?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are a few objects near the central area of the image:\n\n1. **Podium or Lectern**: In the middle of the circular stage, there is a podium or lectern, which seems to be the focal point for any presentations or speeches.\n\n2. **Vintage-Style Airplanes**: Two vintage-style airplanes are suspended above the central stage area, adding a visual element of interest to the scene.\n\n3. **Small Objects**: There are a couple of small, indistinct objects on the wooden floor near the stage. One appears to be a small cylindrical object, possibly a container or a prop.\n\nThese objects contribute to the setting and suggest that the central area is intended for presentations or displays, with the airplanes likely being part of the theme or subject matter of the event.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there a propeller visible in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there is a propeller visible in the image. The vintage-style airplanes suspended above the central stage area each have propellers. The propellers are located at the front of the airplanes and are clearly visible, adding to the authenticity of the vintage aircraft design.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How would you describe the platform's surface?",
+          "tag": "mask"
+        },
+        {
+          "text": "The platform's surface in the image appears to be made of wooden planks. The wood is arranged in a consistent pattern, giving the platform a sturdy and rustic appearance. The surface looks well-maintained and clean, contributing to the overall orderly and organized atmosphere of the scene. The wooden texture adds a natural and warm element to the virtual environment.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000093140.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What is this photo about'?",
+          "tag": "mask"
+        },
+        {
+          "text": "This photo depicts a modern kitchen interior. The kitchen features sleek, white cabinetry with integrated appliances, including an oven and microwave. The countertops are made of a light-colored material, possibly quartz or granite, and there is a cooktop visible in the foreground. The flooring is a warm-toned wood, adding a cozy contrast to the otherwise contemporary design. On the right side of the image, there is a countertop with a bottle of wine and two wine glasses, suggesting a welcoming and hospitable atmosphere. The kitchen is well-lit with recessed lighting in the ceiling.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000432964.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What types of objects can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, I can see the following objects:\n\n1. A building facade with windows and a balcony.\n2. A clock mounted on the building.\n3. Two statues holding a bell above the clock.\n4. Architectural details such as decorative moldings and trim.\n5. A clear blue sky in the background.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many windows are visible in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are three windows visible in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the colors of the building?",
+          "tag": "mask"
+        },
+        {
+          "text": "The building features a combination of colors:\n\n1. The main facade of the building is a light brown or beige color.\n2. The window frames and decorative moldings are white.\n3. There are some reddish or terracotta accents around the windows.\n4. The balcony railing appears to be dark, possibly black or dark brown.\n5. The clock face is white with black numbers and hands.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the clock located on the building?",
+          "tag": "mask"
+        },
+        {
+          "text": "The clock is located near the top of the building, centered above the windows and below the statues holding the bell. It is set within a decorative architectural element that stands out from the rest of the facade.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any sign of movement or action in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, there is no sign of movement or action in the image. The image depicts a static scene of a building facade with a clock and statues. Everything appears to be still and there are no visible indications of movement.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on the style and design of the building, can you guess which part of the world this might be from or its architectural style?",
+          "tag": "mask"
+        },
+        {
+          "text": "The building in the image exhibits characteristics that are often associated with European architecture, particularly from Southern Europe. The following features suggest this:\n\n1. **Stucco Facade:** The light-colored stucco facade is common in Mediterranean architecture.\n2. **Decorative Moldings and Trim:** The ornate moldings and trim around the windows and clock are typical of classical European styles.\n3. **Clock and Statues:** The presence of a clock and statues on the building is reminiscent of town halls or public buildings in European cities.\n4. **Balcony Design:** The wrought iron balcony railing is also a common feature in Southern European architecture.\n\nBased on these elements, the building could be from a country like Italy, Spain, or France, where such architectural styles are prevalent.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If I wanted to hang a banner on this building, where would you recommend placing it to ensure maximum visibility?",
+          "tag": "mask"
+        },
+        {
+          "text": "To ensure maximum visibility for a banner on this building, I would recommend placing it in one of the following locations:\n\n1. **Below the Clock:** Hanging the banner just below the clock would make it highly visible, as the clock is a focal point of the building. This location would draw attention to the banner due to its central and elevated position.\n\n2. **Across the Balcony:** Placing the banner across the balcony railing would also ensure good visibility. The balcony is at a prominent height and would be easily seen by passersby.\n\nBoth of these locations are central and unobstructed, making them ideal for maximum visibility.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What time does the clock show?",
+          "tag": "mask"
+        },
+        {
+          "text": "The clock shows the time as 10:10.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any animals or people in the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, there are no animals or people in the picture. The only figures present are the statues holding the bell above the clock, which are part of the building's architectural design.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000431472.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What object is primarily visible in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The primary object visible in the image is a hot dog with a sausage that appears to be heavily charred or burnt, placed in a bun.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many objects are there in total?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are three main objects in the image: a hot dog bun, a sausage (which is inside the bun), and a hand holding the hot dog.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the action or state of the object?",
+          "tag": "mask"
+        },
+        {
+          "text": "The action or state of the object is that it is being held in a person's hand. The hot dog, with a charred sausage inside a bun, is ready to be eaten.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the surface of the sausage?",
+          "tag": "mask"
+        },
+        {
+          "text": "The surface of the sausage appears to be heavily charred or burnt. It has a dark, blackened appearance with some areas showing a reddish-brown color, indicating it has been cooked on a grill or over an open flame. The texture looks rough and crispy due to the charring.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any sauce or condiment on the sausage?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there appears to be a red sauce or condiment on the sausage, likely ketchup. The sauce is visible on the sausage and also on the inside of the bun.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the object located in relation to the background?",
+          "tag": "mask"
+        },
+        {
+          "text": "The hot dog is being held in the foreground by a hand, and the background is dark and not clearly visible. The focus is primarily on the hot dog, with the background providing little to no detail.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there anything else notable in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "Aside from the hot dog being held in a hand, there isn't much else notable in the image. The background is dark and lacks distinguishable features, keeping the focus on the hot dog itself. The charred appearance of the sausage and the presence of the red sauce are the most prominent details.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on the appearance of the sausage, can you tell how it might taste?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the appearance of the sausage, which is heavily charred or burnt, it might have a smoky, bitter taste due to the charring. The burnt exterior could result in a crispy texture, while the inside might still be juicy if it wasn't overcooked. The presence of the red sauce, likely ketchup, would add a sweet and tangy flavor to the overall taste. However, the extent of the charring might overpower the other flavors, making the burnt taste more dominant.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If someone were to describe this scene in a culinary context, how might they explain it?",
+          "tag": "mask"
+        },
+        {
+          "text": "In a culinary context, someone might describe this scene as follows:\n\n\"A hot dog is being held in a hand, featuring a sausage that has been heavily charred on a grill or over an open flame. The sausage is nestled in a soft, white bun, and is topped with a generous amount of red sauce, likely ketchup. The charred exterior of the sausage suggests a smoky, crispy texture, which contrasts with the soft bun and the tangy sweetness of the ketchup. The overall presentation indicates a rustic, perhaps slightly overcooked, grilled hot dog experience.\"",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any sign of the sausage being overcooked or undercooked?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are signs that the sausage is overcooked. The heavy charring and blackened appearance of the sausage suggest that it has been exposed to high heat for too long, resulting in a burnt exterior. This level of charring typically indicates that the sausage has been overcooked, as it has gone beyond the point of achieving a desirable grilled or browned surface.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000252518.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What's happening in the scene?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the scene, someone is cutting a pizza with a knife. The pizza appears to have a topping of spinach and cheese. The person is using a large knife to slice through the pizza, which is placed on a cutting board.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000139109.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What is the primary action in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The primary action in the image is a person playing tennis. The person appears to be in the middle of hitting a tennis ball with a racket.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you identify any sports equipment present?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, the sports equipment present in the image includes a tennis racket and a tennis ball. The person is also wearing athletic attire and tennis shoes, which are typical for playing tennis.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many socks can you see?",
+          "tag": "mask"
+        },
+        {
+          "text": "I can see two socks in the image, one on each of the person's feet.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the tennis ball in relation to the tennis racket?",
+          "tag": "mask"
+        },
+        {
+          "text": "The tennis ball is in front of the tennis racket, positioned as if it is about to be hit by the racket.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What type of clothing is the person wearing?",
+          "tag": "mask"
+        },
+        {
+          "text": "The person is wearing a white short-sleeved shirt and white shorts, which are typical athletic attire for playing tennis. They are also wearing white socks and white tennis shoes.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any other people or players in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, there are no other people or players visible in the image. The focus is solely on the person playing tennis.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the setting or location where this event is taking place?",
+          "tag": "mask"
+        },
+        {
+          "text": "The event appears to be taking place on an indoor tennis court. The surface looks like a hard court, and the background includes what seems to be a green barrier or wall, which is typical in indoor sports facilities to separate courts or provide a backdrop. The overall setting suggests an indoor sports facility designed for tennis.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Given the player's posture and the tennis ball's position, can you deduce what might have happened right before this moment?",
+          "tag": "mask"
+        },
+        {
+          "text": "Given the player's posture and the position of the tennis ball, it appears that the player is in the process of hitting a forehand shot. The player's body is turned sideways, with their arm extended and the racket positioned to strike the ball. This suggests that the ball was approaching the player from the opposite side of the court, and the player is preparing to return it with a forehand swing. The player's focused expression and the motion blur of the ball indicate that this is an action shot captured during the heat of the game.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000404820.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What's happening in the scene?",
+          "tag": "mask"
+        },
+        {
+          "text": "The scene depicts a person surfing on a wave in the ocean. The surfer is riding a wave, balancing on a surfboard, and appears to be wearing a wetsuit. The wave is breaking, creating splashes and white water around the surfer. The lighting suggests it might be either early morning or late afternoon, as the sun casts a warm glow on the water.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000206806.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What do you see happening in this image?",
+          "tag": "mask"
+        },
+        {
+          "text": "In this black and white image, an elderly person is sitting on a bench facing the sea. The person is alone and appears to be gazing out at the water, possibly in contemplation or relaxation. The scene is calm and serene, with a few rocks visible in the water and a distant horizon. The overall mood of the image is peaceful and reflective.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000112622.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What type of room is depicted in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a bedroom. It features a bed with pillows and a duvet, a bedside table with a lamp, and a small table with some clothes draped over it. The presence of these items suggests that this is a space intended for sleeping and resting.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many pillows are on the bed?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are four pillows on the bed.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any reading material visible in the room?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there appears to be a book or magazine on the small table next to the bed, partially covered by the draped clothing.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you specify the location of any drawer?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are drawers located underneath the bed. The bed frame appears to have built-in storage drawers, as indicated by the visible handles on the side of the bed.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any lighting fixture present? If so, where?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there is a lighting fixture present in the room. A lamp is located on the bedside table to the right of the bed.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the color of the blanket on the bed?",
+          "tag": "mask"
+        },
+        {
+          "text": "The blanket on the bed is white.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any objects placed on the left side of the bed?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are objects placed on the left side of the bed. Specifically, there is a small table with some clothes draped over it and what appears to be a book or magazine partially visible underneath the clothes.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Considering the visual content, would you say this is a well-organized room or a messy one?",
+          "tag": "mask"
+        },
+        {
+          "text": "The room appears to be relatively well-organized. The bed is made, and the pillows are arranged neatly. While there are some clothes draped over the small table and a few items on the floor, the overall impression is one of tidiness rather than messiness. The presence of a few out-of-place items does not significantly detract from the room's organized appearance.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on the design and the items in the room, can you make a guess about the possible age group of the person staying in this room?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the design and items in the room, it is challenging to definitively determine the age group of the person staying there. However, some observations can be made:\n\n1. **Furniture and Decor**: The bed with built-in drawers suggests a practical approach to space utilization, which might be common among young adults or individuals living in smaller apartments.\n2. **Minimalist Design**: The room has a minimalist design with basic furniture and few decorative items, which could indicate a younger adult, possibly a student or a young professional.\n3. **Reading Material**: The presence of a book or magazine suggests that the occupant might be someone who enjoys reading, which is common across various age groups.\n\nWhile these observations might hint at a younger adult, they are not conclusive, and the room could belong to someone from a wide range of age groups.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000032846.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What objects can you identify in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, I can identify the following objects:\n\n1. Sinks with faucets\n2. Mirrors above the sinks\n3. Paper towel dispenser with paper towels\n4. Bathroom stalls with doors\n5. Tiled walls and floor\n6. Lighting fixtures on the ceiling",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many faucets can you see?",
+          "tag": "mask"
+        },
+        {
+          "text": "I can see three faucets in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any mirrors? If so, where are they located?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are mirrors in the image. They are located above the sinks on the wall.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you tell me about the doors and their positions?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image shows two doors, which are part of bathroom stalls. They are positioned on the right side of the image. The doors are metallic and appear to be slightly ajar, leading into the stalls.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How are the faucets arranged in relation to the sink?",
+          "tag": "mask"
+        },
+        {
+          "text": "The faucets are arranged in a linear fashion along the length of the sink. They are mounted on the wall directly above the sink basin, evenly spaced apart from each other.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there anything unusual or unexpected about the objects or their arrangement?",
+          "tag": "mask"
+        },
+        {
+          "text": "One unusual aspect of the arrangement is the design of the sink. Instead of having individual basins for each faucet, there is a single, long, continuous sink basin that accommodates all three faucets. This type of design is less common in some settings but can be found in modern or high-traffic restrooms for ease of cleaning and maintenance.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What might be the purpose or function of this room?",
+          "tag": "mask"
+        },
+        {
+          "text": "The room appears to be a public restroom. The presence of multiple sinks with faucets, mirrors, paper towels, and bathroom stalls with doors suggests that it is designed for personal hygiene and sanitation purposes. This type of setup is typically found in places such as office buildings, restaurants, shopping malls, or other public facilities.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you discuss the importance of hygiene in such a setting?",
+          "tag": "mask"
+        },
+        {
+          "text": "Hygiene in public restrooms is critically important for several reasons:\n\n1. **Disease Prevention**: Public restrooms can be hotspots for the spread of germs and bacteria. Proper hygiene practices, such as washing hands with soap and water, help prevent the transmission of infectious diseases, including colds, flu, and gastrointestinal infections.\n\n2. **Public Health**: Maintaining cleanliness in public restrooms is essential for public health. Regular cleaning and sanitation reduce the risk of contamination and ensure a safer environment for all users.\n\n3. **User Comfort and Satisfaction**: A clean and well-maintained restroom enhances user comfort and satisfaction. People are more likely to use facilities that are clean and hygienic, which reflects positively on the establishment providing the restroom.\n\n4. **Compliance with Health Regulations**: Many regions have health and safety regulations that require public restrooms to be maintained to certain standards. Compliance with these regulations is necessary to avoid fines and legal issues.\n\n5. **Preventing Odors**: Proper hygiene and regular cleaning help prevent unpleasant odors, making the restroom more pleasant to use.\n\n6. **Reducing Maintenance Costs**: Regular cleaning and maintenance can prevent the buildup of grime and damage to fixtures, ultimately reducing long-term maintenance costs.\n\nIn summary, maintaining hygiene in public restrooms is essential for health, safety, and overall user experience. It requires regular cleaning, proper waste disposal, and ensuring that supplies such as soap and paper towels are always available.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000010219.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you describe the primary objects in this photo?",
+          "tag": "mask"
+        },
+        {
+          "text": "Certainly! The primary objects in the photo are:\n\n1. A white dog lying on the grass.\n2. A red frisbee near the dog's front paws.\n3. Fallen leaves scattered around the grass.\n4. A chain-link fence in the background.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many dogs can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There is one dog in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the dog doing?",
+          "tag": "mask"
+        },
+        {
+          "text": "The dog is lying on the grass, surrounded by fallen leaves. It appears to be resting with a red frisbee near its front paws.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the frisbee located in relation to the dog?",
+          "tag": "mask"
+        },
+        {
+          "text": "The frisbee is located near the dog's front paws, slightly in front of and to the right of the dog.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any trees or buildings in the background?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, there are no trees or buildings visible in the background of the image. The background primarily consists of a chain-link fence and some grass.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Given the scattered leaves, can you infer the possible season?",
+          "tag": "mask"
+        },
+        {
+          "text": "Given the scattered leaves on the ground, it is likely that the season is autumn (fall). This is typically when leaves fall from trees and cover the ground.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Does it look like the dog was playing with the frisbee before resting?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, it is possible that the dog was playing with the frisbee before resting. The frisbee is positioned close to the dog's front paws, suggesting that the dog might have been interacting with it before lying down.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any sign of movement or action in the photo, like a wagging tail or flying leaves?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, there are no signs of movement or action in the photo. The dog appears to be lying still, and the leaves are scattered on the ground without any indication of movement, such as flying or being disturbed. The dog's tail is also not visibly wagging.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000320467.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Write a detailed description of the given image.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image is a black-and-white photograph capturing a playful and dynamic moment. It features a person, likely a woman, who appears to be struggling against a strong wind. She is holding a large, black-and-white striped umbrella that is being blown backward by the wind. The force of the wind is so strong that it has caused her to lean back at a sharp angle, with one leg lifted off the ground for balance. \n\nShe is dressed in a long, light-colored coat and dark pants, and she is wearing light-colored shoes. Her expression suggests a mix of surprise and amusement as she grapples with the umbrella. The background shows an urban setting with a sidewalk, a bicycle parked against a pole, and a few buildings. The street is empty, and the sky appears overcast, contributing to the windy atmosphere. The overall scene conveys a sense of whimsy and the unpredictable nature of weather.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000431902.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Write a detailed description of the given image.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a formal meeting or conference setting with four men seated at a long table. The backdrop features a blue banner with a white geometric logo and the word \"CEPS\" prominently displayed. Behind the men, there is a row of various national flags, suggesting an international or European context.\n\nFrom left to right:\n\n1. The first man is dressed in a dark suit with a white shirt and a yellow tie. He appears to be in mid-conversation or making a point, gesturing with his right hand. A nameplate is in front of him, but the name is not clearly visible.\n\n2. The second man is also wearing a dark suit, white shirt, and a dark tie. He is looking down, possibly reading or writing something. His nameplate reads \"Daniel Gros.\"\n\n3. The third man is dressed similarly in a dark suit, white shirt, and dark tie. He is engaged in a handshake with the fourth man, smiling and appearing to be in good spirits. His nameplate reads \"Andrew Watson.\"\n\n4. The fourth man, also in a dark suit, white shirt, and dark tie, is reciprocating the handshake with the third man. He is smiling and appears to be pleased with the interaction. His nameplate reads \"John Smith.\"\n\nOn the table, there are several items including microphones, water glasses, a water pitcher, and papers, indicating that this is a formal meeting or discussion. The overall atmosphere seems professional and cordial.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000124117.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you describe the main subject in this image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The main subject in the image is a person sitting and using a laptop. The person appears to be focused on the screen of the laptop. They are in a room with electronic equipment, including a television and another computer setup in the background. The image is in black and white, and the person is wearing a sweater. The setting suggests a home or office environment.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many screens can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are three screens visible in the image. One is the laptop screen that the person is using, another is a television screen in the background, and the third is a computer monitor on a desk in the background.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What other electronic equipment can you identify in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "In addition to the three screens (laptop, television, and computer monitor), the image shows several other pieces of electronic equipment:\n\n1. A computer tower located on the desk in the background.\n2. A keyboard on the desk in front of the television.\n3. A mouse on the desk in front of the television.\n4. Various cables and possibly other small electronic devices on the desk and shelves.\n\nThe overall setup suggests a workspace with multiple electronic devices.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you specify the position of the largest television set in relation to the person?",
+          "tag": "mask"
+        },
+        {
+          "text": "The largest television set is positioned directly in front of the person, slightly to their right. It is placed on a desk or stand, and the person is sitting in front of it while using their laptop.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is the person using a mouse that's placed close to the laptop?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, the person is not using a mouse that is placed close to the laptop. Their hands are on the laptop's keyboard, and there is no visible mouse near the laptop in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How is the person dressed?",
+          "tag": "mask"
+        },
+        {
+          "text": "The person is dressed in a sweater. The image is in black and white, so the color of the sweater is not discernible. The sweater appears to be cozy and suitable for cooler weather.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you discuss the potential events happening in the image based on the electronic equipment layout?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the electronic equipment layout in the image, several potential events or activities could be happening:\n\n1. **Work or Study Session**: The person might be engaged in work or study, using the laptop for tasks such as writing, researching, or coding. The presence of multiple screens and a computer setup suggests a workspace conducive to productivity.\n\n2. **Multitasking**: The person could be multitasking, using the laptop for one activity while having additional information or entertainment on the television or computer monitor. This setup is common for people who need to manage multiple tasks simultaneously.\n\n3. **Gaming or Media Consumption**: The person might be involved in gaming or media consumption. The television and computer monitor could be used for playing video games, watching videos, or streaming content, while the laptop might be used for related activities such as chatting with friends or looking up information.\n\n4. **Remote Work or Online Meeting**: Given the current trend of remote work, the person could be participating in an online meeting or video conference. The laptop might be used for communication, while the other screens display relevant documents or presentations.\n\n5. **Creative Work**: The person could be engaged in creative work such as graphic design, video editing, or music production. The multiple screens and computer setup would allow for a more efficient workflow in such tasks.\n\nThe exact activity is not clear from the image alone, but the layout suggests a versatile and well-equipped workspace suitable for various digital activities.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any computer equipment to the far left of the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there is computer equipment to the far left of the picture. Specifically, there is a mouse visible on the desk in front of the television.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you provide a general overview of the room based on the electronics present?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the electronics present, the room appears to be a well-equipped workspace or home office. Here is a general overview:\n\n1. **Central Desk Area**: The central area features a desk or stand with a large television screen. In front of the television, there is a keyboard and a mouse, indicating that this setup might be used as a computer workstation.\n\n2. **Laptop Usage**: The person is seated and using a laptop, suggesting that this is a primary device for their current activity. The laptop is placed on their lap, indicating a flexible and possibly temporary working position.\n\n3. **Additional Computer Setup**: In the background, there is another desk with a computer monitor and a computer tower. This setup suggests a more permanent workstation, possibly used for tasks requiring more computing power or a larger display.\n\n4. **Cables and Accessories**: Various cables and possibly other small electronic devices are visible on the desks and shelves, indicating a well-connected and functional workspace.\n\n5. **Furniture and Layout**: The room includes multiple desks or stands to accommodate the electronic equipment. The layout is practical, with the equipment arranged to facilitate easy access and use.\n\nOverall, the room seems to be designed for productivity, with multiple screens and computing devices that support various activities such as work, study, gaming, or media consumption. The presence of both a laptop and a more extensive computer setup suggests versatility and the ability to handle different types of tasks.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000281790.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Can you describe what's in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image shows two individuals sitting at a table, each working on a laptop. They appear to be focused on their screens. On the table, there are various items including a glass pitcher, an empty glass, a can of soda, and some papers. The setting looks like a casual meeting or study session, possibly in a conference room or classroom. The background features a neutral-colored wall with a white trim.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many laptops can you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are two laptops visible in the image. Each of the individuals is working on one.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where are the drink containers placed in relation to the laptops?",
+          "tag": "mask"
+        },
+        {
+          "text": "In the image, there are several drink containers placed on the table:\n\n1. A glass pitcher is positioned to the left of the laptop on the left side.\n2. An empty glass is placed in front of the laptop on the left side.\n3. A can of soda is situated in front of the laptop on the right side.\n4. Another empty glass is placed to the right of the can of soda, in front of the laptop on the right side.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you give me more details about the woman on the left?",
+          "tag": "mask"
+        },
+        {
+          "text": "The woman on the left has light brown hair that is pulled back, and she is wearing large, circular earrings. She is focused on her laptop screen. She is dressed in a dark-colored top. The setting appears to be a casual or work-related environment, possibly a meeting or study session.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What about the woman on the right? What is she wearing and are there any objects near her?",
+          "tag": "mask"
+        },
+        {
+          "text": "The woman on the right has dark hair that is pulled back. She is wearing a dark-colored top with a white strap visible on her shoulder. She is focused on her laptop screen. Near her on the table, there is a can of soda and an empty glass in front of her laptop. Additionally, there are some papers and other items scattered around the table.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any other objects on the table apart from laptops and drink containers?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, in addition to the laptops and drink containers, there are a few other objects on the table:\n\n1. Papers or notebooks, which are scattered around the table.\n2. A power strip or charger cable is visible near the laptops.\n3. A pen or similar writing instrument is also present on the table.\n\nThese items suggest that the individuals might be engaged in a work or study session.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If you had to guess, where do you think this setting might be?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the details in the image, the setting appears to be a casual or work-related environment, possibly a conference room, classroom, or study area. The presence of laptops, papers, and drink containers suggests that the individuals might be engaged in a meeting, study session, or collaborative work. The neutral-colored wall with white trim and the formal arrangement of items on the table further support the idea that this is a professional or educational setting.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Could this image be from a casual cafe setting?",
+          "tag": "mask"
+        },
+        {
+          "text": "While it's possible that this image could be from a casual cafe setting, several elements suggest it is more likely a professional or educational environment:\n\n1. **Arrangement of Items**: The table is set up with multiple laptops, papers, and drink containers in a manner that suggests a focused work or study session.\n2. **Environment**: The background features a neutral-colored wall with white trim, which is more typical of a conference room, classroom, or office rather than a casual cafe.\n3. **Lack of Cafe Elements**: There are no visible elements commonly associated with cafes, such as a menu board, cafe decor, or other patrons in a more relaxed setting.\n\nTherefore, while not impossible, it seems more likely that this image is from a professional or educational setting rather than a casual cafe.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000189212.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Explain the visual content of the image in great detail.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image depicts a wedding scene where a bride and groom are engaged in the traditional cake-cutting ceremony. The setting appears to be indoors, possibly in a reception hall with large windows that allow natural light to fill the room. \n\nThe bride is standing on the left side of the image. She is wearing a white wedding dress with lace detailing and a sleeveless design. Her hair is styled in an elegant updo, and she is adorned with a simple pearl necklace. She is holding a white plate in her hands and is smiling, looking at the groom.\n\nThe groom is standing to the right of the bride. He is dressed in a formal military uniform, which includes a dark blue jacket with gold epaulettes, a red lapel, and various medals and ribbons pinned to his chest. He is using a ceremonial sword to cut the wedding cake, which is a unique and traditional touch often seen in military weddings. The groom is focused on the task, carefully guiding the sword through the cake.\n\nThe wedding cake is positioned on a round table in front of the couple. It is a multi-tiered cake, predominantly white with blue decorations. The decorations appear to be small blue squares or petals scattered across the surface of the cake. The cake is placed on a white tablecloth, and there are a few other items on the table, including a small package with a red and white label.\n\nThe room has a warm and elegant ambiance, with dark wooden paneling and large windows that provide a view of the outside. The overall mood of the image is joyful and celebratory, capturing a special moment in the couple's wedding day.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000511774.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "How many people are visible in this image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are three people visible in this image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What are they doing?",
+          "tag": "mask"
+        },
+        {
+          "text": "The three people in the image are descending the stairs from an aircraft. The person at the front appears to be waving, while the other two are following behind.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe the aircraft they're descending from?",
+          "tag": "mask"
+        },
+        {
+          "text": "The aircraft they are descending from appears to be a government or official plane. It has the seal of the President of the United States near the door, and part of the word \"UNITED\" is visible on the side of the plane. The aircraft has a blue and white color scheme.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are any of the individuals wearing formal attire?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, all three individuals are wearing formal attire. They are dressed in suits, which is typical for formal or official occasions.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What is the relative position of the person waving compared to the other two?",
+          "tag": "mask"
+        },
+        {
+          "text": "The person waving is at the front, descending the stairs ahead of the other two individuals. The other two are positioned behind him, with one directly behind and the other further up the stairs.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Could you give some background on why officials might be exiting such an aircraft?",
+          "tag": "mask"
+        },
+        {
+          "text": "Officials might be exiting such an aircraft for a variety of reasons, often related to their official duties and responsibilities. Some common scenarios include:\n\n1. **State Visits and Diplomatic Missions**: High-ranking officials, including the President, may travel to other countries for state visits, diplomatic negotiations, or international summits.\n\n2. **Domestic Travel for Official Business**: Officials often travel within their own country to attend meetings, visit disaster sites, inspect government projects, or participate in public events.\n\n3. **Campaigning and Public Engagements**: During election periods, officials may travel extensively to campaign, meet with constituents, and attend rallies.\n\n4. **Conferences and Summits**: Officials may attend international or national conferences, summits, and forums to discuss policies, collaborate with other leaders, and represent their country or organization.\n\n5. **Military and Defense Inspections**: High-ranking officials might visit military bases, defense installations, or conflict zones to oversee operations and meet with military personnel.\n\n6. **Ceremonial Events**: Officials often travel to participate in or preside over ceremonial events, such as inaugurations, commemorations, and state funerals.\n\nIn all these scenarios, the use of an official aircraft ensures security, efficiency, and the ability to conduct work while traveling.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any distinguishing features on the aircraft's exterior that might indicate its purpose or origin?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there are several distinguishing features on the aircraft's exterior that indicate its purpose and origin:\n\n1. **Presidential Seal**: Near the door of the aircraft, there is the seal of the President of the United States. This seal signifies that the aircraft is used for official presidential travel.\n\n2. **Partial Word \"UNITED\"**: The visible part of the word \"UNITED\" on the side of the aircraft suggests it is part of the phrase \"United States of America,\" which is commonly displayed on aircraft used for official government purposes.\n\n3. **Color Scheme**: The blue and white color scheme is characteristic of Air Force One and other official U.S. government aircraft used for transporting high-ranking officials, including the President.\n\nThese features collectively indicate that the aircraft is a government plane, specifically used for transporting the President or other high-ranking officials of the United States.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If there were a red carpet leading up to the stairs of the aircraft, would that change the context of the photo?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, the presence of a red carpet leading up to the stairs of the aircraft would add a layer of formality and ceremonial significance to the context of the photo. Red carpets are often used in diplomatic and official events to signify honor, respect, and importance. Here are a few ways it might change the context:\n\n1. **Ceremonial Arrival or Departure**: The red carpet could indicate that the officials are arriving for or departing from a significant event, such as a state visit, diplomatic meeting, or high-level conference.\n\n2. **Welcoming Dignitaries**: It might suggest that the officials are being welcomed as dignitaries, with the red carpet symbolizing a formal reception.\n\n3. **Special Occasion**: The red carpet could denote a special occasion or celebration, highlighting the importance of the event or the status of the individuals.\n\n4. **Media Attention**: The use of a red carpet often attracts media attention, suggesting that the event is noteworthy and of public interest.\n\nOverall, a red carpet would enhance the perception of the event's importance and the status of the individuals involved.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000546274.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What's in the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "The picture shows three boys sitting on a surfboard in the water. They are wearing swim trunks and appear to be enjoying a sunny day at the beach or a lake. The water is calm, and the background shows a distant shoreline with a clear sky above.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many people are in the photo?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are three people in the photo.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What are the people doing?",
+          "tag": "mask"
+        },
+        {
+          "text": "The three people in the photo are sitting on a surfboard in the water. They appear to be enjoying a sunny day, possibly at a beach or a lake.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe their attire?",
+          "tag": "mask"
+        },
+        {
+          "text": "The three boys in the photo are wearing swim trunks. They are all shirtless, which is typical attire for swimming or spending time in the water. The swim trunks have various patterns and colors, suitable for a day at the beach or lake.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any other objects in the water?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, besides the surfboard that the three boys are sitting on, there is also a paddle visible in the water. One of the boys in the middle appears to be holding it.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How would you describe the mood of the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "The mood of the picture appears to be relaxed and joyful. The boys seem to be enjoying a sunny day on the water, which suggests a carefree and fun atmosphere. The calm water and clear sky add to the serene and pleasant vibe of the scene.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "What can you infer about the depth of the water?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the image, it can be inferred that the water is relatively shallow where the boys are sitting on the surfboard. This inference comes from the fact that they are sitting comfortably without appearing to struggle to stay afloat, and the surfboard is not submerged deeply. Additionally, the clarity of the water near their legs suggests it is not very deep.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you provide any information on the surroundings?",
+          "tag": "mask"
+        },
+        {
+          "text": "The surroundings in the photo include a body of water, likely a lake or the ocean, given the calmness of the water and the recreational activity. In the background, there is a distant shoreline with a low, blurred horizon line, possibly indicating trees or land. The sky above is clear, suggesting it is a sunny day. The overall setting appears to be a peaceful and natural environment, ideal for outdoor water activities.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are they near the shore or in the middle of the water?",
+          "tag": "mask"
+        },
+        {
+          "text": "The boys appear to be in the middle of the water rather than near the shore. The distant shoreline in the background suggests they are not close to the edge of the water. The absence of any visible land or beach nearby further supports the idea that they are relatively far from the shore.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Based on their poses, can you speculate on their experience level with water activities?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on their poses, it seems the boys are comfortable and at ease with being in the water, which might suggest some level of experience with water activities. They are sitting calmly on the surfboard without showing signs of distress or discomfort. One boy is holding a paddle, indicating familiarity with using it, which could imply experience with paddleboarding or similar activities. Their relaxed demeanor suggests they are enjoying themselves and are likely accustomed to spending time in the water.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000305686.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What's happening in the scene?",
+          "tag": "mask"
+        },
+        {
+          "text": "The scene shows a child skiing on a snowy slope. The child is wearing a yellow jacket, dark pants, and a helmet for safety. The background features a forested area with leafless trees, indicating a winter setting. The sky appears cloudy, suggesting overcast weather. The child seems to be enjoying the skiing activity.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000501739.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "Write a detailed description of the given image.",
+          "tag": "mask"
+        },
+        {
+          "text": "The image shows a white bowl placed on a wooden surface. Inside the bowl, there are six pieces of fruit: three red apples, two green apples, and one orange. The red apples have a mix of red and yellow hues, while the green apples are uniformly green. The orange is bright and stands out against the apples. The fruits are arranged in a somewhat random manner, with the orange positioned at the bottom center of the bowl. The wooden surface has a natural grain pattern, adding texture to the background. The lighting in the image is even, highlighting the natural colors and textures of the fruits and the wooden surface.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000042222.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What do you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image shows a group of colorful teddy bears arranged in a circle. Each teddy bear is a different color: red, orange, yellow, green, blue, and purple. They appear to be positioned in a playful manner, some lying down and others sitting up. The background features a pastel-colored, wavy striped pattern.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many teddy bears are in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are seven teddy bears in the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you tell me the colors of the teddy bears?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, the teddy bears in the image are colored red, orange, yellow, green, blue, light blue, and purple.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are any of the teddy bears overlapping or interacting with each other?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, the teddy bears in the image appear to be overlapping and interacting with each other. They are arranged in a circle, with some of them touching or leaning against one another.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Which teddy bear is in the center of the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The yellow teddy bear is in the center of the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How do the teddy bears compare in terms of size?",
+          "tag": "mask"
+        },
+        {
+          "text": "The teddy bears in the image appear to be of similar size. There are no significant differences in their dimensions, and they all seem to be proportionate to one another.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there anything notable about the background?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, the background of the image features a pastel-colored, wavy striped pattern. The stripes are horizontal and consist of various soft colors, creating a visually pleasing and gentle backdrop for the colorful teddy bears.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Can you describe an event or story that might be taking place based on this image?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on the image, one could imagine a playful and cheerful event or story involving the teddy bears. Here’s a possible scenario:\n\nThe teddy bears are having a colorful picnic party in a whimsical, pastel-themed land. They’ve gathered in a circle to play a game together. Each bear, representing a different color of the rainbow, has come to celebrate friendship and fun. The yellow bear in the center might be leading a game of \"Ring Around the Rosie,\" and the others are joyfully participating, some tumbling over in their excitement. The wavy striped background adds to the dreamy, festive atmosphere, making it a perfect day for the teddy bears to enjoy each other's company and create happy memories.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are there any teddy bears that seem to be isolated from the rest?",
+          "tag": "mask"
+        },
+        {
+          "text": "No, none of the teddy bears in the image appear to be isolated from the rest. They are all arranged in a circle and seem to be interacting with each other, creating a sense of togetherness and group activity.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If one of the teddy bears were to host a gathering, which one do you think it would be based on their position?",
+          "tag": "mask"
+        },
+        {
+          "text": "Based on their position, the yellow teddy bear in the center of the image seems like the most likely candidate to host a gathering. Being in the center suggests a focal point, which could imply that this bear is the host or leader of the group activity. The central position naturally draws attention, making it a suitable spot for a host.",
+          "tag": "no_mask"
+        }
+      ]
+    },
+    {
+      "image_info": [
+        {
+          "matched_text_index": 0,
+          "image_url": "https://nlp-sr-share.bj.bcebos.com/data/ernie4.5/demo_images/000000269306.jpg"
+        }
+      ],
+      "text_info": [
+        {
+          "text": "What do you see in the image?",
+          "tag": "mask"
+        },
+        {
+          "text": "The image shows a group of pigeons on a concrete surface, eating slices of pizza that are lying on the ground. There are several pigeons gathered around the pizza slices, pecking at the food. The scene appears to be in an urban setting, possibly near a sidewalk or street.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many pigeons are present in the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are five pigeons visible in the picture. Four of them are gathered around the pizza slices, and one is slightly apart from the group on the right side of the image.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "How many pieces of pizza can you see?",
+          "tag": "mask"
+        },
+        {
+          "text": "There are three pieces of pizza visible in the image. Two pieces are being eaten by the pigeons, and one piece is lying on the ground slightly away from the group.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are the pigeons doing anything specific with the pizza slices?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, the pigeons are pecking at and eating the pizza slices on the ground. They are gathered around the slices, actively feeding on them.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Where is the trash can located in relation to the pigeons?",
+          "tag": "mask"
+        },
+        {
+          "text": "The trash can is located to the upper left of the pigeons in the image. It is partially visible and appears to be positioned near the edge of the concrete surface where the pigeons are eating the pizza slices.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Is there any pigeon near the top right corner of the picture?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there is a pigeon near the top right corner of the picture. It is standing slightly apart from the group of pigeons that are eating the pizza slices.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Which pizza slice is the closest to the trash can?",
+          "tag": "mask"
+        },
+        {
+          "text": "The pizza slice that is closest to the trash can is the one on the left side of the image, near the group of pigeons.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Are any of the pigeons standing alone, away from the others?",
+          "tag": "mask"
+        },
+        {
+          "text": "Yes, there is a pigeon standing alone near the top right corner of the image, away from the group of pigeons that are gathered around the pizza slices.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "Given that pigeons are usually seen in urban areas, can you explain why they might be attracted to pizza slices?",
+          "tag": "mask"
+        },
+        {
+          "text": "Pigeons are commonly found in urban areas where food sources are abundant due to human activity. They are opportunistic feeders and will eat a wide variety of foods, including discarded human food. Here are a few reasons why pigeons might be attracted to pizza slices:\n\n1. **Availability**: Urban environments often have a lot of food waste, including items like pizza slices that are discarded or accidentally dropped by people.\n\n2. **Nutritional Content**: Pizza contains ingredients that are appealing to pigeons, such as bread (crust), cheese, and various toppings. These ingredients provide carbohydrates, fats, and proteins, which are essential nutrients for pigeons.\n\n3. **Smell**: The strong smell of pizza can attract pigeons from a distance. Birds have a keen sense of smell and can detect food sources easily.\n\n4. **Habit**: Pigeons in urban areas have adapted to rely on human food waste as a significant part of their diet. They have learned that areas with high human activity, such as streets and parks, are good places to find food.\n\n5. **Competition**: In urban settings, food can be scarce due to competition with other animals. Pigeons take advantage of any available food source, including pizza slices, to ensure they get enough to eat.\n\nOverall, the combination of availability, nutritional content, and learned behavior makes pizza slices an attractive food source for urban pigeons.",
+          "tag": "no_mask"
+        },
+        {
+          "text": "If there weren't any pizza slices, what could be another reason for pigeons to gather at this particular spot?",
+          "tag": "mask"
+        },
+        {
+          "text": "If there weren't any pizza slices, pigeons might still gather at this particular spot for several reasons:\n\n1. **Regular Feeding Area**: Pigeons often return to locations where they have previously found food. If this spot is a common area where people frequently drop or discard food, pigeons might gather here out of habit.\n\n2. **Shelter and Safety**: Urban areas can provide shelter and safety from predators. Pigeons might gather in spots that offer protection from the elements or where they feel safe from threats.\n\n3. **Social Behavior**: Pigeons are social birds and often gather in flocks. They might congregate in certain areas to socialize, mate, or communicate with each other.\n\n4. **Water Source**: If there is a nearby water source, such as a fountain, puddle, or leaking pipe, pigeons might gather to drink and bathe.\n\n5. **Nesting Sites**: Pigeons might gather near potential nesting sites. Urban structures like buildings, bridges, and ledges provide ideal nesting spots for pigeons.\n\n6. **Resting Spot**: Pigeons might use certain areas as resting spots between flights. They often choose flat, open areas where they can easily take off and land.\n\n7. **Human Activity**: Pigeons are attracted to areas with high human activity because these areas often provide food opportunities. They might gather in anticipation of people dropping food or feeding them.\n\nIn summary, even without the presence of pizza slices, pigeons might gather at this spot due to factors related to food availability, safety, social behavior, water sources, nesting sites, resting spots, and human activity.",
+          "tag": "no_mask"
+        }
+      ]
+    }
+  ]

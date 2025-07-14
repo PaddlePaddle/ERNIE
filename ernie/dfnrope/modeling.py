@@ -204,7 +204,13 @@ class VisionFlashAttention2(nn.Layer):
             out = _AllToAll.apply(attn_output, mp_group)
             out = paddle.split(out, mp_group.nranks, axis=0)
             attn_output = paddle.concat(out, axis=1)
-        attn_output = attn_output.astype(paddle.float32)
+        
+        # note!
+        if self.proj.weight.dtype != paddle.float32:
+            attn_output = attn_output.astype(paddle.bfloat16)
+        else:
+            attn_output = attn_output.astype(paddle.float32)
+
         attn_output = self.proj(attn_output)
         return attn_output
 

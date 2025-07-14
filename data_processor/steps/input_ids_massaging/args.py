@@ -28,9 +28,7 @@ class InputIdsMassageArguments:
     """
 
     corpus_name: str = field(default=None, metadata={"help": "corpus name"})
-    data_filelist: str = field(default=None, metadata={"help": "data file list"})
     im_prefix_length: int = field(default=64, metadata={"help": "number of image placeholder"})
-    max_seq_length: int = field(default=8192, metadata={"help": "max sequence length"})
 
     crop_tile_option: str = field(default="9,16", metadata={"help": "crop option"})
     crop_tile_rate: str = field(default="0.8,0.2", metadata={"help": "crop rate"})
@@ -46,7 +44,6 @@ class InputIdsMassageArguments:
     augment_conf: str = field(default="conf/config_transform.yaml", metadata={"help": "image augment conf path"})
     prompt_dir: str = field(default="./", metadata={"help": "prompt path"})
 
-    random_seed: int = field(default=42, metadata={"help": "random seed"})
     serialize_output: bool = field(default=True, metadata={"help": "serialize output"})
     min_crop_flag: bool = field(default=False, metadata={"help": "set 896 * 896"})
     one_sample_in_one_seq: bool = field(default=False, metadata={"help": "one sample in one seq"})
@@ -59,14 +56,12 @@ class InputIdsMassageArguments:
         default=2,
         metadata={"help": "spatial conv size"},
     )
-    vision_model_name_or_path: str = field(default=None, metadata={"help": "image preprocess path"})
     adaptive_max_imgtoken_option: str = field(default=None, metadata={"help": "adaptive max image token"})
     adaptive_max_imgtoken_rate: str = field(default=None, metadata={"help": "adaptive max image token rate"})
     max_pixels: int = field(default=None, metadata={"help": "adaptive use max-pixels"})
     min_pixels: int = field(default=None, metadata={"help": "adaptiveuse min-pixels"})
     video_max_pixels: int = field(default=None, metadata={"help": "video adaptive use max-pixels"})
     video_min_pixels: int = field(default=None, metadata={"help": "video adaptiveuse min-pixels"})
-    rope_3d: bool = field(default=False, metadata={"help": "use 3d rope"})
     drop_untrainble_sample: bool = field(default=False, metadata={"help": "drop untrainable samples"})
     chat_template: str = field(default="ernie", metadata={"help": "chat template"})
 
@@ -83,3 +78,16 @@ class InputIdsMassageArguments:
         assert self.video_fix_crop in [-1, 2], "video_fix_crop only supported values are -1 and 2"
         if self.video_fix_crop != -1:
             self.video_max_tile = self.video_fix_crop
+
+
+@dataclass
+class InputIdsMassageInferArguments(InputIdsMassageArguments):
+    """
+    args for InputIdsMassageProcessor
+    """
+
+    data_filelist: str = field(default=None, metadata={"help": "data file list"})
+    random_seed: int = field(default=42, metadata={"help": "random seed"})
+    vision_model_name_or_path: str = field(default=None, metadata={"help": "image preprocess path"})
+    rope_3d: bool = field(default=False, metadata={"help": "use 3d rope"})
+    max_seq_length: int = field(default=8192, metadata={"help": "max sequence length"})

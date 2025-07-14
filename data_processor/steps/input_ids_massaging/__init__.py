@@ -14,7 +14,7 @@
 
 # datafactory commit id: I898683988c9103223802dc5618ab13d538222412
 """input_ids_massaging"""
-from data_processor.steps.input_ids_massaging.args import InputIdsMassageArguments
+from data_processor.steps.input_ids_massaging.args import InputIdsMassageArguments, InputIdsMassageInferArguments
 from data_processor.steps.input_ids_massaging.processor import InputIdsMassageProcessor
 
-__all__ = ['InputIdsMassageArguments', 'InputIdsMassageProcessor']
+__all__ = ['InputIdsMassageArguments', 'InputIdsMassageInferArguments', 'InputIdsMassageProcessor']

@@ -157,7 +157,7 @@ class Ernie4_5_Config(PretrainedConfig):
             num_key_value_heads (int): Number of key/value heads (for Grouped Query Attention)
             use_sparse_head_and_loss_fn (bool): Whether to use sparse attention head and loss function
             micro_batch_size (int): Size of micro batches (-1 for automatic)
-            use_fused_head_loss_fn (bool): Whether to use fused head and loss function
+            use_fused_head_and_loss_fn (bool): Whether to use fused head and loss function
             token_balance_loss (bool): Whether to balance loss by token count
             token_balance_seqlen (bool): Whether to balance sequence lengths
             cachekv_quant (bool): Whether to quantize key-value cache
@@ -544,6 +544,7 @@ class Ernie4_5_VLMoeConfig(Ernie4_5_MoeConfig):
         use_recompute_resampler=False,
         resampler_fuse_rms_norm=False,
         moe_layer_feed_fake_token=False,
+        offload_pp_data_chunk_size=0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -569,6 +570,7 @@ class Ernie4_5_VLMoeConfig(Ernie4_5_MoeConfig):
         self.use_recompute_resampler = use_recompute_resampler
         self.resampler_fuse_rms_norm = resampler_fuse_rms_norm
         self.moe_layer_feed_fake_token = moe_layer_feed_fake_token
+        self.offload_pp_data_chunk_size = offload_pp_data_chunk_size
 
     @property
     def multimodel_experts(self) -> bool:

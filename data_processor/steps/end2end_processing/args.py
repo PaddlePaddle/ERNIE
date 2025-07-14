@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from data_processor.steps.array_collation import ArrayCollationProcessorArguments
 from data_processor.steps.coarse_processing import CoarseProcessorArguments
 from data_processor.steps.image_modification import ImageModificationProcessorArguments
-from data_processor.steps.input_ids_massaging import InputIdsMassageArguments
+from data_processor.steps.input_ids_massaging import InputIdsMassageArguments, InputIdsMassageInferArguments
 from data_processor.steps.pseudo_multiround_packing import PseudoMultiRoundProcessorArguments
 from data_processor.steps.utterance_processing import UtteranceProcessorArguments
 
@@ -42,6 +42,16 @@ End2EndProcessorArguments = (
     UtteranceProcessorArguments,
     CoarseProcessorArguments,
     InputIdsMassageArguments,
+    PseudoMultiRoundProcessorArguments,
+    ImageModificationProcessorArguments,
+    ArrayCollationProcessorArguments,
+    End2EndProcessorArgumentsHelper,
+)
+
+End2EndProcessorInferArguments = (
+    UtteranceProcessorArguments,
+    CoarseProcessorArguments,
+    InputIdsMassageInferArguments,
     PseudoMultiRoundProcessorArguments,
     ImageModificationProcessorArguments,
     ArrayCollationProcessorArguments,

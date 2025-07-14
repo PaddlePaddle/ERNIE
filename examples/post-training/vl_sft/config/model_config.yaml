@@ -1,0 +1,34 @@
+moe_capacity: [128, 128, 128]
+moe_logging: true
+moe_aux_loss_lambda: 0.0
+moe_orthogonal_loss_lambda: 0.0
+token_balance_loss: false
+rope_theta: 500000
+moe_num_experts: [64, 64]
+moe_intermediate_size: [1536, 512]
+moe_layer_start_index: [1, 1]
+moe_layer_end_index: [29, 28]
+moe_multimodal_dispatch_use_allgather: "v2-alltoall-unpad-text"
+rope_3d: true
+freq_allocation: 20
+vocab_size: 103424
+tie_word_embeddings: true
+num_hidden_layers: 28
+remove_tail_layer: 0
+temporal_conv_size: 2
+spatial_conv_size: 2
+moe_use_hard_gate: true
+fuse_rope: false
+vision_config:
+    attn_sep: true,
+
+refined_recompute: {
+    mlp_row_ln: 0,
+    flash_attn: 0,
+    attention_row_ln: 0,
+    attention_column_ln: 0,
+    mlp_column_ln: 0
+}
+loss_subbatch_seqlen: 1024
+use_recompute_loss_fn: true
+use_fused_head_loss_fn: true

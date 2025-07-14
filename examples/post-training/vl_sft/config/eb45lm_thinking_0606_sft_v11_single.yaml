@@ -1,0 +1,224 @@
+# -----------环境变量----------------------#
+env:
+    HOME: null
+
+idataset_name: "eb4_data_sft_all_to_m"
+idataset_tag: "tag20235833"
+encrypted_dataset: "true"
+eb_project: "eb4_data_sft_all_to_m"
+cipher_bos: "http://bj.bcebos.com/dataplat-prod/dataplat/release/eb4_data_sft_all_to_m/tag20235833/eb4_data_sft_all_to_m_tag20235833.tar.gz?authorization=bce-auth-v1%2FALTAKX8PACBAzPxwRce4aAOnQJ%2F2025-04-08T08%3A26%3A28Z%2F-1%2F%2F9c2b8df65887f5f38795a7ecbacf29162a57c27e6c13c042664475051d542aa8"
+
+
+# ---------------------------model args-------------------------------------------------#
+model_args:
+    from_scratch: 0
+    vision_from_scratch: 0
+    vit_lr_ratio: 0.9
+    use_sp_callback: true
+    freeze_config: "freeze_vision"
+    multimodal: true
+    vision_model_name_or_path:  /root/paddlejob/workspace/env_run/output/huangkui/weight/dfn_stage3tie_46k_FC
+    model_name_or_path: /root/paddlejob/workspace/env_run/output/huangkui/weight/eb45lm_afterStage3128k_v11_think_32k
+    tokenizer_name: data_processor/tokenizer_models/ernie4_tk_m100k_103367_sft_think
+    output_dir: ./output/lite_10step_erniekit
+    data_load_process_num: 1
+    max_seq_length: 8192
+    pad_to_max_seqlen: 8192
+    base_seq_length: 8192
+    max_sequence_length: 8192
+    variable_resolution: 1
+
+    global_shuffle_num_examples: 1000000.0
+    sequence_parallel: 1
+    num_consecutive: 1
+
+    # TODO: set to 0
+    enable_global_training_logs: true
+    global_logging_interval: 1
+    moe_use_aux_free_update_coef: 0.0
+
+    model_config:
+        moe_capacity: [128, 128, 128]
+        moe_logging: true
+        moe_aux_loss_lambda: 0.0
+        moe_orthogonal_loss_lambda: 0.0
+        token_balance_loss: false
+        rope_theta: 500000
+        moe_num_experts: [64, 64]
+        moe_intermediate_size: [1536, 512]
+        moe_layer_start_index: [1, 1]
+        moe_layer_end_index: [29, 28]
+        moe_multimodal_dispatch_use_allgather: "v2-alltoall-unpad-text"
+        rope_3d: true
+        freq_allocation: 20
+        vocab_size: 103424
+        tie_word_embeddings: true
+        num_hidden_layers: 28
+        remove_tail_layer: 0
+        temporal_conv_size: 2
+        spatial_conv_size: 2
+        moe_use_hard_gate: true
+        fuse_rope: false
+        vision_config:
+            # pp_data_balance: true,
+            attn_sep: true,
+            # vit_first_fwd_bsz: 1280,
+            #vit_num_recompute_layers: 10000
+
+        refined_recompute: {
+            mlp_row_ln: 0,
+            flash_attn: 0,
+            attention_row_ln: 0,
+            attention_column_ln: 0,
+            mlp_column_ln: 0
+        }
+        loss_subbatch_seqlen: 1024
+        use_recompute_loss_fn: true
+        use_fused_head_loss_fn: true
+
+
+    # modality_ratio: [1, 1]
+    # modality_interleave: gbs
+
+    visual_ld: 0.9
+    bos_retry_max_time: 3
+    bos_retry_interval: 0.1
+    resume_from_ptx_model: 0
+    #resume_from_checkpoint: ./output/eb45lm_afterStage3128k_v11_think_32k/checkpoint-800
+    # # # init_ckpt: ./step_5520
+    # pre_alloc_memory: 50
+
+    modality_ratio: [1, 1]
+
+trainer_args:
+    rope_3d: true
+    moe_gate_lr_ratio: 0.01
+
+    #################### SFT
+    # MM h5 data filelists
+    # data_filelist: /root/paddlejob/workspace/env_run/output/huangkui/SFT_45V/data_config/mm_sft/data_config_debug_json_mul.yaml
+    dataloader_num_workers: 1 # 只影响多模态SFT
+
+    ### 设置为SFTH5Reader，则job.sh开启id化流程 ###
+    dataset_name: "KnowledgeBasedSFTReader" # 读取明文数据设置为：KnowledgeBasedSFTReader, ID化数据设置为：SFTH5Reader
+    h5_output_dir: "" # 请置空，job.sh内有逻辑，会自动填充地址
+    h5_afs_dir: "/user/erine/shangjunyuan/data/sft" # id化数据上传与下载的afs文件夹路径
+    shuffle_indices: 1 # Id化后进行shuffle, 1: shuffle
+    num_process: 30 # 并行id化分块数量（80进程，8192长度，global-bsz:72, max_step:4000, 约3分钟）
+    ########################
+
+    ####TODO： 一些reader采样的设置
+    text_sft_task_config: "/root/paddlejob/workspace/env_run/output/huangkui/SFT_45V/data_config/text_sft/data_config_0120_v1_test.json"
+    add_sys_token: True
+    add_header_eos_token: False
+    pseudo_strategy: 0
+    example_from_same_task_prob: 0.0
+    pseudo_sampling_prob: 0.0
+    trigger_data_prob: 1.0 # 0.0 for Multi-Modal SFT
+    number_of_samples_each_epoch: 10000000
+    drop_history_with_k: True
+    min_shot: 2
+    max_shot: 8
+    sampling_wo_replacement_data_resuming: True # SFT 无放回采样 数据恢复重启. True: 开启 False: 关闭. (开启后会关闭重启修改factor/seed操作)
+    factor: 20
+    prefetch_factor: 4
+    special_token_loss_mask_ratio: 0.5
+    follow_deepseek: true
+    use_train_part_sharding: true
+    text_use_train_part_sharding: true
+
+    # data_processor
+    # coarse processing
+    video_fps: 2
+    video_min_frames: 16
+    video_max_frames: 120
+    video_target_frames: -1
+    video_frames_sample: leading
+    video_use_asr: true
+
+    # input ids massaging
+    use_crop_specialtoken: false
+    use_loc_specialtoken: false
+    one_sample_in_one_seq: true
+    use_pic_id: true
+    use_multi_image_crop: true # 使用后，api传入max_tile可能会失效。
+    serialize_output: false
+    random_seed: 42
+    chat_template: deepseek
+    video_min_pixels: 306544
+    # video_max_pixels: 937664
+    video_max_pixels: 409920
+
+    # image modification
+    render_timestamp: true
+    # variable_resolution: true
+    # rope_3d: true
+
+    ### 训练参数
+    # hidden_dropout_prob: 0.1
+    # moe_dropout_prob: 0.1
+    enable_timer: true
+    pp_need_data: true
+    adam_beta1: 0.9
+    adam_beta2: 0.95
+    adam_epsilon: 1.0e-08
+    bf16: true
+    disable_tqdm: 1
+    do_eval: false
+    do_train: true
+    eval_iters: -1
+    eval_steps: 100000000000000000
+    fp16_opt_level: O2
+    gc_collect_interval: 6000
+    global_batch_size: 8
+    ignore_data_skip: 0
+    ignore_lr_and_optim: false
+    in_tokens: false
+    learning_rate: 1e-05
+    logging_steps: 1
+    lr_scheduler_type: cosine
+    max_grad_norm: 1.0
+    max_steps: 1
+    min_lr: 1e-06
+    same_data: true
+    load_sharded_model: true
+    save_sharded_model: true
+    save_steps: 1000
+    save_total_limit: 2
+    scale_loss: 4096
+    seed: 42
+    warmup_steps: 1
+    weight_decay: 0.1
+    overwrite_output_dir: 1
+    per_device_eval_batch_size: 1
+    per_device_train_batch_size: 1
+
+    # 分布式策略
+    offload_optim: true
+    pp_need_data_degree: 2
+    pipeline_parallel_degree: 2
+    tensor_parallel_degree: 4
+    virtual_pp_degree: 1
+    data_parallel_degree: 1
+    # sharding_degree: 8
+    # sharding: "stage1"
+    amp_master_grad: 1
+    pipeline_parallel_config: enable_offload_queue enable_delay_scale_loss enable_overlap_p2p_comm best_unbalanced_scheduler #enable_release_grads enable_dp_comm_overlap
+    sharding_parallel_config: split_param enable_fuse_optimizer_states
+    #sharding_comm_buffer_size_MB: 512
+    tensor_parallel_config: sync_param sync_grad sync_moment
+
+    pre_alloc_memory: 30
+    sharding_comm_buffer_size_MB: 512
+
+    # 其他
+    use_moe: true
+    moe_with_send_router_loss: False
+    moe_group: mp  #dp, #mp-dp
+    log_global_grad_norm: True
+    enable_optimizer_timer: False
+    gc_interval: 100000
+    use_attn_mask: false
+    skip_profile_timer: 0
+    save_sharding_stage1_model_include_freeze_params: true
+    disable_pipeline_warmup: True

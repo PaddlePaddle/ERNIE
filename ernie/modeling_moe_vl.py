@@ -469,20 +469,6 @@ class VariableResolutionResamplerModel(nn.Layer):
             num_attention_heads=config.num_attention_heads,
         )
         res = {"spatial_linear.0.weight": partial(fn, is_column=False)}  # row parallel
-        for k in (
-            "spatial_linear.0.bias",  # row linear bias
-            "spatial_linear.2.weight",
-            "spatial_linear.2.bias",  # linear
-            "spatial_linear.3.weight",
-            "spatial_linear.3.bias",  # layernorm
-            "temporal_linear.0.weight",
-            "temporal_linear.0.weight",  # linear
-            "temporal_linear.2.weight",
-            "temporal_linear.2.bias",  # linear
-            "temporal_linear.3.weight",
-            "temporal_linear.3.bias",  # bias
-        ):
-            res.update({k: lambda x: x[:]})
         return res
 
 
@@ -523,6 +509,15 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             loss: text-only CE loss
             loss_sum. text-only CE loss_sum
         """
+        if self.config.use_recompute_loss_fn and self.config.use_fused_head_and_loss_fn:
+            with paddle.no_grad():
+                if token_type_ids_shifted.unique().shape[0] > 1:
+                    labels, token_type_ids_shifted = TensorBalanceByTokenType.apply(
+                        labels.squeeze(0), token_type_ids_shifted, is_tensor_sharded=False
+                    )
+                else:
+                    labels = ScatterOp.apply(labels, axis=-1)
+
 
         if self.use_one_head:
             if self.config.use_recompute_loss_fn:
@@ -531,12 +526,6 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
                 loss, loss_sum = super().forward(scores_text.unsqueeze(0), labels.unsqueeze(0))
             self.update_log(loss, token_type_ids_untouched)
             return loss, loss_sum
-
-        if self.config.use_recompute_loss_fn and self.config.use_fused_head_and_loss_fn:
-            with paddle.no_grad():
-                labels, token_type_ids_shifted = TensorBalanceByTokenType.apply(
-                    labels.squeeze(0), token_type_ids_shifted, is_tensor_sharded=False
-                )
 
         image_mask_shifted = token_type_ids_shifted == TokenType.image
         text_pos_shifted = token_type_ids_shifted == TokenType.text
@@ -613,14 +602,17 @@ def calc_multimodal_logits(
     # token_type_ids_shifted = paddle.concat([token_type_ids[:, 1:], token_type_ids[:, -1:]], 1)  #
 
     if config.use_recompute_loss_fn and config.use_fused_head_and_loss_fn:
-        if token_type_ids_shifted.unique().shape[0] > 1:  # Multimodal data
-            last_hidden_state, token_type_ids_shifted = TensorBalanceByTokenType.apply(
-                last_hidden_state, token_type_ids_shifted
-            )
+        if config.sequence_parallel:
+            if token_type_ids_shifted.unique().shape[0] > 1:  # Multimodal data
+                last_hidden_state, token_type_ids_shifted = TensorBalanceByTokenType.apply(
+                    last_hidden_state, token_type_ids_shifted
+                )
+            else:
+                with paddle.no_grad():
+                    token_type_ids_shifted = ScatterOp.apply(token_type_ids_shifted, axis=-1)
+                    token_type_ids_shifted = token_type_ids_shifted.reshape([-1])
         else:
-            with paddle.no_grad():
-                token_type_ids_shifted = ScatterOp.apply(token_type_ids_shifted, axis=-1)
-                token_type_ids_shifted = token_type_ids_shifted.reshape([-1])
+            token_type_ids_shifted = token_type_ids_shifted.reshape([-1])
     else:
         if config.sequence_parallel:
             last_hidden_state = GatherOp.apply(last_hidden_state)
@@ -637,12 +629,15 @@ def calc_multimodal_logits(
         tensor_parallel_degree=config.tensor_parallel_degree,
         tensor_parallel_output=config.tensor_parallel_output,
         fuse_linear=config.fuse_linear,
+        transpose_y=config.tie_word_embeddings,
     )
 
     if mm_head_weight is None:
         if config.use_recompute_loss_fn:
             return last_hidden_state, None, None
-        score_text = parallel_matmul_tp(last_hidden_state, lm_head_weight, lm_head_bias)
+        score_text = parallel_matmul_tp(
+            last_hidden_state, lm_head_weight, lm_head_bias, transpose_y=config.tie_word_embeddings
+            )
         return score_text, None, None
 
     image_mask_shifted = token_type_ids_shifted == TokenType.image
@@ -697,7 +692,7 @@ class Ernie4_5_MoeVLHead(Ernie4_5_LMHead):
         if not use_cache:
             mm_head_weight = self.mm_head.weight if self.mm_head is not None else None
             mm_head_bias = self.mm_head.bias if self.mm_head is not None else None
-            logits_text, logits_image = calc_multimodal_logits(
+            logits_text, logits_image, *_ = calc_multimodal_logits( # note!!
                 hidden_state,
                 self.weight,
                 self.bias,
