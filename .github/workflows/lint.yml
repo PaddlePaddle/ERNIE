@@ -1,40 +1,70 @@
-name: Codestyle Check
+name: Codestyle
 
-on: [push, pull_request]
+on: [pull_request]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  PR_ID: ${{ github.event.pull_request.number }}
+  BRANCH: ${{ github.event.pull_request.base.ref }}
+  TASK: ERNIE-Codestyle-${{ github.event.pull_request.number }}
 jobs:
   Lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ernie-cpu]
+    permissions:
+      pull-requests: write
+      contents: read
+      id-token: write
     steps:
-      - name: Download Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Checkout Develop
+      - name: Run Container
+        env:
+          work_dir: ${{ github.workspace }}
         run: |
-          if ! git show-ref --quiet refs/heads/develop; then \
-              echo "local develop branch is missing, creating local develop branch that tracks remote develop branch"
-              git fetch origin develop
-              git branch develop --track origin/develop
-          else
-            echo "local develop branch exist, skipping"
-          fi
+          container_name=${TASK}-$(date +%Y%m%d-%H%M%S)
+          echo "container_name=${container_name}" >> "$GITHUB_ENV"
+          docker_image="iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu20.04-gcc12.2-cuda12.3-cudnn9.0-nccl2.20.3.1-openmpi4.1.5"
+          docker run -d -t --name ${container_name} --net=host -v /dev/shm:/dev/shm --shm-size=32G \
+            -v $work_dir/../../..:$work_dir/../../.. \
+            -v $work_dir:/workspace \
+            -v /root/.cache/:/root/.cache/ \
+            -e BRANCH \
+            -e PR_ID \
+            -e work_dir \
+            -w /workspace ${docker_image}
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          cache: 'pip' # caching pip dependencies
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
+          docker exec -t ${container_name} /bin/bash -c '
           python -m pip install --upgrade pip
-          pip install pre-commit
-          pre-commit install
-      - name: Test
-        run: make -f tools/codestyle/Makefile lint
+          python -m pip uninstall pre-commit -y
+          python -m pip install pre-commit
+          '
+
+      - name: Get Diff
+        env:
+          work_dir: ${{ github.workspace }}
+        run: |
+          docker exec -t ${container_name} /bin/bash -c '
+          source $work_dir/../../../proxy
+          rm -rf ERNIE
+          git clone https://github.com/PaddlePaddle/ERNIE.git
+          cd ERNIE
+          git config --global user.name "PaddleCI"
+          git config --global user.email "paddle_ci@example.com"
+          git fetch origin pull/${PR_ID}/head
+          git checkout -b origin_pr FETCH_HEAD
+          git remote add upstream https://github.com/PaddlePaddle/ERNIE.git
+          git checkout -b test_pr upstream/${BRANCH}
+          git merge --no-edit origin_pr
+          git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
+          make lint
+          '
+
+      - name: Terminate And Delete the Container
+        if: always()
+        run: |
+          docker stop $container_name 2>/dev/null || true
+          docker rm -f $container_name 2>/dev/null || true
