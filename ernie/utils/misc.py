@@ -185,7 +185,7 @@ class TrainingLogs:
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{attr}'")
 
     def dict(self, use_async=False):
-        """序列化
+        """
 
         Returns:
             _type_: _description_

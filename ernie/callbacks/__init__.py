@@ -13,6 +13,7 @@
 # limitations under the License.
 """ Trainer Callback functions """
 
+from .layerwise_dropout_callback import LayerwiseDropoutCallback
 from .adaptivegradclip_callback import ClipGradByAdaptiveNormCallback
 from .gc_callback import GCCallback
 from .logging_callback import LoggingCallback
@@ -37,12 +38,10 @@ __all__ = [
     "LoggingCallback",
     "MoECorrectionBiasAdjustCallback",
     "GlobalRNGCallback",
-    "MoeLoggingCallback",
     "MultiModalInterleaveCallback",
     "OptimizerCallback",
     "OrthogonalCallback",
     "PPNeedDataCallback",
-    "ProgreesiveBatchingCallback",
     "RefinedRecomputeCheckCallback",
     "ReshardSaveExitCallback",
     "StopperCallback",
