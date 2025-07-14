@@ -14,7 +14,7 @@
 
 import json
 import os
-
+from tqdm import tqdm
 import numpy as np
 import paddle
 from paddleformers.utils.log import logger
@@ -105,12 +105,15 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
     if train_dataset.max_estimate_samples > 0:
         train_batches = 0
         train_tokens = 0
+        pbar = tqdm(desc="[Estimate Training]", unit="sequences")
         for sequences in train_dataset:
             if not train_dataset.estimate:
                 break
             train_batches += 1
             for sequence in sequences:
                 train_tokens += len(sequence.token_ids)
+            pbar.update()
+        pbar.close()
 
         train_tokens *= training_args.num_train_epochs
         train_batches *= training_args.num_train_epochs
@@ -174,7 +177,7 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
             "sharding_parallel_degree": int(training_args.sharding_parallel_degree),
             "num_samples_each_epoch": data_args.num_samples_each_epoch,
             "max_seq_len": int(data_args.max_seq_len),
-            "seed": data_args.seed,
+            "seed": training_args.seed,
             "valid": False,
             "train_samples": 0,
         }

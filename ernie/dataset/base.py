@@ -16,6 +16,7 @@
 import glob
 import gzip
 import json
+import h5py
 import random
 from contextlib import contextmanager
 from functools import partial
@@ -62,12 +63,8 @@ class FileDataset(IterableDataset):
         self._process_fn = process_fn
         self._shuffle_file = shuffle_file
 
-    def __iter__(self):
-        """Iterate through the dataset with optional shuffling and processing.
-
-        Yields:
-            dict: Processed examples from the file, skipping invalid entries.
-        """
+    def _iter_text(self):
+        """The method for iterating over line-based text files (.txt, .gz, etc.)."""
         with open_file(self._filename) as fin:
             if self._shuffle_file:
                 lines = fin.readlines()
@@ -95,6 +92,56 @@ class FileDataset(IterableDataset):
                     yield from ex
                 else:
                     yield ex
+
+    def _iter_h5(self):
+        """An internal method specifically for iterating over HDF5 files."""
+        all_examples = []
+        with h5py.File(self._filename, "r") as fin:
+            shape = fin["meta"].shape
+            offset_shape = fin["offset"].shape
+            meta = fin["meta"][:]
+            offset = fin["offset"][:]
+            for idx in range(offset_shape[0]):
+                start = offset[idx]
+                if idx + 1 == len(offset):
+                    end = shape[0] + 1
+                else:
+                    end = offset[idx + 1]
+                example = json.loads(meta[start:end].tobytes().decode())
+                converted_example = {
+                    'src': [d['text'] for d in example['text_info'] if d['tag'] == 'mask'],
+                    'tgt': [d['text'] for d in example['text_info'] if d['tag'] != 'mask']
+                }
+                all_examples.append(converted_example)
+        if self._shuffle_file:
+            np.random.shuffle(all_examples)
+        for idx, ex in enumerate(all_examples):
+            if self._process_fn is not None:
+                try:
+                    ex = self._process_fn(ex, self._filename)
+                except Exception as e:
+                    logger.warning(
+                        f"Error processing HDF5 data from {self._filename} at index {idx}. Error: {e}"
+                    )
+                    continue
+            # ignore invalid example
+            if ex is None:
+                continue
+            elif isinstance(ex, list):
+                yield from ex
+            else:
+                yield ex
+
+    def __iter__(self):
+        """Iterate through the dataset with optional shuffling and processing.
+
+        Yields:
+            dict: Processed examples from the file, skipping invalid entries.
+        """
+        if self._filename.endswith(".h5"):
+            yield from self._iter_h5()
+        else:
+            yield from self._iter_text()
 
 
 class FileListDataset(IterableDataset):
