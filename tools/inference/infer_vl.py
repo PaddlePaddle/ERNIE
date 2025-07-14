@@ -32,7 +32,7 @@ from tqdm import tqdm
 from data_processor.image_preprocessor.image_preprocessor_adaptive import AdaptiveImageProcessor
 from data_processor.steps.end2end_processing import (
     End2EndProcessor,
-    End2EndProcessorArguments,
+    End2EndProcessorInferArguments,
 )
 from data_processor.utils.argparser import PdArgumentParser, get_config
 from ernie.configuration import Ernie4_5_VLMoeConfig
@@ -233,7 +233,7 @@ class Predictor:
             variable_resolution=args.variable_resolution,
             rope_3d=args.rope_3d,
         )
-        data_processor_parser = PdArgumentParser(End2EndProcessorArguments)
+        data_processor_parser = PdArgumentParser(End2EndProcessorInferArguments)
         self.processor = End2EndProcessor(
             data_processor_parser.parse_dict(dict(**dict(data_processor_config.processor_args))),
             tokenizer=self.tokenizer,
