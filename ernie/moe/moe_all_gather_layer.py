@@ -93,9 +93,9 @@ def reduce_scatter_async(input, group=None):
     if parallelism == 1:
         return input.clone(), None
     output_shape = input.shape
-    assert input.shape[0] % parallelism == 0, (
-        f"Input sequence length {input.shape[0]} can't be divided exactly by sequence parallelism {parallelism}"
-    )
+    assert (
+        input.shape[0] % parallelism == 0
+    ), f"Input sequence length {input.shape[0]} can't be divided exactly by sequence parallelism {parallelism}"
     output_shape[0] = output_shape[0] // parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
     task = dist.stream.reduce_scatter(
@@ -591,9 +591,9 @@ class MOEAllGatherLayerV2(MOELayer):
         else:
             orig_shape = None
 
-        assert len(input.shape) == 2, (
-            f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
-        )
+        assert (
+            len(input.shape) == 2
+        ), f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
         dispatch_token_type_ids = None
         global_dense_expert_mask = None
         if token_type_ids is not None:
@@ -676,7 +676,8 @@ class MOEAllGatherLayerV2(MOELayer):
                 [
                     sum(
                         expert_num_global_list[
-                            i * self.num_local_experts : (i + 1)
+                            i
+                            * self.num_local_experts : (i + 1)
                             * self.num_local_experts
                         ]
                     )
@@ -1191,7 +1192,8 @@ class MOEAllGatherLayerV2(MOELayer):
         no_tokens_expert_outputs = []
         if not self.multimodal_experts:
             true_experts = self.experts[
-                self.rank * self.num_local_experts : (self.rank + 1)
+                self.rank
+                * self.num_local_experts : (self.rank + 1)
                 * self.num_local_experts
             ]
         else:
