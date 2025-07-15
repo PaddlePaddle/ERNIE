@@ -33,6 +33,7 @@ from paddle.incubate.nn.functional import (
     moe_gate_dispatch_partial_nosoftmaxtopk,
 )
 from paddle.incubate.tensor.manipulation import async_offload
+from paddleformers.peft.lora.lora_quantization_layers import QuantizationLoRALinear
 from paddleformers.utils.log import logger
 
 from ..distributed.common_dist_utils import (
@@ -1212,9 +1213,25 @@ class MOEAllGatherLayerV2(MOELayer):
 
         for iexpert, chunk in enumerate(dispatched_input):
             if chunk is None:
+                # QuantizationLoRALinear can not call `.weight`.
+                if not isinstance(
+                    true_experts[iexpert].up_gate_proj, QuantizationLoRALinear
+                ):
+                    input_shape = [
+                        1,
+                        true_experts[iexpert].up_gate_proj.weight.shape[0],
+                    ]
+                    input_dtype = true_experts[iexpert].up_gate_proj.weight.dtype
+                else:
+                    input_shape = [
+                        1,
+                        true_experts[iexpert].up_gate_proj.lora_A.shape[0],
+                    ]
+                    input_dtype = true_experts[iexpert].up_gate_proj.lora_A.dtype
+
                 chunk = paddle.zeros(
-                    [1, true_experts[iexpert].up_gate_proj.weight.shape[0]],
-                    dtype=true_experts[iexpert].up_gate_proj.weight.dtype,
+                    input_shape,
+                    input_dtype,
                 )
                 if true_experts[iexpert].training:
                     chunk.stop_gradient = False
