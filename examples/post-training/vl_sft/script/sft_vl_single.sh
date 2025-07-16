@@ -82,4 +82,4 @@ nohup sh examples/post-training/vl_sft/script/train_gpu_single.sh \
 --disable_pipeline_warmup true \
 > lite_erniekits.log 2>err.log &
 
-tail -f lite_erniekits_text_mm.log
+tail -f lite_erniekits.log
