@@ -116,7 +116,7 @@ class ChatSFTArguments(PreTrainingArguments):
         },
     )
 
-    use_flash_attn: Optional[bool] = field(default=False, metadata={"help": "use flash attention"})
+    use_flash_attention: Optional[bool] = field(default=False, metadata={"help": "use flash attention"})
     use_mem_eff_attn: Optional[bool] = field(default=True, metadata={"help": "use use_mem_eff_attn"})
     use_flash_attn_with_mask: Optional[bool] = field(
         default=True, metadata={"help": "use use_flash_attn_with_mask"}
@@ -229,7 +229,6 @@ class ModelArguments:
     temporal_conv_size: int = field(default=2, metadata={"help": "Temporal convolution size"})
     tie_word_embeddings: bool = field(default=True, metadata={"help": "Whether to tie word embeddings"})
     use_bias: bool = field(default=False, metadata={"help": "Whether to use bias"})
-    use_flash_attention: bool = field(default=True, metadata={"help": "Whether to use flash attention"})
     use_fused_head_and_loss_fn: bool = field(default=False, metadata={"help": "Whether to use fused head and loss function"})
     use_recompute_lm_head: bool = field(default=False, metadata={"help": "Whether to recompute LM head"})
     use_recompute_loss_fn: bool = field(default=True, metadata={"help": "Whether to recompute loss function"})
@@ -503,7 +502,7 @@ def main():
     )
 
     cfg = update_model_config_from_args(cfg, model_config)
-    cfg.use_flash_attn = args.use_flash_attn
+    cfg.use_flash_attention = args.use_flash_attention
     cfg.use_mem_eff_attn = args.use_mem_eff_attn
     cfg.use_flash_attn_with_mask = args.use_flash_attn_with_mask
     cfg.hidden_dropout_prob = args.hidden_dropout_prob
@@ -689,7 +688,7 @@ def main():
                 ignored_index=tokenizer.ignored_index,
                 task_group=train_task_group_text,
                 use_mem_eff_attn=True,
-                use_flash_attn=False,
+                use_flash_attention=False,
             )
         else:
             logger.info("[TEXT SFT] not training pure text sft.")

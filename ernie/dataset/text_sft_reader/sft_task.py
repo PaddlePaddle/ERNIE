@@ -54,7 +54,7 @@ class KnoverDataset(IterableDataset):
         ignored_index,
         task_group=None,
         input_keys=None,
-        use_flash_attn=False,
+        use_flash_attention=False,
         use_mem_eff_attn=False,
         all_use_skip_align=False,
     ):
@@ -75,7 +75,7 @@ class KnoverDataset(IterableDataset):
             ]
         else:
             self.input_keys = input_keys
-        self.use_flash_attn = use_flash_attn
+        self.use_flash_attention = use_flash_attention
         self.use_mem_eff_attn = use_mem_eff_attn
         self.all_use_skip_align = all_use_skip_align
 
@@ -89,7 +89,7 @@ class KnoverDataset(IterableDataset):
             mask = batch.pop("loss_mask").astype("bool")
             # batch.pop('position_ids')
 
-            if self.use_flash_attn:
+            if self.use_flash_attention:
                 batch.pop("inbatch_pack_offset")
                 batch.pop("attention_mask")
             if self.use_mem_eff_attn:

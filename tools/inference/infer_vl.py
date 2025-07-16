@@ -266,7 +266,7 @@ class Predictor:
         )
         config.tensor_parallel_output = False
         config.sequence_parallel = False
-        config.use_flash_attn = True
+        config.use_flash_attention = True
         if config.rope_3d != args.rope_3d:
             logger.warning(f"rope_3d not match, config.rope_3d: {config.rope_3d}, args.rope_3d: {args.rope_3d}")
             config.rope_3d = args.rope_3d
