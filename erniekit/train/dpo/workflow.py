@@ -346,6 +346,7 @@ def run_dpo(
 
     if model_args.lora:
         logger.info("Start to wrap model with LoRA config ...")
+
         if model_args.lora_path is None:
             target_modules = [
                 ".*qkv_proj.*",

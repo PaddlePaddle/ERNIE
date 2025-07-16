@@ -126,6 +126,7 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
     else:
         input_keys.append("attention_mask")
     return_list = []
+    max_seq_len = max(len(batch_sequence[0].token_ids) for batch_sequence in batch)
     for batch_sequence in batch:
         original_token_ids = [seq.token_ids for seq in batch_sequence]
         token_ids = [sum(original_token_ids, [])]
@@ -372,7 +373,7 @@ class SequenceDataset(IterableDataset):
         if self.is_valid:
             examples_all = examples_all[::-1]
 
-        if not self.greedy_intokens:
+        if True:
             # base
             for example in examples_all[::-1]:
                 actual_example_num = 1
@@ -383,66 +384,78 @@ class SequenceDataset(IterableDataset):
                     continue
                 if self.estimate:
                     self.used_samples += actual_example_num
-                if cur_len + len(sequence.token_ids) <= self.max_seq_len:
-                    batch_sequence.append(sequence)
-                    cur_len += len(sequence.token_ids)
-                else:
-                    yield batch_sequence
-                    batch_sequence, cur_len = [sequence], len(sequence.token_ids)
+                yield [sequence]
+        # elif not self.greedy_intokens:
+        #     # base
+        #     for example in examples_all[::-1]:
+        #         actual_example_num = 1
+        #         sequence = self._postprocess_sequence(example, actual_example_num)
+        #         if sequence is None:
+        #             if self.estimate:
+        #                 self.unused_samples += actual_example_num
+        #             continue
+        #         if self.estimate:
+        #             self.used_samples += actual_example_num
+        #         if cur_len + len(sequence.token_ids) <= self.max_seq_len:
+        #             batch_sequence.append(sequence)
+        #             cur_len += len(sequence.token_ids)
+        #         else:
+        #             yield batch_sequence
+        #             batch_sequence, cur_len = [sequence], len(sequence.token_ids)
 
-                if self.estimate:
-                    self.used_estimate_samples += actual_example_num
-                    if self.used_estimate_samples >= self.max_estimate_samples:
-                        # Yield left batch sequence before estimation ends
-                        if len(batch_sequence) > 0:
-                            yield batch_sequence
-                        self.used_estimate_samples = 0
-                        # Set flag to False and yield empty list to signal the end of estimation
-                        self.estimate = False
-                        yield []
-            if len(batch_sequence) > 0:
-                yield batch_sequence
-        else:
-            # Pseudo multiple rounds + group greedy intokens.
-            buffer_size = 500
-            examples = []
-            actual_example_num_list = []
-            i = 0
-            for example in examples_all[::-1]:
-                actual_example_num = 1
-                if i < buffer_size:
-                    examples.append(example)
-                    actual_example_num_list.append(actual_example_num)
-                    i += 1
-                else:
-                    # Running greedy strategy in examples.
-                    generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
-                    for pack in generate_packs:
-                        if len(pack) > 0:
-                            yield pack
-                    examples = [example]
-                    actual_num_examples_list = [actual_example_num]
-                    i = 1
+        #         if self.estimate:
+        #             self.used_estimate_samples += actual_example_num
+        #             if self.used_estimate_samples >= self.max_estimate_samples:
+        #                 # Yield left batch sequence before estimation ends
+        #                 if len(batch_sequence) > 0:
+        #                     yield batch_sequence
+        #                 self.used_estimate_samples = 0
+        #                 # Set flag to False and yield empty list to signal the end of estimation
+        #                 self.estimate = False
+        #                 yield []
+        #     if len(batch_sequence) > 0:
+        #         yield batch_sequence
+        # else:
+        #     # Pseudo multiple rounds + group greedy intokens.
+        #     buffer_size = 500
+        #     examples = []
+        #     actual_example_num_list = []
+        #     i = 0
+        #     for example in examples_all[::-1]:
+        #         actual_example_num = 1
+        #         if i < buffer_size:
+        #             examples.append(example)
+        #             actual_example_num_list.append(actual_example_num)
+        #             i += 1
+        #         else:
+        #             # Running greedy strategy in examples.
+        #             generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
+        #             for pack in generate_packs:
+        #                 if len(pack) > 0:
+        #                     yield pack
+        #             examples = [example]
+        #             actual_num_examples_list = [actual_example_num]
+        #             i = 1
 
-                if self.estimate:
-                    self.used_estimate_samples += actual_example_num
-                    # Stop estimation if the number of samples used in estimation is larger than max_estimate_samples
-                    if self.used_estimate_samples >= self.max_estimate_samples:
-                        # Yield left packs before estimation ends
-                        if len(examples) > 0:
-                            generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
-                            for pack in generate_packs:
-                                if len(pack) > 0:
-                                    yield pack
-                        # Set flag to False and yield empty list to signal the end of estimation
-                        self.estimate = False
-                        yield []
+        #         if self.estimate:
+        #             self.used_estimate_samples += actual_example_num
+        #             # Stop estimation if the number of samples used in estimation is larger than max_estimate_samples
+        #             if self.used_estimate_samples >= self.max_estimate_samples:
+        #                 # Yield left packs before estimation ends
+        #                 if len(examples) > 0:
+        #                     generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
+        #                     for pack in generate_packs:
+        #                         if len(pack) > 0:
+        #                             yield pack
+        #                 # Set flag to False and yield empty list to signal the end of estimation
+        #                 self.estimate = False
+        #                 yield []
 
-            if len(examples) > 0:
-                generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
-                for pack in generate_packs:
-                    if len(pack) > 0:
-                        yield pack
+        #     if len(examples) > 0:
+        #         generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
+        #         for pack in generate_packs:
+        #             if len(pack) > 0:
+        #                 yield pack
 
         self.epoch_index += 1
 
