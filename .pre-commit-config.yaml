@@ -1,47 +1,49 @@
+# Exclude all third-party libraries and auto-generated files globally
+exclude: |
+    (?x)^(
+        patches/.+|
+        third_party/.+|
+        ^ops/.+|
+        ^dyquant_converter/.+
+    )$
 repos:
-# For Python files
--   repo: https://github.com/psf/black.git
-    rev: 25.1.0
-    hooks:
-    -   id: black
-        files: \.(py|pyi)$
-        additional_dependencies: [toml]
--   repo: https://github.com/PyCQA/isort
-    rev: 6.0.1
-    hooks:
-    -   id: isort
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.1
-    hooks:
-    -   id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-    -   id: ruff-format
+# Common hooks
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v4.4.0
     hooks:
     -   id: check-merge-conflict
     -   id: check-symlinks
     -   id: detect-private-key
-        files: (?!.*paddle)^.*$
     -   id: end-of-file-fixer
-        files: \.md$
+    -   id: sort-simple-yaml
+        files: (ops|backward|op_[a-z_]+)\.yaml$
     -   id: trailing-whitespace
-        files: \.md$
--   repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.5
+-   repo: https://github.com/Lucas-C/pre-commit-hooks.git
+    rev: v1.5.1
     hooks:
-    -   id: forbid-crlf
-        files: \.md$
     -   id: remove-crlf
-        files: \.md$
-    -   id: forbid-tabs
-        files: \.md$
     -   id: remove-tabs
-        files: \.md$
+        name: Tabs remover (C++)
+        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|xpu|kps)$
+        args: [--whitespaces-count, '2']
+    -   id: remove-tabs
+        name: Tabs remover (Python)
+        files: (.*\.(py|bzl)|BUILD|.*\.BUILD|WORKSPACE)$
+        args: [--whitespaces-count, '4']
 -   repo: local
     hooks:
     -   id: copyright_checker
         name: copyright_checker
-        entry: python ./tools/codestyle/.copyright.hook
+        entry: python ./tools/codestyle/copyright.py
         language: system
-        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|sh)$
+        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|pyi|sh)$
+# For Python files
+-   repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 24.8.0
+    hooks:
+    -   id: black
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.1
+    hooks:
+    -   id: ruff
+        args: [--fix, --exit-non-zero-on-fix, --no-cache]

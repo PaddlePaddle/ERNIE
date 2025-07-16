@@ -26,7 +26,7 @@ if importlib.util.find_spec("triton") is not None:
         import use_triton_in_paddle
 
         use_triton_in_paddle.make_triton_compatible_with_paddle()
-    except:
+    except Exception as _:
         raise RuntimeError(
             "Triton is installed, but not yet compatible with Paddle. "
             "Please run 'python -m pip install use-triton-in-paddle' to enable Triton support in Paddle."
@@ -67,11 +67,17 @@ from dpo_utils import (
 
 def main():
     """main"""
-    parser = PdArgumentParser((ModelArgument, DataArgument, DPOTrainingArguments, DPOConfig))
+    parser = PdArgumentParser(
+        (ModelArgument, DataArgument, DPOTrainingArguments, DPOConfig)
+    )
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args, dpo_config = parser.parse_json_file_and_cmd_lines()
+        model_args, data_args, training_args, dpo_config = (
+            parser.parse_json_file_and_cmd_lines()
+        )
     else:
-        model_args, data_args, training_args, dpo_config = parser.parse_args_into_dataclasses()
+        model_args, data_args, training_args, dpo_config = (
+            parser.parse_args_into_dataclasses()
+        )
 
     if not model_args.use_sparse_head_and_loss_fn:
         model_args.use_sparse_head_and_loss_fn = True
@@ -81,7 +87,9 @@ def main():
 
     if data_args.max_seq_len < 16:
         data_args.max_seq_len = 16
-        logger.warning(f"max_seq_len must be greater than 16, set max_seq_len to {data_args.max_seq_len}.")
+        logger.warning(
+            f"max_seq_len must be greater than 16, set max_seq_len to {data_args.max_seq_len}."
+        )
     if data_args.max_seq_len < data_args.max_prompt_len + 10:
         data_args.max_prompt_len = data_args.max_seq_len - 10
         logger.warning(
@@ -95,19 +103,23 @@ def main():
         logger.info("orpo loss_type is equal to sft_loss + pref_loss_ratio * or_loss.")
     if dpo_config.loss_type in ["or", "simpo"] and not dpo_config.reference_free:
         dpo_config.reference_free = True
-        logger.warning(f"{dpo_config.loss_type} loss_type only supports reference_free. Set reference_free to True.")
+        logger.warning(
+            f"{dpo_config.loss_type} loss_type only supports reference_free. Set reference_free to True."
+        )
     if dpo_config.lora:
         assert model_args.continue_training, "Continue training is required for LoRA."
     if training_args.pipeline_parallel_degree > 1:
         assert (
             hasattr(training_args, "pipeline_parallel_config")
-            and "enable_clear_every_step_cache" in training_args.pipeline_parallel_config
+            and "enable_clear_every_step_cache"
+            in training_args.pipeline_parallel_config
         ), "Should set '--pipeline_parallel_config enable_clear_every_step_cache' in bash script for pp."
     if training_args.sequence_parallel:
         if training_args.pipeline_parallel_degree > 1:
             assert (
                 hasattr(training_args, "pipeline_parallel_config")
-                and "disable_partial_send_recv" in training_args.pipeline_parallel_config
+                and "disable_partial_send_recv"
+                in training_args.pipeline_parallel_config
             ), "Should set '--pipeline_parallel_config disable_partial_send_recv' in bash script for pp with sp."
         if training_args.tensor_parallel_degree <= 1:
             training_args.sequence_parallel = False
@@ -118,7 +130,9 @@ def main():
         logger.info("LoRA does not support fuse_linear. Set fuse_linear to False.")
     if dpo_config.lora:
         dpo_config.ref_model_update_steps = -1
-        logger.warning("LoRA does not support ref_model_update_steps. Set ref_model_update_steps to -1.")
+        logger.warning(
+            "LoRA does not support ref_model_update_steps. Set ref_model_update_steps to -1."
+        )
 
     if training_args.sharding_parallel_degree > 1:
         if (
@@ -143,8 +157,15 @@ def main():
     )
 
     last_checkpoint = None
-    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
-        uc_async_save = training_args.unified_checkpoint and "async_save" in training_args.unified_checkpoint_config
+    if (
+        os.path.isdir(training_args.output_dir)
+        and training_args.do_train
+        and not training_args.overwrite_output_dir
+    ):
+        uc_async_save = (
+            training_args.unified_checkpoint
+            and "async_save" in training_args.unified_checkpoint_config
+        )
         last_checkpoint = get_last_checkpoint(
             training_args.output_dir,
             signal_folder=training_args.output_signal_dir,
@@ -172,7 +193,9 @@ def main():
     with open(config_path, "r", encoding="utf-8") as f:
         config_dict = json.load(f)
     if "torch_dtype" in config_dict:
-        raise ValueError("Unsupported weight format: Torch weights are not compatible with Paddle model currently.")
+        raise ValueError(
+            "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
+        )
 
     # fuse_softmax_mask only support for rocm.
     if not paddle.is_compiled_with_rocm():
@@ -182,7 +205,11 @@ def main():
             )
             model_args.fuse_softmax_mask = False
 
-    check_refined_recompute(training_args.refined_recompute, training_args.sequence_parallel, lora=dpo_config.lora)
+    check_refined_recompute(
+        training_args.refined_recompute,
+        training_args.sequence_parallel,
+        lora=dpo_config.lora,
+    )
 
     if model_args.weight_quantize_algo is not None:
         if model_args.weight_quantize_algo == "weight_only_mix":
@@ -249,15 +276,30 @@ def main():
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": False})
     config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+
+    if (
+        training_args.pipeline_parallel_degree > 1
+        and model_args.weight_quantize_algo is not None
+        and config.tie_word_embeddings
+    ):
+        raise NotImplementedError(
+            "Quantization is not supported for models with tied lm_head and word_embedding \
+            weights when using Pipeline Parallelism (PP)."
+        )
+
     if config.moe_num_experts is None or config.moe_num_experts == 0:
-        config.moe_group = "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        config.moe_group = (
+            "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        )
 
     if training_args.pipeline_parallel_degree > 1:
         model_class = Ernie4_5_MoeForCausalLMPipe
     else:
         model_class = Ernie4_5_MoeForCausalLM
     if model_args.continue_training:
-        model = model_class.from_pretrained(model_args.model_name_or_path, config=config)
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path, config=config
+        )
         # for DPO save
         if not dpo_config.reference_free and not dpo_config.lora:
             # (LiuTing): config.moe_group will change in `model_class.from_pretrained`
@@ -272,7 +314,9 @@ def main():
         if not dpo_config.reference_free and not dpo_config.lora:
             ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
             if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
-                ref_config.moe_group = "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+                ref_config.moe_group = (
+                    "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+                )
             ref_model = model_class._from_config(ref_config, dtype=dtype)
             # make sure the state_dict is the same to get the same loss for first step
             ref_model.set_state_dict(model.state_dict())
@@ -300,7 +344,9 @@ def main():
                 model_args.lora_alpha = 4
             if model_args.weight_quantize_algo is not None:
                 if model_args.rslora or model_args.lora_plus_scale != 1.0:
-                    logger.info("Weight quantization is not supported in LoRA+ and RsLoRA.")
+                    logger.info(
+                        "Weight quantization is not supported in LoRA+ and RsLoRA."
+                    )
             if model_args.lora_alpha == -1:
                 if model_args.rslora:
                     model_args.lora_alpha = 4
@@ -319,7 +365,9 @@ def main():
             )
             model = LoRAModel(model, lora_config)
         else:
-            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+            model = LoRAModel.from_pretrained(
+                model=model, lora_path=model_args.lora_path
+            )
         model.print_trainable_parameters()
         logger.info("Wraping model with LoRA config successfully !")
 
@@ -347,7 +395,9 @@ def main():
     if training_args.max_steps == -1:
         if training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
             # NOTE(gongenlei): not to feed train_dataset, or the data will be wrong in next training.
-            training_args, _ = dpo_estimate_training(tokenizer, data_args, training_args, config=model.config)
+            training_args, _ = dpo_estimate_training(
+                tokenizer, data_args, training_args, config=model.config
+            )
 
         if paddle.distributed.get_world_size() > 1:
             paddle.distributed.barrier()
@@ -358,16 +408,24 @@ def main():
             f"Re-setting training_args.max_steps to {training_args.max_steps} ({training_args.num_train_epochs})"
         )
         if training_args.max_steps <= 0:
-            raise ValueError(f"Invalid max_steps: {training_args.max_steps}. Please check your dataset")
+            raise ValueError(
+                f"Invalid max_steps: {training_args.max_steps}. Please check your dataset"
+            )
     if training_args.save_strategy == IntervalStrategy.EPOCH:
         training_args.save_strategy = IntervalStrategy.STEPS
-        training_args.save_steps = int(training_args.max_steps / training_args.num_train_epochs)
+        training_args.save_steps = int(
+            training_args.max_steps / training_args.num_train_epochs
+        )
     if training_args.evaluation_strategy == IntervalStrategy.EPOCH:
         training_args.evaluation_strategy = IntervalStrategy.STEPS
-        training_args.eval_steps = int(training_args.max_steps / training_args.num_train_epochs)
+        training_args.eval_steps = int(
+            training_args.max_steps / training_args.num_train_epochs
+        )
     if training_args.logging_strategy == IntervalStrategy.EPOCH:
         training_args.logging_strategy = IntervalStrategy.STEPS
-        training_args.logging_steps = int(training_args.max_steps / training_args.num_train_epochs)
+        training_args.logging_steps = int(
+            training_args.max_steps / training_args.num_train_epochs
+        )
 
     if training_args.should_load_dataset:
         train_dataset = create_dataset(
@@ -392,8 +450,16 @@ def main():
         ref_model=ref_model,
         dpo_config=dpo_config,
         args=training_args,
-        train_dataset=(train_dataset if training_args.do_train and training_args.should_load_dataset else None),
-        eval_dataset=(eval_dataset if training_args.do_eval and training_args.should_load_dataset else None),
+        train_dataset=(
+            train_dataset
+            if training_args.do_train and training_args.should_load_dataset
+            else None
+        ),
+        eval_dataset=(
+            eval_dataset
+            if training_args.do_eval and training_args.should_load_dataset
+            else None
+        ),
         tokenizer=tokenizer,
         data_collator=partial(
             collate_fn,
@@ -411,7 +477,11 @@ def main():
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-        if training_args.dpo_benchmark and training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
+        if (
+            training_args.dpo_benchmark
+            and training_args.should_load_dataset
+            and paddle.distributed.get_rank() == 0
+        ):
             del train_dataset
             gc.collect()
             train_dataset = create_dataset(
@@ -423,8 +493,12 @@ def main():
             total_effective_tokens, total_tokens = calculate_effective_tokens(
                 training_args, train_dataset, data_args.max_seq_len
             )
-            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
-            total_tokens_per_second = total_tokens / train_result.metrics["train_runtime"]
+            effective_tokens_per_second = (
+                total_effective_tokens / train_result.metrics["train_runtime"]
+            )
+            total_tokens_per_second = (
+                total_tokens / train_result.metrics["train_runtime"]
+            )
             effective_ratio = 100 * total_effective_tokens / total_tokens
             logger.info(
                 "[timelog] {}: {:.2f} % ({}) ".format(
@@ -449,7 +523,9 @@ def main():
             )
 
         if not training_args.dpo_benchmark:
-            trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+            trainer.save_model(
+                merge_tensor_parallel=training_args.tensor_parallel_degree > 1
+            )
             if paddle.distributed.get_world_size() > 1:
                 paddle.distributed.barrier()
             trainer.log_metrics("train", train_result.metrics)
