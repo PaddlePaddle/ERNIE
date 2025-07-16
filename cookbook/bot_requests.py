@@ -39,19 +39,23 @@ class BotClient:
         """
         self.logger = logging.getLogger(__name__)
 
-        self.max_retry_num = getattr(args, 'max_retry_num', 3)
-        self.max_char = getattr(args, 'max_char', 8000)
+        self.max_retry_num = getattr(args, "max_retry_num", 3)
+        self.max_char = getattr(args, "max_char", 8000)
 
-        self.model_map = getattr(args, 'model_map', {})
-        self.api_key = getattr(args, 'api_key', 'bce-v3/xxx')
+        self.model_map = getattr(args, "model_map", {})
+        self.api_key = getattr(args, "api_key", "bce-v3/xxx")
 
-        self.embedding_service_url = getattr(args, 'embedding_service_url', 'embedding_service_url')
-        self.embedding_model = getattr(args, 'embedding_model', 'embedding_model')
+        self.embedding_service_url = getattr(
+            args, "embedding_service_url", "embedding_service_url"
+        )
+        self.embedding_model = getattr(args, "embedding_model", "embedding_model")
 
-        self.web_search_service_url = getattr(args, 'web_search_service_url', 'web_search_service_url')
-        self.max_search_results_num = getattr(args, 'max_search_results_num', 15)
+        self.web_search_service_url = getattr(
+            args, "web_search_service_url", "web_search_service_url"
+        )
+        self.max_search_results_num = getattr(args, "max_search_results_num", 15)
 
-        self.qianfan_api_key = getattr(args, 'qianfan_api_key', 'bce-v3/xxx')
+        self.qianfan_api_key = getattr(args, "qianfan_api_key", "bce-v3/xxx")
 
     def call_back(self, host_url: str, req_data: dict) -> dict:
         """
@@ -108,7 +112,12 @@ class BotClient:
             raise
 
     def process(
-        self, model_name: str, req_data: dict, max_tokens: int = 2048, temperature: float = 1.0, top_p: float = 0.7
+        self,
+        model_name: str,
+        req_data: dict,
+        max_tokens: int = 2048,
+        temperature: float = 1.0,
+        top_p: float = 0.7,
     ) -> dict:
         """
         Handles chat completion requests by mapping the model name to its endpoint, preparing request parameters
@@ -151,7 +160,12 @@ class BotClient:
         return res
 
     def process_stream(
-        self, model_name: str, req_data: dict, max_tokens: int = 2048, temperature: float = 1.0, top_p: float = 0.7
+        self,
+        model_name: str,
+        req_data: dict,
+        max_tokens: int = 2048,
+        temperature: float = 1.0,
+        top_p: float = 0.7,
     ) -> dict:
         """
         Processes streaming requests by mapping the model name to its endpoint, configuring request parameters,
@@ -187,7 +201,9 @@ class BotClient:
 
             except Exception as e:
                 last_error = e
-                self.logger.error(f"Stream request failed (attempt {_ + 1}/{self.max_retry_num}): {e}")
+                self.logger.error(
+                    f"Stream request failed (attempt {_ + 1}/{self.max_retry_num}): {e}"
+                )
 
         self.logger.error("All retry attempts failed for stream request")
         yield {"error": str(last_error)}
@@ -208,7 +224,9 @@ class BotClient:
         en_ch_words = []
 
         for word in words:
-            if word.isalpha() and not any("\u4e00" <= char <= "\u9fff" for char in word):
+            if word.isalpha() and not any(
+                "\u4e00" <= char <= "\u9fff" for char in word
+            ):
                 en_ch_words.append(word)
             else:
                 en_ch_words.extend(list(word))
@@ -340,7 +358,9 @@ class BotClient:
         Returns:
             list: A list of floats representing the embedding.
         """
-        client = OpenAI(base_url=self.embedding_service_url, api_key=self.qianfan_api_key)
+        client = OpenAI(
+            base_url=self.embedding_service_url, api_key=self.qianfan_api_key
+        )
         response = client.embeddings.create(input=[text], model=self.embedding_model)
         return response.data[0].embedding
 
@@ -354,7 +374,10 @@ class BotClient:
         Returns:
             list: List of responses from the AI Search service.
         """
-        headers = {"Authorization": "Bearer " + self.qianfan_api_key, "Content-Type": "application/json"}
+        headers = {
+            "Authorization": "Bearer " + self.qianfan_api_key,
+            "Content-Type": "application/json",
+        }
 
         results = []
         top_k = self.max_search_results_num // len(query_list)
@@ -363,7 +386,9 @@ class BotClient:
                 "messages": [{"role": "user", "content": query}],
                 "resource_type_filter": [{"type": "web", "top_k": top_k}],
             }
-            response = requests.post(self.web_search_service_url, headers=headers, json=payload)
+            response = requests.post(
+                self.web_search_service_url, headers=headers, json=payload
+            )
 
             if response.status_code == 200:
                 response = response.json()
