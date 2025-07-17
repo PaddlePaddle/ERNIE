@@ -414,8 +414,6 @@ def run_sft(
     )
 
     if model_args.lora:
-        logger.info("Start to wrap model with LoRA config ...")
-
         from ernie.utils.peft_utils import initialize_lora_model
 
         model = initialize_lora_model(

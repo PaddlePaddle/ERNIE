@@ -32,7 +32,6 @@ if importlib.util.find_spec("triton") is not None:
         )
 
 import paddle
-from paddleformers.peft import LoRAConfig, LoRAModel
 from paddleformers.trainer import (
     IntervalStrategy,
     get_last_checkpoint,
@@ -345,46 +344,15 @@ def run_dpo(
         del ref_model.config.head_dim
 
     if model_args.lora:
-        logger.info("Start to wrap model with LoRA config ...")
-        if model_args.lora_path is None:
-            target_modules = [
-                ".*qkv_proj.*",
-                ".*out_proj.*",
-                ".*linear1.*",
-                ".*linear2.*",
-            ]
-            if model_args.rslora_plus:
-                model_args.rslora = True
-                model_args.lora_plus_scale = 4
-                model_args.lora_alpha = 4
-            if finetuning_args.weight_quantize_algo is not None:
-                if model_args.rslora or model_args.lora_plus_scale != 1.0:
-                    logger.info(
-                        "Weight quantization is not supported in LoRA+ and RsLoRA."
-                    )
-            if model_args.lora_alpha == -1:
-                if model_args.rslora:
-                    model_args.lora_alpha = 4
-                else:
-                    model_args.lora_alpha = 2 * model_args.lora_rank
-            lora_config = LoRAConfig(
-                target_modules=target_modules,
-                r=model_args.lora_rank,
-                lora_alpha=model_args.lora_alpha,
-                rslora=model_args.rslora,
-                lora_plus_scale=model_args.lora_plus_scale,
-                tensor_parallel_degree=finetuning_args.tensor_parallel_degree,
-                dtype=dtype,
-                head_dim=model.config.hidden_size // model.config.num_attention_heads,
-                base_model_name_or_path=model_args.model_name_or_path,
-            )
-            model = LoRAModel(model, lora_config)
-        else:
-            model = LoRAModel.from_pretrained(
-                model=model, lora_path=model_args.lora_path
-            )
-        model.print_trainable_parameters()
-        logger.info("Wraping model with LoRA config successfully !")
+        from ernie.utils.peft_utils import initialize_lora_model
+
+        model = initialize_lora_model(
+            model=model,
+            training_args=finetuning_args,
+            model_args=model_args,
+            resume_from_checkpoint=last_checkpoint is not None,
+            dtype=dtype,
+        )
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,

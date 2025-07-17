@@ -47,10 +47,38 @@ def get_args() -> argparse.Namespace:
     """
     parser = ArgumentParser(description="ERNIE models web chat demo.")
 
-    parser.add_argument("--server-port", type=int, default=8232, help="Demo server port.")
-    parser.add_argument("--server-name", type=str, default="0.0.0.0", help="Demo server name.")
-    parser.add_argument("--max_char", type=int, default=8000, help="Maximum character limit for messages.")
-    parser.add_argument("--max_retry_num", type=int, default=3, help="Maximum retry number for request.")
+    parser.add_argument(
+        "--server-port", type=int, default=8232, help="Demo server port."
+    )
+    parser.add_argument(
+        "--server-name", type=str, default="0.0.0.0", help="Demo server name."
+    )
+    parser.add_argument(
+        "--max_char",
+        type=int,
+        default=8000,
+        help="Maximum character limit for messages.",
+    )
+    parser.add_argument(
+        "--max_retry_num", type=int, default=3, help="Maximum retry number for request."
+    )
+    parser.add_argument(
+        "--model_name_map",
+        type=str,
+        default="{}",
+        help="""JSON string defining model name to internal name mappings.
+            Required Format:
+            {"model_name": "internal_model_name", ...}
+
+            Note:
+            - When specified, model_name must exist in model_map
+            - All names must be unique
+            - Defaults to empty mapping if not provided
+            - model_name MUST follow prefix rules:
+            * ERNIE-4.5[-*]: Text-only model
+            * ERNIE-4.5-VL[-*]: Multimodal models (image+text)
+            """,
+    )
     parser.add_argument(
         "--model_map",
         type=str,
@@ -67,12 +95,22 @@ def get_args() -> argparse.Namespace:
             {"model_name": "http://localhost:port/v1", ...}
 
             Note:
+            - When specified, model_name must exist in model_name_map
             - All endpoints must be valid HTTP URLs
             - At least one model must be specified
-            - Prefix determines model capabilities:
+            - model_name MUST follow prefix rules:
             * ERNIE-4.5[-*]: Text-only model
             * ERNIE-4.5-VL[-*]: Multimodal models (image+text)
             """,
+    )
+    parser.add_argument(
+        "--api_key", type=str, default="bce-v3/xxx", help="Model service API key."
+    )
+    parser.add_argument(
+        "--concurrency_limit", type=int, default=10, help="Default concurrency limit."
+    )
+    parser.add_argument(
+        "--max_queue_size", type=int, default=50, help="Maximum queue size for request."
     )
 
     args = parser.parse_args()
@@ -83,7 +121,20 @@ def get_args() -> argparse.Namespace:
         if len(args.model_map) < 1:
             raise ValueError("model_map must contain at least one model configuration")
     except json.JSONDecodeError as e:
-        raise ValueError("Invalid JSON format for --model-map") from e
+        raise ValueError("Invalid JSON format for --model_map") from e
+
+    try:
+        args.model_name_map = json.loads(args.model_name_map)
+    except json.JSONDecodeError as e:
+        raise ValueError("Invalid JSON format for --model_name_map") from e
+
+    if args.model_name_map:
+        for model_name in list(args.model_map.keys()):
+            internal_model = args.model_name_map.get(model_name, model_name)
+            args.model_map[internal_model] = args.model_map.pop(model_name)
+    else:
+        for key in args.model_map:
+            args.model_name_map[key] = key
 
     return args
 
@@ -133,6 +184,7 @@ class GradioEvents:
         max_tokens: int,
         temperature: float,
         top_p: float,
+        model_name_map: dict,
         bot_client: BotClient,
     ) -> str:
         """
@@ -151,6 +203,7 @@ class GradioEvents:
             max_tokens (int): Maximum tokens.
             temperature (float): Temperature.
             top_p (float): Top p.
+            model_name_map (dict): Model name map.
             bot_client (BotClient): Bot client.
 
         Yields:
@@ -163,7 +216,12 @@ class GradioEvents:
             if idx in image_history:
                 content = []
                 content.append(
-                    {"type": "image_url", "image_url": {"url": GradioEvents.get_image_url(image_history[idx])}}
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": GradioEvents.get_image_url(image_history[idx])
+                        },
+                    }
                 )
                 content.append({"type": "text", "text": query_h})
                 conversation.append({"role": "user", "content": content})
@@ -172,9 +230,16 @@ class GradioEvents:
             conversation.append({"role": "assistant", "content": response_h})
 
         content = []
-        if file_url and (len(image_history) == 0 or file_url != list(image_history.values())[-1]):
+        if file_url and (
+            len(image_history) == 0 or file_url != list(image_history.values())[-1]
+        ):
             image_history[len(task_history)] = file_url
-            content.append({"type": "image_url", "image_url": {"url": GradioEvents.get_image_url(file_url)}})
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": GradioEvents.get_image_url(file_url)},
+                }
+            )
             content.append({"type": "text", "text": query})
             conversation.append({"role": "user", "content": content})
         else:
@@ -182,7 +247,10 @@ class GradioEvents:
 
         try:
             req_data = {"messages": conversation}
-            for chunk in bot_client.process_stream(model_name, req_data, max_tokens, temperature, top_p):
+            model_name = model_name_map.get(model_name, model_name)
+            for chunk in bot_client.process_stream(
+                model_name, req_data, max_tokens, temperature, top_p
+            ):
                 if "error" in chunk:
                     raise Exception(chunk["error"])
 
@@ -207,6 +275,7 @@ class GradioEvents:
         max_tokens: int,
         temperature: float,
         top_p: float,
+        model_name_map: dict,
         bot_client: BotClient,
     ) -> list:
         """
@@ -226,6 +295,7 @@ class GradioEvents:
             max_tokens (int): The maximum token length of the generated response.
             temperature (float): The temperature parameter used by the model.
             top_p (float): The top_p parameter used by the model.
+            model_name_map (dict): The model name map.
             bot_client (BotClient): The bot client.
 
         Returns:
@@ -239,7 +309,17 @@ class GradioEvents:
         yield chatbot
 
         new_texts = GradioEvents.chat_stream(
-            query, task_history, image_history, model, file_url, system_msg, max_tokens, temperature, top_p, bot_client
+            query,
+            task_history,
+            image_history,
+            model,
+            file_url,
+            system_msg,
+            max_tokens,
+            temperature,
+            top_p,
+            model_name_map,
+            bot_client,
         )
 
         response = ""
@@ -269,6 +349,7 @@ class GradioEvents:
         max_tokens: int,
         temperature: float,
         top_p: float,
+        model_name_map: dict,
         bot_client: BotClient,
     ) -> list:
         """
@@ -286,6 +367,7 @@ class GradioEvents:
             max_tokens (int): The maximum token length of the generated response.
             temperature (float): The temperature parameter used by the model.
             top_p (float): The top_p parameter used by the model.
+            model_name_map (dict): The model name map.
             bot_client (BotClient): The bot client.
 
         Yields:
@@ -313,6 +395,7 @@ class GradioEvents:
             max_tokens,
             temperature,
             top_p,
+            model_name_map,
             bot_client,
         )
 
@@ -340,7 +423,9 @@ class GradioEvents:
         """
         GradioEvents.gc()
 
-        reset_result = namedtuple("reset_result", ["chatbot", "task_history", "image_history", "file_btn"])
+        reset_result = namedtuple(
+            "reset_result", ["chatbot", "task_history", "image_history", "file_btn"]
+        )
         return reset_result(
             [],  # clear chatbot
             [],  # clear task_history
@@ -366,7 +451,9 @@ class GradioEvents:
         Returns:
             gr.update: An update object representing the visibility of the file button.
         """
-        return gr.update(visible=model_name.upper().startswith(MULTI_MODEL_PREFIX))  # file_btn
+        return gr.update(
+            visible=model_name.upper().startswith(MULTI_MODEL_PREFIX)
+        )  # file_btn
 
 
 def launch_demo(args: argparse.Namespace, bot_client: BotClient):
@@ -378,6 +465,11 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient):
         bot_client (BotClient): Bot client instance
     """
     css = """
+    #file-upload {
+        height: 90px !important;
+        min-height: 90px !important;
+        max-height: 90px !important;
+    }
     /* Hide original Chinese text */
     #file-upload .wrap {
         font-size: 0 !important;
@@ -405,21 +497,34 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient):
         )
         gr.Markdown(
             """\
+<center><font size=3>    <a href="https://ernie.baidu.com/">ERNIE Bot</a> | \
+<a href="https://github.com/PaddlePaddle/ERNIE">GitHub</a> | \
+<a href="https://huggingface.co/baidu">Hugging Face</a> | \
+<a href="https://aistudio.baidu.com/modelsoverview">BAIDU AI Studio</a> | \
+<a href="https://yiyan.baidu.com/blog/publication/">Technical Report</a></center>"""
+        )
+        gr.Markdown(
+            """\
 <center><font size=3>This demo is based on ERNIE models. \
 (本演示基于文心大模型实现。)</center>"""
         )
 
-        chatbot = gr.Chatbot(label="ERNIE", elem_classes="control-height", type="messages")
-        model_names = list(args.model_map.keys())
+        chatbot = gr.Chatbot(
+            label="ERNIE", elem_classes="control-height", type="messages"
+        )
+        model_names = list(args.model_name_map.keys())
         with gr.Row():
             model_name = gr.Dropdown(
-                label="Select Model", choices=model_names, value=model_names[0], allow_custom_value=True
+                label="Select Model",
+                choices=model_names,
+                value=model_names[0],
+                allow_custom_value=True,
             )
             file_btn = gr.File(
                 label="Image upload (Active only for multimodal models. Accepted formats: PNG, JPEG, JPG)",
                 height="80px",
                 visible=True,
-                file_types=[".png", ".jpeg", "jpg"],
+                file_types=[".png", ".jpeg", ".jpg"],
                 elem_id="file-upload",
             )
         query = gr.Textbox(label="Input", elem_id="text_input")
@@ -429,51 +534,89 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient):
             submit_btn = gr.Button("🚀 Submit(发送)", elem_id="submit-button")
             regen_btn = gr.Button("🤔️ Regenerate(重试)")
 
-        with gr.Accordion("⚙️ Advanced Config", open=False):  # open=False means collapsed by default
+        with gr.Accordion(
+            "⚙️ Advanced Config", open=False
+        ):  # open=False means collapsed by default
             system_message = gr.Textbox(value="", label="System message", visible=True)
             additional_inputs = [
                 system_message,
-                gr.Slider(minimum=1, maximum=4096, value=2048, step=1, label="Max new tokens"),
-                gr.Slider(minimum=0.1, maximum=1.0, value=1.0, step=0.05, label="Temperature"),
-                gr.Slider(minimum=0.1, maximum=1.0, value=0.7, step=0.05, label="Top-p (nucleus sampling)"),
+                gr.Slider(
+                    minimum=1, maximum=4096, value=2048, step=1, label="Max new tokens"
+                ),
+                gr.Slider(
+                    minimum=0.1, maximum=1.0, value=1.0, step=0.05, label="Temperature"
+                ),
+                gr.Slider(
+                    minimum=0.1,
+                    maximum=1.0,
+                    value=0.7,
+                    step=0.05,
+                    label="Top-p (nucleus sampling)",
+                ),
             ]
 
         task_history = gr.State([])
         image_history = gr.State({})
 
-        model_name.change(GradioEvents.toggle_components_visibility, inputs=model_name, outputs=file_btn)
         model_name.change(
-            GradioEvents.reset_state, outputs=[chatbot, task_history, image_history, file_btn], show_progress=True
+            GradioEvents.toggle_components_visibility,
+            inputs=model_name,
+            outputs=file_btn,
         )
-        predict_with_clients = partial(GradioEvents.predict_stream, bot_client=bot_client)
-        regenerate_with_clients = partial(GradioEvents.regenerate, bot_client=bot_client)
+        model_name.change(
+            GradioEvents.reset_state,
+            outputs=[chatbot, task_history, image_history, file_btn],
+            show_progress=True,
+        )
+        predict_with_clients = partial(
+            GradioEvents.predict_stream,
+            model_name_map=args.model_name_map,
+            bot_client=bot_client,
+        )
+        regenerate_with_clients = partial(
+            GradioEvents.regenerate,
+            model_name_map=args.model_name_map,
+            bot_client=bot_client,
+        )
         query.submit(
             predict_with_clients,
-            inputs=[query, chatbot, task_history, image_history, model_name, file_btn] + additional_inputs,
+            inputs=[query, chatbot, task_history, image_history, model_name, file_btn]
+            + additional_inputs,
             outputs=[chatbot],
             show_progress=True,
         )
         query.submit(GradioEvents.reset_user_input, [], [query])
         submit_btn.click(
             predict_with_clients,
-            inputs=[query, chatbot, task_history, image_history, model_name, file_btn] + additional_inputs,
+            inputs=[query, chatbot, task_history, image_history, model_name, file_btn]
+            + additional_inputs,
             outputs=[chatbot],
             show_progress=True,
         )
         submit_btn.click(GradioEvents.reset_user_input, [], [query])
         empty_btn.click(
-            GradioEvents.reset_state, outputs=[chatbot, task_history, image_history, file_btn], show_progress=True
+            GradioEvents.reset_state,
+            outputs=[chatbot, task_history, image_history, file_btn],
+            show_progress=True,
         )
         regen_btn.click(
             regenerate_with_clients,
-            inputs=[chatbot, task_history, image_history, model_name, file_btn] + additional_inputs,
+            inputs=[chatbot, task_history, image_history, model_name, file_btn]
+            + additional_inputs,
             outputs=[chatbot],
             show_progress=True,
         )
 
-        demo.load(GradioEvents.toggle_components_visibility, inputs=gr.State(model_names[0]), outputs=file_btn)
+        demo.load(
+            GradioEvents.toggle_components_visibility,
+            inputs=gr.State(model_names[0]),
+            outputs=file_btn,
+        )
 
-    demo.queue().launch(server_port=args.server_port, server_name=args.server_name)
+    demo.queue(
+        default_concurrency_limit=args.concurrency_limit, max_size=args.max_queue_size
+    )
+    demo.launch(server_port=args.server_port, server_name=args.server_name)
 
 
 def main():

@@ -72,7 +72,6 @@ compute_type: bf16
 fp16_opt_level: O2
 amp_master_grad: True
 use_fused_head_and_loss_fn: True
-loss_subbatch_seqlen: 8192
 amp_custom_white_list:
   - "lookup_table"
   - "lookup_table_v2"
