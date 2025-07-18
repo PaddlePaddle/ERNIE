@@ -23,7 +23,6 @@ __all__ = [
 
 import contextlib
 import json
-import logging
 import math
 import os
 import re
@@ -52,10 +51,9 @@ try:
 except ImportError:
     TRAINING_ARGS_NAME = "training_args.bin"
 
-# from paddlenlp.trainer.trainer import PREFIX_CHECKPOINT_DIR, SCHEDULER_NAME, TRAINER_STATE_NAME, OPTIMIZER_NAME
 from paddleformers.utils.env import PADDLE_OPTIMIZER_NAME
 
-OPTIMIZER_NAME = PADDLE_OPTIMIZER_NAME  # for compatibility
+OPTIMIZER_NAME = PADDLE_OPTIMIZER_NAME  
 
 try:
     from paddleformers.trainer.trainer import PADDLE_WEIGHT_FILE_NAME as PADDLE_WEIGHTS_NAME
@@ -92,7 +90,7 @@ from ernie.lr_schedulers import get_cosine_schedule_with_warmup, get_wsd_schedul
 from ernie.utils.misc import global_training_logs
 from ernie.utils.training_utils import reset_per_device_batch_size
 
-DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
+DATATYPE_2_ID = {"mm": 0, "lm": 1}
 
 
 try:
@@ -116,21 +114,17 @@ except Exception:
         """
         return False
 
-
 def distributed_optimizer_maybe_hack(
     optimizer,
     use_moe,
 ):
     """rewrite the function of fleet.distributed_optimizer"""
     if use_moe:
-        from src.trainers.dygraph_optimizer.hybrid_parallel_optimizer import (
+        from ernie.distributed.hybrid_parallel_optimizer import (
             HybridParallelOptimizer as MoEHybridParallelOptimizer,
         )
-
-        # moe下需要定制 `HybridParallelOptimizer` 函数以下重写了 `fleet.distributed_optimizer`
         fleet_env = fleet.fleet
         fleet_env.user_defined_optimizer = optimizer
-        # TODO：sharding group 内做 moe
         hp_optim = MoEHybridParallelOptimizer(optimizer, fleet_env._hcg, fleet_env._user_defined_strategy)
 
         if fleet_env._user_defined_strategy.hybrid_configs["pp_configs"].dp_comm_overlap:
@@ -155,21 +149,14 @@ class PreTrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "Path to pretrained model or model identifier from "
-            "https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+            "https://paddleformers.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
     )
     vision_model_name_or_path: str = field(
         default=None,
         metadata={
             "help": "Path to pretrained model or model identifier from "
-            "https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
-        },
-    )
-    inception_model_name_or_path: str = field(
-        default=None,
-        metadata={
-            "help": "Path to pretrained model or model identifier from "
-            "https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+            "https://paddleformers.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
     )
     prefetch_factor: int = field(
@@ -183,7 +170,7 @@ class PreTrainingArguments(TrainingArguments):
     num_consecutive: int = field(
         default=1,
         metadata={
-            "help": "h5 file continuous sampling. For performance reason, read one ID at once."
+            "help": "H5 file continuous sampling. For performance reason, read one ID at once."
         },
     )
     train_emb_only: int = field(
@@ -201,7 +188,7 @@ class PreTrainingArguments(TrainingArguments):
     use_map_style_data: int = field(
         default=0,
         metadata={
-            "help": "以为HF dataset为中心的 MapStyle SFT数据流（支持ShareGPT/DistillGPT)等数据",
+            "help": "use HF dataset map style",
         },
     )
     use_streaming_data: int = field(
@@ -242,33 +229,6 @@ class PreTrainingArguments(TrainingArguments):
             "`gradient_accumulation_steps` will be ignored"
         },
     )
-    init_global_batch_size: int = field(
-        default=-1,
-        metadata={
-            "help": "开启动态Batching。必须提供`global_batch_size`, "
-            "global_batch_size 会在 `batch_size_warumup_steps` 步内从 "
-            "`init_global_batch_size` 提升到 `global_batch_size`, "
-            "每次 `batchsize` 的提升量为`batch_size_warmup_increment`"
-        },
-    )
-    batch_size_warmup_steps: int = field(
-        default=-1,
-        metadata={
-            "help": "开启动态Batching。必须提供`global_batch_size`, "
-            "global_batch_size 会在 `batch_size_warumup_steps` 步内从 "
-            "`init_global_batch_size` 提升到 `global_batch_size`, "
-            "每次 `batchsize` 的提升量为`batch_size_warmup_increment`"
-        },
-    )
-    batch_size_warmup_increment: int = field(
-        default=1,
-        metadata={
-            "help": "开启动态Batching。必须提供`global_batch_size`, "
-            "global_batch_size 会在 `batch_size_warumup_steps` 步内从 "
-            "`init_global_batch_size` 提升到 `global_batch_size`, "
-            "每次 `batchsize` 的提升量为`batch_size_warmup_increment`"
-        },
-    )
     preprocessing_num_workers: Optional[int] = field(
         default=None,
         metadata={"help": "The number of processes to use for the preprocessing."},
@@ -277,10 +237,6 @@ class PreTrainingArguments(TrainingArguments):
         default=None,
         metadata={"help": "Pretrained config name or path if not the same as model_name"},
     )
-    # tokenizer_name: Optional[str] = field(
-    #     default=None,
-    #     metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
-    # )
     init_ckpt: Optional[str] = field(
         default=None,
         metadata={},
@@ -300,53 +256,52 @@ class PreTrainingArguments(TrainingArguments):
             "help": "vpp",
         },
     )
-    from_scratch: Optional[int] = field(default=1, metadata={"help": "是否重头训练"})
-    no_shuffle: Optional[int] = field(default=0, metadata={"help": "不要shuffle数据"})
-    no_part_shuffle: Optional[int] = field(default=0, metadata={"help": "不进行part内数据shuffle"})
-    record_optimizer_stat: Optional[bool] = field(default=False, metadata={"help": "是否记录优化器momentum信息"})
+    from_scratch: Optional[int] = field(default=1, metadata={"help": "if set, ignore init_ckpt"})
+    no_shuffle: Optional[int] = field(default=0, metadata={"help": "no shuffle data"})
+    no_part_shuffle: Optional[int] = field(default=0, metadata={"help": "no shuffle data within part"})
+    record_optimizer_stat: Optional[bool] = field(default=False, metadata={"help": "whether record optimizer momentum info"})
     skip_optimizer_badcases: Optional[bool] = field(
-        default=False, metadata={"help": "是否跳过optimizer badcase很多的step"}
+        default=False, metadata={"help": "whether skip optimizer badcases"}
     )
     same_data: Optional[bool] = field(
-        default=None, metadata={"help": "热启时，数据、配比、DP数是否完全一致, 支持续线"}
+        default=None, metadata={"help": "whether keep the same data with previous run"}
     )
-    base_seq_length: Optional[int] = field(default=4096, metadata={"help": "reeao最小seq_length"})
+    base_seq_length: Optional[int] = field(default=4096, metadata={"help": "reao min seq_length"})
     shuffle_consecutive: Optional[bool] = field(
         default=False,
-        metadata={"help": "是否对num_consecutive片段进行shuffle, same_data=True热启时，该值需与上一次保持一致"},
+        metadata={"help": "shuffle num_consecutive or not"},
     )
     global_shuffle_num_examples: Optional[int] = field(
         default=0,
         metadata={
-            "help": "part间shuffle的num_example总数限制，默认不做限制, "
-            "这个值与最小配比的积 必须大于1, 改变该值时，需要设置same_data=False"
+            "help": "max num of shuffling among different parts"
         },
     )
     adaptive_norm_clip: Optional[bool] = field(
-        default=False, metadata={"help": "是否启用 AdaptiveNormClip 梯度裁剪策略"}
+        default=False, metadata={"help": "whether enable AdaptiveNormClip"}
     )
     adaptive_norm_clip_ratio: Optional[float] = field(
-        default=1.03, metadata={"help": "AdaptiveNormClip 裁剪阈值, 大于设定的阈值才会启动裁剪"}
+        default=1.03, metadata={"help": "AdaptiveNormClip threshold ratio"}
     )
     adaptive_norm_force_clear_state: Optional[bool] = field(
-        default=False, metadata={"help": "AdaptiveNormClip 强制清空 state dict"}
+        default=False, metadata={"help": "AdaptiveNormClip force clear state dict"}
     )
     adaptive_norm_shard_clip: Optional[bool] = field(
-        default=False, metadata={"help": "AdaptiveNormClip 在切分参数上是否在局部clip"}
+        default=False, metadata={"help": "AdaptiveNormClip clip on local shards"}
     )
     adaptive_norm_enable_record: Optional[bool] = field(
-        default=False, metadata={"help": "AdaptiveNormClip 是否启用统计历史norm值"}
+        default=False, metadata={"help": "whether enable AdaptiveNormClip statistics history norm value"}
     )
     adaptive_norm_start_clip_steps: Optional[int] = field(
-        default=100, metadata={"help": "AdaptiveNormClip 开始裁剪的step"}
+        default=100, metadata={"help": "AdaptiveNormClip starting clip step"}
     )
     adaptive_norm_enable_record_clip_history: Optional[bool] = field(
-        default=False, metadata={"help": "AdaptiveNormClip 是否启用统计历史裁剪的记录"}
+        default=False, metadata={"help": "whether enable AdaptiveNormClip statistics history clip"}
     )
     adaptive_norm_verbose: Optional[bool] = field(
-        default=False, metadata={"help": "AdaptiveNormClip 是否开启裁剪日志打印"}
+        default=False, metadata={"help": "whether print AdaptiveNormClip clip log"}
     )
-    use_async_save: Optional[bool] = field(default=False, metadata={"help": "是否开启异步保存功能"})
+    use_async_save: Optional[bool] = field(default=False, metadata={"help": "whether enable async save"})
     pre_alloc_memory: float = field(
         default=0.0,
         metadata={
@@ -354,13 +309,13 @@ class PreTrainingArguments(TrainingArguments):
             "and release it for avoiding memory fragmentation"
         },
     )
-    enable_global_training_logs: bool = field(default=False, metadata={"help": "是否启用global_training_logs"})
-    use_dummy_dataset: Optional[bool] = field(default=False, metadata={"help": "是否使用DummyDataSet, 仅用于Debug"})
-    reshard_save_then_exit: Optional[bool] = field(default=False, metadata={"help": "是否在reshard后直接退出程序"})
-    moe_group: Optional[str] = field(default="dp", metadata={"help": "moe 的通信组，目前支持“dp|sharding|mp|dummy”"})
-    use_moe: Optional[bool] = field(default=False, metadata={"help": "expert parallel 临时替代"})
+    enable_global_training_logs: bool = field(default=False, metadata={"help": "whether enable global_training_logs"})
+    use_dummy_dataset: Optional[bool] = field(default=False, metadata={"help": "whether use DummyDataSet, 仅用于Debug"})
+    reshard_save_then_exit: Optional[bool] = field(default=False, metadata={"help": "whether reshard save then exit"})
+    moe_group: Optional[str] = field(default="dp", metadata={"help": "moe group, “dp|sharding|mp|dummy”"})
+    use_moe: Optional[bool] = field(default=False, metadata={"help": "whether enable moe"})
     log_global_grad_norm: Optional[bool] = field(
-        default=False, metadata={"help": "打印全局grad-norm, 只有在开启`enable_global_training_logs`时生效"}
+        default=False, metadata={"help": "whether print global grad-norm, only valid when `enable_global_training_logs` is True"}
     )
     multi_token_pred_depth: Optional[int] = field(
         default=0,
@@ -377,7 +332,6 @@ class PreTrainingArguments(TrainingArguments):
         metadata={"help": "The decay function for WSD LR scheduler. support half_life(default), 1-sqrt"},
     )
 
-    # image_token_len: int = field(default=64, metadata={"help": "number of images tokens from resampler per image"})
     freeze_config: str = field(
         default="",
         metadata={
@@ -389,15 +343,15 @@ class PreTrainingArguments(TrainingArguments):
     )
     moe_gate_lr_ratio: float = field(
         default=None,
-        metadata={"help": ("启用 moe 时，对 gate/router 的 LR 做特殊处理")},
+        metadata={"help": ("when using MoE, we need a special way to handle gate/router's LR")},
     )
     vit_lr_ratio: float = field(
         default=None,
-        metadata={"help": ("启用vit训练时，对 vit 的 LR 做特殊处理")},
+        metadata={"help": ("when use vit, we need a special way to handle vit's LR")},
     )
     visual_ld: float = field(
         default=None,
-        metadata={"help": ("启用vit训练时，对 vit 的 LR 做特殊处理")},
+        metadata={"help": ("when use vit, we need a special way to handle vit's LR")},
     )
     modality_interleave: str = field(default="acc", metadata={"help": "acc"})
     modality_ratio: tuple = field(
@@ -407,14 +361,10 @@ class PreTrainingArguments(TrainingArguments):
 
     pp_need_data_degree: int = field(
         default=0,
-        metadata={"help": "pipline 并行中的机器也需要 fetch 数据，提升吞吐，搭配 `ErniemmMoEForCausalPipe` 使用"},
+        metadata={"help": "pipline need data degree"},
     )
-    pp_need_data: bool = field(default=False, metadata={"help": "向前兼容"})
-    balanced_image_preprocess: bool = field(default=False, metadata={"help": "向前兼容"})
-    remote_inception_model_name_or_path: str = field(
-        default=None,
-        metadata={"help": "remote inception model name or path"},
-    )
+    pp_need_data: bool = field(default=False, metadata={"help": "pipline need fetch data"})
+    balanced_image_preprocess: bool = field(default=False, metadata={"help": "balanced image preprocess"})
     remote_vision_model_name_or_path: str = field(
         default=None,
         metadata={"help": "remote vision model name or path"},
@@ -429,20 +379,19 @@ class PreTrainingArguments(TrainingArguments):
         metadata={"help": "local export model name or path"},
     )
 
-    gc_interval: int = field(default=0, metadata={"help": "手动gc的间隔"})
+    gc_interval: int = field(default=0, metadata={"help": "gc interval"})
     skip_load_data_seq_cache: bool = field(
-        default=False, metadata={"help": "是否跳过加载数据序列缓存，跳过会导致初始化时间增加"}
+        default=False, metadata={"help": "whether skip load data seq cache"}
     )
     vit_second_fwd_batch_size: int = field(default=None, metadata={"help": "vit second forward batch size"})
     use_sp_callback: bool = field(
-        default=True, metadata={"help": "采用 SP callback 会跳过 SPHook的实现，避免梯度算重复"}
+        default=True, metadata={"help": "whether use SP callback"}
     )
     debug_reeao_dataset_world_size: int = field(default=0, metadata={"help": "debug reeao dataset world size"})
     moe_use_aux_free_update_coef: float = field(
         default=1.0e-3,
-        metadata={"help": "moe aux free update coef, 只有 `model_config` 中启用了 `aux_free` 策略才生效"},
+        metadata={"help": "moe aux free update coef"},
     )
-    # variable_resolution: bool = field(default=True, metadata={"help": "是否使用变长vit"})
 
     use_fp8: bool = field(
         default=False,
@@ -466,46 +415,20 @@ class PreTrainingArguments(TrainingArguments):
     )
     custom_data_status: str = field(default=None, metadata={"help": "load data status from custom trainer_state.json"})
     train_moe_only: int = field(default=None, metadata={"help": "train moe params only"})
-    use_ortho_loss_callback: bool = field(default=False, metadata={"help": "是否开启正交loss callback"})
-    use_doc_pack_atten: bool = field(default=False, metadata={"help": "是否开启Doc Pack Atten"})
+    use_ortho_loss_callback: bool = field(default=False, metadata={"help": "whether use ortho loss callback"})
+    use_doc_pack_atten: bool = field(default=False, metadata={"help": "whether enable Doc Pack Atten"})
     enable_flash_save_mode: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable Flash Save Mode"},
     )
 
-    # @property
-    # def use_moe(self):
-    #     """_summary_
-
-    #     Returns:
-    #         _type_: _description_
-    #     """
-    #     # return getattr(self, "use_expert_parallel", self._use_moe)
-    #     return True  # getattr(self, "use_expert_parallel", self._use_moe)
-
-    # @use_moe.setter
-    # def use_moe(self, value):
-    #     """_summary_
-
-    #     Args:
-    #         value (_type_): _description_
-    #     """
-    #     self.use_expert_parallel = value
-    #     self._use_moe = value
-
     @property
     def need_data(self):
         """
-        判断是否需要加载数据。
-
-        Args:
-            无
-
-        Returns:
-            bool: 如果需要加载数据则返回True，否则返回False。
-
+        whether need load data
+        return True
         """
-        # mp0、pp0状态 卡才需要load数据
+        # only mp0、pp0 need data
         if self.pp_need_data_degree:
             assert self.pipeline_parallel_degree > 1
             assert self.pp_need_data_degree >= 2 and self.pp_need_data_degree <= self.pipeline_parallel_degree, (
@@ -519,7 +442,7 @@ class PreTrainingArguments(TrainingArguments):
 
     @property
     def combine_batch(self):
-        """合并batch 用于增大seqlen
+        """concat batch size
 
         Returns:
             _type_: _description_
@@ -529,7 +452,7 @@ class PreTrainingArguments(TrainingArguments):
     @property
     def reeao_dataset_rank(self):
         """
-        考虑 pp /sharding/ dp 总和的数据流 rank
+        pp /sharding/ dp sum data stream rank
         """
         if not self.pp_need_data_degree:
             return super().dataset_rank
@@ -548,7 +471,7 @@ class PreTrainingArguments(TrainingArguments):
     @property
     def reeao_dataset_world_size(self):
         """
-        考虑 pp /sharding/ dp 总和的数据流 worldsize
+        pp /sharding/ dp sum data stream worldsize
         """
         if not self.pp_need_data_degree:
             return super().dataset_world_size
@@ -560,11 +483,6 @@ class PreTrainingArguments(TrainingArguments):
 
     def __post_init__(self):
         super().__post_init__()
-        # if self.sharding_parallel_degree > 1 and self.data_parallel_degree > 1:
-        #     # MP/PP下， 当前框架不支持同时开启 sharding 和 DP
-        #     assert (
-        #         self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
-        #      ), f"when using mp/pp, `data_parallel_degree` should be 1 but receive {self.data_parallel_degree}"
         if in_auto_parallel_align_mode():
             self.adaptive_norm_clip = False
             self.adaptive_norm_clip_ratio = 0.0
@@ -592,29 +510,12 @@ class PreTrainingArguments(TrainingArguments):
                 acc_steps,
             )
 
-        if self.batch_size_warmup_steps > 0:
-            assert self.global_batch_size > 0, self.global_batch_size
-            assert self.init_global_batch_size > 0, self.init_global_batch_size
-            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps  # hack add new
-            (
-                self.per_device_train_batch_size,
-                self.gradient_accumulation_steps,
-            ) = reset_per_device_batch_size(
-                self.init_global_batch_size,
-                self.per_device_train_batch_size,
-                self.dataset_world_size,
-            )
-            logger.info(
-                f"using progressive batching, accumulate step will increese from {self.gradient_accumulation_steps}"
-                f"to {self.max_gradient_accumulation_steps} in {self.batch_size_warmup_steps} steps"
-            )
-        else:
-            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps  # hack add new
+        self.max_gradient_accumulation_steps = self.gradient_accumulation_steps  
 
         if self.pipeline_parallel_degree > 1:
             self.per_device_eval_batch_size = (
                 self.per_device_train_batch_size * self.gradient_accumulation_steps
-            )  # hack Eval for PP!
+            )  
             logger.warning(f"eval_batch_size set to {self.per_device_eval_batch_size} in Pipeline Parallel!")
             user_defined_strategy = fleet.fleet._user_defined_strategy
             user_defined_strategy.strategy.pipeline_configs.accumulate_steps = self.gradient_accumulation_steps
@@ -625,16 +526,16 @@ class PreTrainingArguments(TrainingArguments):
                     f"gradient_accumulation_steps[{self.gradient_accumulation_steps}] should be divisible by "
                     f"pp_need_data_degree[{self.pp_need_data_degree}]"
                 )
-                # pp_need_data_degree下，args的acc 需要//pp数量，欺骗 在prepare_inputs
+                
                 self.gradient_accumulation_steps = self.gradient_accumulation_steps // self.pp_need_data_degree
                 logger.info(
                     f"pp-need-data hack args.gradient_accumulation_steps to - {self.gradient_accumulation_steps}"
                 )
-            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps  # hack add new
+            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps  
             logger.info(f"fixing pp configs: {user_defined_strategy.pipeline_configs}")
         else:
             self.per_device_eval_batch_size = self.per_device_train_batch_size
-            logger.warn(f"eval_batch_size set to {self.per_device_eval_batch_size}")
+            logger.warning(f"eval_batch_size set to {self.per_device_eval_batch_size}")
 
         if self.sharding_parallel_degree > 1:
             sharding_parallel_config = (
@@ -647,14 +548,12 @@ class PreTrainingArguments(TrainingArguments):
                 else False
             )
             if sharding_comm_overlap_non_pp:
-                # update grad acc steps
                 assert hasattr(fleet.fleet, "_user_defined_strategy")
                 user_defined_strategy = fleet.fleet._user_defined_strategy
                 user_defined_strategy.hybrid_configs["sharding_configs"].accumulate_steps = (
                     self.gradient_accumulation_steps
                 )
 
-        # NOTE(shenliang03): Check sanity of `accumulate_steps` when using sharding comm overlap.
         if hasattr(fleet.fleet, "_user_defined_strategy"):
             user_defined_strategy = fleet.fleet._user_defined_strategy
             if (
@@ -689,32 +588,34 @@ class PreTrainingArguments(TrainingArguments):
 
 class PretrainingTrainer(Trainer):
     """
-    PretrainingTrainer 类继承自 Trainer 类，用于训练模型。
+    PretrainingTrainer 
     """
 
     def __init__(self, _shit=None, args=None, model=None, callbacks=None, **kwargs):
         """
-        初始化方法。
+        Initialization method.
 
         Args:
-            _shit (None, optional): 占位参数，用于确保其他参数使用关键字传递。默认为 None。
-            args (None, optional): 初始化参数，包含训练过程中的各种配置信息。默认为 None。
-            model (None, optional): 训练模型。默认为 None。
-            callbacks (list, optional): 回调函数列表，用于在训练过程中执行特定操作。默认为空列表。
-            **kwargs: 其他关键字参数，用于传递额外的初始化参数。
+            _shit (None, optional): A placeholder parameter to ensure other parameters are passed by keyword. Defaults to None.
+            args (None, optional): Initialization arguments containing various configuration 
+            settings for training. Defaults to None.
+            model (None, optional): The training model. Defaults to None.
+            callbacks (list, optional): List of callback functions to perform specific actions during training. 
+            Defaults to an empty list.
+            **kwargs: Additional keyword arguments for passing extra initialization parameters.
 
         Returns:
-            无返回值。
+            None
 
         Raises:
-            AssertionError: 如果 _shit 参数不为 None，则抛出异常。
+            AssertionError: If the _shit parameter is not None, an exception is raised.
 
         """
         assert _shit is None, "use key-ward argument"
         if callbacks is None:
             callbacks = []
         callbacks = [
-            LoggingCallback(),  # ``LoggingCallback` 需要在`TensorBoardCallback` 前面, timmer会reset
+            LoggingCallback(),  
             StopperCallback(),
             TensorBoardCallback(args, model=model, log_tokens_per_step=True, log_flops_per_step=False),
             RefinedRecomputeCheckCallback(),
@@ -727,28 +628,22 @@ class PretrainingTrainer(Trainer):
             callbacks.append(
                 ClipGradByAdaptiveNormCallback(),
             )
-        # if args.use_fp8:
-        #     callbacks.append(
-        #         TEFP8Callback(),
-        #     )
-        # TODO: restore param.name in other ways
         args.use_async_save = args.use_async_save and args.save_sharded_model and args.load_sharded_model
         super().__init__(args=args, model=model, callbacks=callbacks, **kwargs)
         self.pop_callback(PrinterCallback)
-        self.pp_data_buffer = []  # pp
+        self.pp_data_buffer = []  
         self._tokens_per_sec_per_card_buffer = []
         self._start_save_time = time.time()
         self._end_save_time = time.time()
         self._first_end_save_time = time.time()
         self.resume_global_step = -1
         self.first_skip_step = 5 if self.args.save_steps > 5 else self.args.save_steps / 2
-        # self.return_value = paddle.zeros([]) #fake return value
         global_training_logs.enable_skip_zero([r".*aux_loss.*", r".*orthogonal_loss.*", r".*zloss.*"])
         global_training_logs.set_trainer_interval(self, self.args.global_logging_interval)
 
     def autocast_smart_context_manager(self):
         """
-        需要精心处理精度上的黑白名单问题。
+        manage autocast black white list
         """
         if self.enable_autocast_context_manager:
             black = [
@@ -782,13 +677,8 @@ class PretrainingTrainer(Trainer):
         return ctx_manager
 
     def _load_optimizer_state(self, checkpoint):
-        """重写load_optimizer 方法，兼容moe optimizer merge 功能"""
-        # def _load_moe_optimizer_state(checkpoint):
-        #     opt_moe_suffix = re.sub(r"moe\d\d", "moe00", self.args.optimizer_name_suffix)
-        #     return self._load_optimizer_state_of_one_shard(checkpoint, opt_moe_suffix)
-
+        """override load_optimizer_state to support moe optimizer merge"""
         def _broadcast_moe_optimizer_state(state_dict):
-            # boardcast_keys
             base_state_dict = {"master_weights": {}}
             buf = [
                 {i: j.shape for i, j in state_dict.items() if i not in ["master_weights", "LR_Scheduler"]},
@@ -805,11 +695,10 @@ class PretrainingTrainer(Trainer):
                 group = None
 
             dist.broadcast_object_list(buf, src=src_rank, group=group)
-            # logger.info(f"moe-optimizer-gather-keys{buf}")
+
             for k, s in buf[0].items():
                 v = state_dict.get(k, paddle.zeros(s, "float32")).to(get_env_device())
                 v.name = k
-                # k = k.replace("_fp32_master_0", "")  # TODO 这一手replace待品
                 dist.broadcast(v, src=src_rank, group=group)
                 logger.info(f"broadcast moe optimizer {k} from {src_rank}")
                 base_state_dict[k] = v.cpu()
@@ -826,7 +715,6 @@ class PretrainingTrainer(Trainer):
 
         if self.args.use_moe:
             base_state_dict = _broadcast_moe_optimizer_state(state_dict)
-            # base_state_dict_1 = _load_moe_optimizer_state(checkpoint)
             if self.args.data_parallel_rank > 0:
                 master_weight = state_dict.pop("master_weights", {})
                 base_state_dict.update(state_dict)
@@ -837,11 +725,10 @@ class PretrainingTrainer(Trainer):
                         base_state_dict["master_weights"] = master_weight
                 state_dict = base_state_dict
                 del base_state_dict
-                # return base_state_dict
         return state_dict
 
     def _save_moe_weights(self, output_dir):
-        """重写save_mow_weights 方法 进行参数分离存储"""
+        """overwrite save_mow_weights to do param split"""
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
         saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
@@ -876,7 +763,7 @@ class PretrainingTrainer(Trainer):
         ):
             self._save(output_dir=output_dir)
         else:
-            # 0 号sharding 保存模型
+            # 0 sharding save model
             if self.args.sharding_parallel_rank == 0:
                 paddle.save(
                     filtered_state_dict,
@@ -887,16 +774,10 @@ class PretrainingTrainer(Trainer):
             f.write("1")
 
     def _wrap_model(self, model, training=True):
-
-        # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
             return model
-
-        # Note: in paddle.distributed mode, there's no point in wrapping the model
-        # inside a DistributedDataParallel as we'll be under `no_grad` anyways.
         if not training:
             return model
-
         # Mixed precision training
         if self.args.fp16 or self.args.bf16:
             model = paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
@@ -928,16 +809,9 @@ class PretrainingTrainer(Trainer):
         # Pipeline mode
         if in_pipeline_parallel_mode:
             if self.args.amp_master_grad:
-                #  在开启overlap + TF32 的情况下需要 在TF32下开启 mater-weight，
-                # 此时 `MixPrecisionLayer` 需要传送一个'float16' 才不会挂
-                # `MixPrecisionLayer` 的返回值没有用。return value has no use
-                # TODO: paddle在 TF32 下也应该允许使用main-grad
                 mix_precision_utils.MixPrecisionLayer(
                     model, dtype=self.amp_dtype if hasattr(self, "amp_dtype") else "float16"
                 )
-            # hack for pipeline model mini batch to batch
-            # need batter solution @ZHUI
-            # make batch_fn compatible for fleet.distributed_model decorate.
             prepare_pipeline_inputs_func = (
                 model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
             )
@@ -995,21 +869,20 @@ class PretrainingTrainer(Trainer):
 
             if ShardingOption.SHARD_OP in self.args.sharding:
                 if self.args.amp_master_grad:
-                    mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+                    mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype) 
                 model = fleet.distributed_model(model)
                 if self.args.amp_master_grad:
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = distributed_optimizer_maybe_hack(self.optimizer, self.args.use_moe)
 
             else:
-                # sync params (broadcast) buffers in dp group
                 if (
                     not is_dp_group_support_in_group_sharded_parallel() or self.args.use_moe
                 ) and self.args.data_parallel_degree > 1:
                     try:
                         from paddle.fluid.dygraph.parallel import sync_params_buffers
                     except ImportError:
-                        # fix for new api in paddlepaddle v2.5
+                
                         from paddle.distributed.parallel import sync_params_buffers
 
                     hcg = fleet.get_hybrid_communicate_group()
@@ -1048,7 +921,7 @@ class PretrainingTrainer(Trainer):
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
         if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
             if self.args.amp_master_grad:
-                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
 
             model = fleet.distributed_model(model)
             model.accumulate_steps = self.args.gradient_accumulation_steps
@@ -1069,12 +942,8 @@ class PretrainingTrainer(Trainer):
         try:
             from paddle.fluid.dygraph.parallel import sync_params_buffers
         except ImportError:
-            # fix for new api in paddlepaddle v2.5
             from paddle.distributed.parallel import sync_params_buffers
 
-        # hcg = fleet.get_hybrid_communicate_group()
-        # dp_group = hcg.get_data_parallel_group()
-        # sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
         if (
             isinstance(self.optimizer, HybridParallelOptimizer)
             and self.args.log_global_grad_norm
@@ -1095,10 +964,8 @@ class PretrainingTrainer(Trainer):
                             g.scale_(np.sqrt(num_pp))
                 ret = oldcomm(
                     params_grads, global_norm_var_dist, global_norm_var_not_dist, *args
-                )  # `_comm_and_clip` 会做 inplace nccl.allreduce，在其返回之后算grad-norm可以获得全局值
+                )  
                 global_norm_var_fp32 = paddle.sqrt(global_norm_var_dist + global_norm_var_not_dist)
-                # if global_training_logs_enabled():
-                #    global_training_logs.update(global_grad_norm=global_norm_var_fp32.item())
                 return ret
 
             @paddle.no_grad()
@@ -1106,14 +973,11 @@ class PretrainingTrainer(Trainer):
                 """
                 `_dygraph_clip` calls `_comm_and_clip`
                 """
-                # non_dist_pp = [g for p, g in params_grads if getattr(p, "pp_distributed", True)]
-                # logger.info(f'vit-grad-norm-this-pp:{sum([g.norm()for g in non_dist_pp])}')
                 if num_pp > 1:
                     for p, g in params_grads:
                         if not getattr(p, "pp_distributed", True):
                             g.scale_(1 / np.sqrt(num_pp))
                 ret = oldclip(params_grads)
-                # logger.info(f'[after-clip] vit-grad-norm-this-pp:{sum([g.norm()for g in non_dist_pp])}')
                 return ret
 
             self.optimizer._inner_opt._grad_clip._comm_and_clip = MethodType(
@@ -1165,7 +1029,7 @@ class PretrainingTrainer(Trainer):
         """doc"""
         loss, _, labels = super().prediction_pipeline_step(
             model, inputs, prediction_loss_only, ignore_keys
-        )  # ERNIE-PP模型的loss其实是loss-sum。
+        )  
         num_tokens = (labels != self.tokenizer.ignored_index).sum().item()
         loss_avg = loss * self.model_wrapped.accumulate_steps / num_tokens
         return loss_avg, loss, labels
@@ -1228,14 +1092,14 @@ class PretrainingTrainer(Trainer):
             )
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
+        """ log evaluation metrics """
         flag_log = self.control.should_log
         if self.control.should_log:
             logs = {}
-            # all_gather + mean() to get average loss over all processes
             tr_loss_single_dp_scalar = tr_loss.item()
             dist.all_reduce(
                 tr_loss, dist.ReduceOp.SUM
-            )  # 3级并行时，每个pp下的loss会广播，全局reduce-mean的时候，分子分母都会乘以pp_world_size，结果会被约掉
+            )  
             tr_loss_scalar = tr_loss.item() / dist.get_world_size()
             tr_loss.zero_()
 
@@ -1257,10 +1121,6 @@ class PretrainingTrainer(Trainer):
             logs["max_mem_allocated_gb"] = max_memory_allocated / divisor
             logs["mem_reserved_gb"] = current_memory_reserved / divisor
             logs["max_mem_reserved_gb"] = max_memory_reserved / divisor
-
-            # if not self.args.enable_global_training_logs:
-            #     # 开启任何全局同步都会导致 9000卡降速 5%
-            #     global_training_logs.global_meters_keys = []  # ["data_not_valid", "experts_per_token"]
 
             if get_env_device() == "gpu":
                 info_callback = global_training_logs.dict(use_async=True)
@@ -1292,7 +1152,6 @@ class PretrainingTrainer(Trainer):
 
             tokens_per_steps = self.args.max_seq_length * total_train_batch_size
             logs["tokens_trained_current_step"] = tokens_per_steps
-            # get time in microseconds for efficiency screen
             logs["timestamp"] = int(time.time() * 1000)
             logs["TFLOPS_per_sec_per_card"] = round(
                 6
@@ -1318,23 +1177,10 @@ class PretrainingTrainer(Trainer):
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
 
-            # if get_env_device() == "xpu":
-            #     info, gathered_info = global_training_logs.dict(use_async=False)
-            # else:
-            #     info, gathered_info = info_callback()
             info, gathered_info = info_callback()
             global_training_logs.reset()
             logs.update({f"{k}_cur_dp": v for k, v in info.items()})
             logs.update(gathered_info)
-            # if self.args.enable_global_training_logs:
-            #     info_list = []
-            #     dist.all_gather_object(info_list, info)
-            #     logs.update(
-            #         {
-            #             k: np.mean([v[k] for v in info_list if k in v])
-            #             for k in {key for item in info_list for key in item.keys()}
-            #         }
-            #     )
 
             self.log(logs, **kwargs)
 
@@ -1399,13 +1245,13 @@ class PretrainingTrainer(Trainer):
 
     def create_scheduler(self, num_training_steps):
         """
-        创建一个学习率调度器。
+        Creates a learning rate scheduler.
 
         Args:
-            num_training_steps (int): 训练总步数。
+            num_training_steps (int): Total number of training steps.
 
         Returns:
-            lr_scheduler (torch.optim.lr_scheduler._LRScheduler): 学习率调度器。
+            lr_scheduler (torch.optim.lr_scheduler._LRScheduler): The learning rate scheduler.
 
         """
         if self.args.warmup_steps > 0:
@@ -1440,7 +1286,8 @@ class PretrainingTrainer(Trainer):
         """
         Setup the optimizer.
 
-        We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
+        We provide a reasonable default that works well. 
+        If you want to use something else, you can pass a tuple in the
         Trainer's init through `optimizers`, or subclass and override this method in a subclass.
         """
         optimizer_params = (
@@ -1475,13 +1322,12 @@ class PretrainingTrainer(Trainer):
             grad_clip = nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None
 
             self.static_name_to_dyg_name = {p.name: n for n, p in self.model.state_dict().items()}
-            gate_pattern = re.compile(r"ernie\.layers\.0\.mlp\.gate\.weight")  # TODO 换成更加通配的方法
+            gate_pattern = re.compile(r"ernie\.layers\.0\.mlp\.gate\.weight") 
             vit_pattern = re.compile(r"vision_model\.(cls_token|pos_embed|patch_embed|blocks)")
             vit_blocks_pattern = re.compile(r"vision_model\.blocks\.(\d+)\.")
 
             def lr_ratio_fn(param):
                 name = self.static_name_to_dyg_name[param.name]
-                # logger.info(f'search {param.name} -> {name}')
                 if self.args.moe_gate_lr_ratio is not None and gate_pattern.match(name):
                     logger.info(f"apply moe_gate_lr_ratio to {name}, ratio={self.args.moe_gate_lr_ratio}")
                     return float(self.args.moe_gate_lr_ratio)
@@ -1518,10 +1364,10 @@ class PretrainingTrainer(Trainer):
 
     def save_model(self, output_dir=None):
         """
-        保存模型及相关的配置文件到指定的目录。
+        Saves the model and associated configuration files to the specified directory.
 
         Args:
-            output_dir (str, optional): 保存模型的目录。默认为None。
+            output_dir (str, optional): Directory to save the model. Defaults to None.
 
         Returns:
             None
@@ -1536,5 +1382,5 @@ class PretrainingTrainer(Trainer):
                 of.write(json.dumps(self.static_name_to_dyg_name))
 
     def _load_rng_state(self, checkpoint):
-        # 预训练环节并不需要由框架控制 `rng`
+        """Loads the rng state from a checkpoint."""
         pass

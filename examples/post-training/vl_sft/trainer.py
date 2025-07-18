@@ -241,13 +241,13 @@ class SFTTrainer(PretrainingTrainer):
         logger.info(f"{self.runtime_timer.log()}")
 
         logger.info("***** Running training *****")
-        logger.info(f"  Num examples = {num_examples:,}")
+        logger.info(f"  Num examples = {num_examples*args.pp_need_data_degree:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
         logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
-        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
-        logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size*args.pp_need_data_degree}")
+        logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps*args.pp_need_data_degree}")
         logger.info(f"  Total optimization steps = {max_steps:,}")
-        logger.info(f"  Total num train samples = {num_train_samples:,}")
+        logger.info(f"  Total num train samples = {num_train_samples*args.pp_need_data_degree:,}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
         per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
