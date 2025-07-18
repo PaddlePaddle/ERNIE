@@ -473,6 +473,7 @@ class DistDataLoader(paddle.io.DataLoader):
         persistent_workers=False,
         need_data=True,
         pp_broadcast=True,
+        is_train_text=False,
         text_sft_dataset=None,
         gradient_accumulation_steps=1,
         multimodal_multiround_ratio=0.3,
@@ -509,6 +510,7 @@ class DistDataLoader(paddle.io.DataLoader):
         self.gradient_accumulation_steps = gradient_accumulation_steps
         log.info(f"[DistDataloader] gradient_accumulation_steps: {gradient_accumulation_steps}")
 
+        self.is_train_text = is_train_text
         if self._need_data:
             self._dataloader = MMDataloader(
                 dataset=dataset,
@@ -749,23 +751,26 @@ class DistDataLoader(paddle.io.DataLoader):
         pp_broadcast = (self._pp_data_group is None) or self.pp_rank == 0
         get_timers() and get_timers()("read-raw-data").start()
 
-        if self.counter % self.gradient_accumulation_steps == 0:
-            if self.train_text:
-                self.train_text = False
-                self.count_mm += 1
-            else:
-                self.count_mm += 1
-                if self.count_mm == 4:
-                    self.train_text = True
-                    self.count_mm = 0
-                else:
+        if self.is_train_text:
+            if self.counter % self.gradient_accumulation_steps == 0:
+                if self.train_text:
                     self.train_text = False
-        # if self.counter % self.gradient_accumulation_steps == 0:
-        #     if self.train_text:
-        #         self.train_text = False
-        #     else:
-        #         self.train_text = True
-        self.train_text = False
+                    self.count_mm += 1
+                else:
+                    self.count_mm += 1
+                    if self.count_mm == 2:
+                        self.train_text = True
+                        self.count_mm = 0
+                    else:
+                        self.train_text = False
+                # if self.counter % self.gradient_accumulation_steps == 0:
+                #     if self.train_text:
+                #         self.train_text = False
+                #     else:
+                #         self.train_text = True
+                # self.train_text = self.train_text and self.train_text_flag
+        else:
+            self.train_text = False
         self.counter += 1
 
         if self.train_text:
@@ -790,7 +795,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 )
 
             if data is not None:
-
                 (
                     input_ids,
                     inbatch_pack_offset,
@@ -810,9 +814,6 @@ class DistDataLoader(paddle.io.DataLoader):
                     data["data_type"],
                     data["position_ids"],
                 )
-                # print(f"position_ids: {position_ids.shape}")
-                # print(f"input_ids: {input_ids.shape}")
-                # print(f"inbatch_pack_offset: {inbatch_pack_offset.shape}")
 
                 if inbatch_pack_offset is not None:
                     assert {inbatch_pack_offset.dtype} == {paddle.int64}, (
