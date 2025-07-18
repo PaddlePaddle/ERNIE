@@ -379,14 +379,14 @@ def main():
         args.same_data = True
     logger.info(f"setting same_data: {args.same_data}")
 
-    image_preprocess = AdaptiveImageProcessor.from_pretrained(args.model_name_or_path)
+    image_preprocess_save = AdaptiveImageProcessor.from_pretrained(args.model_name_or_path)
     for i, x in enumerate(data_processor_args):
         print('data_processor_args:\n', i, x)
 
     tokenizer= Ernie4_5_VLTokenizer.from_pretrained(
             args.model_name_or_path, padding_side="right", model_max_length=args.max_seq_length
         )
-    data_processor = End2EndProcessor(data_processor_args, tokenizer, image_preprocess) 
+    data_processor = End2EndProcessor(data_processor_args, tokenizer, image_preprocess_save) 
     data_processor.train().sft()
     logger.info(f"[DEBUG] data_processor_args: {data_processor_args}")
 
@@ -744,7 +744,7 @@ def main():
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
         callbacks=callbacks,
-        processing_class=image_preprocess, 
+        processing_class=image_preprocess_save, 
     )
     if vit_trainable_callback is not None:
         vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager
