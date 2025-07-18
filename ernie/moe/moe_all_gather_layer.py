@@ -341,17 +341,20 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
 
             output_ptr += recv_counts_num[i_local_expert]
 
-            tasks.append(
-                dist.stream.alltoall_single(
-                    output_local_expert,
-                    input_local_expert,
-                    recv_count,
-                    send_count,
-                    group=group,
-                    sync_op=False,
-                    use_calc_stream=False,
+            if group.nranks <= 1:
+                output_local_expert[:] = input_local_expert[:]
+            else:
+                tasks.append(
+                    dist.stream.alltoall_single(
+                        output_local_expert,
+                        input_local_expert,
+                        recv_count,
+                        send_count,
+                        group=group,
+                        sync_op=False,
+                        use_calc_stream=False,
+                    )
                 )
-            )
         ctx.router_loss_bwfn, (router_loss,) = manual_backward(
             router_loss_fn, is_first_fwd, *router_loss_args
         )
@@ -477,16 +480,19 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
                 g = ctx.dummy_input
             tmp_g.append(g)
             out_ptr += recv_counts_num[i_local_expert]
-            task = dist.stream.alltoall_single(
-                g,
-                out_g,
-                send_count,
-                recv_count,
-                group=ctx.group,
-                sync_op=False,
-                use_calc_stream=False,
-            )
-            tasks.append(task)
+            if ctx.group.nranks <= 1:
+                g[:] = out_g[:]
+            else:
+                task = dist.stream.alltoall_single(
+                    g,
+                    out_g,
+                    send_count,
+                    recv_count,
+                    group=ctx.group,
+                    sync_op=False,
+                    use_calc_stream=False,
+                )
+                tasks.append(task)
         router_fn_args_grad = ctx.router_loss_bwfn(d_routerloss)
 
         for i_local_expert, t in enumerate(tasks):
@@ -668,26 +674,31 @@ class MOEAllGatherLayerV2(MOELayer):
 
         else:
             all_expert_num = sum(expert_num_global_list)
-            recv_rank = paddle.empty([all_expert_num], dtype=recv_rank_local.dtype)
             # 非常慢
-            recv_rank_task = dist.stream.alltoall_single(
-                recv_rank,
-                recv_rank_local.tile(self.config.moe_world_size),
-                [
-                    sum(
-                        expert_num_global_list[
-                            i
-                            * self.num_local_experts : (i + 1)
-                            * self.num_local_experts
-                        ]
-                    )
-                    for i in range(self.config.moe_world_size)
-                ],  # output-size
-                [len(recv_rank_local)] * self.config.moe_world_size,  # input-size
-                group=self.config.moe_group,
-                sync_op=False,
-                use_calc_stream=False,
-            )
+            if self.config.moe_group.nranks > 1:
+                recv_rank = paddle.empty([all_expert_num], dtype=recv_rank_local.dtype)
+                # 非常慢
+                recv_rank_task = dist.stream.alltoall_single(
+                    recv_rank,
+                    recv_rank_local.tile(self.config.moe_world_size),
+                    [
+                        sum(
+                            expert_num_global_list[
+                                i
+                                * self.num_local_experts : (i + 1)
+                                * self.num_local_experts
+                            ]
+                        )
+                        for i in range(self.config.moe_world_size)
+                    ],  # output-size
+                    [len(recv_rank_local)] * self.config.moe_world_size,  # input-size
+                    group=self.config.moe_group,
+                    sync_op=False,
+                    use_calc_stream=False,
+                )
+            else:
+                recv_rank_task = None
+                recv_rank = recv_rank_local.tile(self.config.moe_world_size)
 
             # send_rank_cpu = np.concatenate(
             #     [
@@ -1237,9 +1248,6 @@ class MOEAllGatherLayerV2(MOELayer):
                 )
                 if true_experts[iexpert].training:
                     chunk.stop_gradient = False
-                logger.warning(
-                    f"local-expert: {iexpert} does not process data, we give a zero input to expert"
-                )
                 expert_out = true_experts[iexpert](chunk.contiguous())
                 no_tokens_expert_outputs.append(
                     expert_out * 0.0
