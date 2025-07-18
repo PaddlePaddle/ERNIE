@@ -151,20 +151,20 @@ Required fields for DPO:
 
 Supports json and jsonl file formats:
 
-* **json**: Each line contains one JSON object:
-```json
-{"instruction":"instructionA", "input":"inputA", "output":"outputA"}
-{"instruction":"instructionB", "input":"inputB", "output":"outputB"}
-{"instruction":"instructionC", "input":"inputC", "output":"outputC"}
-```
-
-* **jsonl**: All data in a single JSON array:
+* **json**: All data in a single JSON array:
 ```json
 [
     {"instruction":"instructionA", "input":"inputA", "output":"outputA"},
     {"instruction":"instructionB", "input":"inputB", "output":"outputB"},
     {"instruction":"instructionC", "input":"inputC", "output":"outputC"}
 ]
+```
+
+* **jsonl**: Each line contains one JSON object:
+```json
+{"instruction":"instructionA", "input":"inputA", "output":"outputA"}
+{"instruction":"instructionB", "input":"inputB", "output":"outputB"}
+{"instruction":"instructionC", "input":"inputC", "output":"outputC"}
 ```
 
 **Field Mapping Between alpaca and erniekit**
