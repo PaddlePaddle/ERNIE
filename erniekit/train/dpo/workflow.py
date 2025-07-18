@@ -314,28 +314,21 @@ def run_dpo(
         model = model_class.from_pretrained(
             model_args.model_name_or_path, config=config
         )
-        # for DPO save
-        if not finetuning_args.reference_free and not model_args.lora:
-            # (LiuTing): config.moe_group will change in `model_class.from_pretrained`
-            # so need to re-create new ref_config.
-            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-            ref_model = model_class._from_config(ref_config, dtype=dtype)
-            ref_model.set_state_dict(model.state_dict())
-        else:
-            ref_model = None
     else:
         model = model_class._from_config(config, dtype=dtype)
-        if not finetuning_args.reference_free and not model_args.lora:
-            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-            if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
-                ref_config.moe_group = (
-                    "dummy" if model_args.moe_group == "mp" else model_args.moe_group
-                )
-            ref_model = model_class._from_config(ref_config, dtype=dtype)
-            # make sure the state_dict is the same to get the same loss for first step
-            ref_model.set_state_dict(model.state_dict())
-        else:
-            ref_model = None
+
+    if not finetuning_args.reference_free and not model_args.lora:
+        ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+        if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
+            ref_config.moe_group = (
+                "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+            )
+        ref_model = model_class._from_config(ref_config, dtype=dtype)
+        # make sure the state_dict is the same to get the same loss for first step
+        ref_model.set_state_dict(model.state_dict())
+    else:
+        ref_model = None
+
     model.config.dpo_config = None
 
     if model.config.head_dim is None:
