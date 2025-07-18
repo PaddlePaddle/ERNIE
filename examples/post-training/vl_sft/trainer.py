@@ -90,8 +90,10 @@ class SFTTrainer(PretrainingTrainer):
     The main trainer class which handles all the logic necessary for fine-tuning models.
     """
 
-    def __init__(self, _shit=None, args=None, model=None, callbacks=None, text_sft_dataset=None, **kwargs):
+    def __init__(self, _shit=None, args=None, model=None, callbacks=None,
+        is_train_text=False, text_sft_dataset=None, **kwargs):
         super().__init__(_shit=_shit, args=args, model=model, callbacks=callbacks, **kwargs)
+        self.is_train_text = is_train_text
         self.text_sft_dataset = text_sft_dataset
 
     def get_train_dataloader(self):
@@ -114,6 +116,7 @@ class SFTTrainer(PretrainingTrainer):
             collate_fn=self.data_collator,
             num_workers=self.args.dataloader_num_workers,
             prefetch_factor=self.args.prefetch_factor,
+            is_train_text=self.is_train_text,
             text_sft_dataset=self.text_sft_dataset,
             need_data=self.args.need_data,
             gradient_accumulation_steps=self.args.gradient_accumulation_steps,

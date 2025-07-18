@@ -624,10 +624,11 @@ def main():
             train_dataset = None
 
         text_sft_dataset = None
-        args.train_text = getattr(args, "text_sft_task_config", False)
-        if args.need_data and args.train_text:
+        args.is_train_text = getattr(args, "text_sft_task_config", False)
+        if args.need_data and args.is_train_text:
             # text SFT close multi-thread processing data
             logger.info(f"[TEXT SFT] training pure text sft with {args.text_sft_task_config}.")
+            # text_sft_task_list = args.text_sft_task_config.split(",")
             train_task_group_text = json.load(open(args.text_sft_task_config))
             train_task_group_text = [task for task in train_task_group_text if task["prob"] > 0]
             logger.info(f"train_task_group_text: {train_task_group_text}")
@@ -746,6 +747,7 @@ def main():
         args=args,
         data_collator=data_collator,
         train_dataset=train_dataset,
+        is_train_text=args.is_train_text,
         text_sft_dataset=text_sft_dataset,
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
