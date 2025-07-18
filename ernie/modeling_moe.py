@@ -478,6 +478,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
                     gate=lm_gate,
                     experts=lm_experts,
                     layer_idx=layer_idx,
+                    use_padding=False,
                     shared_experts=shared_experts,
                     group=config.moe_group,
                     recompute=config.use_recompute_moe,
