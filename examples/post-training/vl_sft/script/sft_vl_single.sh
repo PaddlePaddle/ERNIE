@@ -80,6 +80,8 @@ nohup sh examples/post-training/vl_sft/script/train_gpu_single.sh \
 --skip_profile_timer 0 \
 --save_sharding_stage1_model_include_freeze_params true \
 --disable_pipeline_warmup true \
+--use_flash_attention 1 \
+--unified_checkpoint true \
 > lite_erniekits.log 2>err.log &
 
-tail -f lite_erniekits_text_mm.log
+tail -f lite_erniekits.log

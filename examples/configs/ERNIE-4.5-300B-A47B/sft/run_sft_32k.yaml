@@ -55,7 +55,7 @@ offload_optim: True
 
 # performance
 tensor_parallel_degree: 8
-pipeline_parallel_degree: 12
+pipeline_parallel_degree: 14
 sharding_parallel_degree: 1
 sharding: stage1
 sequence_parallel: True

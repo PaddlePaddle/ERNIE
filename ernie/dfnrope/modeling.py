@@ -333,38 +333,6 @@ class DFNRopeVisionBlock(nn.Layer):
         hidden_states = hidden_states + self.mlp(self.norm2(hidden_states))
         return hidden_states
 
-
-class PatchMerger(nn.Layer):
-    """PatchMerger"""
-
-    def __init__(self, dim: int, context_dim: int, spatial_merge_size: int = 2) -> None:
-        """
-        Args:
-            dim (int): output dimension
-            context_dim (int): input dimension
-            spatial_merge_size (int, optional): spatial merge size. Defaults to 2.
-        """
-        super().__init__()
-        self.hidden_size = context_dim * (spatial_merge_size**2)
-        self.ln_q = nn.LayerNorm(context_dim, epsilon=1e-6)
-        self.mlp = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.GELU(),
-            nn.Linear(self.hidden_size, dim),
-        )
-
-    def forward(self, x: paddle.Tensor) -> paddle.Tensor:
-        """
-        Args:
-            x (paddle.Tensor): input tensor
-
-        Returns:
-            paddle.Tensor: PatchMerger output tensor
-        """
-        x = self.mlp(self.ln_q(x).reshape([-1, self.hidden_size]))
-        return x
-
-
 class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
     """DFNRopeVisionTransformerPretrainedModel"""
 
@@ -392,7 +360,6 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
         assert (
             config.hidden_size == config.embed_dim
         ), "in DFNRope, vit's config.hidden must be equal to config.embed_dim"
-        # self.merger = PatchMerger(dim=config.hidden_size, context_dim=config.embed_dim)
         self.ln = nn.LayerNorm(config.hidden_size, epsilon=1e-6)
 
     def get_dtype(self) -> paddle.dtype:
@@ -486,8 +453,6 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
                     attn_sep=attn_sep,
                 )
 
-        # ret = self.merger(hidden_states)
-        # ret = hidden_states
         ret = self.ln(hidden_states)  # add norm
         return ret
 

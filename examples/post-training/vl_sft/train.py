@@ -116,7 +116,7 @@ class ChatSFTArguments(PreTrainingArguments):
         },
     )
 
-    use_flash_attn: Optional[bool] = field(default=False, metadata={"help": "use flash attention"})
+    use_flash_attention: Optional[bool] = field(default=True, metadata={"help": "use flash attention"})
     use_mem_eff_attn: Optional[bool] = field(default=True, metadata={"help": "use use_mem_eff_attn"})
     use_flash_attn_with_mask: Optional[bool] = field(
         default=True, metadata={"help": "use use_flash_attn_with_mask"}
@@ -181,7 +181,6 @@ class ModelArguments:
     initializer_range: float = field(default=0.011410316056095904, metadata={"help": "Initializer range"})
     intermediate_size: int = field(default=12288, metadata={"help": "Intermediate size"})
     max_position_embeddings: int = field(default=4096, metadata={"help": "Maximum position embeddings"})
-    micro_batch_size: int = field(default=-1, metadata={"help": "Micro batch size"})
     mm_vocab_size: int = field(default=0, metadata={"help": "Multimodal vocabulary size"})
     modality_detach: bool = field(default=False, metadata={"help": "Whether to detach modalities"})
     model_type: str = field(default="ernie4_5_moe_vl", metadata={"help": "Model type"})
@@ -229,7 +228,6 @@ class ModelArguments:
     temporal_conv_size: int = field(default=2, metadata={"help": "Temporal convolution size"})
     tie_word_embeddings: bool = field(default=True, metadata={"help": "Whether to tie word embeddings"})
     use_bias: bool = field(default=False, metadata={"help": "Whether to use bias"})
-    use_flash_attention: bool = field(default=True, metadata={"help": "Whether to use flash attention"})
     use_fused_head_and_loss_fn: bool = field(default=False, metadata={"help": "Whether to use fused head and loss function"})
     use_recompute_lm_head: bool = field(default=False, metadata={"help": "Whether to recompute LM head"})
     use_recompute_loss_fn: bool = field(default=True, metadata={"help": "Whether to recompute loss function"})
@@ -388,7 +386,7 @@ def main():
     tokenizer= Ernie4_5_VLTokenizer.from_pretrained(
             args.model_name_or_path, padding_side="right", model_max_length=args.max_seq_length
         )
-    data_processor = End2EndProcessor(data_processor_args, tokenizer, image_preprocess)  # add tokenizer by nifeng03
+    data_processor = End2EndProcessor(data_processor_args, tokenizer, image_preprocess) 
     data_processor.train().sft()
     logger.info(f"[DEBUG] data_processor_args: {data_processor_args}")
 
@@ -503,7 +501,7 @@ def main():
     )
 
     cfg = update_model_config_from_args(cfg, model_config)
-    cfg.use_flash_attn = args.use_flash_attn
+    cfg.use_flash_attention = args.use_flash_attention
     cfg.use_mem_eff_attn = args.use_mem_eff_attn
     cfg.use_flash_attn_with_mask = args.use_flash_attn_with_mask
     cfg.hidden_dropout_prob = args.hidden_dropout_prob
@@ -597,7 +595,7 @@ def main():
                     im_patch_id=tokenizer.get_vocab()[
                         MMSpecialTokensConfig.get_special_tokens_info()["image_placeholder"]
                     ],
-                    use_crop=True,  # true
+                    use_crop=True,  
                     crop_tile_option="9",  # args.crop_tile_option,
                     crop_tile_rate="1.0",  # args.crop_tile_rate,
                     batch_size=args.per_device_train_batch_size,
@@ -673,9 +671,6 @@ def main():
                 "use_train_part_sharding": args.text_use_train_part_sharding,
                 "rope_3d": args.rope_3d,
             }
-            # print("========" * 15, "config_dataset_text", "========" * 15)
-            # logger.info(f"config_dataset_text: {config_dataset_text}")
-            # print("========" * 30)
 
             text_sft_train_reader = create_pyreader(config_dataset_text)
             text_sft_generator = text_sft_train_reader.data_generator()
@@ -690,7 +685,7 @@ def main():
                 ignored_index=tokenizer.ignored_index,
                 task_group=train_task_group_text,
                 use_mem_eff_attn=True,
-                use_flash_attn=False,
+                use_flash_attention=False,
             )
         else:
             logger.info("[TEXT SFT] not training pure text sft.")
@@ -710,18 +705,14 @@ def main():
         combine_batch=1,
     )
 
-    callbacks = []  # if not args.use_dummy_dataset else []
+    callbacks = []  
     callbacks += [GlobalRNGCallback()]
-    # if "freeze_lm" in freeze_config and args.modality_ratio is not None:
-    #     callbacks += [MultiModalInterleaveCallback()]
     if "freeze_lm" in freeze_config:
         if args.modality_ratio is not None:
             callbacks += [MultiModalInterleaveCallback()]
         elif hasattr(model, "update_params_stat"):
             logger.info("Freeze model lm module")
             model.update_params_stat("lm", stop_gradient=True)
-    # else:
-    #     callbacks += [MultiModalInterleaveCallback()]
     if args.pp_need_data:
         callbacks += [PPNeedDataCallback()]
 
@@ -753,6 +744,7 @@ def main():
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
         callbacks=callbacks,
+        processing_class=image_preprocess, 
     )
     if vit_trainable_callback is not None:
         vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager
