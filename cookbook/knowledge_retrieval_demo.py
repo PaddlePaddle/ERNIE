@@ -109,10 +109,21 @@ def get_args() -> argparse.Namespace:
     """
     parser = ArgumentParser(description="ERNIE models web chat demo.")
 
-    parser.add_argument("--server-port", type=int, default=8333, help="Demo server port.")
-    parser.add_argument("--server-name", type=str, default="0.0.0.0", help="Demo server name.")
-    parser.add_argument("--max_char", type=int, default=20000, help="Maximum character limit for messages.")
-    parser.add_argument("--max_retry_num", type=int, default=3, help="Maximum retry number for request.")
+    parser.add_argument(
+        "--server-port", type=int, default=8333, help="Demo server port."
+    )
+    parser.add_argument(
+        "--server-name", type=str, default="0.0.0.0", help="Demo server name."
+    )
+    parser.add_argument(
+        "--max_char",
+        type=int,
+        default=20000,
+        help="Maximum character limit for messages.",
+    )
+    parser.add_argument(
+        "--max_retry_num", type=int, default=3, help="Maximum retry number for request."
+    )
     parser.add_argument(
         "--model_map",
         required=True,
@@ -130,15 +141,57 @@ def get_args() -> argparse.Namespace:
             """,
     )
     parser.add_argument(
-        "--embedding_service_url", type=str, default="https://qianfan.baidubce.com/v2", help="Embedding service url."
+        "--embedding_service_url",
+        type=str,
+        default="https://qianfan.baidubce.com/v2",
+        help="Embedding service url.",
     )
-    parser.add_argument("--qianfan_api_key", type=str, default="bce-v3/xxx", help="Qianfan API key.", required=True)
-    parser.add_argument("--embedding_model", type=str, default="embedding-v1", help="Embedding model name.")
-    parser.add_argument("--embedding_dim", type=int, default=384, help="Dimension of the embedding vector.")
-    parser.add_argument("--chunk_size", type=int, default=512, help="Chunk size for splitting long documents.")
-    parser.add_argument("--top_k", type=int, default=3, help="Top k results to retrieve.")
-    parser.add_argument("--faiss_index_path", type=str, default="data/faiss_index", help="Faiss index path.")
-    parser.add_argument("--text_db_path", type=str, default="data/text_db.jsonl", help="Text database path.")
+    parser.add_argument(
+        "--qianfan_api_key",
+        type=str,
+        default="bce-v3/xxx",
+        help="Qianfan API key.",
+        required=True,
+    )
+    parser.add_argument(
+        "--embedding_model",
+        type=str,
+        default="embedding-v1",
+        help="Embedding model name.",
+    )
+    parser.add_argument(
+        "--embedding_dim",
+        type=int,
+        default=384,
+        help="Dimension of the embedding vector.",
+    )
+    parser.add_argument(
+        "--chunk_size",
+        type=int,
+        default=512,
+        help="Chunk size for splitting long documents.",
+    )
+    parser.add_argument(
+        "--top_k", type=int, default=3, help="Top k results to retrieve."
+    )
+    parser.add_argument(
+        "--faiss_index_path",
+        type=str,
+        default="data/faiss_index",
+        help="Faiss index path.",
+    )
+    parser.add_argument(
+        "--text_db_path",
+        type=str,
+        default="data/text_db.jsonl",
+        help="Text database path.",
+    )
+    parser.add_argument(
+        "--concurrency_limit", type=int, default=10, help="Default concurrency limit."
+    )
+    parser.add_argument(
+        "--max_queue_size", type=int, default=50, help="Maximum queue size for request."
+    )
 
     args = parser.parse_args()
     try:
@@ -148,7 +201,7 @@ def get_args() -> argparse.Namespace:
         if len(args.model_map) < 1:
             raise ValueError("model_map must contain at least one model configuration")
     except json.JSONDecodeError as e:
-        raise ValueError("Invalid JSON format for --model-map") from e
+        raise ValueError("Invalid JSON format for --model_map") from e
 
     return args
 
@@ -180,11 +233,14 @@ class FaissTextDatabase:
         # If faiss_index_path exists, load it and text_db_path
         if os.path.exists(self.faiss_index_path) and os.path.exists(self.text_db_path):
             self.index = faiss.read_index(self.faiss_index_path)
-            with open(self.text_db_path, 'r', encoding='utf-8') as f:
+            with open(self.text_db_path, "r", encoding="utf-8") as f:
                 self.text_db = json.load(f)
         else:
             self.index = faiss.IndexFlatIP(self.embedding_dim)
-            self.text_db = {"file_md5s": [], "chunks": []}  # Save file_md5s to avoid duplicates  # Save chunks
+            self.text_db = {
+                "file_md5s": [],
+                "chunks": [],
+            }  # Save file_md5s to avoid duplicates  # Save chunks
 
     def calculate_md5(self, file_path: str) -> str:
         """
@@ -213,7 +269,11 @@ class FaissTextDatabase:
         return file_md5 in self.text_db["file_md5s"]
 
     def add_embeddings(
-        self, file_path: str, segments: list[str], progress_bar: gr.Progress = None, save_file: bool = False
+        self,
+        file_path: str,
+        segments: list[str],
+        progress_bar: gr.Progress = None,
+        save_file: bool = False,
     ) -> bool:
         """
         Stores document embeddings in FAISS database after checking for duplicates.
@@ -242,7 +302,7 @@ class FaissTextDatabase:
             if progress_bar is not None:
                 progress_bar((i + 1) / len(segments), desc=file_name + " Processing...")
         vectors = np.array(vectors)
-        self.index.add(vectors.astype('float32'))
+        self.index.add(vectors.astype("float32"))
 
         start_id = len(self.text_db["chunks"])
         for i, text in enumerate(segments):
@@ -276,7 +336,7 @@ class FaissTextDatabase:
         # Step 1: Retrieve top_k results for each query and collect all indices
         all_indices = []
         for query in query_list:
-            query_vector = np.array([self.bot_client.embed_fn(query)]).astype('float32')
+            query_vector = np.array([self.bot_client.embed_fn(query)]).astype("float32")
             _, indices = self.index.search(query_vector, self.top_k)
             all_indices.extend(indices[0].tolist())
 
@@ -294,12 +354,17 @@ class FaissTextDatabase:
 
             if target_file_md5 not in file_boundaries:
                 file_start = target_idx
-                while file_start > 0 and self.text_db["chunks"][file_start - 1]["file_md5"] == target_file_md5:
+                while (
+                    file_start > 0
+                    and self.text_db["chunks"][file_start - 1]["file_md5"]
+                    == target_file_md5
+                ):
                     file_start -= 1
                 file_end = target_idx
                 while (
                     file_end < len(self.text_db["chunks"]) - 1
-                    and self.text_db["chunks"][file_end + 1]["file_md5"] == target_file_md5
+                    and self.text_db["chunks"][file_end + 1]["file_md5"]
+                    == target_file_md5
                 ):
                     file_end += 1
             else:
@@ -331,7 +396,9 @@ class FaissTextDatabase:
         # Step 5: Create merged text for each group
         result = ""
         for idx, group in enumerate(groups):
-            result += "\n段落{idx}:\n{title}\n".format(idx=idx + 1, title=self.text_db["chunks"][group[0]]["file_txt"])
+            result += "\n段落{idx}:\n{title}\n".format(
+                idx=idx + 1, title=self.text_db["chunks"][group[0]]["file_txt"]
+            )
             for idx in group:
                 result += self.text_db["chunks"][idx]["text"] + "\n"
             self.logger.info(f"Merged chunk range: {group[0]}-{group[-1]}")
@@ -342,7 +409,7 @@ class FaissTextDatabase:
         """Save the database to disk."""
         faiss.write_index(self.index, self.faiss_index_path)
 
-        with open(self.text_db_path, 'w', encoding='utf-8') as f:
+        with open(self.text_db_path, "w", encoding="utf-8") as f:
             json.dump(self.text_db, f, ensure_ascii=False, indent=2)
 
 
@@ -397,19 +464,26 @@ class GradioEvents:
         Yields:
             dict: A dictionary containing the event type and its corresponding content.
         """
-        conversation, conversation_str = GradioEvents.get_history_conversation(task_history)
+        conversation, conversation_str = GradioEvents.get_history_conversation(
+            task_history
+        )
         conversation_str += f"user:\n{query}\n"
 
         search_info_message = QUERY_REWRITE_PROMPT.format(
-            TIMESTAMP=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), CONVERSATION=conversation_str
+            TIMESTAMP=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            CONVERSATION=conversation_str,
         )
         search_conversation = [{"role": "user", "content": search_info_message}]
-        search_info_result = GradioEvents.get_sub_query(search_conversation, model, bot_client)
+        search_info_result = GradioEvents.get_sub_query(
+            search_conversation, model, bot_client
+        )
         if search_info_result is None:
             search_info_result = {"query": [query]}
 
         if search_info_result.get("query", []):
-            relevant_passages = faiss_db.search_with_context(search_info_result["query"])
+            relevant_passages = faiss_db.search_with_context(
+                search_info_result["query"]
+            )
             yield {"type": "relevant_passage", "content": relevant_passages}
 
             query = ANSWER_PROMPT.format(
@@ -563,7 +637,9 @@ class GradioEvents:
         """
         GradioEvents.gc()
 
-        reset_result = namedtuple("reset_result", ["chatbot", "task_history", "file_btn", "relevant_passage"])
+        reset_result = namedtuple(
+            "reset_result", ["chatbot", "task_history", "file_btn", "relevant_passage"]
+        )
         return reset_result(
             [],  # clear chatbot
             [],  # clear task_history
@@ -601,7 +677,9 @@ class GradioEvents:
         return url
 
     @staticmethod
-    def get_sub_query(conversation: list, model_name: str, bot_client: BotClient) -> dict:
+    def get_sub_query(
+        conversation: list, model_name: str, bot_client: BotClient
+    ) -> dict:
         """
         Enhances user queries by generating alternative phrasings using language models.
         Creates semantically similar variations of the original query to improve retrieval accuracy.
@@ -645,7 +723,20 @@ class GradioEvents:
         Returns:
             tuple: Two strings, the first part of the original line and the rest of the line.
         """
-        PUNCTUATIONS = {".", "。", "!", "！", "?", "？", ",", "，", ";", "；", ":", "："}
+        PUNCTUATIONS = {
+            ".",
+            "。",
+            "!",
+            "！",
+            "?",
+            "？",
+            ",",
+            "，",
+            ";",
+            "；",
+            ":",
+            "：",
+        }
 
         if len(line) <= chunk_size:
             return line, ""
@@ -712,7 +803,10 @@ class GradioEvents:
 
     @staticmethod
     def file_upload(
-        files_url: list, chunk_size: int, faiss_db: FaissTextDatabase, progress_bar: gr.Progress = gr.Progress()
+        files_url: list,
+        chunk_size: int,
+        faiss_db: FaissTextDatabase,
+        progress_bar: gr.Progress = gr.Progress(),
     ) -> str:
         """
         Uploads and processes multiple files by splitting them into semantically meaningful chunks,
@@ -731,7 +825,9 @@ class GradioEvents:
             return
         yield gr.update(visible=True)
         for file_url in files_url:
-            if not GradioEvents.save_file_to_db(file_url, chunk_size, faiss_db, progress_bar):
+            if not GradioEvents.save_file_to_db(
+                file_url, chunk_size, faiss_db, progress_bar
+            ):
                 file_name = os.path.basename(file_url)
                 gr.Info(f"{file_name} already processed.")
 
@@ -780,7 +876,11 @@ class GradioEvents:
             return False
 
 
-def launch_demo(args: argparse.Namespace, bot_client: BotClient, faiss_db_template: FaissTextDatabase):
+def launch_demo(
+    args: argparse.Namespace,
+    bot_client: BotClient,
+    faiss_db_template: FaissTextDatabase,
+):
     """
     Launch demo program
 
@@ -824,6 +924,14 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient, faiss_db_templa
 <center><font size=3>This demo is based on ERNIE models. \
 (本演示基于文心大模型实现。)</center>"""
         )
+        gr.Markdown(
+            """\
+<center><font size=3>    <a href="https://ernie.baidu.com/">ERNIE Bot</a> | \
+<a href="https://github.com/PaddlePaddle/ERNIE">GitHub</a> | \
+<a href="https://huggingface.co/baidu">Hugging Face</a> | \
+<a href="https://aistudio.baidu.com/modelsoverview">BAIDU AI Studio</a> | \
+<a href="https://yiyan.baidu.com/blog/publication/">Technical Report</a></center>"""
+        )
 
         chatbot = gr.Chatbot(label="ERNIE", type="messages")
 
@@ -836,7 +944,11 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient, faiss_db_templa
                 file_count="multiple",
             )
             relevant_passage = gr.Textbox(
-                label="Relevant Passage", lines=5, max_lines=5, placeholder=RELEVANT_PASSAGE_DEFAULT, interactive=False
+                label="Relevant Passage",
+                lines=5,
+                max_lines=5,
+                placeholder=RELEVANT_PASSAGE_DEFAULT,
+                interactive=False,
             )
         with gr.Row():
             progress_bar = gr.Textbox(label="Progress", visible=False)
@@ -850,8 +962,12 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient, faiss_db_templa
 
         task_history = gr.State([])
 
-        predict_with_clients = partial(GradioEvents.predict_stream, bot_client=bot_client)
-        regenerate_with_clients = partial(GradioEvents.regenerate, bot_client=bot_client)
+        predict_with_clients = partial(
+            GradioEvents.predict_stream, bot_client=bot_client
+        )
+        regenerate_with_clients = partial(
+            GradioEvents.regenerate, bot_client=bot_client
+        )
         file_upload_with_clients = partial(
             GradioEvents.file_upload,
         )
@@ -877,7 +993,9 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient, faiss_db_templa
         )
         submit_btn.click(GradioEvents.reset_user_input, [], [query])
         empty_btn.click(
-            GradioEvents.reset_state, outputs=[chatbot, task_history, file_btn, relevant_passage], show_progress=True
+            GradioEvents.reset_state,
+            outputs=[chatbot, task_history, file_btn, relevant_passage],
+            show_progress=True,
         )
         regen_btn.click(
             regenerate_with_clients,
@@ -886,7 +1004,10 @@ def launch_demo(args: argparse.Namespace, bot_client: BotClient, faiss_db_templa
             show_progress=True,
         )
 
-    demo.queue().launch(server_port=args.server_port, server_name=args.server_name)
+    demo.queue(
+        default_concurrency_limit=args.concurrency_limit, max_size=args.max_queue_size
+    )
+    demo.launch(server_port=args.server_port, server_name=args.server_name)
 
 
 def main():
@@ -896,7 +1017,9 @@ def main():
     faiss_db = FaissTextDatabase(args, bot_client)
 
     # Run file upload function to save default knowledge base.
-    GradioEvents.save_file_to_db(FILE_URL_DEFAULT, args.chunk_size, faiss_db, save_file=True)
+    GradioEvents.save_file_to_db(
+        FILE_URL_DEFAULT, args.chunk_size, faiss_db, save_file=True
+    )
 
     launch_demo(args, bot_client, faiss_db)
 

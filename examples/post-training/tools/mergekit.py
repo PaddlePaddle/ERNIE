@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Model Merge Tools. """
+"""Model Merge Tools."""
 
 import argparse
 import json
 import os
+import shutil
 import time
 
 import paddle
@@ -36,12 +37,22 @@ def parse_arguments():
         argparse.Namespace: An object containing all parsed command line arguments.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mergekit_task_config", type=str, help="The merge config path.")
-    parser.add_argument("--output_path", required=True, type=str, help="The merge config path.")
-    parser.add_argument("--lora_model_path", default=None, type=str, help="The lora model path.")
-    parser.add_argument("--model_name_or_path", default=None, type=str, help="The base model path.")
+    parser.add_argument(
+        "--mergekit_task_config", type=str, help="The merge config path."
+    )
+    parser.add_argument(
+        "--output_path", required=True, type=str, help="The merge config path."
+    )
+    parser.add_argument(
+        "--lora_model_path", default=None, type=str, help="The lora model path."
+    )
+    parser.add_argument(
+        "--model_name_or_path", default=None, type=str, help="The base model path."
+    )
     parser.add_argument("--device", default="gpu", type=str, help="Device")
-    parser.add_argument("--copy_tokenizer", default="True", type=strtobool, help="Copy tokenizer file")
+    parser.add_argument(
+        "--copy_tokenizer", default="True", type=strtobool, help="Copy tokenizer file"
+    )
     return parser.parse_args()
 
 
@@ -112,25 +123,40 @@ def merge():
                 "tokenizer.model",
                 "tokenizer_config.json",
                 "special_tokens_map.json",
-                "config.json",
             ]
-
         merge_config = MergeConfig(**config)
         mergekit = MergeModel(merge_config)
         logger_merge_config(merge_config, lora_merge)
         mergekit.merge_model()
-        logger.info(f"***** Successfully finished merging LoRA model. Time cost: {time.time()-start} s *****")
+        src_file = os.path.join(args.model_name_or_path, "config.json")
+        dst_file = os.path.join(args.output_path, "config.json")
+        if os.path.isfile(src_file):
+            shutil.copy2(src_file, dst_file)
+        else:
+            logger.debug(
+                f"Copy failed: 'config.json' not found in {args.model_name_or_path}"
+            )
+        logger.info(
+            f"***** Successfully finished merging LoRA model. Time cost: {time.time() - start} s *****"
+        )
     else:
         with open(args.mergekit_task_config, "r", encoding="utf-8") as f:
             config_list = json.load(f)
-        if not (isinstance(config_list, list) and all(isinstance(config, dict) for config in config_list)):
-            raise ValueError("The mergekit_task_config must be a list of dict. Please check config.")
+        if not (
+            isinstance(config_list, list)
+            and all(isinstance(config, dict) for config in config_list)
+        ):
+            raise ValueError(
+                "The mergekit_task_config must be a list of dict. Please check config."
+            )
 
         for i, config in enumerate(config_list):
             logger.info("=" * 30)
             start = time.time()
             logger.info(f"***** Start merging model id: {i} *****")
-            config["output_path"] = os.path.join(args.output_path, config.pop("output_folder_name"))
+            config["output_path"] = os.path.join(
+                args.output_path, config.pop("output_folder_name")
+            )
             config["tensor_type"] = tensor_type
             if args.copy_tokenizer:
                 config["copy_file_list"] = [
@@ -142,7 +168,9 @@ def merge():
             mergekit = MergeModel(merge_config)
             logger_merge_config(merge_config, lora_merge)
             mergekit.merge_model()
-            logger.info(f"***** Successfully finished merging model id: {i}. Time cost: {time.time()-start} s *****")
+            logger.info(
+                f"***** Successfully finished merging model id: {i}. Time cost: {time.time() - start} s *****"
+            )
 
 
 if __name__ == "__main__":

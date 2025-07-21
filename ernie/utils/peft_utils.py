@@ -14,28 +14,29 @@
 
 """PEFT utils"""
 from paddleformers.peft import LoRAConfig, LoRAModel
-from paddleformers.trainer import RuntimeTimer
 from paddleformers.utils.log import logger
 
 
-def initialize_lora_model(model, training_args, model_args, resume_from_checkpoint, dtype):
+def initialize_lora_model(
+    model, training_args, model_args, resume_from_checkpoint, dtype
+):
     """Initialize LoRAModel"""
-
-    runtime_timer = RuntimeTimer("Initializing LoRA Model")
 
     logger.info("Start to wrap model with LoRA config ...")
     if model_args.lora_path is None or resume_from_checkpoint:
         # If resume from checkpoint, LoRA adatper will be overwritten in the checkpoint loading process.
-        target_modules = [".*qkv_proj.*", ".*o_proj.*", ".*up_gate_proj.*", ".*down_proj.*"]
+        target_modules = [
+            ".*qkv_proj.*",
+            ".*o_proj.*",
+            ".*up_gate_proj.*",
+            ".*down_proj.*",
+        ]
         if model_args.rslora_plus:
             model_args.rslora = True
             model_args.lora_plus_scale = 4
             model_args.lora_alpha = 4
-        if hasattr(model_args, 'weight_quantize_algo'):
-            weight_quantize_algo_init = model_args.weight_quantize_algo
-        else:
-            weight_quantize_algo_init = training_args.weight_quantize_algo
-        if weight_quantize_algo_init is not None:
+
+        if training_args.weight_quantize_algo is not None:
             if model_args.rslora or model_args.lora_plus_scale != 1.0:
                 logger.info("Weight quantization is not supported in LoRA+ and RsLoRA.")
         if model_args.lora_alpha == -1:
@@ -54,16 +55,12 @@ def initialize_lora_model(model, training_args, model_args, resume_from_checkpoi
             head_dim=model.config.hidden_size // model.config.num_attention_heads,
             base_model_name_or_path=model_args.model_name_or_path,
         )
-
         model = LoRAModel(model, lora_config)
-
     else:
-        runtime_timer.start("lora model loading time")
         model = LoRAModel.from_pretrained(
             model=model,
             lora_path=model_args.lora_path,
         )
-        logger.info(f"{runtime_timer.log()}")
 
     model.mark_only_lora_as_trainable()
     model.print_trainable_parameters()

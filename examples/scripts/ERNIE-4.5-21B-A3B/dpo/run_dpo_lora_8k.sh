@@ -20,4 +20,4 @@ huggingface-cli download baidu/ERNIE-4.5-21B-A3B-Paddle --local-dir baidu/ERNIE-
 # # download model from modelscope
 # modelscope download --model PaddlePaddle/ERNIE-4.5-21B-A3B-Paddle --local_dir baidu/ERNIE-4.5-21B-A3B-Paddle
 
-CUDA_VISIBLE_DEVICES=0,1 erniekit train examples/configs/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_8k.yaml
+CUDA_VISIBLE_DEVICES=0 erniekit train examples/configs/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_8k.yaml
