@@ -17,6 +17,6 @@ from .mix_weighted_sampler import MixExampleSetJson
 from .vl_sft_dataset_json import SFTMultimodalDatasetJson
 
 __all__ = [
-    'MixExampleSetJson',
-    'SFTMultimodalDatasetJson',
+    "MixExampleSetJson",
+    "SFTMultimodalDatasetJson",
 ]

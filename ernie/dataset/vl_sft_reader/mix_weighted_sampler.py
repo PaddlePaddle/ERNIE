@@ -42,16 +42,16 @@ class MixExampleSetJson(IterableDataset):
         self.num_samples = 0
 
     def _transform_lm_example(self, instance):
-        """A reformatting is required to 
+        """A reformatting is required to
         bridge the discrepancy in example formats between text and image data
 
         Args:
             ex (_type_): _description_
         """
-        instance['part_id'] = instance['src_id']
-        instance['image'] = 0
-        instance['invalid'] = 0
-        instance['data_type'] = DATATYPE_2_ID['h5lm']
+        instance["part_id"] = instance["src_id"]
+        instance["image"] = 0
+        instance["invalid"] = 0
+        instance["data_type"] = DATATYPE_2_ID["h5lm"]
         return instance
 
     def __len__(self):
@@ -62,7 +62,9 @@ class MixExampleSetJson(IterableDataset):
         )
 
     def __iter__(self):
-        if self.lm_example_set is not None and self.num_samples < len(self.lm_example_set):
+        if self.lm_example_set is not None and self.num_samples < len(
+            self.lm_example_set
+        ):
             for example in self.lm_example_set:
                 yield self._transform_lm_example(example)
                 self.num_samples += 1

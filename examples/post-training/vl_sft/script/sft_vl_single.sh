@@ -14,7 +14,7 @@
 
 
 # Clean up old distributed training variables to prevent conflicts
-unset PADDLE_ELASTIC_JOB_ID PADDLE_TRAINER_ENDPOINTS 
+unset PADDLE_ELASTIC_JOB_ID PADDLE_TRAINER_ENDPOINTS
 unset DISTRIBUTED_TRAINER_ENDPOINTS FLAGS_START_PORT PADDLE_ELASTIC_TIMEOUT
 
 # NCCL communication settings (recommended to keep)

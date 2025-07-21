@@ -66,11 +66,13 @@ class ReshardSaveExitCallback(TrainerCallback):
         opt_state_dict = self.trainer.optimizer.state_dict()
         if "master_weights" in opt_state_dict:
             new_opt_state_dict["master_weights"] = opt_state_dict["master_weights"]
-            self.trainer.optimizer.set_state_dict(opt_state_dict)  
+            self.trainer.optimizer.set_state_dict(opt_state_dict)
 
         self.trainer.state.global_step = int(args.resume_from_checkpoint.split("-")[-1])
         self.trainer._save_checkpoint(self.trainer.model, metrics=None)
 
-        logger.info("In ReshardSaveExitCallback, finishing saving reshared model, will exit after 20s...")
+        logger.info(
+            "In ReshardSaveExitCallback, finishing saving reshared model, will exit after 20s..."
+        )
         time.sleep(10)
         exit(0)

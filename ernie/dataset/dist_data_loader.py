@@ -112,18 +112,24 @@ def broadcast_data_obj(data, src_rank, group):
     ret_flat = [-1 for _ in range(len(temp_flat))]
     for dtype, grouped in groupby(sorted(enumerate(temp_flat), key=keyfn), keyfn):
         grouped = list(grouped)
-        for grouped_chunk in split_group(grouped, 2**18):  # 对 > 2**31 的 tensor 进行 spilt 会出 paddle 问题。
+        for grouped_chunk in split_group(
+            grouped, 2**18
+        ):  # 对 > 2**31 的 tensor 进行 spilt 会出 paddle 问题。
             idxs = [g[0] for g in grouped_chunk]
             if not dtype:
                 for id in idxs:
                     ret_flat[id] = None
                 continue
 
-            data_buf_shapes = [reduce(lambda x, y: x * y, g[1].shape) for g in grouped_chunk]
+            data_buf_shapes = [
+                reduce(lambda x, y: x * y, g[1].shape) for g in grouped_chunk
+            ]
             if this_rank == src_rank:
                 data_buf = paddle.concat([data_flat[i].reshape([-1]) for i in idxs], 0)
             else:
-                data_buf = paddle.empty([sum(data_buf_shapes)], dtype=grouped_chunk[0][1].dtype)
+                data_buf = paddle.empty(
+                    [sum(data_buf_shapes)], dtype=grouped_chunk[0][1].dtype
+                )
             # log.info(f'[rank={dist.get_rank()}]: broadcast data:{data_buf.shape}')
             dist.broadcast(data_buf, src_rank, group)
             # log.info(f'[rank={dist.get_rank()}]: done broadcast data:{data_buf.shape}')
@@ -223,12 +229,18 @@ class MMDataloader(paddle.io.DataLoader):
         self.tokenizer = tokenizer
         self.eos_token = self.tokenizer.special_tokens_map.get("eos_token", "</s>")
         self.cls_token = self.tokenizer.special_tokens_map.get("cls_token", "<mask:0>")
-        self.sep_token = self.tokenizer.special_tokens_map.get("sep_token", "<|endofprompt|>")
-        log.info(f"cls token: {self.cls_token}, sep token: {self.sep_token}, eos token: {self.eos_token}")
+        self.sep_token = self.tokenizer.special_tokens_map.get(
+            "sep_token", "<|endofprompt|>"
+        )
+        log.info(
+            f"cls token: {self.cls_token}, sep token: {self.sep_token}, eos token: {self.eos_token}"
+        )
         self.cls_token_id = self.tokenizer._convert_token_to_id(self.cls_token)
         self.sep_token_id = self.tokenizer._convert_token_to_id(self.sep_token)
         self.eos_token_id = self.tokenizer._convert_token_to_id(self.eos_token)
-        log.info(f"cls token: {self.cls_token_id}, sep token: {self.sep_token_id}, eos token: {self.eos_token_id}")
+        log.info(
+            f"cls token: {self.cls_token_id}, sep token: {self.sep_token_id}, eos token: {self.eos_token_id}"
+        )
 
         self._lazy_dataloader_iter = None
         self.rng = random.Random(2048)
@@ -258,9 +270,13 @@ class MMDataloader(paddle.io.DataLoader):
         """
 
         # common operation
-        cur_images = paddle.concat(buffer["images"]) if len(buffer["images"]) > 0 else None
+        cur_images = (
+            paddle.concat(buffer["images"]) if len(buffer["images"]) > 0 else None
+        )
         cur_image_type_ids = np.array(buffer["image_type_ids"])
-        cur_data_type = DATATYPE_2_ID["lm"] if cur_images is None else DATATYPE_2_ID["mm"]
+        cur_data_type = (
+            DATATYPE_2_ID["lm"] if cur_images is None else DATATYPE_2_ID["mm"]
+        )
         cur_grid_thw = np.concatenate(buffer["grid_thw"], axis=0)
 
         # Helper function to slice arrays
@@ -279,30 +295,41 @@ class MMDataloader(paddle.io.DataLoader):
 
         # Apply the slicing consistently
         if len(buffer["input_ids"]) > 1:
-            lengths = np.cumsum(np.array([0] + [len(arr) for arr in buffer["input_ids"]]))
+            lengths = np.cumsum(
+                np.array([0] + [len(arr) for arr in buffer["input_ids"]])
+            )
             intervals = [(start, end) for start, end in zip(lengths[:-1], lengths[1:])]
             input_ids_batch = [
-                slice_array(cur_input_ids, remove_first, intervals, idx) for idx in range(len(intervals))
+                slice_array(cur_input_ids, remove_first, intervals, idx)
+                for idx in range(len(intervals))
             ]
             cur_input_ids = np.concatenate(input_ids_batch)
             cur_labels = np.concatenate(
-                [slice_array(cur_labels, remove_first, intervals, idx) for idx in range(len(intervals))]
+                [
+                    slice_array(cur_labels, remove_first, intervals, idx)
+                    for idx in range(len(intervals))
+                ]
             )
             cur_position_ids = np.concatenate(buffer["position_ids"], axis=0)
             # position ids
             cur_position_ids = [
-                slice_array(cur_position_ids, remove_first, intervals, idx) for idx in range(len(intervals))
+                slice_array(cur_position_ids, remove_first, intervals, idx)
+                for idx in range(len(intervals))
             ]
             if remove_first:
                 cur_position_ids = [
-                    position_id - 1 if idx != 0 else position_id for idx, position_id in enumerate(cur_position_ids)
+                    position_id - 1 if idx != 0 else position_id
+                    for idx, position_id in enumerate(cur_position_ids)
                 ]
             cur_position_ids = merge_rope_3d_position(cur_position_ids)
 
             # token type ids
             cur_token_type_ids = np.concatenate(buffer["token_type_ids"], axis=0)
             cur_token_type_ids = np.concatenate(
-                [slice_array(cur_token_type_ids, remove_first, intervals, idx) for idx in range(len(intervals))]
+                [
+                    slice_array(cur_token_type_ids, remove_first, intervals, idx)
+                    for idx in range(len(intervals))
+                ]
             )
 
         else:
@@ -310,7 +337,9 @@ class MMDataloader(paddle.io.DataLoader):
             cur_token_type_ids = np.concatenate(buffer["token_type_ids"])
             cur_image_type_ids = np.array(buffer["image_type_ids"])
             cur_grid_thw = np.concatenate(buffer["grid_thw"], axis=0)
-            cur_position_ids = np.array(merge_rope_3d_position(buffer["position_ids"])[:-1])
+            cur_position_ids = np.array(
+                merge_rope_3d_position(buffer["position_ids"])[:-1]
+            )
 
         return {
             "input_ids_batch": input_ids_batch,
@@ -364,15 +393,22 @@ class MMDataloader(paddle.io.DataLoader):
 
                 # assert data_type[0] == DATATYPE_2_ID["mm"], "not valid mm data"
 
-                need_to_yield_sample = self._lens_rcd[src_id] + input_ids.shape[0] > self.tokenizer.model_max_length
+                need_to_yield_sample = (
+                    self._lens_rcd[src_id] + input_ids.shape[0]
+                    > self.tokenizer.model_max_length
+                )
                 # or (self._lens_images[src_id] + len(images) > 120)
                 if need_to_yield_sample:
-                    slice_result = self.sync_array_slices(self._sample_buffer[src_id], self.need_multiround)
+                    slice_result = self.sync_array_slices(
+                        self._sample_buffer[src_id], self.need_multiround
+                    )
                     example = {
                         "data_id": np.array(self._sample_buffer[src_id]["data_id"]),
                         "part_id": np.array(self._sample_buffer[src_id]["part_id"]),
                         "src_id": np.array(self._sample_buffer[src_id]["src_id"]),
-                        "example_id": np.array(self._sample_buffer[src_id]["example_id"]),
+                        "example_id": np.array(
+                            self._sample_buffer[src_id]["example_id"]
+                        ),
                         "need_multiround": self.need_multiround,
                     }
                     example.update(slice_result)
@@ -391,7 +427,9 @@ class MMDataloader(paddle.io.DataLoader):
                                 batch_data[k] = paddle.to_tensor(batch_data[k])
                         self._batch_buffer["cur_batch"] = []
                         yield batch_data
-                        self.need_multiround = self.rng.random() < self.multimodal_multiround_ratio
+                        self.need_multiround = (
+                            self.rng.random() < self.multimodal_multiround_ratio
+                        )
 
                 # 样本进伪多轮 buffer
                 # if len(self._sample_buffer[src_id]["input_ids"]) > 0:
@@ -508,7 +546,9 @@ class DistDataLoader(paddle.io.DataLoader):
         sharding_rank = self._hcg.get_sharding_parallel_rank()
         self._need_data = need_data
         self.gradient_accumulation_steps = gradient_accumulation_steps
-        log.info(f"[DistDataloader] gradient_accumulation_steps: {gradient_accumulation_steps}")
+        log.info(
+            f"[DistDataloader] gradient_accumulation_steps: {gradient_accumulation_steps}"
+        )
 
         self.is_train_text = is_train_text
         if self._need_data:
@@ -559,7 +599,9 @@ class DistDataLoader(paddle.io.DataLoader):
         if self._need_data:
             return super().__len__()
         else:
-            raise ValueError("raise error for `paddlenlp.trainer.trainer_utils.has_length`")
+            raise ValueError(
+                "raise error for `paddlenlp.trainer.trainer_utils.has_length`"
+            )
 
     def _init_dataloader_comm_group(self):
         topo = self._hcg._topo
@@ -609,18 +651,26 @@ class DistDataLoader(paddle.io.DataLoader):
 
         assert input_ids.shape[-1] == labels.shape[-1]
         assert input_ids.shape[-1] + 1 == token_type_ids.shape[-1]
-        self.sys_start_token = self.tokenizer.special_tokens_map.get("sys_start_token", "<mask:4>")
-        self.sys_end_token = self.tokenizer.special_tokens_map.get("sys_end_token", "<mask:5>")
+        self.sys_start_token = self.tokenizer.special_tokens_map.get(
+            "sys_start_token", "<mask:4>"
+        )
+        self.sys_end_token = self.tokenizer.special_tokens_map.get(
+            "sys_end_token", "<mask:5>"
+        )
         self.eos_token = self.tokenizer.special_tokens_map.get("eos_token", "</s>")
         self.cls_token = self.tokenizer.special_tokens_map.get("cls_token", "<mask:0>")
-        self.sep_token = self.tokenizer.special_tokens_map.get("sep_token", "<|endofprompt|>")
+        self.sep_token = self.tokenizer.special_tokens_map.get(
+            "sep_token", "<|endofprompt|>"
+        )
         self.image_token = "<|IMAGE_PLACEHOLDER|>"
         self.img_start_token = "<|IMAGE_START|>"
         self.img_end_token = "<|IMAGE_END|>"
         self.cls_token_id = self.tokenizer._convert_token_to_id(self.cls_token)
         self.sep_token_id = self.tokenizer._convert_token_to_id(self.sep_token)
         self.eos_token_id = self.tokenizer._convert_token_to_id(self.eos_token)
-        self.img_start_token_id = self.tokenizer.convert_tokens_to_ids(self.img_start_token)
+        self.img_start_token_id = self.tokenizer.convert_tokens_to_ids(
+            self.img_start_token
+        )
         self.img_end_token_id = self.tokenizer.convert_tokens_to_ids(self.img_end_token)
         self.image_token_id = self.tokenizer.convert_tokens_to_ids(self.image_token)
         assert labels[labels != self.tokenizer.ignored_index][-1] == self.eos_token_id
@@ -631,21 +681,32 @@ class DistDataLoader(paddle.io.DataLoader):
                 assert np.sum([a[1] * a[2] for a in grid_thw]) == images.shape[0]
             inbatch_pack_offset_unpad = inbatch_pack_offset[inbatch_pack_offset != -1]
             accu_image_num = 0
-            for start, end in zip(inbatch_pack_offset_unpad[:-1], inbatch_pack_offset_unpad[1:]):
+            for start, end in zip(
+                inbatch_pack_offset_unpad[:-1], inbatch_pack_offset_unpad[1:]
+            ):
                 assert start < end, f"inbatch_pack_offset错误：{start}, {end}"
                 # check-position-id
                 image_num = sum(input_ids[start:end] == self.img_start_token_id)
                 if image_num == 0:
-                    image_num = int(sum(input_ids[start:end] == self.image_token_id) > 0)
+                    image_num = int(
+                        sum(input_ids[start:end] == self.image_token_id) > 0
+                    )
                 part_position_ids = position_ids[start:end]
                 # assert not ((part_position_ids == 0).all(axis=-1)).any(), "position_ids 中存在 [0,0,0]"
-                if sum(np.all(part_position_ids == 0, axis=1)) > 1 and end != self.tokenizer.model_max_length:
+                if (
+                    sum(np.all(part_position_ids == 0, axis=1)) > 1
+                    and end != self.tokenizer.model_max_length
+                ):
                     log.info(f"[start-end]: ({start}, {end})")
-                    log.info(f"[inbatch_pack_offset_unpad]: {inbatch_pack_offset_unpad}")
+                    log.info(
+                        f"[inbatch_pack_offset_unpad]: {inbatch_pack_offset_unpad}"
+                    )
                     log.info(f"[Error Position-ids]: {part_position_ids.tolist()}")
                     assert False
                 if image_num > 0:
-                    part_grid_thw = grid_thw[accu_image_num : accu_image_num + image_num]
+                    part_grid_thw = grid_thw[
+                        accu_image_num : accu_image_num + image_num
+                    ]
                     if ((part_grid_thw == 0).all(axis=-1)).any():
                         import json
 
@@ -667,11 +728,19 @@ class DistDataLoader(paddle.io.DataLoader):
                         log.info(f"[start-end]: ({start}, {end})")
                         log.info(f"[grid_thw]: {grid_thw.tolist()}")
                         log.info(f"[input_ids]: {input_ids.tolist()}")
-                        log.info(f"[inbatch_pack_offset_unpad]: {inbatch_pack_offset_unpad.tolist()}")
+                        log.info(
+                            f"[inbatch_pack_offset_unpad]: {inbatch_pack_offset_unpad.tolist()}"
+                        )
                         log.info(f"[Error Position-ids]: {part_position_ids.tolist()}")
                     accu_image_num += image_num
-                    if end != self.tokenizer.model_max_length and not self.position_id_assert(
-                        part_position_ids, input_ids[start:end], self.image_token_id, part_grid_thw
+                    if (
+                        end != self.tokenizer.model_max_length
+                        and not self.position_id_assert(
+                            part_position_ids,
+                            input_ids[start:end],
+                            self.image_token_id,
+                            part_grid_thw,
+                        )
                     ):
                         import json
 
@@ -693,18 +762,24 @@ class DistDataLoader(paddle.io.DataLoader):
                         log.info(f"[start-end]: ({start}, {end})")
                         log.info(f"[grid_thw]: {grid_thw.tolist()}")
                         log.info(f"[input_ids]: {input_ids.tolist()}")
-                        log.info(f"[inbatch_pack_offset_unpad]: {inbatch_pack_offset_unpad.tolist()}")
+                        log.info(
+                            f"[inbatch_pack_offset_unpad]: {inbatch_pack_offset_unpad.tolist()}"
+                        )
                         log.info(f"[Error Position-ids]: {part_position_ids.tolist()}")
                         # assert False
                 else:
                     if end != self.tokenizer.model_max_length:
                         for idx in range(part_position_ids.shape[0]):
                             position_id = part_position_ids[idx]
-                            assert position_id.tolist() == [idx] * 3, f"position_id错误：{position_id}, {idx}"
+                            assert (
+                                position_id.tolist() == [idx] * 3
+                            ), f"position_id错误：{position_id}, {idx}"
                     else:
                         for idx in range(part_position_ids.shape[0]):
                             position_id = part_position_ids[idx]
-                            assert position_id.tolist() == [idx] * 3 or position_id.tolist() == [
+                            assert position_id.tolist() == [
+                                idx
+                            ] * 3 or position_id.tolist() == [
                                 0,
                                 0,
                                 0,
@@ -732,18 +807,29 @@ class DistDataLoader(paddle.io.DataLoader):
                 assert position_id[0] == accu_pos
                 for ik, thw_sum in enumerate(grid_thw_list[1:]):
                     if accu_im_patch_id <= sum(grid_thw_list[: 2 + ik]):
-                        inner_image_idx = accu_im_patch_id - sum(grid_thw_list[: 1 + ik]) - 1
-                        if position_id[1] != accu_pos + inner_image_idx // grid_thw[ik][2]:
+                        inner_image_idx = (
+                            accu_im_patch_id - sum(grid_thw_list[: 1 + ik]) - 1
+                        )
+                        if (
+                            position_id[1]
+                            != accu_pos + inner_image_idx // grid_thw[ik][2]
+                        ):
                             return False
                         if (
                             position_id[2]
-                            != accu_pos + inner_image_idx - inner_image_idx // grid_thw[ik][2] * grid_thw[ik][2]
+                            != accu_pos
+                            + inner_image_idx
+                            - inner_image_idx // grid_thw[ik][2] * grid_thw[ik][2]
                         ):
                             return False
 
                         break
                 accu_im_patch_id += 1
-            if idx < len(input_ids) - 1 and input_id == im_patch_id and input_ids[idx + 1] != im_patch_id:
+            if (
+                idx < len(input_ids) - 1
+                and input_id == im_patch_id
+                and input_ids[idx + 1] != im_patch_id
+            ):
                 accu_pos = max(position_id) + 1
         return True
 
@@ -835,14 +921,14 @@ class DistDataLoader(paddle.io.DataLoader):
 
             to_return = OrderedDict(
                 [
-                    ('input_ids', input_ids),
-                    ('labels', labels),
-                    ('inbatch_pack_offset', inbatch_pack_offset),
-                    ('token_type_ids', token_type_ids),
-                    ('task_ids', task_ids),
-                    ('exact_total_task_ids', exact_total_task_ids),
-                    ('data_type', data_type),
-                    ('position_ids', position_ids),
+                    ("input_ids", input_ids),
+                    ("labels", labels),
+                    ("inbatch_pack_offset", inbatch_pack_offset),
+                    ("token_type_ids", token_type_ids),
+                    ("task_ids", task_ids),
+                    ("exact_total_task_ids", exact_total_task_ids),
+                    ("data_type", data_type),
+                    ("position_ids", position_ids),
                 ]
             )
         else:
@@ -898,7 +984,13 @@ class DistDataLoader(paddle.io.DataLoader):
                     data.get("grid_thw", None),
                     data.get("position_ids", None),
                 )
-                assert {input_ids.dtype, labels.dtype, data_id.dtype, src_id.dtype, part_id.dtype} == {paddle.int64}, (
+                assert {
+                    input_ids.dtype,
+                    labels.dtype,
+                    data_id.dtype,
+                    src_id.dtype,
+                    part_id.dtype,
+                } == {paddle.int64}, (
                     f"Distloader requires dtype == `int64`, "
                     f"got:{[input_ids.dtype, labels.dtype, data_id.dtype, part_id.dtype]}"
                 )
@@ -922,7 +1014,20 @@ class DistDataLoader(paddle.io.DataLoader):
                     inbatch_pack_offset,
                     grid_thw,
                     position_ids,
-                ) = (None, None, None, None, None, None, None, None, None, None, None, None)
+                ) = (
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
             to_return = OrderedDict(
                 [
                     ("input_ids", input_ids),
@@ -948,7 +1053,9 @@ class DistDataLoader(paddle.io.DataLoader):
                 "grid_thw",
                 "position_ids",
             ]
-            none_keys = [k for k, v in to_return.items() if v is None and k in optional_keys]
+            none_keys = [
+                k for k, v in to_return.items() if v is None and k in optional_keys
+            ]
             for k in none_keys:
                 to_return.pop(k)  # none key whill break paddlle mp broadcast
             # debug_info = map_structure(lambda i: i.shape if i is not None else None, to_return)

@@ -27,13 +27,13 @@ from copy import deepcopy
 import numpy as np
 import paddle
 
-DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
-
 from contextlib import contextmanager
 
 from paddle.io import IterableDataset
 
 log = logging.getLogger(__name__)
+
+DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
 
 
 def fetch_worker():
@@ -101,19 +101,19 @@ def contains_markdown_table(text):
         bool: Returns True if the text contains a Markdown-formatted table; otherwise, returns False.
 
     """
-    lines = text.strip().split('\n')
+    lines = text.strip().split("\n")
     for i in range(1, len(lines) - 1):
         separator_line = lines[i].strip()
         # Check if it's a table separator line
-        if re.match(r'^(\s*\|?\s*:?-+:?\s*\|)+\s*$', separator_line):
+        if re.match(r"^(\s*\|?\s*:?-+:?\s*\|)+\s*$", separator_line):
             header_line = lines[i - 1].strip()
             body_line = lines[i + 1].strip()
             # Check if the previous and next lines could be content rows of a table
-            if '|' in header_line and '|' in body_line:
+            if "|" in header_line and "|" in body_line:
                 # Check if the number of | characters in each row is consistent
-                header_pipes = header_line.count('|')
-                body_pipes = body_line.count('|')
-                separator_pipes = separator_line.count('|')
+                header_pipes = header_line.count("|")
+                body_pipes = body_line.count("|")
+                separator_pipes = separator_line.count("|")
                 if header_pipes == body_pipes == separator_pipes:
                     return True
     return False
@@ -136,20 +136,26 @@ def process_markdown_table(table: str) -> str:
     if not contains_markdown_table(table):
         return table
 
-    # Remove extra spaces before and after each cell, 
+    # Remove extra spaces before and after each cell,
     # and ensure at least one space is present before and after each cell
     def format_row(row: str) -> str:
-        return '| ' + ' | '.join(cell.strip() for cell in row.split('|')[1:-1]) + ' |'
+        return "| " + " | ".join(cell.strip() for cell in row.split("|")[1:-1]) + " |"
 
-    # Limit characters above "---" to at most three '-', 
+    # Limit characters above "---" to at most three '-',
     # applicable for alignment lines
     def format_alignment_row(row: str) -> str:
         # maybe have some bugs
-        line = '| ' + ' | '.join(re.sub(r'-{3,}', '---', cell.strip()) for cell in row.split('|')[1:-1]) + ' |'
-        line = line.replace(':---:', ':-:')
-        line = line.replace(':--:', ':-:')
-        line = line.replace(':---', ':--')
-        line = line.replace('---:', '--:')
+        line = (
+            "| "
+            + " | ".join(
+                re.sub(r"-{3,}", "---", cell.strip()) for cell in row.split("|")[1:-1]
+            )
+            + " |"
+        )
+        line = line.replace(":---:", ":-:")
+        line = line.replace(":--:", ":-:")
+        line = line.replace(":---", ":--")
+        line = line.replace("---:", "--:")
 
         return line
 
@@ -157,15 +163,15 @@ def process_markdown_table(table: str) -> str:
     processed_lines = []
 
     for line in lines:
-        if re.match(r'^\s*\|', line):  
-            if '-' in line:  
+        if re.match(r"^\s*\|", line):
+            if "-" in line:
                 processed_lines.append(format_alignment_row(line))
-            else:  
+            else:
                 processed_lines.append(format_row(line))
         else:
-            processed_lines.append(line) 
+            processed_lines.append(line)
 
-    return '\n'.join(processed_lines)
+    return "\n".join(processed_lines)
 
 
 Example = namedtuple("Example", ["meta", "task", "prompt", "labels", "src"])
@@ -256,12 +262,18 @@ class SFTMultimodalDatasetJson(IterableDataset):
         self.adaptive_resolution = adaptive_resolution
         self.use_crop = use_crop
         if self.use_crop:  # 1
-            self.crop_tile_option = [int(op.strip()) for op in crop_tile_option.strip().split(',')]
-            self.crop_tile_rate = [float(op.strip()) for op in crop_tile_rate.strip().split(',')]
+            self.crop_tile_option = [
+                int(op.strip()) for op in crop_tile_option.strip().split(",")
+            ]
+            self.crop_tile_rate = [
+                float(op.strip()) for op in crop_tile_rate.strip().split(",")
+            ]
             assert len(self.crop_tile_option) == len(
                 self.crop_tile_rate
-            ), 'crop_tile_option and crop_tile_rate len are no match'
-            log.info(f'[Use Crop] crop_tile_option={self.crop_tile_option} crop_tile_rate={self.crop_tile_rate}')
+            ), "crop_tile_option and crop_tile_rate len are no match"
+            log.info(
+                f"[Use Crop] crop_tile_option={self.crop_tile_option} crop_tile_rate={self.crop_tile_rate}"
+            )
 
         self.wo_vit = False
 
@@ -272,12 +284,20 @@ class SFTMultimodalDatasetJson(IterableDataset):
         self.seqlen = seqlen
         self.use_prompt = use_prompt
 
-        self.sys_start_token = self.tokenizer.special_tokens_map.get("sys_start_token", "<mask:4>")
-        self.sys_end_token = self.tokenizer.special_tokens_map.get("sys_end_token", "<mask:5>")
+        self.sys_start_token = self.tokenizer.special_tokens_map.get(
+            "sys_start_token", "<mask:4>"
+        )
+        self.sys_end_token = self.tokenizer.special_tokens_map.get(
+            "sys_end_token", "<mask:5>"
+        )
         self.eos_token = self.tokenizer.special_tokens_map.get("eos_token", "</s>")
         self.cls_token = self.tokenizer.special_tokens_map.get("cls_token", "<mask:0>")
-        self.sep_token = self.tokenizer.special_tokens_map.get("sep_token", "<|endofprompt|>")
-        log.info(f"cls token: {self.cls_token}, sep token: {self.sep_token}, eos token: {self.eos_token}")
+        self.sep_token = self.tokenizer.special_tokens_map.get(
+            "sep_token", "<|endofprompt|>"
+        )
+        log.info(
+            f"cls token: {self.cls_token}, sep token: {self.sep_token}, eos token: {self.eos_token}"
+        )
 
         # "<|IMAGE_START|>", "<|IMAGE_END|>" "<|CROP_COL_SEP|>", "<|CROP_ROW_SEP|>"
         self.img_start_token = "<|IMAGE_START|>"
@@ -295,12 +315,20 @@ class SFTMultimodalDatasetJson(IterableDataset):
         self.sep_token_id = self.tokenizer._convert_token_to_id(self.sep_token)
         self.eos_token_id = self.tokenizer._convert_token_to_id(self.eos_token)
 
-        log.info(f"cls token: {self.cls_token_id}, sep token: {self.sep_token_id}, eos token: {self.eos_token_id}")
+        log.info(
+            f"cls token: {self.cls_token_id}, sep token: {self.sep_token_id}, eos token: {self.eos_token_id}"
+        )
 
-        self.img_start_token_id = self.tokenizer.convert_tokens_to_ids(self.img_start_token)
+        self.img_start_token_id = self.tokenizer.convert_tokens_to_ids(
+            self.img_start_token
+        )
         self.img_end_token_id = self.tokenizer.convert_tokens_to_ids(self.img_end_token)
-        self.crop_col_sep_token_id = self.tokenizer.convert_tokens_to_ids(self.crop_col_sep_token)
-        self.crop_row_sep_token_id = self.tokenizer.convert_tokens_to_ids(self.crop_row_sep_token)
+        self.crop_col_sep_token_id = self.tokenizer.convert_tokens_to_ids(
+            self.crop_col_sep_token
+        )
+        self.crop_row_sep_token_id = self.tokenizer.convert_tokens_to_ids(
+            self.crop_row_sep_token
+        )
         self.sys_start_id = self.tokenizer.convert_tokens_to_ids(self.sys_start_token)
         self.sys_end_id = self.tokenizer.convert_tokens_to_ids(self.sys_end_token)
         log.info(
@@ -352,8 +380,14 @@ class SFTMultimodalDatasetJson(IterableDataset):
 
     def reformat_meta(self, meta):
         """reformat_meta"""
-        text_list = "".join([text["text"] for text in meta["text_info"] if text["tag"] == "no_mask"])
-        if type(text_list) == str and "<think>" in text_list and "</think>" in text_list:
+        text_list = "".join(
+            [text["text"] for text in meta["text_info"] if text["tag"] == "no_mask"]
+        )
+        if (
+            isinstance(text_list, str)
+            and "<think>" in text_list
+            and "</think>" in text_list
+        ):
             # think-data
             pass
         else:
@@ -367,7 +401,11 @@ class SFTMultimodalDatasetJson(IterableDataset):
         train_dataset_path_list = self.train_dataset_path.split(",")
         train_dataset_prob_list = self.train_dataset_prob.split(",")
 
-        for src_id, path, prob in zip(range(len(train_dataset_path_list)), train_dataset_path_list, train_dataset_prob_list):
+        for src_id, path, prob in zip(
+            range(len(train_dataset_path_list)),
+            train_dataset_path_list,
+            train_dataset_prob_list,
+        ):
             part = ExampleSet(
                 file_name=path,
                 src=src_id,
@@ -379,7 +417,7 @@ class SFTMultimodalDatasetJson(IterableDataset):
             self.src_id_list.append(part.src)
             self.length += len(part)
             self.weight_list.append(float(prob))
-        
+
         weight_sum = sum(self.weight_list)
         self.weight_list = [item / weight_sum for item in self.weight_list]
 
@@ -403,12 +441,14 @@ class SFTMultimodalDatasetJson(IterableDataset):
 
             # Fix Table
             for idx, _ in enumerate(raw_meta["text_info"]):
-                raw_meta["text_info"][idx]["text"] = raw_meta["text_info"][idx]["text"].strip()
+                raw_meta["text_info"][idx]["text"] = raw_meta["text_info"][idx][
+                    "text"
+                ].strip()
                 if raw_meta["text_info"][idx]["tag"] == "no_mask":
-                    raw_text = raw_meta["text_info"][idx]["text"]
                     raw_meta = self.reformat_meta(raw_meta)
-                    raw_meta["text_info"][idx]["text"] = process_markdown_table(raw_meta["text_info"][idx]["text"])
-
+                    raw_meta["text_info"][idx]["text"] = process_markdown_table(
+                        raw_meta["text_info"][idx]["text"]
+                    )
 
             result = self.data_processor.process(raw_meta)
             assert len(result) == 1, f"result: {len(result)}, {result}"
@@ -494,7 +534,9 @@ class SFTMultimodalDatasetJson(IterableDataset):
     def __iter__(self):
         while True:
             np.random.seed(make_seed(self.local_seed, self.epoch))
-            sample_list = np.random.choice(self.src_id_list, size=5120, p=self.weight_list)
+            sample_list = np.random.choice(
+                self.src_id_list, size=5120, p=self.weight_list
+            )
             self.epoch += 1
             for sample in sample_list:
                 data = self.task_group[int(sample)]

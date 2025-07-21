@@ -37,7 +37,7 @@ def is_sequence_parallel_parameter(parameter):
         parameter (object): The parameter object to be checked.
 
     Returns:
-        bool: Returns True if the parameter is a sequence-parallel parameter; 
+        bool: Returns True if the parameter is a sequence-parallel parameter;
         otherwise, returns False.
 
     """
@@ -67,12 +67,16 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
                 assert hasattr(
                     layer.mlp, "moe_statics"
                 ), "make sure update to latest ernie-core, too use AuxFree Balance"
-                usages[layer.layer_idx] = layer.mlp.moe_statics.expert_usage  # usage list
+                usages[layer.layer_idx] = (
+                    layer.mlp.moe_statics.expert_usage
+                )  # usage list
                 biases[layer.layer_idx] = layer.mlp.moe_statics.e_score_correction_bias
 
         model.apply(get_stat)
         keys, tensor_list = zip(*sorted(usages.items(), key=lambda x: x[0]))
-        usages_tensor = paddle.stack(tensor_list, 0)  # [num_layers, 2, num_experts_per_modality]
+        usages_tensor = paddle.stack(
+            tensor_list, 0
+        )  # [num_layers, 2, num_experts_per_modality]
         if not hasattr(fleet, "_hcg"):
             dist.all_reduce(usages_tensor)
             return

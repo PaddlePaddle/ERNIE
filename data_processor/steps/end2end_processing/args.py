@@ -23,8 +23,13 @@ from dataclasses import dataclass, field
 from data_processor.steps.array_collation import ArrayCollationProcessorArguments
 from data_processor.steps.coarse_processing import CoarseProcessorArguments
 from data_processor.steps.image_modification import ImageModificationProcessorArguments
-from data_processor.steps.input_ids_massaging import InputIdsMassageArguments, InputIdsMassageInferArguments
-from data_processor.steps.pseudo_multiround_packing import PseudoMultiRoundProcessorArguments
+from data_processor.steps.input_ids_massaging import (
+    InputIdsMassageArguments,
+    InputIdsMassageInferArguments,
+)
+from data_processor.steps.pseudo_multiround_packing import (
+    PseudoMultiRoundProcessorArguments,
+)
 from data_processor.steps.utterance_processing import UtteranceProcessorArguments
 
 
@@ -35,7 +40,9 @@ class End2EndProcessorArgumentsHelper:
     """
 
     batch_size: int = field(default=1, metadata={"help": "batch size"})
-    load_args_from_api: bool = field(default=False, metadata={"help": "load arguments from api"})
+    load_args_from_api: bool = field(
+        default=False, metadata={"help": "load arguments from api"}
+    )
 
 
 End2EndProcessorArguments = (

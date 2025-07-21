@@ -26,7 +26,7 @@ from ernie.dataset.data_utils import contains_markup
 logger = logging.getLogger(__name__)
 
 SFTExample = namedtuple(
-    'SFTExample',
+    "SFTExample",
     [
         "src",
         "tgt",
@@ -66,8 +66,8 @@ class RandomNoReplacementSampler:
         Returns:
             None
 
-        Set the epoch and offset of the current object. 
-        `epoch` represents the number of epochs corresponding to the current data status, 
+        Set the epoch and offset of the current object.
+        `epoch` represents the number of epochs corresponding to the current data status,
         and `offset` represents the offset of the current data status within the corresponding epoch.
         The formulas for calculating epoch and offset are:
         - epoch = data_status // len(self)
@@ -117,18 +117,18 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
         previous_pseudo_example_list (list): List of pseudo examples from the previous round.
         current_pseudo_example_list (list): List of pseudo examples from the current round.
         tokenizer (Tokenizer): The tokenizer used for tokenization.
-        stop_by_k (bool, optional): Whether to stop optimization based on K. 
+        stop_by_k (bool, optional): Whether to stop optimization based on K.
         Defaults to False.
-        no_opt_markups (list, optional): List of markup tags that do not 
+        no_opt_markups (list, optional): List of markup tags that do not
         require optimization. Defaults to empty list.
         rng (Random, optional): Random number generator. Defaults to None.
-        use_anti_k_sampling (bool, optional): Whether to use anti-K sampling strategy. 
+        use_anti_k_sampling (bool, optional): Whether to use anti-K sampling strategy.
         Defaults to False.
-        drop_history_with_k (bool, optional): Whether to drop history containing K. 
+        drop_history_with_k (bool, optional): Whether to drop history containing K.
         Defaults to False.
 
     Returns:
-        tuple: A tuple containing the converted new examples and a mapping 
+        tuple: A tuple containing the converted new examples and a mapping
         from source to optimization counts.
     """
     multi_turn_src, multi_turn_tgt, multi_turn_label = [], [], []
@@ -138,8 +138,12 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
     for i, example in enumerate(previous_pseudo_example_list):
 
         if example.math_is_end == 1:
-            assert len(example.src) == len(example.ctxt_src), "len(example.src) == len(example.ctxt_src)"
-            assert len(example.tgt) == len(example.ctxt_tgt), "len(example.tgt) == len(example.ctxt_tgt)"
+            assert len(example.src) == len(
+                example.ctxt_src
+            ), "len(example.src) == len(example.ctxt_src)"
+            assert len(example.tgt) == len(
+                example.ctxt_tgt
+            ), "len(example.tgt) == len(example.ctxt_tgt)"
             example = example._replace(src=example.ctxt_src, tgt=example.ctxt_tgt)
 
         if contains_markup(example.src, tokenizer.markup_tokens):
@@ -149,17 +153,15 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
             src = example.src[:-2] + [example.src[-2]]
             tgt = example.tgt[:-2] + [example.tgt[-1]]
 
-            label = [x and int(not stop_by_k) for x in example.label[:-2]]  
-            label.append(
-                int(not stop_by_k and not is_contain_no_opt_markups)
-            ) 
+            label = [x and int(not stop_by_k) for x in example.label[:-2]]
+            label.append(int(not stop_by_k and not is_contain_no_opt_markups))
             if 1 in label:
                 source_to_num_opt[example.source] += 1
         else:
             src = example.src
             tgt = example.tgt
 
-            label = [x and int(not stop_by_k) for x in example.label]  
+            label = [x and int(not stop_by_k) for x in example.label]
 
             if 1 in label:
                 source_to_num_opt[example.source] += 1
@@ -181,14 +183,19 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
             multi_turn_tgt.append(tgt)
             multi_turn_label.append(label)
 
-
     random_choice_index_to_opt_anti_k = -1
-    if len(current_pseudo_example_list) > 1 and use_anti_k_sampling and rng.random() < 0.5:
- 
-        random_choice_index_to_opt_anti_k = rng.choice(range(len(current_pseudo_example_list) - 1))
+    if (
+        len(current_pseudo_example_list) > 1
+        and use_anti_k_sampling
+        and rng.random() < 0.5
+    ):
+
+        random_choice_index_to_opt_anti_k = rng.choice(
+            range(len(current_pseudo_example_list) - 1)
+        )
 
     for i, example in enumerate(current_pseudo_example_list):
-     
+
         if example.math_is_end == 1 and i != len(current_pseudo_example_list) - 1:
             assert len(example.src) == len(
                 example.ctxt_src
@@ -197,18 +204,17 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
                 example.ctxt_tgt
             ), f"'src': {example.tgt}, 'ctxt_src': {example.ctxt_tgt}, 'source': {example.source}"
             example = example._replace(src=example.ctxt_src, tgt=example.ctxt_tgt)
-   
+
         src = example.src
         tgt = example.tgt
         if i != len(current_pseudo_example_list) - 1:
-            label = [x and int(not stop_by_k) for x in example.label]  
+            label = [x and int(not stop_by_k) for x in example.label]
             if i == random_choice_index_to_opt_anti_k:
                 inner_random_opt_index = rng.choice(range(len(example.label)))
                 label[inner_random_opt_index] = example.label[inner_random_opt_index]
 
             if 1 in label:
                 source_to_num_opt[example.source] += 1
-
 
             new_src = []
             for x in src:
@@ -219,9 +225,9 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
                 new_src.append(x)
             src = new_src
         else:
-       
+
             if contains_markup(src, tokenizer.markup_tokens):
-     
+
                 label = [0] * len(src[:-2])
                 label.extend([1] * (len(src) - len(src[:-2])))
             else:
@@ -240,11 +246,11 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
             multi_turn_label.append(label)
 
     # K = 30
-    # cc = [x / 1000 + 1.0 / K for x in range(0, K)]  
+    # cc = [x / 1000 + 1.0 / K for x in range(0, K)]
     # [i /sum(cc) for i in cc]
     if drop_history_with_k:
         K = len(multi_turn_src)
-        cc = [x / 100 + 1.0 / K for x in range(0, K)]  
+        cc = [x / 100 + 1.0 / K for x in range(0, K)]
         p = [i / sum(cc) for i in cc]
         pos = int(np.random.choice(list(range(K)), 1, p=p))  # 0, k-1
         multi_turn_src = multi_turn_src[pos:]
@@ -289,12 +295,15 @@ def get_length(example, tokenizer, eb_markup_rounter, add_number=4):
     """
     cur_len_w_k = 0
     cur_len_wo_k = 0
-    if contains_markup(example.src, tokenizer.markup_tokens) and contains_markup(example.tgt, tokenizer.markup_tokens):
+    if contains_markup(example.src, tokenizer.markup_tokens) and contains_markup(
+        example.tgt, tokenizer.markup_tokens
+    ):
         try:
-            tokens_src, tokens_target, is_parts_a_truncated, is_parts_b_truncated = eb_markup_rounter.encode(
-                example.src[-2:], example.tgt[-2:], 10000
+            tokens_src, tokens_target, is_parts_a_truncated, is_parts_b_truncated = (
+                eb_markup_rounter.encode(example.src[-2:], example.tgt[-2:], 10000)
             )
-        except:
+        except Exception as e:
+            print(f"Error encoding example: {e}")
             print(example, example.src)
             assert False
         cur_len_w_k += len(tokens_src) + len(tokens_target)
@@ -306,11 +315,15 @@ def get_length(example, tokenizer, eb_markup_rounter, add_number=4):
             cur_len_wo_k += src_len + tgt_len + add_number
 
         cur_len_wo_k += (
-            len(tokenizer.tokenize(example.src[-2])) + len(tokenizer.tokenize(example.tgt[-1])) + add_number
+            len(tokenizer.tokenize(example.src[-2]))
+            + len(tokenizer.tokenize(example.tgt[-1]))
+            + add_number
         )
     else:
         for src, tgt in zip(example.src, example.tgt):
-            cur_len_wo_k += len(tokenizer.tokenize(src)) + len(tokenizer.tokenize(tgt)) + add_number
+            cur_len_wo_k += (
+                len(tokenizer.tokenize(src)) + len(tokenizer.tokenize(tgt)) + add_number
+            )
         cur_len_w_k = cur_len_wo_k
 
     return cur_len_w_k, cur_len_wo_k
@@ -337,10 +350,10 @@ def sampling_pseudo_examples(
     Sample pseudo examples from tasks.
 
     Args:
-        tasks (List[Dict[str, Any]]): List of tasks, each task 
+        tasks (List[Dict[str, Any]]): List of tasks, each task
         is a dictionary containing a sampler.
         weighted_task_indices (List[int]): List of weighted task indices.
-        sample_from_same_source_flags (List[bool]): List of flags indicating 
+        sample_from_same_source_flags (List[bool]): List of flags indicating
         whether to sample from the same source.
         tokenizer (Any): Tokenizer object.
         eb_markup_router (Any): EB markup router object.
@@ -358,7 +371,7 @@ def sampling_pseudo_examples(
     Yields:
         Tuple[Any, Dict[str, int], Dict[int, int], Dict[int, int]]:
             - example (Any): Sampled example.
-            - source_to_num_opt (Dict[str, int]): Mapping from 
+            - source_to_num_opt (Dict[str, int]): Mapping from
             source to number of optimizations.
             - task_id_counter (Dict[int, int]): Task ID counter.
             - exact_total_task_id_counter (Dict[int, int]): Exact total task ID counter.
@@ -370,10 +383,16 @@ def sampling_pseudo_examples(
     elif pseudo_strategy == 2:
         no_opt_markups = ["[<kg>]", "[<kg-res>]", "[<search>]", "[<search-res>]"]
     elif pseudo_strategy == 3:
-        no_opt_markups = ["[<kg>]", "[<kg-res>]", "[<search>]", "[<search-res>]", "[<prompt>]", "[<prompt-res>]"]
+        no_opt_markups = [
+            "[<kg>]",
+            "[<kg-res>]",
+            "[<search>]",
+            "[<search-res>]",
+            "[<prompt>]",
+            "[<prompt-res>]",
+        ]
     else:
         no_opt_markups = []
-
 
     no_opt_markups = no_opt_markups + [
         "[<citation>]",
@@ -384,33 +403,39 @@ def sampling_pseudo_examples(
         "[<retrieve-ref>]",
     ]
 
-
     previous_pseudo_example_list = []
     current_pseudo_example_list = []
     total_len_wo_k = 0
     total_example_num = 0
 
-    task_id_counter = defaultdict(int)  
-    exact_total_task_id_counter = defaultdict(int)  
+    task_id_counter = defaultdict(int)
+    exact_total_task_id_counter = defaultdict(int)
 
     def gen_example(task_id, task_id_counter, exact_total_task_id_counter):
-        task_id_local = (task_id - dp_worldrank) // dp_worldsize if use_train_part_sharding else task_id
+        task_id_local = (
+            (task_id - dp_worldrank) // dp_worldsize
+            if use_train_part_sharding
+            else task_id
+        )
         example = next(tasks[task_id_local]["sampler"])
-
 
         task_id_counter[task_id] += 1
         exact_total_task_id_counter[task_id] += 1
 
         return example
 
-    for task_id, same_source_flag in zip(weighted_task_indices, sample_from_same_source_flags):
+    for task_id, same_source_flag in zip(
+        weighted_task_indices, sample_from_same_source_flags
+    ):
         example = gen_example(task_id, task_id_counter, exact_total_task_id_counter)
 
-   
-        if contains_markup(example.src, tokenizer.markup_tokens) and rng.random() > trigger_data_prob:
-       
+        if (
+            contains_markup(example.src, tokenizer.markup_tokens)
+            and rng.random() > trigger_data_prob
+        ):
+
             if contains_markup(example.src, no_opt_markups):
- 
+
                 exact_total_task_id_counter[task_id] -= 1
                 continue
             example = SFTExample(
@@ -430,17 +455,21 @@ def sampling_pseudo_examples(
                 }
             )
 
+        if (
+            not same_source_flag and rng.random() > pseudo_sampling_prob
+        ) or example.disable_pseudo_multi_turn:
 
-        if (not same_source_flag and rng.random() > pseudo_sampling_prob) or example.disable_pseudo_multi_turn:
-
-            yield example, {example.source: 1}, task_id_counter, exact_total_task_id_counter
+            yield example, {
+                example.source: 1
+            }, task_id_counter, exact_total_task_id_counter
             task_id_counter = defaultdict(int)
             exact_total_task_id_counter = defaultdict(int)
             continue
 
-
         CONTAINS_SAME_TGT = False
-        for previous_example in previous_pseudo_example_list + current_pseudo_example_list:
+        for previous_example in (
+            previous_pseudo_example_list + current_pseudo_example_list
+        ):
             for current_tgt_str in example.tgt:
                 if contains_markup(current_tgt_str, tokenizer.markup_tokens):
 
@@ -454,12 +483,13 @@ def sampling_pseudo_examples(
             if CONTAINS_SAME_TGT:
                 break
         if CONTAINS_SAME_TGT:
-    
-            yield example, {example.source: 1}, task_id_counter, exact_total_task_id_counter
+
+            yield example, {
+                example.source: 1
+            }, task_id_counter, exact_total_task_id_counter
             task_id_counter = defaultdict(int)
             exact_total_task_id_counter = defaultdict(int)
             continue
-
 
         len_w_k, len_wo_k = get_length(example, tokenizer, eb_markup_rounter, 3)
         if (
@@ -471,9 +501,9 @@ def sampling_pseudo_examples(
         ):
             ### Termination Conditions 1 & 3 & 4: ###
             # 1. Exceeds maximum length limit, clear the historical pseudo-multi-turn samples #
-            # 3. Encounters a sample containing 'memory', clear the historical pseudo-multi-turn 
+            # 3. Encounters a sample containing 'memory', clear the historical pseudo-multi-turn
             # samples because 'memory' must be the first sample in the sequence #
-            # 4. Encounters data that only triggers computation (e.g., compute), 
+            # 4. Encounters data that only triggers computation (e.g., compute),
             # or q2code data, clear the historical pseudo-multi-turn samples #
 
             if example.is_q2code == 1 or example.math_is_end == 0:
@@ -481,32 +511,33 @@ def sampling_pseudo_examples(
                 total_example_num += 1
 
             if len(current_pseudo_example_list) != 0:
-               
-                new_example, source_to_num_opt = convert_pseudo_example_list_to_example_only_opt_kb(
-                    previous_pseudo_example_list,
-                    current_pseudo_example_list,
-                    tokenizer,
-                    False,
-                    no_opt_markups,
-                    rng,
-                    use_anti_k_sampling=use_anti_k_sampling,
-                    drop_history_with_k=False,
+
+                new_example, source_to_num_opt = (
+                    convert_pseudo_example_list_to_example_only_opt_kb(
+                        previous_pseudo_example_list,
+                        current_pseudo_example_list,
+                        tokenizer,
+                        False,
+                        no_opt_markups,
+                        rng,
+                        use_anti_k_sampling=use_anti_k_sampling,
+                        drop_history_with_k=False,
+                    )
                 )
-                # When yielding, also output the `task_id` for 
-                # both non-source-equivalent and source-equivalent consumptions, 
+                # When yielding, also output the `task_id` for
+                # both non-source-equivalent and source-equivalent consumptions,
                 # to record the number of consumption times.
                 yield new_example, source_to_num_opt, task_id_counter, exact_total_task_id_counter
                 task_id_counter = defaultdict(int)
                 exact_total_task_id_counter = defaultdict(int)
 
-        
             previous_pseudo_example_list, current_pseudo_example_list = [], []
-       
+
             total_len_wo_k = 0
             total_example_num = 0
 
         if not (example.is_q2code == 1 or example.math_is_end == 0):
-         
+
             current_pseudo_example_list.append(example)
             total_example_num += 1
 
@@ -514,25 +545,26 @@ def sampling_pseudo_examples(
             ### Termination Condition 2: ###
             # 2. Contains Markup #
 
-            new_example, source_to_num_opt = convert_pseudo_example_list_to_example_only_opt_kb(
-                previous_pseudo_example_list,
-                current_pseudo_example_list,
-                tokenizer,
-                True,
-                no_opt_markups,
-                rng,
-                use_anti_k_sampling=use_anti_k_sampling,
-                drop_history_with_k=drop_history_with_k,
+            new_example, source_to_num_opt = (
+                convert_pseudo_example_list_to_example_only_opt_kb(
+                    previous_pseudo_example_list,
+                    current_pseudo_example_list,
+                    tokenizer,
+                    True,
+                    no_opt_markups,
+                    rng,
+                    use_anti_k_sampling=use_anti_k_sampling,
+                    drop_history_with_k=drop_history_with_k,
+                )
             )
-        
+
             yield new_example, source_to_num_opt, task_id_counter, exact_total_task_id_counter
             task_id_counter = defaultdict(int)
             exact_total_task_id_counter = defaultdict(int)
             total_example_num = 0
 
-      
             previous_pseudo_example_list.extend(current_pseudo_example_list)
             current_pseudo_example_list = []
 
         if not (example.is_q2code == 1 or example.math_is_end == 0):
-            total_len_wo_k += len_wo_k  
+            total_len_wo_k += len_wo_k

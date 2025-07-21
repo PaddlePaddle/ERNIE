@@ -20,7 +20,6 @@ board callback
 import importlib.util
 import json
 
-DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
 from paddleformers.peft.lora import LoRAModel
 from paddleformers.trainer.trainer_callback import TrainerCallback
 from paddleformers.transformers.model_utils import PretrainedModel
@@ -30,6 +29,8 @@ try:
     from paddleformers.trainer.trainer import clear_async_save_task_queue
 except Exception:
     clear_async_save_task_queue = None
+
+DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
 
 
 def is_tensorboard_available():
@@ -43,20 +44,23 @@ def is_tensorboard_available():
         bool: Returns True if TensorBoard or TensorBoardX is available; otherwise, returns False.
 
     """
-    return importlib.util.find_spec("tensorboard") is not None or importlib.util.find_spec("tensorboardX") is not None
+    return (
+        importlib.util.find_spec("tensorboard") is not None
+        or importlib.util.find_spec("tensorboardX") is not None
+    )
 
 
 def rewrite_logs(d):
     """
-    Rewrite the log messages by categorizing entries with prefixes 'eval_' and 'test_' 
+    Rewrite the log messages by categorizing entries with prefixes 'eval_' and 'test_'
     into the 'eval/' and 'test/' directories, respectively, and all other entries into the 'train/' directory.
 
     Args:
-        d (dict): A dictionary containing log information, 
+        d (dict): A dictionary containing log information,
         where keys are log names and values are the corresponding log values.
 
     Returns:
-        dict: The reorganized log dictionary, where keys are formed by combining the category directory 
+        dict: The reorganized log dictionary, where keys are formed by combining the category directory
               (e.g., 'eval/', 'test/', 'train/') with the original log name, and values remain unchanged.
 
     """
@@ -85,7 +89,14 @@ class TensorBoardCallback(TrainerCallback):
             The writer to use. Will instantiate one if not set.
     """
 
-    def __init__(self, args, model, tb_writer=None, log_flops_per_step=False, log_tokens_per_step=False):
+    def __init__(
+        self,
+        args,
+        model,
+        tb_writer=None,
+        log_flops_per_step=False,
+        log_tokens_per_step=False,
+    ):
         has_tensorboard = is_tensorboard_available()
         if not has_tensorboard:
             raise RuntimeError(
@@ -152,14 +163,17 @@ class TensorBoardCallback(TrainerCallback):
             if "model" in kwargs:
                 model = kwargs["model"]
 
-                if (isinstance(model, PretrainedModel) and model.constructed_from_pretrained_config()) or isinstance(
-                    model, LoRAModel
-                ):
+                if (
+                    isinstance(model, PretrainedModel)
+                    and model.constructed_from_pretrained_config()
+                ) or isinstance(model, LoRAModel):
                     model.config.architectures = [model.__class__.__name__]
                     self.tb_writer.add_text("model_config", str(model.config))
 
                 elif hasattr(model, "init_config") and model.init_config is not None:
-                    model_config_json = json.dumps(model.get_model_config(), ensure_ascii=False, indent=2)
+                    model_config_json = json.dumps(
+                        model.get_model_config(), ensure_ascii=False, indent=2
+                    )
                     self.tb_writer.add_text("model_config", model_config_json)
 
     def on_log(self, args, state, control, logs=None, **kwargs):
@@ -196,7 +210,6 @@ class TensorBoardCallback(TrainerCallback):
                 * args.max_seq_length
             )
 
-
             if self.log_flops_per_step:
                 logger.warning("The FLOPs might be not accurate")
                 flops_per_step = self.model_numel * total_tokens_per_step * 6
@@ -212,9 +225,17 @@ class TensorBoardCallback(TrainerCallback):
             if data_type is not None:
                 data_type = data_type.tolist()[-1]
                 if data_type == DATATYPE_2_ID["mm"]:
-                    logs = {k.replace("train", "mm_train"): v for k, v in logs.items() if k.startswith("train")}
+                    logs = {
+                        k.replace("train", "mm_train"): v
+                        for k, v in logs.items()
+                        if k.startswith("train")
+                    }
                 elif data_type == DATATYPE_2_ID["audio"]:
-                    logs = {k.replace("train", "audio_train"): v for k, v in logs.items() if k.startswith("train")}
+                    logs = {
+                        k.replace("train", "audio_train"): v
+                        for k, v in logs.items()
+                        if k.startswith("train")
+                    }
                 logs.update(data_type=data_type)
 
             for k, v in logs.items():
@@ -222,10 +243,14 @@ class TensorBoardCallback(TrainerCallback):
                     self.tb_writer.add_scalar(k, v, state.global_step)
 
                     if tokens_per_step is not None and k in ["train/loss"]:
-                        self.tb_writer.add_scalar(k + "_xaxis_tokens", v, state.global_step * tokens_per_step)
+                        self.tb_writer.add_scalar(
+                            k + "_xaxis_tokens", v, state.global_step * tokens_per_step
+                        )
 
                     if flops_per_step is not None and k in ["train/loss"]:
-                        self.tb_writer.add_scalar(k + "_xaxis_flops", v, state.global_step * flops_per_step)
+                        self.tb_writer.add_scalar(
+                            k + "_xaxis_flops", v, state.global_step * flops_per_step
+                        )
 
                 else:
                     logger.warning(
@@ -235,12 +260,16 @@ class TensorBoardCallback(TrainerCallback):
                         "is incorrect so we dropped this attribute."
                     )
             if timers is not None:
-                timers.write(timers.timers.keys(), self.tb_writer, state.global_step, reset=False)
+                timers.write(
+                    timers.timers.keys(), self.tb_writer, state.global_step, reset=False
+                )
 
             if paddle_pipeline_timers:
                 for name, timer in paddle_pipeline_timers.timers.items():
                     elapsed_time = timer.elapsed(reset=False)
-                    self.tb_writer.add_scalar(f"timers/{name}", elapsed_time, state.global_step)
+                    self.tb_writer.add_scalar(
+                        f"timers/{name}", elapsed_time, state.global_step
+                    )
 
             self.tb_writer.flush()
 
@@ -249,7 +278,7 @@ class TensorBoardCallback(TrainerCallback):
         Method called at the end of training.
 
         Args:
-            args (argparse.Namespace): Command line arguments object 
+            args (argparse.Namespace): Command line arguments object
             used to store and parse command line parameters.
             state (TrainerState): Object containing the current training state.
             control (Controller): Object controlling the training process.

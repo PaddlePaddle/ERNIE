@@ -16,13 +16,11 @@
 Trainer for Ernie-MoE VL model with enhanced distributed training support.
 """
 
-import logging
 import math
 import os
 import shutil
 import sys
 import time
-from dataclasses import dataclass, field
 from functools import partial
 from typing import List, Optional, Union
 
@@ -45,12 +43,12 @@ try:
     )
 
     _obtain_optimizer_parameters_list = obtain_optimizer_parameters_list
-except:
+except Exception:
     try:
         from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
             _obtain_optimizer_parameters_list,
         )
-    except:
+    except Exception:
         _obtain_optimizer_parameters_list = None
 
 from distutils.util import strtobool
@@ -64,7 +62,10 @@ from paddleformers.trainer.trainer import (
     TRAINER_STATE_NAME,
 )
 from paddleformers.trainer.trainer_callback import TrainerState
-from paddleformers.trainer.trainer_utils import TrainOutput, download_recovery_ckpt_from_pdc, has_length
+from paddleformers.trainer.trainer_utils import (
+    TrainOutput,
+    has_length,
+)
 from paddleformers.trainer.utils import reshard as reshard_util
 from paddleformers.utils.log import logger
 
@@ -73,11 +74,15 @@ from paddleformers.trainer.utils.helper import (  # nested_truncate,
     distributed_file,
     distributed_isfile,
 )
-from paddleformers.transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
+from paddleformers.transformers.context_parallel_utils import (
+    split_inputs_sequence_dim_load_balance,
+)
 from paddleformers.transformers.model_utils import _add_variant
 from paddleformers.transformers.segment_parallel_utils import split_inputs_sequence_dim
 from paddleformers.utils.batch_sampler import DistributedBatchSampler
-from paddleformers.utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from paddleformers.utils.batch_sampler import (
+    DistributedBatchSampler as NlpDistributedBatchSampler,
+)
 
 # from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
 from pretraining_trainer import PretrainingTrainer
@@ -90,9 +95,19 @@ class SFTTrainer(PretrainingTrainer):
     The main trainer class which handles all the logic necessary for fine-tuning models.
     """
 
-    def __init__(self, _shit=None, args=None, model=None, callbacks=None,
-        is_train_text=False, text_sft_dataset=None, **kwargs):
-        super().__init__(_shit=_shit, args=args, model=model, callbacks=callbacks, **kwargs)
+    def __init__(
+        self,
+        _shit=None,
+        args=None,
+        model=None,
+        callbacks=None,
+        is_train_text=False,
+        text_sft_dataset=None,
+        **kwargs,
+    ):
+        super().__init__(
+            _shit=_shit, args=args, model=model, callbacks=callbacks, **kwargs
+        )
         self.is_train_text = is_train_text
         self.text_sft_dataset = text_sft_dataset
 
@@ -102,8 +117,15 @@ class SFTTrainer(PretrainingTrainer):
             raise ValueError("Trainer: training requires a train_dataset.")
         # `pp_need_data`，data bradcast in model
         _DataLoader = (
-            partial(DistDataLoader, need_data=self.args.need_data, pp_broadcast=not self.args.pp_need_data_degree)
-            if (self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1)
+            partial(
+                DistDataLoader,
+                need_data=self.args.need_data,
+                pp_broadcast=not self.args.pp_need_data_degree,
+            )
+            if (
+                self.args.tensor_parallel_degree > 1
+                or self.args.pipeline_parallel_degree > 1
+            )
             else DataLoader
         )  # use `DistDataLoader` before init fleet
         train_dataset = self.train_dataset
@@ -142,21 +164,35 @@ class SFTTrainer(PretrainingTrainer):
         args = self.args
         self.is_in_train = True
 
-        logger.info(f"Starting training from resume_from_checkpoint : {resume_from_checkpoint}")
+        logger.info(
+            f"Starting training from resume_from_checkpoint : {resume_from_checkpoint}"
+        )
 
         # The resume_from_checkpoint could be None in some machine node.
         # Here we reset None to temp directory.
         if args.world_size > 1:
-            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None], dtype="int32")
+            is_resume_from_checkpoint = paddle.to_tensor(
+                [resume_from_checkpoint is not None], dtype="int32"
+            )
             paddle.distributed.all_reduce(is_resume_from_checkpoint)
             is_resume_from_checkpoint = is_resume_from_checkpoint.item()
-            if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
+            if (
+                is_resume_from_checkpoint > 0
+                and is_resume_from_checkpoint < paddle.distributed.get_world_size()
+            ):
                 if resume_from_checkpoint is None:
-                    resume_from_checkpoint = os.path.join(self.args.output_dir, "local_tempdir")
-                    if os.path.exists(resume_from_checkpoint) and self.args.local_rank == 0:
+                    resume_from_checkpoint = os.path.join(
+                        self.args.output_dir, "local_tempdir"
+                    )
+                    if (
+                        os.path.exists(resume_from_checkpoint)
+                        and self.args.local_rank == 0
+                    ):
                         shutil.rmtree(resume_from_checkpoint)
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
-                    logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
+                    logger.info(
+                        f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}"
+                    )
 
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
@@ -165,11 +201,17 @@ class SFTTrainer(PretrainingTrainer):
 
         train_dataloader = self.get_train_dataloader()
 
-        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
+        total_train_batch_size = (
+            args.train_batch_size
+            * args.gradient_accumulation_steps
+            * args.dataset_world_size
+        )
         len_dataloader = None
         if has_length(train_dataloader):
             len_dataloader = len(train_dataloader)
-            num_update_steps_per_epoch = len(train_dataloader) // args.gradient_accumulation_steps
+            num_update_steps_per_epoch = (
+                len(train_dataloader) // args.gradient_accumulation_steps
+            )
             num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
             num_examples = len(self.train_dataset)
 
@@ -188,9 +230,13 @@ class SFTTrainer(PretrainingTrainer):
                 if max_steps // args.eval_steps < args.minimum_eval_times:
                     exp_step = max_steps / args.minimum_eval_times
                     exp_step = max(int(exp_step - exp_step % 10), 10)
-                    logger.info("Reset eval step by minimum_eval_times to %d" % exp_step)
+                    logger.info(
+                        "Reset eval step by minimum_eval_times to %d" % exp_step
+                    )
                     args.eval_steps = exp_step
-        elif args.max_steps > 0:  # Rely on max_steps when dataloader does not have a working size
+        elif (
+            args.max_steps > 0
+        ):  # Rely on max_steps when dataloader does not have a working size
             max_steps = args.max_steps
             # Setting a very large number of epochs so we go as many times as necessary over the iterator.
             num_train_epochs = sys.maxsize
@@ -223,7 +269,9 @@ class SFTTrainer(PretrainingTrainer):
             # implicitly broadcast params from rank0 to the other ranks.
             model = self._wrap_model(self.model_wrapped)
             if self.sharding_io is not None:
-                assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
+                assert (
+                    delay_optimizer_creation is False
+                ), "delay_optimizer_creation should be False"
                 # the self.optimizer should be wrapped and it is done in _wrap_model
                 self.sharding_io.set_optimizer(self.optimizer)
             # for the rest of this function `model` is the outside model, whether it was wrapped or not
@@ -246,34 +294,56 @@ class SFTTrainer(PretrainingTrainer):
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples*args.pp_need_data_degree:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
-        logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
-        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size*args.pp_need_data_degree}")
-        logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps*args.pp_need_data_degree}")
+        logger.info(
+            f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
+        )
+        logger.info(
+            f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size*args.pp_need_data_degree}"
+        )
+        logger.info(
+            f"  Gradient Accumulation steps = {args.gradient_accumulation_steps*args.pp_need_data_degree}"
+        )
         logger.info(f"  Total optimization steps = {max_steps:,}")
-        logger.info(f"  Total num train samples = {num_train_samples*args.pp_need_data_degree:,}")
+        logger.info(
+            f"  Total num train samples = {num_train_samples*args.pp_need_data_degree:,}"
+        )
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
-        per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-        logger.debug(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
+        per_device_trainable_numel = sum(
+            np.prod(p.shape) for p in model.parameters() if not p.stop_gradient
+        )
+        logger.debug(
+            f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)"
+        )
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
-            parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
+            parts_num = max(self.args.tensor_parallel_degree, 1) * max(
+                self.args.pipeline_parallel_degree, 1
+            )
             if parts_num > 1:
                 all_reduce_dtype = "int64"
                 if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
                     # TODO(duanyanhui): fix when NPU all_reduce supports int64
                     all_reduce_dtype = "float32"
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
+                trainable_numel_tensor = paddle.to_tensor(
+                    per_device_trainable_numel, dtype=all_reduce_dtype
+                )
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                trainable_numel = (
+                    int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                )
                 if self.args.sep_parallel_degree > 0:
                     trainable_numel = trainable_numel // self.args.sep_parallel_degree
                 if self.args.context_parallel_degree > 0:
-                    trainable_numel = trainable_numel // self.args.context_parallel_degree
+                    trainable_numel = (
+                        trainable_numel // self.args.context_parallel_degree
+                    )
                 # the numel is roughly,
                 # because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
-                logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
+                logger.debug(
+                    f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)"
+                )
 
         return self._inner_training_loop(
             args,
@@ -311,31 +381,43 @@ class SFTTrainer(PretrainingTrainer):
         # Check if continuing training from a checkpoint
         if (
             resume_from_checkpoint is not None
-            and distributed_isfile(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            and distributed_isfile(
+                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+            )
             and not self.args.ignore_load_lr_and_optim
         ):
             self.state = TrainerState.load_from_json(
-                distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+                distributed_file(
+                    os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+                )
             )
             if self.args.world_size > 1:
                 global_step_list = []
                 paddle.distributed.all_gather(
-                    global_step_list, paddle.to_tensor([self.state.global_step], dtype="int64")
+                    global_step_list,
+                    paddle.to_tensor([self.state.global_step], dtype="int64"),
                 )
                 assert (
-                    paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
+                    paddle.sum(paddle.stack(global_step_list) - global_step_list[0])
+                    == 0
                 ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
 
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
-                steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
+                steps_trained_in_current_epoch = self.state.global_step % (
+                    num_update_steps_per_epoch
+                )
                 steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
 
-            logger.info("  Continuing training from checkpoint, will skip to saved global_step")
+            logger.info(
+                "  Continuing training from checkpoint, will skip to saved global_step"
+            )
             logger.info(f"  Continuing training from epoch {epochs_trained}")
-            logger.info(f"  Continuing training from global step {self.state.global_step}")
+            logger.info(
+                f"  Continuing training from global step {self.state.global_step}"
+            )
             if not args.ignore_data_skip:
                 logger.info(
                     f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
@@ -343,8 +425,12 @@ class SFTTrainer(PretrainingTrainer):
                     "flag to your launch command, but you will resume the training on data already seen by your model."
                 )
                 if self.is_local_process_zero() and not args.disable_tqdm:
-                    steps_trained_progress_bar = tqdm(total=steps_trained_in_current_epoch)
-                    steps_trained_progress_bar.set_description("Skipping the first batches")
+                    steps_trained_progress_bar = tqdm(
+                        total=steps_trained_in_current_epoch
+                    )
+                    steps_trained_progress_bar.set_description(
+                        "Skipping the first batches"
+                    )
             if not args.ignore_data_skip:
                 if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                     train_dataloader.batch_sampler, NlpDistributedBatchSampler
@@ -355,13 +441,19 @@ class SFTTrainer(PretrainingTrainer):
                         * args.gradient_accumulation_steps
                         * args.dataset_world_size
                     )
-                    train_dataloader.batch_sampler.set_epoch(consumed_samples=consumed_samples)
-                    logger.info(f"Set DistributedBatchSampler consumed_samples to {consumed_samples}")
+                    train_dataloader.batch_sampler.set_epoch(
+                        consumed_samples=consumed_samples
+                    )
+                    logger.info(
+                        f"Set DistributedBatchSampler consumed_samples to {consumed_samples}"
+                    )
 
         epoch_iterator = train_dataloader
         # steps_in_epoch = len(epoch_iterator)
         steps_in_epoch = (
-            len(epoch_iterator) if len_dataloader is not None else args.max_steps * args.gradient_accumulation_steps
+            len(epoch_iterator)
+            if len_dataloader is not None
+            else args.max_steps * args.gradient_accumulation_steps
         )
         if len_dataloader is not None:
             if self.args.gradient_accumulation_steps > len(epoch_iterator):
@@ -381,7 +473,9 @@ class SFTTrainer(PretrainingTrainer):
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
-        self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
+        self.control = self.callback_handler.on_train_begin(
+            args, self.state, self.control
+        )
 
         tr_loss = paddle.to_tensor(0.0)
         self._total_loss_scalar = 0.0
@@ -402,18 +496,25 @@ class SFTTrainer(PretrainingTrainer):
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step_control = 0  # used in loop control, reset to 0 after every step
-            self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
+            self.control = self.callback_handler.on_epoch_begin(
+                args, self.state, self.control
+            )
 
             for step, inputs in enumerate(epoch_iterator):
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
-                if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and self.args.context_parallel_degree > 1
+                ):
                     inputs = split_inputs_sequence_dim_load_balance(inputs)
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").stop()
 
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
-                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
+                self.callback_handler.on_load_data_end(
+                    args, self.state, self.control, inputs=inputs
+                )
 
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
@@ -423,7 +524,9 @@ class SFTTrainer(PretrainingTrainer):
                 ):
                     if step == 0:
                         if steps_trained_progress_bar is not None:
-                            steps_trained_progress_bar.update(steps_trained_in_current_epoch)
+                            steps_trained_progress_bar.update(
+                                steps_trained_in_current_epoch
+                            )
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
                         self._load_rng_state(resume_from_checkpoint)
@@ -441,7 +544,9 @@ class SFTTrainer(PretrainingTrainer):
                     steps_trained_progress_bar = None
 
                 if step_control % args.gradient_accumulation_steps == 0:
-                    self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
+                    self.control = self.callback_handler.on_step_begin(
+                        args, self.state, self.control
+                    )
                     self.timers and self.timers("forward-backward").start()
 
                 # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
@@ -460,7 +565,9 @@ class SFTTrainer(PretrainingTrainer):
                 # stage2. manualy collect gradient on dp group
 
                 dp_master_grad = (
-                    self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                    self.args.world_size > 1
+                    and self.args.amp_master_grad
+                    and not self.args.use_hybrid_parallel
                 )
                 if dp_master_grad:
                     is_no_sync = True
@@ -475,10 +582,14 @@ class SFTTrainer(PretrainingTrainer):
 
                 def fused_allreduce_gradients_no_sync(paramlist, hcg):
                     paramlist = list(paramlist)
-                    nonmoe_list = [p for p in paramlist if not getattr(p, "no_sync", False)]
+                    nonmoe_list = [
+                        p for p in paramlist if not getattr(p, "no_sync", False)
+                    ]
                     moelist = [p for p in paramlist if getattr(p, "no_sync", False)]
                     if moelist and not self.args.use_expert_parallel:
-                        logger.warning("found `no sync` param when `use_expert_parallel=False`")
+                        logger.warning(
+                            "found `no sync` param when `use_expert_parallel=False`"
+                        )
                     fused_allreduce_gradients(nonmoe_list, hcg)
 
                 if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
@@ -486,7 +597,10 @@ class SFTTrainer(PretrainingTrainer):
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
-                    if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
+                    if (
+                        self.args.pipeline_parallel_degree <= 1
+                        and self._enable_delay_scale_loss()
+                    ):
                         tr_loss /= self.args.gradient_accumulation_steps
 
                     # assert if loss is invalid
@@ -502,53 +616,86 @@ class SFTTrainer(PretrainingTrainer):
 
                     # Case 1: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
-                    if (args.recompute or args.use_expert_parallel) and availiable_no_sync:
-                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
+                    if (
+                        args.recompute or args.use_expert_parallel
+                    ) and availiable_no_sync:
+                        fused_allreduce_gradients_no_sync(
+                            list(model.parameters()), None
+                        )
 
                     # Case 2: hack dp with master_grad
                     elif dp_master_grad:
-                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
+                        fused_allreduce_gradients_no_sync(
+                            list(model.parameters()), None
+                        )
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
                     pipeline_parallel_config = (
-                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
+                        set(args.pipeline_parallel_config.split(" "))
+                        if args.pipeline_parallel_degree > 1
+                        else set()
                     )
                     sharding_parallel_config = (
-                        set(args.sharding_parallel_config.split(" ")) if args.sharding_parallel_degree > 1 else set()
+                        set(args.sharding_parallel_config.split(" "))
+                        if args.sharding_parallel_degree > 1
+                        else set()
                     )
-                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+                    enable_dp_comm_overlap = (
+                        "enable_dp_comm_overlap" in pipeline_parallel_config
+                    )
                     enable_release_grads = (
                         "enable_release_grads" in pipeline_parallel_config
                         or "enable_release_grads" in sharding_parallel_config
                     )
 
                     # Case 3: Pipeline parallel mode, overlap with dp
-                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+                    if (
+                        isinstance(self.optimizer, HybridParallelOptimizer)
+                        and not self.do_grad_scaling
+                    ):
+                        parameters_list = _obtain_optimizer_parameters_list(
+                            self.optimizer._inner_opt
+                        )
 
                         if not enable_dp_comm_overlap:
                             if self.optimizer._sharding_enable:
                                 assert reshard_util.is_sharding_opt(self.optimizer)
-                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+                                self.optimizer._inner_opt.reduce_gradients(
+                                    list(parameters_list), self.optimizer._hcg
+                                )
 
-                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                                fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
+                            if self.optimizer._dp_enable or getattr(
+                                self.optimizer, "_sep_enable", False
+                            ):
+                                fused_allreduce_gradients_no_sync(
+                                    list(parameters_list), self.optimizer._hcg
+                                )
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
-                    if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                    if (
+                        self.args.gradient_accumulation_steps > 1
+                        and self._enable_delay_scale_loss()
+                    ):
                         paddle.device.synchronize()
                         for p in model._layers.parameters():
                             with paddle.no_grad():
                                 if hasattr(p, "main_grad") and p.main_grad is not None:
                                     assert p.grad is None
-                                    p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                                    p.main_grad.scale_(
+                                        1.0 / self.args.gradient_accumulation_steps
+                                    )
                                 elif p.grad is not None:
-                                    p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                                    p.grad.scale_(
+                                        1.0 / self.args.gradient_accumulation_steps
+                                    )
 
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
-                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                        args,
+                        self.state,
+                        self.control,
+                        scaler=self.scaler if self.do_grad_scaling else None,
                     )
 
                     optimizer_was_run = True
@@ -560,7 +707,9 @@ class SFTTrainer(PretrainingTrainer):
 
                     if self.do_grad_scaling:
                         if args.pipeline_parallel_degree > 1:
-                            assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
+                            assert (
+                                not self.args.use_expert_parallel
+                            ), "pipeline moe not work under fp16"
                         scale_before = paddle.assign(self.scaler._scale)
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
@@ -602,17 +751,26 @@ class SFTTrainer(PretrainingTrainer):
                         self.optimizer.clear_grad()
 
                     self.callback_handler.on_optimizer_end(
-                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                        args,
+                        self.state,
+                        self.control,
+                        scaler=self.scaler if self.do_grad_scaling else None,
                     )
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    self.control = self.callback_handler.on_step_end(
+                        args, self.state, self.control
+                    )
+                    self._maybe_log_save_evaluate(
+                        tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs
+                    )
                     self._print_timer()
                     step_control = 0
                 else:
-                    self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                    self.control = self.callback_handler.on_substep_end(
+                        args, self.state, self.control
+                    )
                     step_control += 1
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
@@ -629,8 +787,12 @@ class SFTTrainer(PretrainingTrainer):
                 )
                 self.control.should_training_stop = True
 
-            self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-            self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+            self.control = self.callback_handler.on_epoch_end(
+                args, self.state, self.control
+            )
+            self._maybe_log_save_evaluate(
+                tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs
+            )
 
             if self.control.should_training_stop:
                 break
@@ -647,12 +809,15 @@ class SFTTrainer(PretrainingTrainer):
             logger.info(
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
-            if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            if isinstance(self.model, LoRAModel) or isinstance(
+                self.model, PrefixModelForCausalLM
+            ):
                 self._load_best_model_from_peft_checkpoint()
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
                 best_model_path = os.path.join(
-                    self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                    self.state.best_model_checkpoint,
+                    _add_variant(weight_name, self.args.weight_name_suffix),
                 )
                 if os.path.exists(best_model_path):
                     # We load the model state dict on the CPU to avoid an OOM error.
@@ -665,12 +830,16 @@ class SFTTrainer(PretrainingTrainer):
                         "if you are running a distributed training "
                         "on multiple nodes, you should activate `--save_on_each_node`."
                     )
-                    
 
         self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
 
-        metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
+        metrics = speed_metrics(
+            "train",
+            start_time,
+            num_samples=num_train_samples,
+            num_steps=self.state.max_steps,
+        )
 
         metrics["train_loss"] = train_loss
 
@@ -683,7 +852,9 @@ class SFTTrainer(PretrainingTrainer):
         kwargs = {
             "metrics_dumper": self.metrics_dumper,
         }
-        self.control = self.callback_handler.on_train_end(args, self.state, self.control, **kwargs)
+        self.control = self.callback_handler.on_train_end(
+            args, self.state, self.control, **kwargs
+        )
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
@@ -699,20 +870,29 @@ class SFTTrainer(PretrainingTrainer):
 
     def reload(self, exclude_opt=True):
         """reload model parameters and optimizers"""
-        if strtobool(os.getenv("FLAGS_use_cuda_managed_memory", 'False')):
+        if strtobool(os.getenv("FLAGS_use_cuda_managed_memory", "False")):
             logger.warning(
-                "FLAGS_use_cuda_managed_memory has been set to True, " "offloading strategy is ineffective."
+                "FLAGS_use_cuda_managed_memory has been set to True, "
+                "offloading strategy is ineffective."
             )
             return
 
         if not exclude_opt:
             # reload moment1
-            for key, value in self.optimizer._accumulators[self.optimizer._moment1_acc_str].items():
-                self.optimizer._accumulators[self.optimizer._moment1_acc_str][key] = value.cuda()
+            for key, value in self.optimizer._accumulators[
+                self.optimizer._moment1_acc_str
+            ].items():
+                self.optimizer._accumulators[self.optimizer._moment1_acc_str][
+                    key
+                ] = value.cuda()
 
             # reload moment2
-            for key, value in self.optimizer._accumulators[self.optimizer._moment2_acc_str].items():
-                self.optimizer._accumulators[self.optimizer._moment2_acc_str][key] = value.cuda()
+            for key, value in self.optimizer._accumulators[
+                self.optimizer._moment2_acc_str
+            ].items():
+                self.optimizer._accumulators[self.optimizer._moment2_acc_str][
+                    key
+                ] = value.cuda()
 
             # reload master_weight
             for key, value in self.optimizer._master_weights.items():
@@ -725,21 +905,30 @@ class SFTTrainer(PretrainingTrainer):
 
     def offload(self, exclude_param=False, exclude_opt=True):
         """offload model parameters to CPU"""
-        if strtobool(os.getenv("FLAGS_use_cuda_managed_memory", 'False')):
+        if strtobool(os.getenv("FLAGS_use_cuda_managed_memory", "False")):
             logger.warning(
-                "FLAGS_use_cuda_managed_memory has been set to True, " "offloading strategy is ineffective."
+                "FLAGS_use_cuda_managed_memory has been set to True, "
+                "offloading strategy is ineffective."
             )
             return
 
         if not exclude_opt:
 
             # offload moment1
-            for key, value in self.optimizer._accumulators[self.optimizer._moment1_acc_str].items():
-                self.optimizer._accumulators[self.optimizer._moment1_acc_str][key] = value.cpu()
+            for key, value in self.optimizer._accumulators[
+                self.optimizer._moment1_acc_str
+            ].items():
+                self.optimizer._accumulators[self.optimizer._moment1_acc_str][
+                    key
+                ] = value.cpu()
 
             # offload moment2
-            for key, value in self.optimizer._accumulators[self.optimizer._moment2_acc_str].items():
-                self.optimizer._accumulators[self.optimizer._moment2_acc_str][key] = value.cpu()
+            for key, value in self.optimizer._accumulators[
+                self.optimizer._moment2_acc_str
+            ].items():
+                self.optimizer._accumulators[self.optimizer._moment2_acc_str][
+                    key
+                ] = value.cpu()
 
             # offload master_weight
             for key, value in self.optimizer._master_weights.items():

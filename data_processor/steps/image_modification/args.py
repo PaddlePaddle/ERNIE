@@ -28,7 +28,11 @@ class ImageModificationProcessorArguments:
     args for ImageModificationProcessor
     """
 
-    image_token_len: int = field(default=64, metadata={"help": "image placeholder num per frame"})
+    image_token_len: int = field(
+        default=64, metadata={"help": "image placeholder num per frame"}
+    )
     image_dtype: str = field(default="uint8", metadata={"help": "image dtype"})
     render_timestamp: bool = field(default=False, metadata={"help": "render timestamp"})
-    sft_shift_by_one: bool = field(default=False, metadata={"help": "SFT data_processor shift-by-one"})
+    sft_shift_by_one: bool = field(
+        default=False, metadata={"help": "SFT data_processor shift-by-one"}
+    )

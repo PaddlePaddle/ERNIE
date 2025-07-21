@@ -84,11 +84,6 @@ from .sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
-try:
-    from ernie.utils.misc import global_training_logs
-except ModuleNotFoundError:
-    global_training_logs = {}
-
 
 class PipelinePretrainedModel(PipelinePretrainedModelBase):
     # Rewrite pipeline name mapping

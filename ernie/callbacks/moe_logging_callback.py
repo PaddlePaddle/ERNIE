@@ -26,13 +26,17 @@ from collections import OrderedDict
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import GroupShardedOptimizerStage2
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import (
+    GroupShardedOptimizerStage2,
+)
 from paddleformers.trainer.trainer import PREFIX_CHECKPOINT_DIR
 from paddleformers.trainer.trainer_callback import TrainerCallback
 from paddleformers.utils.log import logger
 
 try:
-    from paddleformers.trainer.trainer import PADDLE_WEIGHT_FILE_NAME as PADDLE_WEIGHTS_NAME
+    from paddleformers.trainer.trainer import (
+        PADDLE_WEIGHT_FILE_NAME as PADDLE_WEIGHTS_NAME,
+    )
 except ImportError:
     from paddleformers.utils.env import PADDLE_WEIGHTS_NAME
 from paddleformers.transformers.model_utils import _add_variant
@@ -114,7 +118,9 @@ class MoeLoggingCallback(TrainerCallback):
             dist.all_gather_object(sd_md5_lst, p_md5_info, sharding_group)
             for idx, (name, pmd5, no_sync) in enumerate(p_md5_info):
                 if set([info[idx][1] for info in sd_md5_lst]) != {pmd5}:
-                    logger.error(f"param: {name} md5 is not equal between sharding-group")
+                    logger.error(
+                        f"param: {name} md5 is not equal between sharding-group"
+                    )
                     check_error = True
 
         if not args.use_hybrid_parallel or args.data_parallel_degree > 1:
@@ -123,7 +129,9 @@ class MoeLoggingCallback(TrainerCallback):
             for idx, (name, pmd5, no_sync) in enumerate(p_md5_info):
                 if no_sync:
                     if set([info[idx][1] for info in dp_md5_lst]) == {pmd5}:
-                        logger.error(f"param: {name} md5 is not different between dp-group")
+                        logger.error(
+                            f"param: {name} md5 is not different between dp-group"
+                        )
                         check_error = True
                 else:
                     if set([info[idx][1] for info in dp_md5_lst]) != {pmd5}:
@@ -154,6 +162,10 @@ class MoeLoggingCallback(TrainerCallback):
             paddle.save(
                 state_dict,
                 os.path.join(
-                    output_dir, _add_variant(PADDLE_WEIGHTS_NAME, args.weight_name_suffix.replace("shard00_", ""))
+                    output_dir,
+                    _add_variant(
+                        PADDLE_WEIGHTS_NAME,
+                        args.weight_name_suffix.replace("shard00_", ""),
+                    ),
                 ),
             )

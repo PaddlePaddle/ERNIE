@@ -72,10 +72,9 @@ class LoggingCallback(TrainerCallback):
                 """
         )
 
-
     def on_log(self, args, state, control, logs=None, **kwargs):
         """
-        Processes log information, including converting data_id and src_id to strings 
+        Processes log information, including converting data_id and src_id to strings
         and adding them to the logs.
         If the `metrics_dumper` argument is provided, the log information is added to it.
 
@@ -83,11 +82,11 @@ class LoggingCallback(TrainerCallback):
             args (Any, optional): Optional argument, defaults to None.
             state (Any, optional): Optional argument, defaults to None.
             control (Any, optional): Optional argument, defaults to None.
-            logs (List[Dict], optional): Optional argument, defaults to None. 
+            logs (List[Dict], optional): Optional argument, defaults to None.
             A list of logs in dictionary format, where each dictionary contains a set of key-value pairs.
-            kwargs (Dict, optional): Optional argument, defaults to an empty dict. 
-            Additional keyword arguments. Contains the `inputs` key, 
-            whose value is a dictionary that includes `data_id` and `src_id`, 
+            kwargs (Dict, optional): Optional argument, defaults to an empty dict.
+            Additional keyword arguments. Contains the `inputs` key,
+            whose value is a dictionary that includes `data_id` and `src_id`,
             representing the data ID and source ID respectively.
 
         Returns:
@@ -103,7 +102,9 @@ class LoggingCallback(TrainerCallback):
             data_type = kwargs["inputs"].get("data_type", None)
 
             if data_id is not None:
-                logs = dict(logs, data_id="-".join(map(str, (data_id.numpy().tolist()))))
+                logs = dict(
+                    logs, data_id="-".join(map(str, (data_id.numpy().tolist())))
+                )
             if src_id is not None:
                 logs = dict(logs, src_id="-".join(map(str, (src_id.numpy().tolist()))))
             if data_type is not None:
@@ -113,7 +114,11 @@ class LoggingCallback(TrainerCallback):
             logger.info(
                 ", ".join(
                     (
-                        (f"{k}: {v}" if k == "loss" or "cur_dp" in k else f"{k}: {v:e}" if v < 1e-3 else f"{k}: {v:f}")
+                        (
+                            f"{k}: {v}"
+                            if k == "loss" or "cur_dp" in k
+                            else f"{k}: {v:e}" if v < 1e-3 else f"{k}: {v:f}"
+                        )
                         if isinstance(v, float)
                         else f"{k}: {v}"
                     )

@@ -15,6 +15,7 @@
 import math
 
 import paddle
+import contextlib
 from paddleformers.utils.log import logger
 
 from .modeling import DFNRopeVisionTransformerPretrainedModel
@@ -37,14 +38,19 @@ class DFNRopeVisionTransformerPipe(DFNRopeVisionTransformerPretrainedModel):
         self.seq_list = None
         self.new_thw = []
         self.pp_data_balance = getattr(config.vision_config, "pp_data_balance", False)
-        self.attn_sep = getattr(config.vision_config, "attn_sep", False) and config.tensor_parallel_degree > 1
+        self.attn_sep = (
+            getattr(config.vision_config, "attn_sep", False)
+            and config.tensor_parallel_degree > 1
+        )
         self.use_full_recompute = use_full_recompute
         if self.use_full_recompute:
             logger.info("use full recompute, vision model will NOT use recompute inner")
             config.vision_config.recompute = False
         super().__init__(config.vision_config)
         if self.config.tensor_parallel_degree > 1:
-            logger.info("use sp extract feature, vit parameter will be marked as sequence parallel")
+            logger.info(
+                "use sp extract feature, vit parameter will be marked as sequence parallel"
+            )
             for p in self.parameters():
                 mark_as_sequence_parallel_parameter(p)
 
@@ -60,10 +66,14 @@ class DFNRopeVisionTransformerPipe(DFNRopeVisionTransformerPretrainedModel):
             capacity = (grid_thw.prod(-1).sum(-1) + parallelism - 1) // parallelism
             crop_sizes = grid_thw.prod(-1)
             crop_offset = crop_sizes.cumsum(0)
-            rank_per_crop = paddle.maximum((crop_offset - 1) // capacity, paddle.to_tensor(0))
+            rank_per_crop = paddle.maximum(
+                (crop_offset - 1) // capacity, paddle.to_tensor(0)
+            )
             image_size_per_rank = paddle.zeros([parallelism], dtype="int64")
             num_crop_per_rank = paddle.bincount(rank_per_crop, minlength=parallelism)
-            image_size_per_rank = paddle.scatter(image_size_per_rank, rank_per_crop, crop_sizes, overwrite=False)
+            image_size_per_rank = paddle.scatter(
+                image_size_per_rank, rank_per_crop, crop_sizes, overwrite=False
+            )
 
             thw_indices = num_crop_per_rank
             images_indices = image_size_per_rank
@@ -73,7 +83,9 @@ class DFNRopeVisionTransformerPipe(DFNRopeVisionTransformerPretrainedModel):
                 seqlen = images.shape[0]
                 num_pad = math.ceil(seqlen / parallelism) * parallelism - seqlen
                 images = paddle.nn.functional.pad(images, [0, num_pad, 0, 0], value=0)
-                images_indices = [images.shape[0] // parallelism for _ in range(parallelism)]
+                images_indices = [
+                    images.shape[0] // parallelism for _ in range(parallelism)
+                ]
                 images = SliceVarlenOp.apply(images, images_indices)
             else:
                 images = SliceVarlenOp.apply(images, images_indices)
@@ -81,13 +93,22 @@ class DFNRopeVisionTransformerPipe(DFNRopeVisionTransformerPretrainedModel):
                 grid_thw = mp_slice(grid_thw, thw_indices)
 
             if len(images):
-                image_features = self._extract_feature(images, grid_thw, num_pad=num_pad)
+                image_features = self._extract_feature(
+                    images, grid_thw, num_pad=num_pad
+                )
             else:
-                image_features = paddle.empty([0, self.config.hidden_size], dtype=self.patch_embed.proj.weight.dtype)
-                image_features.stop_gradient = self.patch_embed.proj.weight.stop_gradient
+                image_features = paddle.empty(
+                    [0, self.config.hidden_size],
+                    dtype=self.patch_embed.proj.weight.dtype,
+                )
+                image_features.stop_gradient = (
+                    self.patch_embed.proj.weight.stop_gradient
+                )
             # sanity check
             if not second_fwd:
-                image_features = AllGatherVarlenOpV2.apply(image_features, images_indices)
+                image_features = AllGatherVarlenOpV2.apply(
+                    image_features, images_indices
+                )
                 if self.attn_sep:
                     image_features = image_features[:seqlen, :]
             # diff = (feas-image_features).abs().mean()
@@ -98,7 +119,11 @@ class DFNRopeVisionTransformerPipe(DFNRopeVisionTransformerPretrainedModel):
 
     def _extract_feature(self, images, grid_thw, num_pad=0):
         """extract feature"""
-        ctx = paddle.no_grad if getattr(self.config, "freeze_vision", False) else contextlib.nullcontext
+        ctx = (
+            paddle.no_grad
+            if getattr(self.config, "freeze_vision", False)
+            else contextlib.nullcontext
+        )
         with ctx():
             image_features = super().forward(images, grid_thw, num_pad)
         return image_features

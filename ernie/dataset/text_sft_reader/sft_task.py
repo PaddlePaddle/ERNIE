@@ -28,7 +28,7 @@ def create_pyreader(config_dataset):
     Create the corresponding data reader based on the configuration.
 
     Args:
-        config_dataset (dict): Dataset configuration dictionary, 
+        config_dataset (dict): Dataset configuration dictionary,
         containing the dataset name and other related configurations.
 
     Returns:
@@ -83,7 +83,7 @@ class KnoverDataset(IterableDataset):
         buf = []
         for batch in self._generator():
             # batch = list(batch)
-    
+
             batch = [np.squeeze(b, 0) for b in batch]
             batch = dict(zip(self.input_keys, batch))
             mask = batch.pop("loss_mask").astype("bool")
@@ -96,7 +96,9 @@ class KnoverDataset(IterableDataset):
                 batch.pop("attention_mask")
 
             batch["labels"][~mask] = self.ignored_index  # we use ignored-index
-            batch["token_type_ids"] = np.zeros(batch["input_ids"].shape[0] + 1).astype("int64")
+            batch["token_type_ids"] = np.zeros(batch["input_ids"].shape[0] + 1).astype(
+                "int64"
+            )
             batch["data_type"] = np.array(DATATYPE_2_ID["lm"]).astype("int64")
             buf.append(batch)
             if len(buf) == self.batch_size:

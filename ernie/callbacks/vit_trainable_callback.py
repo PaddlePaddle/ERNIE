@@ -24,9 +24,15 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed.fleet import fleet
-from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients_with_group
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients_with_group,
+)
 from paddle.nn import functional as F
-from paddleformers.trainer.trainer_callback import TrainerCallback, TrainerControl, TrainerState
+from paddleformers.trainer.trainer_callback import (
+    TrainerCallback,
+    TrainerControl,
+    TrainerState,
+)
 from paddleformers.trainer.training_args import TrainingArguments
 from paddleformers.utils.log import logger
 
@@ -73,7 +79,9 @@ class VitTrainableCallback(TrainerCallback):
         self.meta = None
         self.patches_per_image = patches_per_image
         self.vit_second_fwd_batch_size = args.vit_second_fwd_batch_size
-        assert args.log_global_grad_norm, "need hacked `log-global-grad-norm` to support pp non-dist-var gradnorm"
+        assert (
+            args.log_global_grad_norm
+        ), "need hacked `log-global-grad-norm` to support pp non-dist-var gradnorm"
         for n, p in self.vision_model.named_parameters():
             p.pp_distributed = False  # used to avoid duplicate gradnorm
 
@@ -85,19 +93,21 @@ class VitTrainableCallback(TrainerCallback):
         logger.info(
             f"self.pp_group: {self.pp_group} - {args.pipeline_parallel_degree} -- {args.pipeline_parallel_rank}"
         )
-        # hack extract_feature func 
+        # hack extract_feature func
         assert hasattr(self.vision_model, "extract_feature")
 
         self.ori_extract_feature = self.vision_model.extract_feature
 
         def extract_feature_wrapper(inner_self, images, grid_thw, second_fwd=False):
-            # recompute images 
+            # recompute images
             if second_fwd:
                 ori_freeze_vision = getattr(inner_self.config, "freeze_vision", True)
                 inner_self.config.freeze_vision = False
             else:
                 self.images_buffer.append((images.detach(), grid_thw))
-            image_feature = self.ori_extract_feature(images, grid_thw, second_fwd=second_fwd)
+            image_feature = self.ori_extract_feature(
+                images, grid_thw, second_fwd=second_fwd
+            )
             if self.meta is None:
                 meta = image_feature.shape[1:]
                 meta[-1] = meta[-1] // self.mp_degree
@@ -107,7 +117,9 @@ class VitTrainableCallback(TrainerCallback):
                 inner_self.config.freeze_vision = ori_freeze_vision
             return image_feature
 
-        self.vision_model.extract_feature = MethodType(extract_feature_wrapper, self.vision_model)
+        self.vision_model.extract_feature = MethodType(
+            extract_feature_wrapper, self.vision_model
+        )
 
         if args.pipeline_parallel_degree > 1:
             assert args.pp_need_data_degree == args.pipeline_parallel_degree
@@ -115,7 +127,9 @@ class VitTrainableCallback(TrainerCallback):
             assert hasattr(model, "_prepare_pipeline_inputs_func")
             ori_prepare_pipeline_inputs_func = model._prepare_pipeline_inputs_func
 
-            assert not model.balanced_image_preprocess, "不支持balanced_image_preprocess"
+            assert (
+                not model.balanced_image_preprocess
+            ), "不支持balanced_image_preprocess"
 
             def limao_huan_taizi_hook(
                 p,
@@ -129,9 +143,7 @@ class VitTrainableCallback(TrainerCallback):
             def _prepare_pipeline_inputs_func_wrapper(inner_self, data):
                 def wrap(micro_data):
                     inputs, labels = micro_data
-                    if (
-                        args.pipeline_parallel_rank == 0 and inputs[2] is not None
-                    ): 
+                    if args.pipeline_parallel_rank == 0 and inputs[2] is not None:
                         fea = inputs[2]
                         self.images_features.append(fea)
                         fea.stop_gradient = False
@@ -140,7 +152,9 @@ class VitTrainableCallback(TrainerCallback):
 
                 return (wrap(i) for i in ori_prepare_pipeline_inputs_func(data))
 
-            model._prepare_pipeline_inputs_func = MethodType(_prepare_pipeline_inputs_func_wrapper, model)
+            model._prepare_pipeline_inputs_func = MethodType(
+                _prepare_pipeline_inputs_func_wrapper, model
+            )
             logger.info("set prepare pipeline inputs func success.")
 
     @staticmethod
@@ -181,7 +195,13 @@ class VitTrainableCallback(TrainerCallback):
                     logger.info(f"freeze_vit--{name}")
                     param.stop_gradient = True
 
-    def on_optimizer_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_optimizer_begin(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
         """_summary_
 
         Args:
@@ -195,7 +215,9 @@ class VitTrainableCallback(TrainerCallback):
             return
         # showmem("____begin")
         if args.pipeline_parallel_rank == 0:
-            image_features_grad = paddle.concat([fea.grad for fea in self.images_features], axis=0)
+            image_features_grad = paddle.concat(
+                [fea.grad for fea in self.images_features], axis=0
+            )
             pp_data_balance = getattr(self.vision_model, "pp_data_balance", False)
             if pp_data_balance:
                 with paddle.no_grad():
@@ -213,10 +235,19 @@ class VitTrainableCallback(TrainerCallback):
                         rank_idx = sorted_idx[sorted_thw[:, -1] == rank]
                         new_grad = []
                         start_offset = seq_idx_list[rank_thw[:, -2]] + rank_idx
-                        end_offset = seq_idx_list[rank_thw[:, -2]] + rank_idx + rank_thw[:, 1] * rank_thw[:, 2]
+                        end_offset = (
+                            seq_idx_list[rank_thw[:, -2]]
+                            + rank_idx
+                            + rank_thw[:, 1] * rank_thw[:, 2]
+                        )
                         # index_list = [paddle.arange(start_offset[i],end_offset[i]) for i in range(len(rank_thw))]
-                        index_list = [np.arange(start_offset[i], end_offset[i]) for i in range(len(rank_thw))]
-                        index_list = paddle.to_tensor(np.concatenate(index_list, axis=-1), dtype=paddle.int64)
+                        index_list = [
+                            np.arange(start_offset[i], end_offset[i])
+                            for i in range(len(rank_thw))
+                        ]
+                        index_list = paddle.to_tensor(
+                            np.concatenate(index_list, axis=-1), dtype=paddle.int64
+                        )
                         new_grad = paddle.gather(image_features_grad, index_list)
                         new_grads.append(new_grad)
                     image_features_grad = paddle.concat(new_grads, axis=0)
@@ -227,13 +258,23 @@ class VitTrainableCallback(TrainerCallback):
             # logger.info(f"image_features_grad-{image_features_grad}")
             seqlen = sum([im.shape[0] for im, _ in self.images_buffer])
             indices = []
-            dist.all_gather(indices, paddle.to_tensor(seqlen, dtype="int32"), self.pp_group)
+            dist.all_gather(
+                indices, paddle.to_tensor(seqlen, dtype="int32"), self.pp_group
+            )
             # logger.info(f"INDICES_____{indices}")
             grads = paddle.empty(sum([self.meta[0]], [seqlen]), self.meta[1])
             # logger.info(f"INDICES_____{indices} -- GRADS____{grads.shape}")
             # grad 反广
-            scatter_varlen(image_features_grad, grads, [i.item() for i in indices], 0, self.pp_group)
-            grads = paddle.split(grads, [im.shape[0] for im, _ in self.images_buffer], axis=0)
+            scatter_varlen(
+                image_features_grad,
+                grads,
+                [i.item() for i in indices],
+                0,
+                self.pp_group,
+            )
+            grads = paddle.split(
+                grads, [im.shape[0] for im, _ in self.images_buffer], axis=0
+            )
         gather_grads = []
         if self.mp_degree > 1:
             for grad in grads:
@@ -249,16 +290,23 @@ class VitTrainableCallback(TrainerCallback):
             # showmem("____before_inner_forward")
             with self.auto_cast_func():
                 # logger.info(f"2 forward_im_____{i.shape}")
-                hi, indices = self.vision_model.extract_feature(im, thw, second_fwd=True)
+                hi, indices = self.vision_model.extract_feature(
+                    im, thw, second_fwd=True
+                )
             # logger.info(f"BACKWARD_hi____{hi.shape}")
             # showmem("____before_inner_backward")
-            if args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss(args):
+            if args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss(
+                args
+            ):
                 g = g.scale_(1.0 / args.gradient_accumulation_steps)
             with paddle.no_grad():
                 shard_head = getattr(self.vision_model, "attn_sep", False)
                 if shard_head:
                     seqlen = g.shape[0]
-                    num_pad = math.ceil(seqlen / self.mp_group.nranks) * self.mp_group.nranks - seqlen
+                    num_pad = (
+                        math.ceil(seqlen / self.mp_group.nranks) * self.mp_group.nranks
+                        - seqlen
+                    )
                     g = paddle.nn.functional.pad(g, [0, num_pad, 0, 0], value=0)
                 g = mp_slice(g, indices, axis=0, group=self.mp_group)
             paddle.autograd.backward(hi, g)
@@ -278,8 +326,10 @@ class VitTrainableCallback(TrainerCallback):
                         s = 0
                         for i in range(1, len(thw)):
                             if (
-                                thw_cumsum[i] - thw_cumsum[s]
-                            ) >= self.vit_second_fwd_batch_size * self.patches_per_image:
+                                (thw_cumsum[i] - thw_cumsum[s])
+                                >= self.vit_second_fwd_batch_size
+                                * self.patches_per_image
+                            ):
                                 indices.append(thw_cumsum[i] - thw_cumsum[s])
                                 thw_indices.append(i - s)
                                 s = i
@@ -287,14 +337,20 @@ class VitTrainableCallback(TrainerCallback):
                             thw_indices.append(len(thw) - s)
                             indices.append(thw_cumsum[-1] - thw_cumsum[s])
                     else:
-                        indices = [self.vit_second_fwd_batch_size] * (im.shape[0] // self.vit_second_fwd_batch_size)
+                        indices = [self.vit_second_fwd_batch_size] * (
+                            im.shape[0] // self.vit_second_fwd_batch_size
+                        )
                         if im.shape[0] % self.vit_second_fwd_batch_size != 0:
                             indices.append(im.shape[0] % self.vit_second_fwd_batch_size)
                     # logger.info(f"{indices}-{sum(indices)}--{thw_indices}-{sum(thw_indices)}")
                     for i, g, t in zip(
                         paddle.split(im, indices, axis=0),
                         paddle.split(grad, indices, axis=0),
-                        paddle.split(thw, thw_indices, axis=0) if thw is not None else [None] * len(indices),
+                        (
+                            paddle.split(thw, thw_indices, axis=0)
+                            if thw is not None
+                            else [None] * len(indices)
+                        ),
                     ):
                         _innder_backward(i, t, g)
                 else:
@@ -309,12 +365,22 @@ class VitTrainableCallback(TrainerCallback):
             for p in self.vision_model.parameters():
                 if p.trainable and getattr(p, "main_grad", None) is None:
                     p.main_grad = paddle.zeros(p.shape, dtype="float32")
-            fused_allreduce_gradients_with_group(self.vision_model.parameters(), self.pp_group)
+            fused_allreduce_gradients_with_group(
+                self.vision_model.parameters(), self.pp_group
+            )
             if self.sd_group.nranks > 1:
-                fused_allreduce_gradients_with_group(self.vision_model.parameters(), self.sd_group)
+                fused_allreduce_gradients_with_group(
+                    self.vision_model.parameters(), self.sd_group
+                )
         # showmem("____after_pp_reduce_grad")
 
-    def on_optimizer_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_optimizer_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
         """_summary_
 
         Args:

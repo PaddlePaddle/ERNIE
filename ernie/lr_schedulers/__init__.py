@@ -16,4 +16,4 @@
 from .cosine_lr import get_cosine_schedule_with_warmup
 from .wsd_lr import get_wsd_schedule_with_warmup
 
-__all__ = ['get_cosine_schedule_with_warmup', 'get_wsd_schedule_with_warmup']
+__all__ = ["get_cosine_schedule_with_warmup", "get_wsd_schedule_with_warmup"]
