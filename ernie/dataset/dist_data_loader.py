@@ -35,7 +35,6 @@ from paddleformers.data import default_data_collator
 from paddleformers.trainer.plugins.timer import get_timers
 from paddleformers.utils.batch_sampler import DistributedBatchSampler
 
-# from .mm_sft_reader.data_utils import merge_rope_3d_position
 from ernie.dataset.vl_sft_reader.data_utils import merge_rope_3d_position
 from ernie.modeling_moe_vl_pp import _DtypeSndShape
 from ernie.utils.mm_data_utils import DATATYPE_2_ID
@@ -73,15 +72,16 @@ def split_group(grouped, split_size):
 
 
 def broadcast_data_obj(data, src_rank, group):
-    """广播任意嵌套嵌套的 `data` 结构，每个 value 必须是 paddle.Tensor
-    Args:
-        data : 任意嵌套嵌套的 `data` 结构，每个 value 必须是 paddle.Tensor
-        src_rank (int): 发送节点的全局 rank
-        this_rank (int): 本机 mp_rank
-        group (ProcessGroup): 通信组
+    """
+    Broadcast arbitrarily nested `data` structures, where each value must be a paddle.Tensor.
+        Args:
+            data: Arbitrarily nested `data` structure, where each value must be a paddle.Tensor.
+            src_rank (int): Global rank of the sending node.
+            this_rank (int): Local mp_rank of the current device.
+            group (ProcessGroup): Communication group.
 
-    Returns:
-        data: 广播后的 `data`
+        Returns:
+            data: The broadcasted `data`.
     """
     this_rank = dist.get_rank()
     if this_rank == src_rank:
@@ -99,12 +99,9 @@ def broadcast_data_obj(data, src_rank, group):
         template = [None]
     dist.broadcast_object_list(template, src_rank, group)
     template = template[0]
-    # log.info(f'[rank={dist.get_rank()}]: {template}')
 
     temp_flat = flatten(template)
     data_flat = flatten(data)
-    # log.info(f'[rank={dist.get_rank()}] {temp_flat[0]}')
-    # keyfn = lambda i: str(i[1].dtype)
 
     def keyfn(i):
         return str(i[1].dtype)
@@ -112,9 +109,7 @@ def broadcast_data_obj(data, src_rank, group):
     ret_flat = [-1 for _ in range(len(temp_flat))]
     for dtype, grouped in groupby(sorted(enumerate(temp_flat), key=keyfn), keyfn):
         grouped = list(grouped)
-        for grouped_chunk in split_group(
-            grouped, 2**18
-        ):  # 对 > 2**31 的 tensor 进行 spilt 会出 paddle 问题。
+        for grouped_chunk in split_group(grouped, 2**18):
             idxs = [g[0] for g in grouped_chunk]
             if not dtype:
                 for id in idxs:
@@ -130,12 +125,9 @@ def broadcast_data_obj(data, src_rank, group):
                 data_buf = paddle.empty(
                     [sum(data_buf_shapes)], dtype=grouped_chunk[0][1].dtype
                 )
-            # log.info(f'[rank={dist.get_rank()}]: broadcast data:{data_buf.shape}')
             dist.broadcast(data_buf, src_rank, group)
-            # log.info(f'[rank={dist.get_rank()}]: done broadcast data:{data_buf.shape}')
 
             if this_rank != src_rank:
-                # log.info(f'[rank={dist.get_rank()}] split:{data_buf_shapes}')
                 if len(data_buf_shapes) == 1:
                     data_buf = [data_buf]
                 else:
@@ -151,14 +143,14 @@ def broadcast_data_obj(data, src_rank, group):
 
 def text_sft_collate_fn(batch):
     """
-    文本SFT数据批量处理函数。
+    Batch processing function for text SFT data.
 
     Args:
-        batch (list): 一个包含文本SFT数据的列表，每个元素为一个包含文本和SFT标签的字典。
+        batch (list): A list containing text SFT data,
+        where each element is a dictionary consisting of text and SFT labels.
 
     Returns:
-        np.ndarray: 处理后的批量数据，以numpy数组的形式返回。
-
+        np.ndarray: The processed batch data, returned as a numpy array.
     """
     batch = default_data_collator(batch, return_tensors="np")
     return batch
@@ -258,15 +250,18 @@ class MMDataloader(paddle.io.DataLoader):
 
     def sync_array_slices(self, buffer, remove_first=True):
         """
-        同步数组切片。
+        Synchronize array slices.
 
         Args:
-            buffer (dict): 包含图像、标签、输入ID、位置ID和标记类型ID等数据的字典。
-            remove_first (bool, optional): 是否从第一个切片中移除第一个元素。默认为True。
+            buffer (dict): A dictionary containing data such as images, labels,
+            input IDs, position IDs, and token type IDs.
+            remove_first (bool, optional): Whether to remove the first element
+            from the first slice. Defaults to True.
 
         Returns:
-            dict: 包含同步后的数据字典，包括输入ID、标签、位置ID、标记类型ID、图像、图像类型ID、网格尺寸和数据类型等。
-
+            dict: A dictionary containing the synchronized data, including input IDs,
+            labels, position IDs, token type IDs,
+                images, image type IDs, grid sizes, and data types.
         """
 
         # common operation
@@ -360,7 +355,6 @@ class MMDataloader(paddle.io.DataLoader):
                 data_not_valid = data.get("data_not_valid", 1)
                 if data_not_valid:
                     log.info("[MMDataloader] mm data not valid.")
-                    # global_training_logs.update(data_not_valid=data["data_not_valid"].mean())
                     continue
 
                 (
@@ -391,13 +385,11 @@ class MMDataloader(paddle.io.DataLoader):
                     data.get("position_ids", None),
                 )
 
-                # assert data_type[0] == DATATYPE_2_ID["mm"], "not valid mm data"
-
                 need_to_yield_sample = (
                     self._lens_rcd[src_id] + input_ids.shape[0]
                     > self.tokenizer.model_max_length
                 )
-                # or (self._lens_images[src_id] + len(images) > 120)
+
                 if need_to_yield_sample:
                     slice_result = self.sync_array_slices(
                         self._sample_buffer[src_id], self.need_multiround
@@ -415,11 +407,9 @@ class MMDataloader(paddle.io.DataLoader):
 
                     self._batch_buffer["cur_batch"].append(example)
 
-                    # 清空 sample_buffer
                     self._lens_rcd[src_id] = 0
                     self._lens_images[src_id] = 0
                     self._sample_buffer[src_id] = defaultdict(list)
-                    # batch_buffer 已满，输出 batch_data
                     if len(self._batch_buffer["cur_batch"]) == self.batch_size:
                         batch_data = self._collate_fn(self._batch_buffer["cur_batch"])
                         for k in batch_data:
@@ -430,15 +420,6 @@ class MMDataloader(paddle.io.DataLoader):
                         self.need_multiround = (
                             self.rng.random() < self.multimodal_multiround_ratio
                         )
-
-                # 样本进伪多轮 buffer
-                # if len(self._sample_buffer[src_id]["input_ids"]) > 0:
-                #     if input_ids[0] == self.cls_token_id:
-                #         input_ids = input_ids[1:]
-                #         labels = labels[1:]
-                #         token_type_ids = token_type_ids[1:]
-                #         position_ids = position_ids[1:] - 1
-
                 self._sample_buffer[src_id]["input_ids"].append(input_ids)
                 self._sample_buffer[src_id]["labels"].append(labels)
                 self._sample_buffer[src_id]["data_id"].append(data_id)
@@ -472,11 +453,11 @@ class SFTDataLoader(paddle.io.DataLoader):
 
         self.text_sft_dataloader = paddle.io.DataLoader(
             dataset,
-            batch_size=None,  # we do data collation in Stream
+            batch_size=None,
             collate_fn=text_sft_collate_fn,
-            num_workers=num_workers,  # 强制为1，否则多个worker会读重复数据
+            num_workers=num_workers,
             use_shared_memory=True,
-            prefetch_factor=prefetch_factor,  # self.args.prefetch_factor,
+            prefetch_factor=prefetch_factor,
         )
 
     def __iter__(self):
@@ -621,17 +602,19 @@ class DistDataLoader(paddle.io.DataLoader):
 
     def check_to_return_is_good(self, to_return):
         """
-        检查返回的数据是否有效。
+        Check whether the returned data is valid.
 
         Args:
-            to_return (dict): 包含模型输出数据的字典，包括 "input_ids", "labels", "images"（可选）,
-            "token_type_ids", "inbatch_pack_offset"（可选）, "grid_thw"（可选）, "position_ids" 等键。
+            to_return (dict): A dictionary containing model output data,
+            including keys such as "input_ids", "labels", "images" (optional),
+            "token_type_ids", "inbatch_pack_offset" (optional), "grid_thw" (optional), and "position_ids".
 
         Returns:
             None
 
         Raises:
-            AssertionError: 如果数据格式或内容不符合预期，将引发此异常。
+            AssertionError: If the data format or content does not meet the expectations,
+            this exception will be raised.
         """
         input_ids = to_return["input_ids"].cpu().numpy().squeeze(0)
         labels = to_return["labels"].cpu().numpy().squeeze(0)
@@ -692,7 +675,6 @@ class DistDataLoader(paddle.io.DataLoader):
                         sum(input_ids[start:end] == self.image_token_id) > 0
                     )
                 part_position_ids = position_ids[start:end]
-                # assert not ((part_position_ids == 0).all(axis=-1)).any(), "position_ids 中存在 [0,0,0]"
                 if (
                     sum(np.all(part_position_ids == 0, axis=1)) > 1
                     and end != self.tokenizer.model_max_length
@@ -789,7 +771,7 @@ class DistDataLoader(paddle.io.DataLoader):
 
     def position_id_assert(self, position_ids, input_ids, im_patch_id, grid_thw=None):
         """
-        测试3d-rope的position ids是否正确
+        Test whether the position IDs for 3D RoPE are correct
         """
         accu_pos = 0
         accu_im_patch_id = 1
@@ -849,12 +831,7 @@ class DistDataLoader(paddle.io.DataLoader):
                         self.count_mm = 0
                     else:
                         self.train_text = False
-                # if self.counter % self.gradient_accumulation_steps == 0:
-                #     if self.train_text:
-                #         self.train_text = False
-                #     else:
-                #         self.train_text = True
-                # self.train_text = self.train_text and self.train_text_flag
+
         else:
             self.train_text = False
         self.counter += 1
@@ -1057,12 +1034,7 @@ class DistDataLoader(paddle.io.DataLoader):
                 k for k, v in to_return.items() if v is None and k in optional_keys
             ]
             for k in none_keys:
-                to_return.pop(k)  # none key whill break paddlle mp broadcast
-            # debug_info = map_structure(lambda i: i.shape if i is not None else None, to_return)
-            # log.info(f"data out: {self._need_data} {debug_info}")
-        # toda = [(k, v.dtype, v.shape) for (k, v) in to_return.items() if k == "data_type"]
-        # toda = [x for x in labels.numpy().tolist()[0] if x >= 0][:20]
-        # log.info(f"toda: {toda}")
+                to_return.pop(k)
         get_timers() and get_timers()("read-raw-data").stop()
-        # self.check_to_return_is_good(to_return)
+
         return to_return
