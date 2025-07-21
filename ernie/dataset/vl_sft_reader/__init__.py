@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""end2end_processing"""
-from data_processor.steps.end2end_processing.args import (
-    End2EndProcessorArguments,
-    End2EndProcessorInferArguments,
-)
-from data_processor.steps.end2end_processing.processor import End2EndProcessor
+"""This package contains the dataset classes used in VL-SFT"""
+from .mix_weighted_sampler import MixExampleSetJson
+from .vl_sft_dataset_json import SFTMultimodalDatasetJson
 
 __all__ = [
-    "End2EndProcessor",
-    "End2EndProcessorArguments",
-    "End2EndProcessorInferArguments",
+    "MixExampleSetJson",
+    "SFTMultimodalDatasetJson",
 ]

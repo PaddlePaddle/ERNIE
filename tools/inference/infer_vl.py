@@ -29,10 +29,12 @@ from paddleformers.trainer import RuntimeTimer
 from paddleformers.transformers.model_utils import load_tp_checkpoint
 from tqdm import tqdm
 
-from data_processor.image_preprocessor.image_preprocessor_adaptive import AdaptiveImageProcessor
+from data_processor.image_preprocessor.image_preprocessor_adaptive import (
+    AdaptiveImageProcessor,
+)
 from data_processor.steps.end2end_processing import (
     End2EndProcessor,
-    End2EndProcessorArguments,
+    End2EndProcessorInferArguments,
 )
 from data_processor.utils.argparser import PdArgumentParser, get_config
 from ernie.configuration import Ernie4_5_VLMoeConfig
@@ -80,7 +82,9 @@ def get_parser():
     )
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--rope_3d", type=int, default=1)
-    parser.add_argument("--variable_resolution", type=int, default=1, help="variable resolution vit")
+    parser.add_argument(
+        "--variable_resolution", type=int, default=1, help="variable resolution vit"
+    )
     parser.add_argument("--max_seq_length", type=int, default=8182)
     parser.add_argument("--distributed", type=int, default=0, help="distributed mode")
     parser.add_argument("--gpu", type=str, default=None, help="gpu")
@@ -179,7 +183,9 @@ class Predictor:
         self.tokenizer = tokenizer
 
         if args.distributed:
-            self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env(args.seed)
+            self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env(
+                args.seed
+            )
         else:
             self.tensor_parallel_rank, self.tensor_parallel_degree = 0, 1
 
@@ -215,13 +221,19 @@ class Predictor:
             None.
         """
 
-        if not os.path.exists(os.path.join(args.model_name_or_path, "preprocessor_config.json")):
-            assert args.vision_model_name_or_path is not None, "vision_model_name_or_path is None"
+        if not os.path.exists(
+            os.path.join(args.model_name_or_path, "preprocessor_config.json")
+        ):
+            assert (
+                args.vision_model_name_or_path is not None
+            ), "vision_model_name_or_path is None"
             vision_model_name_or_path = args.vision_model_name_or_path
         else:
             vision_model_name_or_path = args.model_name_or_path
 
-        image_preprocess = AdaptiveImageProcessor.from_pretrained(vision_model_name_or_path)
+        image_preprocess = AdaptiveImageProcessor.from_pretrained(
+            vision_model_name_or_path
+        )
         data_processor_config = get_config(
             args.dpconfig,
             tokenizer=args.model_name_or_path,
@@ -233,9 +245,11 @@ class Predictor:
             variable_resolution=args.variable_resolution,
             rope_3d=args.rope_3d,
         )
-        data_processor_parser = PdArgumentParser(End2EndProcessorArguments)
+        data_processor_parser = PdArgumentParser(End2EndProcessorInferArguments)
         self.processor = End2EndProcessor(
-            data_processor_parser.parse_dict(dict(**dict(data_processor_config.processor_args))),
+            data_processor_parser.parse_dict(
+                dict(**dict(data_processor_config.processor_args))
+            ),
             tokenizer=self.tokenizer,
             image_preprocess=image_preprocess,
         )
@@ -243,7 +257,9 @@ class Predictor:
         self.processor.eval()
         self.processor.sft()
 
-        self.image_preprocess = AdaptiveImageProcessor.from_pretrained(vision_model_name_or_path)
+        self.image_preprocess = AdaptiveImageProcessor.from_pretrained(
+            vision_model_name_or_path
+        )
 
         config = Ernie4_5_VLMoeConfig.from_pretrained(
             args.model_name_or_path,
@@ -266,9 +282,11 @@ class Predictor:
         )
         config.tensor_parallel_output = False
         config.sequence_parallel = False
-        config.use_flash_attn = True
+        config.use_flash_attention = True
         if config.rope_3d != args.rope_3d:
-            logger.warning(f"rope_3d not match, config.rope_3d: {config.rope_3d}, args.rope_3d: {args.rope_3d}")
+            logger.warning(
+                f"rope_3d not match, config.rope_3d: {config.rope_3d}, args.rope_3d: {args.rope_3d}"
+            )
             config.rope_3d = args.rope_3d
         if (
             isinstance(config.moe_multimodal_dispatch_use_allgather, str)
@@ -304,8 +322,12 @@ class Predictor:
                 state_dict[new_key] = state_dict.pop(key)
 
         if not has_vision_model:
-            assert args.vision_model_name_or_path is not None, "vision_model_name_or_path is None"
-            vision_state_dict = paddle.load(os.path.join(args.vision_model_name_or_path, "model_state.pdparams"))
+            assert (
+                args.vision_model_name_or_path is not None
+            ), "vision_model_name_or_path is None"
+            vision_state_dict = paddle.load(
+                os.path.join(args.vision_model_name_or_path, "model_state.pdparams")
+            )
             for k in list(vision_state_dict.keys()):
                 new_k = "vision_model." + k
                 vision_state_dict[new_k] = vision_state_dict.pop(k)
@@ -316,7 +338,9 @@ class Predictor:
         self.model.set_state_dict(state_dict)
 
         if config.dtype != "float32":
-            self.model = paddle.amp.decorate(models=self.model, level="O2", dtype=args.dtype)
+            self.model = paddle.amp.decorate(
+                models=self.model, level="O2", dtype=args.dtype
+            )
 
         self.model.eval()
 
@@ -332,14 +356,18 @@ class Predictor:
             "penalty_score": inputs[0]["penalty_score"],
             "frequency_score": inputs[0]["frequency_score"],
             "presence_score": inputs[0]["presence_score"],
-            "eos_token_id": self.tokenizer._convert_token_to_id(self.tokenizer.eos_token),
+            "eos_token_id": self.tokenizer._convert_token_to_id(
+                self.tokenizer.eos_token
+            ),
             "pad_token_id": self.tokenizer.pad_token_id,
         }
-        logger.info(f"[gen config] {json.dumps(generation_configs, indent=4, ensure_ascii=False)}")
+        logger.info(
+            f"[gen config] {json.dumps(generation_configs, indent=4, ensure_ascii=False)}"
+        )
 
         try:
             one = self.processor.process(inputs[0])[0]
-        except Exception as e:
+        except Exception:
             raise
 
         input_ids = one["input_ids"][np.newaxis, :]
@@ -362,17 +390,23 @@ class Predictor:
             self.image_preprocess.rescale_factor = paddle.to_tensor(
                 self.image_preprocess.rescale_factor, dtype="float32"
             )
-            self.image_preprocess.image_mean_tensor = self.image_preprocess.image_mean_tensor.squeeze(
-                [-2, -1]
-            ).repeat_interleave(
-                self.vision_config.patch_size**2,
-                -1,
+            self.image_preprocess.image_mean_tensor = (
+                self.image_preprocess.image_mean_tensor.squeeze(
+                    [-2, -1]
+                ).repeat_interleave(
+                    self.vision_config.patch_size**2,
+                    -1,
+                )
             )
-            self.image_preprocess.image_std_tensor = self.image_preprocess.image_std_tensor.squeeze(
-                [-2, -1]
-            ).repeat_interleave(self.vision_config.patch_size**2, -1)
+            self.image_preprocess.image_std_tensor = (
+                self.image_preprocess.image_std_tensor.squeeze(
+                    [-2, -1]
+                ).repeat_interleave(self.vision_config.patch_size**2, -1)
+            )
             images = self.image_preprocess.rescale_factor * images.astype("float32")
-            images = (images - self.image_preprocess.image_mean_tensor) / self.image_preprocess.image_std_tensor
+            images = (
+                images - self.image_preprocess.image_mean_tensor
+            ) / self.image_preprocess.image_std_tensor
 
             # to tensor
             input_ids = paddle.to_tensor(input_ids, dtype=paddle.int64)
@@ -383,8 +417,12 @@ class Predictor:
                 grid_thw = paddle.to_tensor(grid_thw, dtype=paddle.int64)
 
             logger.info(f"[LOGCHW] input_ids {input_ids.shape} {input_ids.dtype}")
-            logger.info(f"[LOGCHW] image_type_ids {image_type_ids.shape} {image_type_ids.dtype}")
-            logger.info(f"[LOGCHW] token_type_ids {token_type_ids.shape} {token_type_ids.dtype}")
+            logger.info(
+                f"[LOGCHW] image_type_ids {image_type_ids.shape} {image_type_ids.dtype}"
+            )
+            logger.info(
+                f"[LOGCHW] token_type_ids {token_type_ids.shape} {token_type_ids.dtype}"
+            )
             logger.info(f"[LOGCHW] images {images.shape} {images.dtype}")
         else:
             image_type_ids, images, grid_thw = None, None, None
@@ -433,7 +471,9 @@ class Predictor:
         """postprocess"""
         result = []
         for text_tensor in input_data:
-            text_str = self.tokenizer.decode(text_tensor.numpy().tolist(), skip_special_tokens=False)
+            text_str = self.tokenizer.decode(
+                text_tensor.numpy().tolist(), skip_special_tokens=False
+            )
             text = enforce_stop_tokens(text_str, stop_sequences)
             result.append(text)
         return result
@@ -451,7 +491,9 @@ class Predictor:
             logger.info(e)
             import traceback
 
-            decoded_predictions = [f"<|ERROR|> Please check API! ERROR {e!s}-{traceback.format_exc()}"]
+            decoded_predictions = [
+                f"<|ERROR|> Please check API! ERROR {e!s}-{traceback.format_exc()}"
+            ]
         return decoded_predictions
 
     def predict_with_timeout(self, inputs, return_dict):
@@ -467,7 +509,9 @@ class Predictor:
             logger.info(e)
             import traceback
 
-            decoded_predictions = [f"<|ERROR|> Please check API! ERROR {e!s}-{traceback.format_exc()}"]
+            decoded_predictions = [
+                f"<|ERROR|> Please check API! ERROR {e!s}-{traceback.format_exc()}"
+            ]
 
         return_dict["result"] = decoded_predictions
 
@@ -488,7 +532,7 @@ if __name__ == "__main__":
     # Inference
     infer_dials: list[list[dict]] = []
     if args.input_file is None or not os.path.exists(args.input_file):
-        print(f'input file not found: {args.input_file}, run default case')
+        print(f"input file not found: {args.input_file}, run default case")
         infer_dials = [
             {
                 "context": [
