@@ -14,15 +14,35 @@
 """Config for parse dataset to same format"""
 import os
 
-DATASET_WORKROOT = os.getenv("ERNIE_DATASET_WORKROOT", os.path.abspath(os.path.join(os.path.dirname(__file__))))
+DATASET_WORKROOT = os.getenv(
+    "ERNIE_DATASET_WORKROOT", os.path.abspath(os.path.join(os.path.dirname(__file__)))
+)
 DATASET_DOWNLOAD_ROOT = os.path.join(DATASET_WORKROOT, "download")
 DATASET_OUTPUT_ROOT = os.path.join(DATASET_WORKROOT, "output")
 
 DATA_INFO_FILE = os.path.join(DATASET_WORKROOT, "data_info.json")
 DEFAULT_DOC_FORMATTING = "json"
 
-DEFAULT_ALPACA_COLUMNS_MAPPING = {"prompt": "instruction", "query": "input", "response": "output", "system": "system"}
+DEFAULT_ALPACA_COLUMNS_MAPPING = {
+    "prompt": "instruction",
+    "query": "input",
+    "response": "output",
+    "system": "system",
+}
 DEFAULT_COLUMN_VALUE_MAPPING = {"prompt": "", "query": "", "response": ""}
+DEFAULT_ALPACA_DPO_COLUMNS_MAPPING = {
+    "prompt": "instruction",
+    "query": "input",
+    "chosen": "chosen",
+    "rejected": "rejected",
+    "system": "system",
+}
+DEFAULT_ALPACA_DPO_COLUMNS_VALUE_MAPPING = {
+    "prompt": "",
+    "query": "",
+    "chosen": "",
+    "rejected": "",
+}
 DEFAULT_DATASET_COLUMNS_MAPPING = {"alpaca": DEFAULT_ALPACA_COLUMNS_MAPPING}
 
 DEFAULT_OUTPUT_JSON_INDENT = 2

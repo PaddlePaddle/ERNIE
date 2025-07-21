@@ -48,36 +48,36 @@ train_dataset_prob: "0.8,0.2"
 Supported Hugging Face datasets are defined in `ernie.dataset.hf.data_info.json`:
 
 ### Supported Hugging Face Datasets
-| Dataset Name | Format | File | File Format |
-|--------------|--------|------|-------------|
-| [llamafactory/alpaca_en](https://huggingface.co/datasets/llamafactory/alpaca_en) | alpaca | alpaca_data_en_52k.json | json |
-| [llamafactory/alpaca_zh](https://huggingface.co/datasets/llamafactory/alpaca_zh) | alpaca | alpaca_data_zh_51k.json | json |
-| [llamafactory/alpaca_gpt4_en](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_en) | alpaca | alpaca_gpt4_data_en.json | json |
-| [llamafactory/alpaca_gpt4_zh](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_zh) | alpaca | alpaca_gpt4_data_zh.json | json |
-| [BelleGroup/train_2M_CN](https://huggingface.co/datasets/BelleGroup/train_2M_CN) | alpaca | train_2M_CN.json | jsonl |
-| [BelleGroup/train_1M_CN](https://huggingface.co/datasets/BelleGroup/train_1M_CN) | alpaca | Belle_open_source_1M.json | jsonl |
-| [BelleGroup/train_0.5M_CN](https://huggingface.co/datasets/BelleGroup/train_0.5M_CN) | alpaca | Belle_open_source_0.5M.json | jsonl |
-| [BelleGroup/generated_chat_0.4M](https://huggingface.co/datasets/BelleGroup/generated_chat_0.4M) | alpaca | generated_chat_0.4M.json | jsonl |
-| [BelleGroup/school_math_0.25M](https://huggingface.co/datasets/BelleGroup/school_math_0.25M) | alpaca | school_math_0.25M.json | jsonl |
-| [sahil2801/CodeAlpaca-20k](https://huggingface.co/datasets/sahil2801/CodeAlpaca-20k) | alpaca | code_alpaca_20k.json | json |
-| [TIGER-Lab/MathInstruct](https://huggingface.co/datasets/TIGER-Lab/MathInstruct) | alpaca | MathInstruct.json | json |
-| [YeungNLP/firefly-train-1.1M](https://huggingface.co/datasets/YeungNLP/firefly-train-1.1M) | alpaca | firefly-train-1.1M.jsonl | jsonl |
-| [suolyer/webqa](https://huggingface.co/datasets/suolyer/webqa) | alpaca | train.json | jsonl |
-| [zxbsmk/webnovel_cn](https://huggingface.co/datasets/zxbsmk/webnovel_cn) | alpaca | novel_cn_token512_50k.json | json |
-| [AstraMindAI/SFT-Nectar](https://huggingface.co/datasets/AstraMindAI/SFT-Nectar) | alpaca | sft_data_structured.json | json |
-| [hfl/stem_zh_instruction](https://huggingface.co/datasets/hfl/stem_zh_instruction) | alpaca | bio_50282.json | jsonl |
-| [llamafactory/OpenO1-SFT](https://huggingface.co/datasets/llamafactory/OpenO1-SFT) | alpaca | OpenO1-SFT-Pro.jsonl | jsonl |
-| [Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT](https://huggingface.co/datasets/Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT) | alpaca | distill_r1_110k_sft.jsonl | jsonl |
-| [mayflowergmbh/oasst_de](https://huggingface.co/datasets/mayflowergmbh/oasst_de) | alpaca | oasst_de.json | json |
-| [mayflowergmbh/dolly-15k_de](https://huggingface.co/datasets/mayflowergmbh/dolly-15k_de) | alpaca | dolly_de.json | json |
-| [mayflowergmbh/alpaca-gpt4_de](https://huggingface.co/datasets/mayflowergmbh/alpaca-gpt4_de) | alpaca | alpaca_gpt4_data_de.json | json |
-| [mayflowergmbh/openschnabeltier_de](https://huggingface.co/datasets/mayflowergmbh/openschnabeltier_de) | alpaca | openschnabeltier.json | json |
-| [mayflowergmbh/evol-instruct_de](https://huggingface.co/datasets/mayflowergmbh/evol-instruct_de) | alpaca | evol_instruct_de.json | json |
-| [mayflowergmbh/dolphin_de](https://huggingface.co/datasets/mayflowergmbh/dolphin_de) | alpaca | dolphin.json | json |
-| [mayflowergmbh/booksum_de](https://huggingface.co/datasets/mayflowergmbh/booksum_de) | alpaca | booksum.json | json |
-| [mayflowergmbh/airoboros-3.0_de](https://huggingface.co/datasets/mayflowergmbh/airoboros-3.0_de) | alpaca | airoboros_3.json | json |
-| [mayflowergmbh/ultra-chat_de](https://huggingface.co/datasets/mayflowergmbh/ultra-chat_de) | alpaca | ultra_chat_german.json | json |
-| [pleisto/wikipedia-cn-20230720-filtered](https://huggingface.co/datasets/pleisto/wikipedia-cn-20230720-filtered) | alpaca | wikipedia-cn-20230720-filtered.json | json |
+| Dataset Name | Type |Format | File | File Format |
+|--------------|------|-------|------|-------------|
+| [llamafactory/alpaca_en](https://huggingface.co/datasets/llamafactory/alpaca_en) | sft | alpaca | alpaca_data_en_52k.json | json |
+| [llamafactory/alpaca_zh](https://huggingface.co/datasets/llamafactory/alpaca_zh) | sft | alpaca | alpaca_data_zh_51k.json | json |
+| [llamafactory/alpaca_gpt4_en](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_en) | sft | alpaca | alpaca_gpt4_data_en.json | json |
+| [llamafactory/alpaca_gpt4_zh](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_zh) | sft | alpaca | alpaca_gpt4_data_zh.json | json |
+| [BelleGroup/train_2M_CN](https://huggingface.co/datasets/BelleGroup/train_2M_CN) | sft | alpaca | train_2M_CN.json | jsonl |
+| [BelleGroup/train_1M_CN](https://huggingface.co/datasets/BelleGroup/train_1M_CN) | sft | alpaca | Belle_open_source_1M.json | jsonl |
+| [BelleGroup/train_0.5M_CN](https://huggingface.co/datasets/BelleGroup/train_0.5M_CN) | sft | alpaca | Belle_open_source_0.5M.json | jsonl |
+| [BelleGroup/generated_chat_0.4M](https://huggingface.co/datasets/BelleGroup/generated_chat_0.4M) | sft | alpaca | generated_chat_0.4M.json | jsonl |
+| [BelleGroup/school_math_0.25M](https://huggingface.co/datasets/BelleGroup/school_math_0.25M) | sft | alpaca | school_math_0.25M.json | jsonl |
+| [sahil2801/CodeAlpaca-20k](https://huggingface.co/datasets/sahil2801/CodeAlpaca-20k) | sft | alpaca | code_alpaca_20k.json | json |
+| [TIGER-Lab/MathInstruct](https://huggingface.co/datasets/TIGER-Lab/MathInstruct) | sft | alpaca | MathInstruct.json | json |
+| [YeungNLP/firefly-train-1.1M](https://huggingface.co/datasets/YeungNLP/firefly-train-1.1M) | sft | alpaca | firefly-train-1.1M.jsonl | jsonl |
+| [suolyer/webqa](https://huggingface.co/datasets/suolyer/webqa) | sft | alpaca | train.json | jsonl |
+| [zxbsmk/webnovel_cn](https://huggingface.co/datasets/zxbsmk/webnovel_cn) | sft | alpaca | novel_cn_token512_50k.json | json |
+| [AstraMindAI/SFT-Nectar](https://huggingface.co/datasets/AstraMindAI/SFT-Nectar) | sft | alpaca | sft_data_structured.json | json |
+| [hfl/stem_zh_instruction](https://huggingface.co/datasets/hfl/stem_zh_instruction) | sft | alpaca | bio_50282.json | jsonl |
+| [llamafactory/OpenO1-SFT](https://huggingface.co/datasets/llamafactory/OpenO1-SFT) | sft | alpaca | OpenO1-SFT-Pro.jsonl | jsonl |
+| [Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT](https://huggingface.co/datasets/Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT) | sft | alpaca | distill_r1_110k_sft.jsonl | jsonl |
+| [mayflowergmbh/oasst_de](https://huggingface.co/datasets/mayflowergmbh/oasst_de) | sft | alpaca | oasst_de.json | json |
+| [mayflowergmbh/dolly-15k_de](https://huggingface.co/datasets/mayflowergmbh/dolly-15k_de) | sft | alpaca | dolly_de.json | json |
+| [mayflowergmbh/alpaca-gpt4_de](https://huggingface.co/datasets/mayflowergmbh/alpaca-gpt4_de) | sft | alpaca | alpaca_gpt4_data_de.json | json |
+| [mayflowergmbh/openschnabeltier_de](https://huggingface.co/datasets/mayflowergmbh/openschnabeltier_de) | sft | alpaca | openschnabeltier.json | json |
+| [mayflowergmbh/evol-instruct_de](https://huggingface.co/datasets/mayflowergmbh/evol-instruct_de) | sft | alpaca | evol_instruct_de.json | json |
+| [mayflowergmbh/dolphin_de](https://huggingface.co/datasets/mayflowergmbh/dolphin_de) | sft | alpaca | dolphin.json | json |
+| [mayflowergmbh/booksum_de](https://huggingface.co/datasets/mayflowergmbh/booksum_de) | sft | alpaca | booksum.json | json |
+| [mayflowergmbh/airoboros-3.0_de](https://huggingface.co/datasets/mayflowergmbh/airoboros-3.0_de) | sft | alpaca | airoboros_3.json | json |
+| [mayflowergmbh/ultra-chat_de](https://huggingface.co/datasets/mayflowergmbh/ultra-chat_de) | sft | alpaca | ultra_chat_german.json | json |
+| [Intel/orca_dpo_pairs](https://huggingface.co/datasets/Intel/orca_dpo_pairs) | dpo | alpaca | orca_rlhf.jsonl | jsonl |
 
 ## erniekit Data Format
 
