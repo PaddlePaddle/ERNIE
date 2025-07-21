@@ -826,7 +826,7 @@ class DistDataLoader(paddle.io.DataLoader):
                     self.count_mm += 1
                 else:
                     self.count_mm += 1
-                    if self.count_mm == 2:
+                    if self.count_mm == 4:
                         self.train_text = True
                         self.count_mm = 0
                     else:
