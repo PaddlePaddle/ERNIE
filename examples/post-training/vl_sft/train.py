@@ -174,10 +174,6 @@ class ChatSFTArguments(PreTrainingArguments):
         default=False, metadata={"help": "use send router loss"}
     )
 
-    resume_from_ptx_model: Optional[bool] = field(
-        default=True, metadata={"help": "load pretrained weights from ptx_upload_dir"}
-    )
-
 
 @dataclass
 class VisionArguments:
@@ -596,9 +592,6 @@ def main():
             i / sum(args.modality_ratio) for i in args.modality_ratio
         ]
 
-    if args.resume_from_ptx_model:
-        args.ignore_load_lr_and_optim = True
-
     # same_data is set to "" and modifed here by default, but can be set to True/False explicitly
     if (
         not hasattr(args, "same_data")
@@ -926,9 +919,7 @@ def main():
                 "add_sys_token": args.add_sys_token,
                 "add_header_eos_token": args.add_header_eos_token,
                 "ignore_load_lr_and_optim": args.ignore_load_lr_and_optim,
-                "load_optimizer_and_scheduler": (
-                    False if args.resume_from_ptx_model else True
-                ),
+                "load_optimizer_and_scheduler": True,
                 "resume_from_checkpoint": args.resume_from_checkpoint,
                 "sampling_wo_replacement_data_resuming": args.sampling_wo_replacement_data_resuming,
                 "min_shot": args.min_shot,
