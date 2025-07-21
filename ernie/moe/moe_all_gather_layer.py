@@ -33,6 +33,7 @@ from paddle.incubate.nn.functional import (
     moe_gate_dispatch_partial_nosoftmaxtopk,
 )
 from paddle.incubate.tensor.manipulation import async_offload
+from paddleformers.peft.lora.lora_quantization_layers import QuantizationLoRALinear
 from paddleformers.utils.log import logger
 
 from ..distributed.common_dist_utils import (
@@ -67,7 +68,9 @@ def allgather_async(input, group=None):
     output_shape = input.shape
     output_shape[0] = output_shape[0] * parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
-    task = dist.stream.all_gather(output, input, group=group, use_calc_stream=False, sync_op=False)
+    task = dist.stream.all_gather(
+        output, input, group=group, use_calc_stream=False, sync_op=False
+    )
     return output, task
 
 
@@ -96,7 +99,12 @@ def reduce_scatter_async(input, group=None):
     output_shape[0] = output_shape[0] // parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
     task = dist.stream.reduce_scatter(
-        output, input, op=dist.ReduceOp.SUM, group=group, use_calc_stream=False, sync_op=False
+        output,
+        input,
+        op=dist.ReduceOp.SUM,
+        group=group,
+        use_calc_stream=False,
+        sync_op=False,
     )
     return output, task
 
@@ -268,12 +276,14 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
         ctx.num_local_experts = num_local_experts
         ctx.input_shape = [i.shape if i is not None else None for i in inputs]
 
-        op_list = []
         this_rank = dist.get_rank(group)
         world_size = dist.get_world_size(group)
         capacity = len(send_rank_global) // world_size // num_local_experts
         ctx.capacity = capacity
-        assert len(local_expert_id) == len(recv_rank_global), (len(local_expert_id), len(recv_rank_global))
+        assert len(local_expert_id) == len(recv_rank_global), (
+            len(local_expert_id),
+            len(recv_rank_global),
+        )
 
         for i in inputs:
             if i is not None:
@@ -294,14 +304,21 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
         for i_local_expert in range(num_local_experts):
             send_count = send_counts[i_local_expert]
             recv_count = recv_counts[i_local_expert]
-            assert len(recv_count) == len(send_count) == (world_size), (len(recv_count), len(send_count))
+            assert len(recv_count) == len(send_count) == (world_size), (
+                len(recv_count),
+                len(send_count),
+            )
 
             if send_counts_num[i_local_expert] > 0:
-                input_local_expert = inputs[i_local_expert].slice((0,), 0, send_counts_num[i_local_expert])
+                input_local_expert = inputs[i_local_expert].slice(
+                    (0,), 0, send_counts_num[i_local_expert]
+                )
                 if forward_func_dict is not None:
                     input_local_expert.stop_gradient = False
                     bwf, (input_local_expert,) = manual_backward(
-                        forward_func_dict[i_local_expert], is_first_fwd, input_local_expert
+                        forward_func_dict[i_local_expert],
+                        is_first_fwd,
+                        input_local_expert,
                     )
                     ctx.bw_funcs[i_local_expert] = bwf
 
@@ -316,56 +333,77 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
                 # tensor._slice ensures it always returns a view.
                 # See:
                 #   https://github.com/PaddlePaddle/Paddle/blob/release/3.1/paddle/phi/core/dense_tensor_impl.cc#L299
-                output_local_expert = output._slice(output_ptr, (output_ptr + recv_counts_num[i_local_expert]))
+                output_local_expert = output._slice(
+                    output_ptr, (output_ptr + recv_counts_num[i_local_expert])
+                )
             else:
                 output_local_expert = dummy_input
 
             output_ptr += recv_counts_num[i_local_expert]
 
-            tasks.append(
-                dist.stream.alltoall_single(
-                    output_local_expert,
-                    input_local_expert,
-                    recv_count,
-                    send_count,
-                    group=group,
-                    sync_op=False,
-                    use_calc_stream=False,
+            if group.nranks <= 1:
+                output_local_expert[:] = input_local_expert[:]
+            else:
+                tasks.append(
+                    dist.stream.alltoall_single(
+                        output_local_expert,
+                        input_local_expert,
+                        recv_count,
+                        send_count,
+                        group=group,
+                        sync_op=False,
+                        use_calc_stream=False,
+                    )
                 )
-            )
-        ctx.router_loss_bwfn, (router_loss,) = manual_backward(router_loss_fn, is_first_fwd, *router_loss_args)
+        ctx.router_loss_bwfn, (router_loss,) = manual_backward(
+            router_loss_fn, is_first_fwd, *router_loss_args
+        )
         with paddle.no_grad():
             recv_mask = (recv_rank_global == this_rank).astype(send_rank_global.dtype)
             if ctx.use_padding:
                 recv_mask_alltoall_out = (
-                    recv_mask.reshape([-1, num_local_experts, capacity]).transpose([1, 0, 2]).reshape([-1])
+                    recv_mask.reshape([-1, num_local_experts, capacity])
+                    .transpose([1, 0, 2])
+                    .reshape([-1])
                 )
                 distributed_input_to_alltoall_out = paddle.maximum(
-                    recv_mask_alltoall_out.cumsum() - 1, paddle.zeros([1], dtype=recv_mask_alltoall_out.dtype)
+                    recv_mask_alltoall_out.cumsum() - 1,
+                    paddle.zeros([1], dtype=recv_mask_alltoall_out.dtype),
                 )
                 distributed_input_to_alltoall_out = (
-                    distributed_input_to_alltoall_out.view([num_local_experts, -1, capacity])
+                    distributed_input_to_alltoall_out.view(
+                        [num_local_experts, -1, capacity]
+                    )
                     .transpose([1, 0, 2])
                     .reshape([-1])
                 )
             else:
-                recv_mask_alltoall_out = recv_mask.split(expert_num_global)  # h->d copy break overlap
+                recv_mask_alltoall_out = recv_mask.split(
+                    expert_num_global
+                )  # h->d copy break overlap
                 recv_mask_alltoall_out = [
-                    recv_mask_alltoall_out[(iexpert % world_size) * num_local_experts + (iexpert // world_size)]
+                    recv_mask_alltoall_out[
+                        (iexpert % world_size) * num_local_experts
+                        + (iexpert // world_size)
+                    ]
                     for iexpert in range(world_size * num_local_experts)
                 ]
                 alltoall_shape = [i.shape[0] for i in recv_mask_alltoall_out]
 
                 recv_mask_alltoall_out = paddle.concat(recv_mask_alltoall_out, 0)
                 distributed_input_to_alltoall_out = paddle.maximum(
-                    recv_mask_alltoall_out.cumsum() - 1, paddle.zeros([1], dtype=recv_mask_alltoall_out.dtype)
+                    recv_mask_alltoall_out.cumsum() - 1,
+                    paddle.zeros([1], dtype=recv_mask_alltoall_out.dtype),
                 )
-                distributed_input_to_alltoall_out = distributed_input_to_alltoall_out.split(alltoall_shape)
+                distributed_input_to_alltoall_out = (
+                    distributed_input_to_alltoall_out.split(alltoall_shape)
+                )
 
                 distributed_input_to_alltoall_out = paddle.concat(
                     [
                         distributed_input_to_alltoall_out[
-                            (iexpert % num_local_experts) * world_size + (iexpert // num_local_experts)
+                            (iexpert % num_local_experts) * world_size
+                            + (iexpert // num_local_experts)
                         ]
                         for iexpert in range(world_size * num_local_experts)
                     ],
@@ -409,10 +447,12 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
             tuple: Combined gradients (expert gradients + router loss gradients)
         """
 
-        grads = [paddle.zeros(s, dtype=out_grad.dtype) if s is not None else None for s in ctx.input_shape]
+        grads = [
+            paddle.zeros(s, dtype=out_grad.dtype) if s is not None else None
+            for s in ctx.input_shape
+        ]
         assert len(grads) == ctx.num_local_experts
-        capacity = ctx.capacity
-        in_ptr, out_ptr = 0, 0
+        out_ptr = 0
         tasks = []
         tmp_g = []
         send_counts_num = ctx.send_counts.sum(-1)
@@ -422,9 +462,13 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
             send_count = ctx.send_counts[i_local_expert]
             recv_count = ctx.recv_counts[i_local_expert]
             if recv_counts_num[i_local_expert] > 0:
-                out_g = out_grad.slice((0,), out_ptr, out_ptr + recv_counts_num[i_local_expert])
+                out_g = out_grad.slice(
+                    (0,), out_ptr, out_ptr + recv_counts_num[i_local_expert]
+                )
             else:
-                out_g = ctx.dummy_input  # paddle.empty([0,]+out_grad.shape[1:], dtype=out_grad.dtype)
+                out_g = (
+                    ctx.dummy_input
+                )  # paddle.empty([0,]+out_grad.shape[1:], dtype=out_grad.dtype)
             if send_counts_num[i_local_expert] > 0:
                 # When FLAGS_use_stride_kernel=0, tensor.slice(...) returns a
                 # new tensor instead of a view, causing in-place assignment to fail.
@@ -436,10 +480,19 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
                 g = ctx.dummy_input
             tmp_g.append(g)
             out_ptr += recv_counts_num[i_local_expert]
-            task = dist.stream.alltoall_single(
-                g, out_g, send_count, recv_count, group=ctx.group, sync_op=False, use_calc_stream=False
-            )
-            tasks.append(task)
+            if ctx.group.nranks <= 1:
+                g[:] = out_g[:]
+            else:
+                task = dist.stream.alltoall_single(
+                    g,
+                    out_g,
+                    send_count,
+                    recv_count,
+                    group=ctx.group,
+                    sync_op=False,
+                    use_calc_stream=False,
+                )
+                tasks.append(task)
         router_fn_args_grad = ctx.router_loss_bwfn(d_routerloss)
 
         for i_local_expert, t in enumerate(tasks):
@@ -491,8 +544,6 @@ class MOEAllGatherLayerV2(MOELayer):
         )
         self.enable_reverse_token_drop = enable_reverse_token_drop
         self.is_allgather_moe_layer = True
-        # assert self.gate.config.sequence_parallel
-        world_size = self.gate.config.moe_world_size
         self.use_padding = use_padding
 
         # 全局 gate gather
@@ -546,7 +597,9 @@ class MOEAllGatherLayerV2(MOELayer):
         else:
             orig_shape = None
 
-        assert len(input.shape) == 2, f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
+        assert (
+            len(input.shape) == 2
+        ), f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
         dispatch_token_type_ids = None
         global_dense_expert_mask = None
         if token_type_ids is not None:
@@ -555,12 +608,18 @@ class MOEAllGatherLayerV2(MOELayer):
             if self.config.sequence_parallel:
                 hcg = fleet.get_hybrid_communicate_group()
                 rank = hcg.get_model_parallel_rank()
-                interval = token_type_ids.shape[0] // hcg.get_model_parallel_world_size()
-                token_type_ids = token_type_ids.slice([0], rank * interval, (rank + 1) * interval)
+                interval = (
+                    token_type_ids.shape[0] // hcg.get_model_parallel_world_size()
+                )
+                token_type_ids = token_type_ids.slice(
+                    [0], rank * interval, (rank + 1) * interval
+                )
                 token_type_ids.stop_gradient = True
 
             if use_dense_expert:
-                global_dense_expert_mask = dispatch_token_type_ids == self.dense_token_type
+                global_dense_expert_mask = (
+                    dispatch_token_type_ids == self.dense_token_type
+                )
 
         assert self.gate is not None
         if hasattr(self, "rng") and self.rng.random() < self.all_to_all_dropout:
@@ -582,7 +641,9 @@ class MOEAllGatherLayerV2(MOELayer):
             (gate_logits, gate_prob),
             (gate_logits_mm, gate_prob_mm),
             expert_num_local,
-        ) = self.fused_gate_and_dispatch(input, token_type_ids, global_dense_expert_mask)
+        ) = self.fused_gate_and_dispatch(
+            input, token_type_ids, global_dense_expert_mask
+        )
         seqlen_this_mp = input.shape[0]
         if len(scatter_index_rev):
             recv_rank_local = scatter_index_rev // seqlen_this_mp
@@ -591,7 +652,9 @@ class MOEAllGatherLayerV2(MOELayer):
 
         if self.use_padding:
             if self.send_rank is None:
-                capacity = self.gate.get_capacity(input.shape[0] * self.config.moe_world_size)
+                capacity = self.gate.get_capacity(
+                    input.shape[0] * self.config.moe_world_size
+                )
                 self.send_rank = (
                     paddle.arange(self.config.moe_world_size)
                     .repeat_interleave(capacity * self.num_local_experts)
@@ -603,26 +666,39 @@ class MOEAllGatherLayerV2(MOELayer):
                     .tile(self.config.moe_world_size)
                     .astype(self.send_rank.dtype)
                 )
-            recv_rank, recv_rank_task = allgather_async(recv_rank_local, group=self.config.moe_group)
+            recv_rank, recv_rank_task = allgather_async(
+                recv_rank_local, group=self.config.moe_group
+            )
             send_rank = self.send_rank
             local_expert_id = self.local_expert_id
 
         else:
             all_expert_num = sum(expert_num_global_list)
-            recv_rank = paddle.empty([all_expert_num], dtype=recv_rank_local.dtype)
             # 非常慢
-            recv_rank_task = dist.stream.alltoall_single(
-                recv_rank,
-                recv_rank_local.tile(self.config.moe_world_size),
-                [
-                    sum(expert_num_global_list[i * self.num_local_experts : (i + 1) * self.num_local_experts])
-                    for i in range(self.config.moe_world_size)
-                ],  # output-size
-                [len(recv_rank_local)] * self.config.moe_world_size,  # input-size
-                group=self.config.moe_group,
-                sync_op=False,
-                use_calc_stream=False,
-            )
+            if self.config.moe_group.nranks > 1:
+                recv_rank = paddle.empty([all_expert_num], dtype=recv_rank_local.dtype)
+                # 非常慢
+                recv_rank_task = dist.stream.alltoall_single(
+                    recv_rank,
+                    recv_rank_local.tile(self.config.moe_world_size),
+                    [
+                        sum(
+                            expert_num_global_list[
+                                i
+                                * self.num_local_experts : (i + 1)
+                                * self.num_local_experts
+                            ]
+                        )
+                        for i in range(self.config.moe_world_size)
+                    ],  # output-size
+                    [len(recv_rank_local)] * self.config.moe_world_size,  # input-size
+                    group=self.config.moe_group,
+                    sync_op=False,
+                    use_calc_stream=False,
+                )
+            else:
+                recv_rank_task = None
+                recv_rank = recv_rank_local.tile(self.config.moe_world_size)
 
             # send_rank_cpu = np.concatenate(
             #     [
@@ -650,8 +726,12 @@ class MOEAllGatherLayerV2(MOELayer):
                 if self.recompute and self.training
                 else self.forward_experts(*dispatched_input)
             )
-            expert_outs = paddle.concat([e for e in expert_outs if e is not None], axis=0)  # [e*c,m]
-            expert_out_to_combine = AllGatherGroupOp.apply(expert_outs, group=self.config.moe_group)  # for test
+            expert_outs = paddle.concat(
+                [e for e in expert_outs if e is not None], axis=0
+            )  # [e*c,m]
+            expert_out_to_combine = AllGatherGroupOp.apply(
+                expert_outs, group=self.config.moe_group
+            )  # for test
             router_loss2 = self.calc_router_loss_and_logging(
                 router_loss,
                 gate_logits,
@@ -669,18 +749,27 @@ class MOEAllGatherLayerV2(MOELayer):
             world_size = dist.get_world_size(self.config.moe_group)
             this_rank = dist.get_rank(self.config.moe_group)
 
-            recv_size = paddle.count_nonzero(recv_rank == dist.get_rank(self.config.moe_group))
-            recv_size = paddle.maximum(recv_size, paddle.ones([], dtype=recv_size.dtype))
+            recv_size = paddle.count_nonzero(
+                recv_rank == dist.get_rank(self.config.moe_group)
+            )
+            recv_size = paddle.maximum(
+                recv_size, paddle.ones([], dtype=recv_size.dtype)
+            )
 
             recv_size_cpu, recv_size_task = async_offload(recv_size, get_async_loader())
 
             send_rank_this_rank = paddle.count_nonzero(send_rank == this_rank)
 
-            send_rank_this_rank_cpu, send_rank_this_rank_task = async_offload(send_rank_this_rank, get_async_loader())
+            send_rank_this_rank_cpu, send_rank_this_rank_task = async_offload(
+                send_rank_this_rank, get_async_loader()
+            )
 
             recv_rank[recv_rank == -1] = world_size
             send_recv_count_global = paddle.scatter_nd_add(
-                paddle.zeros([self.num_local_experts, world_size + 1, world_size + 1], dtype="int32"),
+                paddle.zeros(
+                    [self.num_local_experts, world_size + 1, world_size + 1],
+                    dtype="int32",
+                ),
                 paddle.stack([local_expert_id, send_rank, recv_rank], -1),
                 paddle.ones([len(send_rank)], dtype="int32"),
             )  # [num_local_experts, world_size + 1 , world_size + 1]
@@ -703,50 +792,58 @@ class MOEAllGatherLayerV2(MOELayer):
                     [len(i) if i is not None else 0 for i in dispatched_input],
                 )
 
-            expert_out_to_combine, router_loss2, distributed_input_to_alltoall_out = AlltoAllSmart.apply(
-                *dispatched_input,
-                router_loss,
-                gate_logits,
-                gate_prob,
-                gate_logits_mm,
-                gate_prob_mm,
-                local_combine_weights,
-                expert_num_global_no_token_drop,
-                token_type_ids,
-                dispatch_token_type_ids,
-                forward_func_dict=None,
-                router_loss_fn=self.calc_router_loss_and_logging,
-                local_expert_id=local_expert_id,
-                send_rank_global=send_rank,
-                recv_rank_global=recv_rank,
-                num_local_experts=self.num_local_experts,
-                capacity=dispatched_input[0].shape[1] if self.use_padding else None,
-                use_padding=self.use_padding,
-                expert_num_global=expert_num_global_list,
-                is_first_fwd=not framework._dygraph_tracer()._has_grad,
-                group=self.config.moe_group,
-                recv_size=recv_size_cpu,
-                send_counts=send_counts_cpu,
-                recv_counts=recv_counts_cpu,
-                send_counts_num=send_counts_num_cpu,
-                recv_counts_num=recv_counts_num_cpu,
+            expert_out_to_combine, router_loss2, distributed_input_to_alltoall_out = (
+                AlltoAllSmart.apply(
+                    *dispatched_input,
+                    router_loss,
+                    gate_logits,
+                    gate_prob,
+                    gate_logits_mm,
+                    gate_prob_mm,
+                    local_combine_weights,
+                    expert_num_global_no_token_drop,
+                    token_type_ids,
+                    dispatch_token_type_ids,
+                    forward_func_dict=None,
+                    router_loss_fn=self.calc_router_loss_and_logging,
+                    local_expert_id=local_expert_id,
+                    send_rank_global=send_rank,
+                    recv_rank_global=recv_rank,
+                    num_local_experts=self.num_local_experts,
+                    capacity=dispatched_input[0].shape[1] if self.use_padding else None,
+                    use_padding=self.use_padding,
+                    expert_num_global=expert_num_global_list,
+                    is_first_fwd=not framework._dygraph_tracer()._has_grad,
+                    group=self.config.moe_group,
+                    recv_size=recv_size_cpu,
+                    send_counts=send_counts_cpu,
+                    recv_counts=recv_counts_cpu,
+                    send_counts_num=send_counts_num_cpu,
+                    recv_counts_num=recv_counts_num_cpu,
+                )
             )
             # /origin input -> distributed input/ => /origin-input -> alltoall out -input/
             local_scatter_index = distributed_input_to_alltoall_out[local_scatter_index]
             local_scatter_index.stop_gradient = True
         # global -> local
-        combined_output = self.combine_expert_output(expert_out_to_combine, local_combine_weights, local_scatter_index)
+        combined_output = self.combine_expert_output(
+            expert_out_to_combine, local_combine_weights, local_scatter_index
+        )
 
         if self.shared_experts is not None:
             shared_out = self.shared_experts(input)
             combined_output += shared_out
 
         if orig_shape:
-            combined_output = combined_output.reshape(orig_shape[:-1] + [combined_output.shape[-1]])
+            combined_output = combined_output.reshape(
+                orig_shape[:-1] + [combined_output.shape[-1]]
+            )
 
         return combined_output, local_combine_weights, router_loss2, gate_logits
 
-    def fused_gate_logits_process_fused(self, gate_logits_lm, gate_logits_mm=None, token_type_ids=None):
+    def fused_gate_logits_process_fused(
+        self, gate_logits_lm, gate_logits_mm=None, token_type_ids=None
+    ):
         """Process gating logits for expert selection in Mixture-of-Experts (MoE) layers.
 
         Core Functionality:
@@ -765,11 +862,15 @@ class MOEAllGatherLayerV2(MOELayer):
             )
         """
         top_k = self.k
-        num_expert_per_rank_per_modality = gate_logits_lm.shape[-1] // self.config.moe_world_size
+        num_expert_per_rank_per_modality = (
+            gate_logits_lm.shape[-1] // self.config.moe_world_size
+        )
         group_size = gate_logits_lm.shape[-1] // top_k
         if self.group_experts:
             assert not self.use_correction_bias
-            gate_logits_lm = gate_logits_lm.reshape([gate_logits_lm.shape[0], top_k, -1])
+            gate_logits_lm = gate_logits_lm.reshape(
+                [gate_logits_lm.shape[0], top_k, -1]
+            )
             prob_lm = self.gate.act(gate_logits_lm)
             prob_lm_ = prob_lm
             weight_lm, expert_id_lm = prob_lm_.topk(k=1, axis=-1)
@@ -779,27 +880,39 @@ class MOEAllGatherLayerV2(MOELayer):
         else:
             prob_lm = self.gate.act(gate_logits_lm)
             if self.use_correction_bias:
-                prob_lm_ = prob_lm + self.moe_statics.e_score_correction_bias[0].detach()
+                prob_lm_ = (
+                    prob_lm + self.moe_statics.e_score_correction_bias[0].detach()
+                )
             else:
                 prob_lm_ = prob_lm
             weight_lm, expert_id_lm = prob_lm_.topk(k=top_k, axis=-1)
 
         if self.use_correction_bias:
-            batch_idx = paddle.arange(prob_lm_.shape[0]).unsqueeze(-1).expand_as(expert_id_lm)
+            batch_idx = (
+                paddle.arange(prob_lm_.shape[0]).unsqueeze(-1).expand_as(expert_id_lm)
+            )
             weight_lm = prob_lm[batch_idx, expert_id_lm]  # use correct bias
 
         expert_id_lm = expand_modality_expert_id(
             expert_id_lm,
-            num_expert_per_modality=num_expert_per_rank_per_modality if token_type_ids is not None else 0,
+            num_expert_per_modality=(
+                num_expert_per_rank_per_modality if token_type_ids is not None else 0
+            ),
             group_size=group_size,
             modality_offset=0,
             is_group_expert=self.group_experts,
         )
         expert_id_lm = expert_id_lm.reshape(weight_lm.shape)
-        lm_weight_and_expert_id = paddle.concat([weight_lm, expert_id_lm.astype("float32")], -1)
+        lm_weight_and_expert_id = paddle.concat(
+            [weight_lm, expert_id_lm.astype("float32")], -1
+        )
 
         if token_type_ids is None or gate_logits_mm is None:
-            return lm_weight_and_expert_id, prob_lm.reshape([prob_lm.shape[0], -1]), None
+            return (
+                lm_weight_and_expert_id,
+                prob_lm.reshape([prob_lm.shape[0], -1]),
+                None,
+            )
 
         prob_mm = self.gate.act(gate_logits_mm)
         if self.use_correction_bias:
@@ -808,7 +921,9 @@ class MOEAllGatherLayerV2(MOELayer):
             prob_mm_ = prob_mm
         weight_mm, expert_id_mm = prob_mm_.topk(k=top_k, axis=-1)
         if self.use_correction_bias:
-            batch_idx = paddle.arange(prob_lm_.shape[0]).unsqueeze(-1).expand_as(expert_id_lm)
+            batch_idx = (
+                paddle.arange(prob_lm_.shape[0]).unsqueeze(-1).expand_as(expert_id_lm)
+            )
             weight_mm = prob_mm[batch_idx, expert_id_mm]  # use correct bias
 
         expert_id_mm = expand_modality_expert_id(
@@ -819,7 +934,9 @@ class MOEAllGatherLayerV2(MOELayer):
             is_group_expert=False,
         )
         expert_id_mm = expert_id_mm.reshape(weight_mm.shape)
-        mm_weight_and_expert_id = paddle.concat([weight_mm, expert_id_mm.astype("float32")], -1)
+        mm_weight_and_expert_id = paddle.concat(
+            [weight_mm, expert_id_mm.astype("float32")], -1
+        )
         weight_and_expert = paddle.where(
             (token_type_ids == 0).unsqueeze(-1),
             lm_weight_and_expert_id,
@@ -827,7 +944,9 @@ class MOEAllGatherLayerV2(MOELayer):
         )
         return weight_and_expert, prob_lm.reshape([prob_lm.shape[0], -1]), prob_mm
 
-    def fused_gate_and_dispatch(self, input, token_type_ids=None, global_dense_expert_mask=None):
+    def fused_gate_and_dispatch(
+        self, input, token_type_ids=None, global_dense_expert_mask=None
+    ):
         """Implements fused expert gating and token dispatch logic for Mixture-of-Experts (MoE) layers.
 
         Core Functionality:
@@ -865,19 +984,31 @@ class MOEAllGatherLayerV2(MOELayer):
 
         def build_weights_and_expert_id(input):
             nonlocal token_type_ids, args
-            logits, capacity, router_loss = self.gate(input, *args, transform_weight=False)
+            logits, capacity, router_loss = self.gate(
+                input, *args, transform_weight=False
+            )
             if self.config.multimodel_experts:
                 gate_logits_lm, gate_logits_mm = logits.chunk(2, axis=-1)
             else:
                 gate_logits_lm, gate_logits_mm = logits, None
 
-            weigth_and_expert, gate_prob_lm, gate_prob_mm = self.fused_gate_logits_process_fused(
+            weigth_and_expert, gate_prob_lm, gate_prob_mm = (
+                self.fused_gate_logits_process_fused(
+                    gate_logits_lm,
+                    gate_logits_mm,
+                    token_type_ids if global_dense_expert_mask is None else None,
+                )
+            )
+            weigth_and_expert = AllGatherGroupOp.apply(
+                weigth_and_expert, group=self.config.moe_group
+            )
+            return (
+                weigth_and_expert,
                 gate_logits_lm,
                 gate_logits_mm,
-                token_type_ids if global_dense_expert_mask is None else None,
+                gate_prob_lm,
+                gate_prob_mm,
             )
-            weigth_and_expert = AllGatherGroupOp.apply(weigth_and_expert, group=self.config.moe_group)
-            return weigth_and_expert, gate_logits_lm, gate_logits_mm, gate_prob_lm, gate_prob_mm
 
         capacity = self.gate.get_capacity(input.shape[0]) * self.world_size
         (
@@ -894,7 +1025,9 @@ class MOEAllGatherLayerV2(MOELayer):
             group=self.config.moe_group,
             is_first_fwd=not framework._dygraph_tracer()._has_grad,
         )
-        combine_weights_unnorm, expert_id = combine_weights_and_expert_id.chunk(2, axis=-1)
+        combine_weights_unnorm, expert_id = combine_weights_and_expert_id.chunk(
+            2, axis=-1
+        )
         expert_id = expert_id.cast("int32")
         expert_id.stop_gradient = True
         num_experts = (
@@ -907,7 +1040,10 @@ class MOEAllGatherLayerV2(MOELayer):
             expert_id[global_dense_expert_mask] = num_experts
             num_experts += 1
 
-        if "reverse_token_drop" in inspect.signature(moe_gate_dispatch_partial_nosoftmaxtopk).parameters:
+        if (
+            "reverse_token_drop"
+            in inspect.signature(moe_gate_dispatch_partial_nosoftmaxtopk).parameters
+        ):
             compat_kwargs = {"reverse_token_drop": self.enable_reverse_token_drop}
         else:
             compat_kwargs = {}
@@ -941,7 +1077,9 @@ class MOEAllGatherLayerV2(MOELayer):
             if self.gate.config.multimodel_experts:
                 # MLLM
                 for i in range(len(self.moe_statics.expert_usage)):
-                    self.moe_statics.expert_usage[i] += expert_num_local[self.gate.experts_type_mask[i]].detach()
+                    self.moe_statics.expert_usage[i] += expert_num_local[
+                        self.gate.experts_type_mask[i]
+                    ].detach()
             else:
                 # LLM
                 self.moe_statics.expert_usage[0] += expert_num_local.detach()
@@ -974,7 +1112,11 @@ class MOEAllGatherLayerV2(MOELayer):
         if self.use_padding:
             offset = last_local_expert * capacity
         else:
-            offset = expert_offset_global[last_local_expert - 1] if self.config.moe_rank > 0 else 0
+            offset = (
+                expert_offset_global[last_local_expert - 1]
+                if self.config.moe_rank > 0
+                else 0
+            )
         local_combine_weights_unnorm = ReshardCombineWeight.apply(
             combine_weights_unnorm.contiguous(), group=self.config.moe_group
         )
@@ -994,7 +1136,9 @@ class MOEAllGatherLayerV2(MOELayer):
             local_combine_weights = local_combine_weights_unnorm
         local_combine_weights = local_combine_weights.cast(dispatched_input.dtype)
         if self.use_padding:
-            dispatched_input = dispatched_input.reshape([self.num_local_experts, -1, d_model])
+            dispatched_input = dispatched_input.reshape(
+                [self.num_local_experts, -1, d_model]
+            )
             dispatched_input = dispatched_input.unbind(0)
         else:
             s = self.num_local_experts * self.config.moe_rank
@@ -1008,7 +1152,9 @@ class MOEAllGatherLayerV2(MOELayer):
                 for p, t in zip(valid_pos, dispatched_input_list):
                     dispatched_input[p] = t
             else:
-                dispatched_input = [dispatched_input] + ([None] * (len(expert_num_local) - 1))
+                dispatched_input = [dispatched_input] + (
+                    [None] * (len(expert_num_local) - 1)
+                )
 
         scatter_index.stop_gradient = True
         scatter_index_rev.stop_gradient = True
@@ -1056,19 +1202,57 @@ class MOEAllGatherLayerV2(MOELayer):
 
         no_tokens_expert_outputs = []
         if not self.multimodal_experts:
-            true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
+            true_experts = self.experts[
+                self.rank
+                * self.num_local_experts : (self.rank + 1)
+                * self.num_local_experts
+            ]
         else:
             true_experts = []
             for i, num in enumerate(self.num_local_multimodal_experts):
                 current_modal_experts = self.experts[
-                    self.multimodal_expert_index[i] : self.multimodal_expert_index[i + 1]
+                    self.multimodal_expert_index[i] : self.multimodal_expert_index[
+                        i + 1
+                    ]
                 ]
-                true_experts.extend(current_modal_experts[self.rank * num : (self.rank + 1) * num])
+                true_experts.extend(
+                    current_modal_experts[self.rank * num : (self.rank + 1) * num]
+                )
 
-        assert len(dispatched_input) == len(true_experts), (len(dispatched_input), len(true_experts))
+        assert len(dispatched_input) == len(true_experts), (
+            len(dispatched_input),
+            len(true_experts),
+        )
 
         for iexpert, chunk in enumerate(dispatched_input):
             if chunk is None:
+                # QuantizationLoRALinear can not call `.weight`.
+                if not isinstance(
+                    true_experts[iexpert].up_gate_proj, QuantizationLoRALinear
+                ):
+                    input_shape = [
+                        1,
+                        true_experts[iexpert].up_gate_proj.weight.shape[0],
+                    ]
+                    input_dtype = true_experts[iexpert].up_gate_proj.weight.dtype
+                else:
+                    input_shape = [
+                        1,
+                        true_experts[iexpert].up_gate_proj.lora_A.shape[0],
+                    ]
+                    input_dtype = true_experts[iexpert].up_gate_proj.lora_A.dtype
+
+                chunk = paddle.zeros(
+                    input_shape,
+                    input_dtype,
+                )
+                if true_experts[iexpert].training:
+                    chunk.stop_gradient = False
+                expert_out = true_experts[iexpert](chunk.contiguous())
+                no_tokens_expert_outputs.append(
+                    expert_out * 0.0
+                )  # mutiply 0.0 to zero out and grad
+
                 expert_outputs.append(None)
                 continue
 
@@ -1116,12 +1300,15 @@ class MOEAllGatherLayerV2(MOELayer):
         Returns:
             Tensor: Updated router loss with new auxiliary components
         """
-        top_k = self.k
         dispatch_mask_3d = dispatch_mask.reshape([self.config.moe_world_size, -1])
         if token_type_ids is not None and self.gate.config.moe_use_hard_gate:
             # MLLM
             if not self.gate.weight.stop_gradient:
-                dispatch_tokens_mask = dispatch_token_type_ids == 0 if dispatch_token_type_ids is not None else None
+                dispatch_tokens_mask = (
+                    dispatch_token_type_ids == 0
+                    if dispatch_token_type_ids is not None
+                    else None
+                )
                 lm_tokens_mask = (token_type_ids == 0).astype(gate_prob.dtype)
                 # hard code
                 lm_experts = (
@@ -1129,7 +1316,9 @@ class MOEAllGatherLayerV2(MOELayer):
                     if isinstance(self.gate.num_experts, (tuple, list))
                     else self.gate.num_experts
                 )
-                dispatch_mask_lm = dispatch_mask_3d[:, : lm_experts // self.config.moe_world_size].reshape([-1])
+                dispatch_mask_lm = dispatch_mask_3d[
+                    :, : lm_experts // self.config.moe_world_size
+                ].reshape([-1])
                 router_loss += self._calc_router_loss(
                     dispatch_mask_lm,
                     gate_logits * lm_tokens_mask.unsqueeze(-1),
@@ -1146,7 +1335,11 @@ class MOEAllGatherLayerV2(MOELayer):
                 router_loss += self.zero * gate_logits[0, 0] * gate_prob[0, 0]
             if gate_prob_mm is not None:
                 mm_tokens_mask = (token_type_ids == 1).astype(gate_prob_mm.dtype)
-                dispatch_tokens_mask = dispatch_token_type_ids == 1 if dispatch_token_type_ids is not None else None
+                dispatch_tokens_mask = (
+                    dispatch_token_type_ids == 1
+                    if dispatch_token_type_ids is not None
+                    else None
+                )
                 dispatch_mask_mm = dispatch_mask_3d[
                     :, self.gate.num_experts[0] // self.config.moe_world_size :
                 ].reshape([-1])
@@ -1175,7 +1368,9 @@ class MOEAllGatherLayerV2(MOELayer):
                 self.layer_idx,
                 0,
                 paddle.ones([gate_prob.shape[0]], "bool"),
-                paddle.ones([self.gate.config.moe_world_size * gate_prob.shape[0]], "bool"),
+                paddle.ones(
+                    [self.gate.config.moe_world_size * gate_prob.shape[0]], "bool"
+                ),
                 prefix="lm",
             )
 

@@ -55,7 +55,7 @@ adam_beta2: 0.95
 offload_optim: True
 
 # performance
-tensor_parallel_degree: 2
+tensor_parallel_degree: 1
 pipeline_parallel_degree: 1
 sharding_parallel_degree: 1
 sharding: stage1

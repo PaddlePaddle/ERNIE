@@ -922,6 +922,12 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             _layers = (cc for c in self._model_chunks for cc in c.run_function)
         func(self.config, _layers)
 
+    def fp8_quant_weight(self):
+        with paddle.no_grad():
+            for i, layer in self._sub_layers.items():
+                if isinstance(layer, ErnieDecoderLayer) and hasattr(layer, "fp8_quant_weight"):
+                    layer.fp8_quant_weight()
+
     def _post_init(self, original_init, *args, **kwargs):
         super()._post_init(self, original_init, *args, **kwargs)
         with paddle.no_grad():

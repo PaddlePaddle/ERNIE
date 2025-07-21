@@ -84,13 +84,13 @@ docker run -it --privileged=true  --net host --device=/dev/xpu0:/dev/xpu0 --devi
 3. Install paddlepaddle-xpu
 ```
 # The "PaddlePaddle" deep learning framework provides basic computing capabilities
-python -m pip install paddlepaddle-xpu==3.1.0 -i https://www.paddlepaddle.org.cn/packages/stable/xpu/
+python -m pip install paddlepaddle-xpu==3.1.0 -i https://www.paddlepaddle.org.cn/packages/stable/xpu-p800/
 # Paddle_xpu contains a small number of XPU custom operators, mainly used to support XPU training acceleration
 wget https://klx-sdk-release-public.su.bcebos.com/v1/xpaddle/release/3.1/paddle_xpu-0.0.1-py3-none-any.whl
 python -m pip install paddle_xpu-0.0.1-py3-none-any.whl
 
 Nightly version link:
-https://www.paddlepaddle.org.cn/packages/nightly/xpu/paddlepaddle-xpu/
+https://www.paddlepaddle.org.cn/packages/nightly/xpu-p800/paddlepaddle-xpu/
 ```
 
 4. Install requirements
@@ -226,7 +226,6 @@ python -m paddle.distributed.launch \
 2. SFT-LoRA fine-tuning
 ```
 #!/bin/bash
-!/bin/bash
 
 unset PADDLE_TRAINERS_NUM
 unset PADDLE_ELASTIC_JOB_ID

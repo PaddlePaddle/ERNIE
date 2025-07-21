@@ -32,8 +32,12 @@ def parse_arguments():
     Returns:
         Namespace object containing the following parameters:
             --train_dataset_path:
-                str type. Used to specify the configuration file path for training tasks.
-                Default: ./config/task_sft_no_seed.json.
+                str type. Used to specify the path of training dataset.
+                Default: examples/data/sft-train.jsonl.
+            --train_dataset_type:
+                str type. Used to specify the type of training dataset. Default: erniekit.
+            --train_dataset_prob:
+                str type. Used to specify the prob of training dataset. Default: 1.0.
             --model_name_or_path: str type. Used to specify the model directory or filename. Default: ./inference.
             --max_seq_len: int type. Used to specify the maximum input sequence length after tokenization. Default: 4096.
             --num_epochs: int type. Number of epochs to train for. No default value provided.
@@ -62,7 +66,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--train_dataset_type",
-        default="examples/data/sft-train.jsonl",
+        default="erniekit",
         help="type of training datasets.",
     )
     parser.add_argument(

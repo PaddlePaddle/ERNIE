@@ -15,6 +15,7 @@
 """ Eval Ernie Model. """
 
 import os
+import json
 from functools import partial
 from typing import Any, Optional
 
@@ -40,6 +41,7 @@ from ernie.utils.common_utils import (
 
 from ..hparams import get_eval_args, read_args
 from ..train.sft.trainer import ErnieMoETrainer
+from ..utils.process import is_valid_model_dir
 
 
 def run_eval(args: Optional[dict[str, Any]] = None) -> None:
@@ -107,20 +109,15 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     )
 
     last_checkpoint = None
-    if os.path.isdir(finetuning_args.output_dir) and not finetuning_args.overwrite_output_dir:
-        uc_async_save = (
-            finetuning_args.unified_checkpoint and "async_save" in finetuning_args.unified_checkpoint_config
-        )
-        last_checkpoint = get_last_checkpoint(
-            finetuning_args.output_dir,
-            signal_folder=finetuning_args.output_signal_dir,
-            uc_async_save=uc_async_save,
-        )
-        if last_checkpoint is not None and finetuning_args.resume_from_checkpoint is None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
+    if os.path.isdir(finetuning_args.output_dir):
+        # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
+        if is_valid_model_dir(finetuning_args.output_dir):
+            last_checkpoint = finetuning_args.output_dir
+        # If not a model directory but still a valid path, try to find the latest checkpoint
+        else:
+            last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
+    if last_checkpoint is not None:
+        logger.info(f"Checkpoint detected, starting model eval from checkpoint: {last_checkpoint}")
 
     if last_checkpoint is not None and model_args.continue_training and not model_args.lora:
         model_args.continue_training = False
@@ -135,6 +132,14 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             dtype = "bfloat16"
 
     logger.info("Start to load model ...")
+
+    # Detect torch model.
+    config_path = os.path.join(model_args.model_name_or_path, "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_dict = json.load(f)
+    if "torch_dtype" in config_dict:
+        raise ValueError("Unsupported weight format: Torch weights are not compatible with Paddle model currently.")
+
     model_class = Ernie4_5_MoeForCausalLM
     if finetuning_args.pipeline_parallel_degree > 1:
         model_class = Ernie4_5_MoeForCausalLMPipe
@@ -232,6 +237,8 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
+    if model_config.moe_num_experts is None or model_config.moe_num_experts == 0:
+        model_config.moe_group = "dummy" if model_args.moe_group == "mp" else model_args.moe_group
 
     if model_args.continue_training or finetuning_args.weight_quantize_algo is not None:
         model = model_class.from_pretrained(
@@ -241,11 +248,13 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     else:
         model = model_class.from_config(model_config, dtype=dtype)
 
+    if model.config.head_dim is None:
+        del model.config.head_dim
+
     paddle.device.cuda.empty_cache()
     logger.info("Loading model successfully !")
     logger.debug(f"Model config: {model.config}")
     logger.info(f"{runtime_timer.log()}")
-
     if (
         finetuning_args.pipeline_parallel_degree > 1
         and finetuning_args.weight_quantize_algo is not None

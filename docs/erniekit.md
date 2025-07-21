@@ -74,6 +74,8 @@ python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e . # We recommend install in editable mode
 ```
 
+You can also build docker image yourself which includes all the dependencies listed in `requirements.txt`. Please refer to [build docker](../docker/docker-cuda/README.md) for more details.
+
 ### 2.4 Install FastDeploy
 
 Please refer to [FastDeploy installation](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/get_started/installation/).
@@ -101,13 +103,13 @@ ERNIEKit supports training for the following models. Before initiating training 
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 8K       | 8x80G A/H GPUs     | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_8k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 32K      | 8x80G A/H GPUs     | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_32k.sh)|
 | ERNIE-4.5-21B-A3B-B base/ERNIE-4.5-21B-A3B | SFT         | 128K     | 8x80G A/H GPUs     | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_128k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 8K       | 2x80G A/H GPUs     | [run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 32K      | 2x80G A/H GPUs     | [run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_32k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 8K       | 1x80G A/H GPUs     | [run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_8k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 32K      | 1x80G A/H GPUs     | [run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_32k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 8K       | 8x80G A/H GPUs     | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_8k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 32K      | 8x80G A/H GPUs     | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_32k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 128K     | 8x80G A/H GPUs     | [run_dpo_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_128k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 8K       | 2x80G A/H GPUs     | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 32K      | 2x80G A/H GPUs     | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_32k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 8K       | 1x80G A/H GPUs     | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_8k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 32K      | 1x80G A/H GPUs     | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_32k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 8K       | 1x80G A/H GPU      | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_8k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 32K      | 1x80G A/H GPU      | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_32k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 128K      | 1x80G A/H GPU      | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_128k.sh)|

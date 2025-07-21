@@ -1,5 +1,5 @@
 paddleformers
-setuptools==50.3.2
+setuptools==79.0.1
 decord
 moviepy
 GPUtil
