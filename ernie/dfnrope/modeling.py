@@ -214,7 +214,7 @@ class VisionFlashAttention2(nn.Layer):
             k.astype("bfloat16").unsqueeze(0),
             v.astype("bfloat16").unsqueeze(0),
             startend_row_indices=startend_row_indices,
-            causal=False,  # 视觉是双向 Attention
+            causal=False,
         )
         attn_output = attn_output.reshape([seq_length, -1])
 

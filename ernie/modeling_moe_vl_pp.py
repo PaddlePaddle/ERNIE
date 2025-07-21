@@ -884,7 +884,7 @@ class ErnieVLEmbeddingPipe(Ernie4_5_EmbeddingPipe):
 
         def fwd(image_features, _):
             nonlocal input_ids, lm_input_ids, mm_input_ids, token_type_ids_input, image_type_ids, image_mask
-            """recompute 段"""
+            """recompute"""
             assert lm_input_ids.max() < self.config.vocab_size, lm_input_ids.tolist()
 
             inputs_embeds = super_forward(lm_input_ids)

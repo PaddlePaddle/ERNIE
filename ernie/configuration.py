@@ -591,6 +591,11 @@ class Ernie4_5_VLMoeConfig(Ernie4_5_MoeConfig):
         self.resampler_fuse_rms_norm = resampler_fuse_rms_norm
         self.moe_layer_feed_fake_token = moe_layer_feed_fake_token
         self.offload_pp_data_chunk_size = offload_pp_data_chunk_size
+        self.register_unsavable_keys(
+            [
+                "sequence_parallel",
+            ]
+        )
 
     @property
     def multimodel_experts(self) -> bool:
