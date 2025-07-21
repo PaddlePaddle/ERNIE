@@ -27,7 +27,6 @@ from ernie.dataset.data_utils import (
     get_markup_tokens,
     pad_batch_data,
 )
-from ernie.dataset.pvp import EBMarkUpRouter
 
 LOGGER_COUNT = 0
 
@@ -458,14 +457,6 @@ class SequenceDataset(IterableDataset):
             while True:
                 yield from self.__iter_func()
 
-    def _setup_markup(self):
-        """Initialize markup tokens and router for special token handling."""
-        self.eb_markup_rounter = EBMarkUpRouter(
-            self.tokenizer,
-            break_token=self.break_token,
-            break_turn_token=self.break_turn_token,
-        )
-        self.tokenizer.markup_tokens = get_markup_tokens()
 
     def _postprocess_sequence(self, example, actual_example_num):
         """Process code completion examples into token sequences.
