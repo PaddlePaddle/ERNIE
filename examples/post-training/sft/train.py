@@ -138,6 +138,13 @@ class SFTTrainingArguments(TrainingArguments):
             "to avoid redundant gradient computation."
         },
     )
+    # Quantiztaion
+    weight_quantize_algo: str = field(
+        default=None,
+        metadata={
+            "help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."
+        },
+    )
 
 
 @dataclass
@@ -402,13 +409,6 @@ class ModelArgument:
         },
     )
 
-    # Quantiztaion
-    weight_quantize_algo: str = field(
-        default=None,
-        metadata={
-            "help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."
-        },
-    )
     apply_hadamard: bool = field(
         default=True, metadata={"help": "Whether to apply hadamard"}
     )
@@ -606,8 +606,8 @@ def main():
     )
 
     runtime_timer.start("basemodel loading time")
-    if model_args.weight_quantize_algo is not None:
-        if model_args.weight_quantize_algo == "weight_only_mix":
+    if training_args.weight_quantize_algo is not None:
+        if training_args.weight_quantize_algo == "weight_only_mix":
             weight_quantize_algo = {
                 "weight_only_int4": [".*mlp.experts.*"],
                 "weight_only_int8": [
@@ -618,7 +618,7 @@ def main():
                 ],
             }
         else:
-            weight_quantize_algo = model_args.weight_quantize_algo
+            weight_quantize_algo = training_args.weight_quantize_algo
         quantization_config = dict(
             weight_quantize_algo=weight_quantize_algo,
             ignore_modules=[".*out_linear.*"],
@@ -630,7 +630,7 @@ def main():
             actscale_moving_rate=model_args.actscale_moving_rate,
             fp8_format_type=model_args.fp8_format_type,
         )
-        if model_args.weight_quantize_algo == "fp8linear":
+        if training_args.weight_quantize_algo == "fp8linear":
             quantization_config.update(
                 {
                     "dense_quant_type": "tensor_wise_fp8",
@@ -639,7 +639,9 @@ def main():
                 }
             )
     else:
-        quantization_config = dict(weight_quantize_algo=model_args.weight_quantize_algo)
+        quantization_config = dict(
+            weight_quantize_algo=training_args.weight_quantize_algo
+        )
 
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
@@ -697,7 +699,7 @@ def main():
 
     if (
         training_args.pipeline_parallel_degree > 1
-        and model_args.weight_quantize_algo is not None
+        and training_args.weight_quantize_algo is not None
         and model_config.tie_word_embeddings
     ):
         raise NotImplementedError(
@@ -705,7 +707,7 @@ def main():
             weights when using Pipeline Parallelism (PP)."
         )
 
-    if model_args.continue_training or model_args.weight_quantize_algo is not None:
+    if model_args.continue_training or training_args.weight_quantize_algo is not None:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
