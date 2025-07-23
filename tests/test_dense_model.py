@@ -173,6 +173,6 @@ def test_dpo_lora_merge():
     config["model_name_or_path"] = MODEL_PATH
     config["pipeline_parallel_degree"] = 1
 
-    ret_code,err_log = run_update_config_training(config,steps="export")
+    ret_code, err_log = run_update_config_training(config, steps="export")
     attach_log_file()
     assert_result(ret_code, err_log)

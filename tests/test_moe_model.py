@@ -186,7 +186,7 @@ def test_dpo_eval():
     ret_code, err_log = run_update_config_training(config, steps="eval")
     attach_log_file()
     assert_result(ret_code, err_log)
-    
+
 
 def test_dpo_lora():
     clean_output_dir()
