@@ -1,4 +1,4 @@
-name: Test
+name: GPU_CI_Test
 
 on: [push, pull_request]
 
@@ -8,7 +8,7 @@ concurrency:
   
 jobs:
   Test:
-    name: Test
+    name: GPU_CI_Test
     runs-on: [self-hosted, ernie-8gpu, ernie-8gpu-2]
     steps:
       - name: Start Docker 
@@ -37,4 +37,4 @@ jobs:
           pip install -e.'
       - name: Runing case
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
-          make test'
+          make gpu_ci_test'
