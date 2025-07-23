@@ -374,7 +374,11 @@ def process_session_example(data, input_file):
             data["messages"].append({"role": "assistant", "content": data["tgt"][idx]})
 
     chosen_m, rejected_m = data["messages"], deepcopy(data["messages"])
-    session_start_index = len(data["messages"])
+    session_start_index = (
+        len(data["messages"])
+        if data["messages"][0]["role"] != "system"
+        else len(data["messages"]) - 1
+    )
     for idx in range(len(chosen)):
         if idx % 2 == 0:
             # assistant

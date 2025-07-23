@@ -3,18 +3,22 @@
 
 ##  🚀 Quick Start🚀
 
-### （0）Before starting, you need a Kunlun XPU machine, and the system requirements for this machine are as follows:
+### （0）Before starting, you need Kunlun XPU machine, and the system requirements for this machine are as follows:
 
- | Chip type | Driver version |
+| Chip type | Driver version |
  | --- | --- |
- | KunlunxinP800 | 5.0.21.21 |
+| KunlunxinP800 | 5.0.21.21 |
+
+#### Instructions for the Minimum Number of XPU Cards Required for Training
+SFT: At least 112 cards (14 nodes x 8 cards) of 96G Kunlunxin P800 cards are required.
+LoRA: At least 16 cards (2 nodes x 8 cards) of 96G Kunlunxin P800 cards are required.
 
 #### Environment Description
 - **Machine：** KunlunxinP800 96GB 8-card machine x 14
 - **Docker image：** registry.baidubce.com/device/paddle-xpu:ubuntu20-x86_64-gcc84-py310
 - **GCC path：** /usr/bin/gcc (8.4)
 - **python version：** 3.10
-**Note: This example uses an 8-card machine: To verify if your machine is a Kunlunxin, simply enter the command in the system environment and see if there is any output:**
+  **Note: This example uses an 8-card machine: To verify if your machine is a Kunlunxin, simply enter the command in the system environment and see if there is any output:**
 ```
 xpu_smi
 #example：$ xpu_smi
@@ -78,6 +82,8 @@ docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-xpu:ubuntu20-x86_
 
 2. Start the Container
 ```
+# Recommended: Map your project directory and a dataset directory
+# Replace pwd with the actual path on your host machine
 docker run -it --privileged=true  --net host --device=/dev/xpu0:/dev/xpu0 --device=/dev/xpu1:/dev/xpu1 --device=/dev/xpu2:/dev/xpu2 --device=/dev/xpu3:/dev/xpu3 --device=/dev/xpu4:/dev/xpu4 --device=/dev/xpu5:/dev/xpu5 --device=/dev/xpu6:/dev/xpu6 --device=/dev/xpu7:/dev/xpu7 --device=/dev/xpuctrl:/dev/xpuctrl --name paddle-xpu-dev -v $(pwd):/work -w=/work -v xxx ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-xpu:ubuntu20-x86_64-gcc84-py310 /bin/bash
 ```
 
@@ -98,7 +104,7 @@ https://www.paddlepaddle.org.cn/packages/nightly/xpu-p800/paddlepaddle-xpu/
 pip install -r requirements/gpu/requirements.txt
 ```
 
-### (2) Start post-traning：(This will take a relatively long time)
+### (2) Start post-traning：(Adjust NIC names for your setup, this will take a relatively long time)
 
 1. SFT fine-tuning
 ```
@@ -118,24 +124,26 @@ export FLAGS_dataloader_use_file_descriptor=False
 export FLAGS_set_to_1d=False
 export FLAGS_use_stride_kernel=0
 
+# These settings are tuned for performance on Kunlunxin hardware.
 export XPU_PADDLE_L3_SIZE=0
 export XPUAPI_DEFAULT_SIZE=2205258752
 
 # The driver can support up to 8 streams
 export CUDA_DEVICE_MAX_CONNECTIONS=8
 
-# BKCL
+# BKCL is the Kunlunxin Collective Communication Library
 export BKCL_TREE_THRESHOLD=0
 export BKCL_ENABLE_XDR=1
 export BKCL_RDMA_FORCE_TREE=1
 export BKCL_TREE_THRESHOLD=0
-export BKCL_RDMA_NICS=eth1,eth1,eth2,eth2,eth3,eth3,eth4,eth4
-export BKCL_SOCKET_IFNAME=eth0
+export BKCL_RDMA_NICS=eth1,eth1,eth2,eth2,eth3,eth3,eth4,eth4 # Adjust NIC names for your setup
+export BKCL_SOCKET_IFNAME=eth0 # Adjust NIC names for your setup
 export BKCL_FORCE_L3_RDMA=0
 export BKCL_USE_AR=1
 export BKCL_RING_OPT=1
 export BKCL_RING_HOSTID_USE_RANK=1
 
+# Enable specific optimizations for XPU performance.
 export XPU_PADDLE_FC_LOCAL_INT16=1
 export XPU_AUTO_BF16_TF32_RADIO=10
 export XPU_AUTO_BF16_TF32=1
@@ -241,6 +249,7 @@ export FLAGS_dataloader_use_file_descriptor=False
 export FLAGS_set_to_1d=False
 export FLAGS_use_stride_kernel=0
 
+# These settings are tuned for performance on Kunlunxin hardware.
 export XPU_PADDLE_L3_SIZE=0
 export XPUAPI_DEFAULT_SIZE=2205258752
 
@@ -252,13 +261,14 @@ export BKCL_TREE_THRESHOLD=0
 export BKCL_ENABLE_XDR=1
 export BKCL_RDMA_FORCE_TREE=1
 export BKCL_TREE_THRESHOLD=0
-export BKCL_RDMA_NICS=eth1,eth1,eth2,eth2,eth3,eth3,eth4,eth4
-export BKCL_SOCKET_IFNAME=eth0
+export BKCL_RDMA_NICS=eth1,eth1,eth2,eth2,eth3,eth3,eth4,eth4 # Adjust NIC names for your setup
+export BKCL_SOCKET_IFNAME=eth0 # Adjust NIC names for your setup
 export BKCL_FORCE_L3_RDMA=0
 export BKCL_USE_AR=1
 export BKCL_RING_OPT=1
 export BKCL_RING_HOSTID_USE_RANK=1
 
+# Enable specific optimizations for XPU performance.
 export XPU_PADDLE_FC_LOCAL_INT16=1
 export XPU_AUTO_BF16_TF32_RADIO=10
 export XPU_AUTO_BF16_TF32=1
