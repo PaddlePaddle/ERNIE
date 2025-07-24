@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Training DPO """
+"""Training DPO"""
+
 import gc
 import importlib.util
 import os
 import sys
 import time
-import json
 from functools import partial
 
 if importlib.util.find_spec("triton") is not None:
@@ -50,6 +50,7 @@ from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import check_refined_recompute
+from ernie.utils.download_utils import check_download_repo
 
 # isort: off
 from dpo_estimate_training import dpo_estimate_training
@@ -188,14 +189,15 @@ def main():
 
     logger.info("Start to load model ...")
 
-    # Detect torch model.
-    config_path = os.path.join(model_args.model_name_or_path, "config.json")
-    with open(config_path, "r", encoding="utf-8") as f:
-        config_dict = json.load(f)
-    if "torch_dtype" in config_dict:
-        raise ValueError(
-            "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
-        )
+    model_args.model_name_or_path = check_download_repo(
+        model_args.model_name_or_path,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        from_modelscope=model_args.from_modelscope,
+    )
+
+    if getattr(model_args, "from_modelscope", False):
+        os.environ["from_modelscope"] = "True"
 
     # fuse_softmax_mask only support for rocm.
     if not paddle.is_compiled_with_rocm():
@@ -272,6 +274,8 @@ def main():
         num_acc_steps=training_args.gradient_accumulation_steps,
         add_tail_layers=model_args.add_tail_layers,
         num_nextn_predict_layers=0,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
     )
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": False})
@@ -298,7 +302,11 @@ def main():
         model_class = Ernie4_5_MoeForCausalLM
     if model_args.continue_training:
         model = model_class.from_pretrained(
-            model_args.model_name_or_path, config=config
+            model_args.model_name_or_path,
+            config=config,
+            from_hf_hub=model_args.from_hf_hub,
+            from_aistudio=model_args.from_aistudio,
+            convert_from_torch=False,
         )
     else:
         model = model_class._from_config(config, dtype=dtype)
@@ -366,6 +374,9 @@ def main():
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        convert_from_torch=False,
     )
     logger.info("Loading model & tokenizer successfully !")
 

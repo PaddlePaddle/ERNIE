@@ -32,6 +32,9 @@ Each parameter is documented with its type, default value and detailed descripti
 | `do_train` | bool | False | Enable training |
 | `disable_tqdm` | bool | False | Disable tqdm progress bar for estimating total training time |
 | `continue_training` | bool | True | Load pretrained weights to continue training |
+| `from_hf_hub` | bool | False | Downloading model from HuggingFace Hub |
+| `from_aistudio` | bool | False | Downloading model from Aistudio |
+| `from_modelscope` | bool | False | Downloading model from ModelScope |
 
 ### 1.2 Evaluation
 
