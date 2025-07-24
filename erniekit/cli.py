@@ -14,14 +14,13 @@
 """cli
 """
 import os
+import paddle
 import shlex
 import subprocess
 import sys
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-
-import GPUtil
 
 script_dir = Path(__file__).parent.resolve()
 parent_dir = script_dir.parent
@@ -92,13 +91,20 @@ def main():
     nnodes = os.getenv("NNODES", "1")
     master_ip = os.getenv("MASTER_ADDR", "127.0.0.1")
     master_port = os.getenv("MASTER_PORT", "8080")
+    is_xpu = os.getenv("XPU_ENABLED", False)
 
-    num_gpus = len(GPUtil.getGPUs())
-    # Create a default GPU list string (e.g., "0,1,2" for 3 GPUs)
-    default_gpus = ",".join(map(str, range(0, num_gpus)))
-    # Get the CUDA_VISIBLE_DEVICES environment variable value,
-    # use the default GPU list if the environment variable is not set
-    cuda_visible_gpu = os.getenv("CUDA_VISIBLE_DEVICES", default_gpus)
+    if is_xpu:
+        num_xpus = paddle.device.xpu.device_count()
+        default_xpus = ",".join(map(str, range(0, num_xpus)))
+        visible_cards = os.getenv("XPU_VISIBLE_DEVICES", default_xpus)
+    else:
+        import GPUtil
+        num_gpus = len(GPUtil.getGPUs())
+        # Create a default GPU list string (e.g., "0,1,2" for 3 GPUs)
+        default_gpus = ",".join(map(str, range(0, num_gpus)))
+        # Get the CUDA_VISIBLE_DEVICES environment variable value,
+        # use the default GPU list if the environment variable is not set
+        visible_cards = os.getenv("CUDA_VISIBLE_DEVICES", default_gpus)
 
     for key in [
         "PADDLE_TRAINERS_NUM",
@@ -115,6 +121,27 @@ def main():
     os.environ["NVIDIA_TF32_OVERRIDE"] = "0"
     os.environ["FLAGS_dataloader_use_file_descriptor"] = "False"
 
+    if is_xpu:
+        os.environ["FLAGS_use_stride_kernel"] = "0"
+        os.environ["XPU_PADDLE_L3_SIZE"] = "0"
+        os.environ["XPUAPI_DEFAULT_SIZE"] = "2205258752"
+        
+        os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "8"
+        
+        os.environ["BKCL_TREE_THRESHOLD"] = "0"
+        os.environ["BKCL_ENABLE_XDR"] = "1"
+        os.environ["BKCL_RDMA_FORCE_TREE"] = "1"
+        os.environ["BKCL_RDMA_NICS"] = "eth1,eth1,eth2,eth2,eth3,eth3,eth4,eth4"
+        os.environ["BKCL_SOCKET_IFNAME"] = "eth0"
+        os.environ["BKCL_FORCE_L3_RDMA"] = "0"
+        os.environ["BKCL_USE_AR"] = "1"
+        os.environ["BKCL_RING_OPT"] = "1"
+        os.environ["BKCL_RING_HOSTID_USE_RANK"] = "1"
+
+        os.environ["XPU_PADDLE_FC_LOCAL_INT16"] = "1"
+        os.environ["XPU_AUTO_BF16_TF32_RADIO"] = "10"
+        os.environ["XPU_AUTO_BF16_TF32"] = "1"
+
     if command in distributed_funcs:
 
         # if os.path.exists(erniekit_dist_log):
@@ -127,11 +154,18 @@ def main():
         # launch distributed training
         env = deepcopy(os.environ)
         args_to_pass = " ".join(shlex.quote(arg) for arg in sys.argv[1:])
-        command = (
-            f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
-            f"--gpus {cuda_visible_gpu} --master {master_ip}:{master_port} "
-            f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
-        )
+        if is_xpu:
+            command = (
+                f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
+                f"--xpus {visible_cards} --master {master_ip}:{master_port} "
+                f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
+            )
+        else:
+            command = (
+                f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
+                f"--gpus {visible_cards} --master {master_ip}:{master_port} "
+                f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
+            )
         command = shlex.split(command)
         process = subprocess.Popen(
             command,
