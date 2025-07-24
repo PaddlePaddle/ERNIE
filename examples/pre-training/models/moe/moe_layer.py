@@ -861,7 +861,7 @@ class MOELayer(nn.Layer):
         dispatch_tokens_mask=None,
         prefix="",
     ):
-        router_loss, l_aux = 0.0, None
+        router_loss, l_aux, orthogonal_loss = 0.0, None, None
         if self.gate.config.moe_aux_loss_lambda:
             l_aux = self.gate._cal_aux_loss(
                 gate_prob,
@@ -874,7 +874,11 @@ class MOELayer(nn.Layer):
             router_loss += self.gate.moe_aux_loss_lambda[token_type or 0] * l_aux
         else:
             router_loss += self.zero * gate_prob[0, 0]
-
+        if self.gate.config.moe_orthogonal_loss_lambda:
+            orthogonal_loss = self.gate._cal_orthogonal_loss(token_type, use_group)
+            router_loss += (
+                self.gate.moe_orthogonal_loss_lambda[token_type or 0] * orthogonal_loss
+            )
         return router_loss
 
     def calc_router_loss_and_logging(

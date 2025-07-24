@@ -141,6 +141,7 @@ class ErnieMoEConfig(PretrainedConfig):
         moe_num_experts: Union[int, list] = 0,
         use_recompute_moe=False,
         moe_capacity=(),
+        moe_orthogonal_loss_lambda=0,
         moe_layer_interval=2,
         moe_layer_start_index: Union[int, list] = 0,
         moe_layer_end_index: Union[int, list] = -1,
@@ -188,6 +189,7 @@ class ErnieMoEConfig(PretrainedConfig):
             eos_token_id=eos_token_id,
             **kwargs,
         )
+        self.moe_orthogonal_loss_lambda = moe_orthogonal_loss_lambda
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
