@@ -22,16 +22,19 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
+from .utils.env import VERSION
+from .utils.process import terminate_process_tree
+
 script_dir = Path(__file__).parent.resolve()
 parent_dir = script_dir.parent
 
 if str(parent_dir) not in sys.path:
     sys.path.insert(0, str(parent_dir))
 
-os.environ["PYTHONPATH"] = f"{parent_dir!s}{os.pathsep}{os.environ.get('PYTHONPATH', '')}"
+os.environ["PYTHONPATH"] = (
+    f"{parent_dir!s}{os.pathsep}{os.environ.get('PYTHONPATH', '')}"
+)
 
-from .utils.env import VERSION
-from .utils.process import terminate_process_tree
 
 USAGE = (
     "-" * 60
@@ -86,7 +89,7 @@ def main():
     }
 
     command = sys.argv[1] if len(sys.argv) > 1 else "help"
-    distributed_funcs = ['train', 'export', 'split', 'eval']
+    distributed_funcs = ["train", "export", "split", "eval"]
     erniekit_dist_log = os.getenv("ERNIEKIT_DIST_LOG", "erniekit_dist_log")
     nnodes = os.getenv("NNODES", "1")
     master_ip = os.getenv("MASTER_ADDR", "127.0.0.1")
@@ -99,6 +102,7 @@ def main():
         visible_cards = os.getenv("XPU_VISIBLE_DEVICES", default_xpus)
     else:
         import GPUtil
+
         num_gpus = len(GPUtil.getGPUs())
         # Create a default GPU list string (e.g., "0,1,2" for 3 GPUs)
         default_gpus = ",".join(map(str, range(0, num_gpus)))
@@ -125,9 +129,9 @@ def main():
         os.environ["FLAGS_use_stride_kernel"] = "0"
         os.environ["XPU_PADDLE_L3_SIZE"] = "0"
         os.environ["XPUAPI_DEFAULT_SIZE"] = "2205258752"
-        
+
         os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "8"
-        
+
         os.environ["BKCL_TREE_THRESHOLD"] = "0"
         os.environ["BKCL_ENABLE_XDR"] = "1"
         os.environ["BKCL_RDMA_FORCE_TREE"] = "1"
