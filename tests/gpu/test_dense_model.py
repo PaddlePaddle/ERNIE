@@ -80,7 +80,7 @@ def attach_log_file():
         )
 
 
-def test_sft_default_args():
+def test_sft():
     clean_output_dir()
     yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_8k.yaml")
     config = default_args(yaml_path).copy()
@@ -94,7 +94,17 @@ def test_sft_default_args():
     assert_result(ret_code, err_log)
 
 
-def test_sft_lora_default_args():
+def test_sft_eval():
+    yaml_path = os.path.join(CONFIG_PATH + "run_eval.yaml")
+    config = default_args(yaml_path).copy()
+    config["model_name_or_path"] = MODEL_PATH
+
+    ret_code, err_log = run_update_config_training(config, steps="eval")
+    attach_log_file()
+    assert_result(ret_code, err_log)
+
+
+def test_sft_lora():
     clean_output_dir()
     yaml_path = os.path.join(SFT_CONFIG_PATH + "run_sft_lora_8k.yaml")
     config = default_args(yaml_path).copy()
@@ -119,7 +129,7 @@ def test_sft_lora_merge():
     assert_result(ret_code, err_log)
 
 
-def test_dpo_default_args():
+def test_dpo():
     clean_output_dir()
     yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_8k.yaml")
     config = default_args(yaml_path).copy()
@@ -133,7 +143,17 @@ def test_dpo_default_args():
     assert_result(ret_code, err_log)
 
 
-def test_dpo_lora_default_args():
+def test_dpo_eval():
+    yaml_path = os.path.join(CONFIG_PATH + "run_eval.yaml")
+    config = default_args(yaml_path).copy()
+    config["model_name_or_path"] = MODEL_PATH
+
+    ret_code, err_log = run_update_config_training(config, steps="eval")
+    attach_log_file()
+    assert_result(ret_code, err_log)
+
+
+def test_dpo_lora():
     clean_output_dir()
     yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_lora_8k.yaml")
     config = default_args(yaml_path).copy()
@@ -147,12 +167,12 @@ def test_dpo_lora_default_args():
     assert_result(ret_code, err_log)
 
 
-# def test_dpo_lora_merge():
-#     yaml_path = os.path.join(CONFIG_PATH + "run_export.yaml")
-#     config = default_args(yaml_path).copy()
-#     config["model_name_or_path"] = MODEL_PATH
-#     config["pipeline_parallel_degree"] = 1
+def test_dpo_lora_merge():
+    yaml_path = os.path.join(CONFIG_PATH + "run_export.yaml")
+    config = default_args(yaml_path).copy()
+    config["model_name_or_path"] = MODEL_PATH
+    config["pipeline_parallel_degree"] = 1
 
-#     ret_code,err_log = run_update_config_training(config,steps="export")
-#     attach_log_file()
-#     assert_result(ret_code, err_log)
+    ret_code, err_log = run_update_config_training(config, steps="export")
+    attach_log_file()
+    assert_result(ret_code, err_log)

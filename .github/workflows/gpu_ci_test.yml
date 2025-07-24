@@ -9,18 +9,18 @@ concurrency:
 jobs:
   Test:
     name: Test
-    runs-on: [self-hosted, 4gpu]
+    runs-on: [self-hosted, ernie-8gpu]
     steps:
       - name: Start Docker 
         run: |
-          if [ ! "$(docker ps -q -f name=ERNIE_CI_Container)" ]; then
-            echo "Starting container ERNIE_CI_Container"
-            docker start ERNIE_CI_Container
+          if [ ! "$(docker ps -q -f name=ERNIE_CI_Test)" ]; then
+            echo "Starting Test ERNIE_CI_Test"
+            docker start ERNIE_CI_Test
           else
-            echo "ERNIE_CI_Container already running"
+            echo "ERNIE_CI_Test already running"
           fi
       - name: Cleanup Environment Cache
-        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+        run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           rm -rf /workspace/* /workspace/.[!.]* /workspace/..?*'
       - name: Get Repo
         env:
@@ -31,11 +31,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Prepare Model
-        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-            cp -r /home/ERNIE_Model/* /workspace/ '
+        run: docker exec -t ERNIE_CI_Test /bin/bash -c ' cp -r /home/models/* /workspace '
       - name: Install erniekit
-        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
+        run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           pip install -e.'
       - name: Runing case
-        run: docker exec -t ERNIE_CI_Container /bin/bash -c '
-          make test'
+        run: docker exec -t ERNIE_CI_Test /bin/bash -c '
+          make gpu_ci_test'

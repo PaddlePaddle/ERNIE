@@ -667,7 +667,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
             is_multimodel_token_cpu, is_multimodel_token_task = async_offload(
                 is_multimodel_token, async_loader
             )
-            has_dense_experts_token_task = async_offload(
+            _, has_dense_experts_token_task = async_offload(
                 has_dense_experts_token, async_loader
             )
         else:
