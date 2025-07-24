@@ -40,10 +40,12 @@ class TestSFTTrainingE2E:
         # 1. Configuration Section
         # ==============================================================================
         with allure.step("Setup: Configure environment and paths"):
-            ERNIE_PROJECT_ROOT = Path("/host_all/home/zhouti/ERNIE")
+            ERNIE_PROJECT_ROOT = Path.cwd()
             master_ip = "127.0.0.1"
             nnodes = 1
-            model_path = "/host_all/home/zhouti/ERNIE-4.5-21B-A3B-Paddle-dummy-moe"
+            model_path = os.path.join(
+                ERNIE_PROJECT_ROOT, "ERNIE-4.5-21B-A3B-Paddle-dummy-moe"
+            )
             task_name = "sft_8k_dummy"
 
             log_dir = Path(f"log_{task_name}")
@@ -83,8 +85,8 @@ class TestSFTTrainingE2E:
                     "BKCL_TREE_THRESHOLD": "0",
                     "BKCL_ENABLE_XDR": "1",
                     "BKCL_RDMA_FORCE_TREE": "1",
-                    "BKCL_RDMA_NICS": "xgbe0,xgbe0,xgbe2,xgbe2,xgbe4,xgbe4,xgbe8,xgbe8",
-                    "BKCL_SOCKET_IFNAME": "xgbe5",
+                    "BKCL_RDMA_NICS": "eth1,eth1,eth2,eth2,eth3,eth3,eth4,eth4",
+                    "BKCL_SOCKET_IFNAME": "eth0",
                     "BKCL_FORCE_L3_RDMA": "0",
                     "BKCL_USE_AR": "1",
                     "BKCL_RING_OPT": "1",
