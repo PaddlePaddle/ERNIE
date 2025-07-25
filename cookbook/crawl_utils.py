@@ -19,7 +19,13 @@ CrawlUtils is a class that provides utility methods for web crawling and process
 import logging
 import re
 
-from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig, DefaultMarkdownGenerator, PruningContentFilter
+from crawl4ai import (
+    AsyncWebCrawler,
+    CacheMode,
+    CrawlerRunConfig,
+    DefaultMarkdownGenerator,
+    PruningContentFilter,
+)
 
 
 class CrawlUtils:
@@ -43,7 +49,16 @@ class CrawlUtils:
             page_timeout=20000,
             # Filtering
             word_count_threshold=10,
-            excluded_tags=["nav", "footer", "aside", "header", "script", "style", "iframe", "meta"],
+            excluded_tags=[
+                "nav",
+                "footer",
+                "aside",
+                "header",
+                "script",
+                "style",
+                "iframe",
+                "meta",
+            ],
             exclude_external_links=True,
             exclude_internal_links=True,
             exclude_social_media_links=True,
@@ -76,10 +91,10 @@ class CrawlUtils:
 
             # Clean up the text
             cleaned_text = webpage_text.replace("undefined", "")
-            cleaned_text = re.sub(r'(\n\s*){3,}', '\n\n', cleaned_text)
-            cleaned_text = re.sub(r'[\r\t]', '', cleaned_text)
-            cleaned_text = re.sub(r' +', ' ', cleaned_text)
-            cleaned_text = re.sub(r'^\s+|\s+$', '', cleaned_text, flags=re.MULTILINE)
+            cleaned_text = re.sub(r"(\n\s*){3,}", "\n\n", cleaned_text)
+            cleaned_text = re.sub(r"[\r\t]", "", cleaned_text)
+            cleaned_text = re.sub(r" +", " ", cleaned_text)
+            cleaned_text = re.sub(r"^\s+|\s+$", "", cleaned_text, flags=re.MULTILINE)
             return cleaned_text.strip()
 
         except Exception as e:

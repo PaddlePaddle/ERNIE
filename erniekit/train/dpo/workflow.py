@@ -25,14 +25,13 @@ if importlib.util.find_spec("triton") is not None:
         import use_triton_in_paddle
 
         use_triton_in_paddle.make_triton_compatible_with_paddle()
-    except:
+    except Exception as _:
         raise RuntimeError(
             "Triton is installed, but not yet compatible with Paddle. "
             "Please run 'python -m pip install use-triton-in-paddle' to enable Triton support in Paddle."
         )
 
 import paddle
-from paddleformers.peft import LoRAConfig, LoRAModel
 from paddleformers.trainer import (
     IntervalStrategy,
     get_last_checkpoint,
@@ -53,7 +52,12 @@ from ernie.utils.common_utils import check_refined_recompute
 from .dpo_estimate_training import dpo_estimate_training
 from .trainer import ErnieMoEDPOTrainer
 from .dpo_utils import calculate_effective_tokens, DPOConfig
-from ...hparams import DataArguments, FinetuningArguments, GeneratingArguments, ModelArguments
+from ...hparams import (
+    DataArguments,
+    FinetuningArguments,
+    GeneratingArguments,
+    ModelArguments,
+)
 
 
 def run_dpo(
@@ -86,7 +90,9 @@ def run_dpo(
 
     if data_args.max_seq_len < 16:
         data_args.max_seq_len = 16
-        logger.warning(f"max_seq_len must be greater than 16, set max_seq_len to {data_args.max_seq_len}.")
+        logger.warning(
+            f"max_seq_len must be greater than 16, set max_seq_len to {data_args.max_seq_len}."
+        )
     if data_args.max_seq_len < data_args.max_prompt_len + 10:
         data_args.max_prompt_len = data_args.max_seq_len - 10
         logger.warning(
@@ -98,23 +104,29 @@ def run_dpo(
         finetuning_args.sft_loss_ratio = 1.0
         finetuning_args.loss_type = "or"
         logger.info("orpo loss_type is equal to sft_loss + pref_loss_ratio * or_loss.")
-    if finetuning_args.loss_type in ["or", "simpo"] and not finetuning_args.reference_free:
+    if (
+        finetuning_args.loss_type in ["or", "simpo"]
+        and not finetuning_args.reference_free
+    ):
         finetuning_args.reference_free = True
         logger.warning(
-            f"{finetuning_args.loss_type} loss_type only supports reference_free. " "Set reference_free to True."
+            f"{finetuning_args.loss_type} loss_type only supports reference_free. "
+            "Set reference_free to True."
         )
     if model_args.lora:
         assert model_args.continue_training, "Continue training is required for LoRA."
     if finetuning_args.pipeline_parallel_degree > 1:
         assert (
             hasattr(finetuning_args, "pipeline_parallel_config")
-            and "enable_clear_every_step_cache" in finetuning_args.pipeline_parallel_config
+            and "enable_clear_every_step_cache"
+            in finetuning_args.pipeline_parallel_config
         ), "Should set '--pipeline_parallel_config enable_clear_every_step_cache' in bash script for pp."
     if finetuning_args.sequence_parallel:
         if finetuning_args.pipeline_parallel_degree > 1:
             assert (
                 hasattr(finetuning_args, "pipeline_parallel_config")
-                and "disable_partial_send_recv" in finetuning_args.pipeline_parallel_config
+                and "disable_partial_send_recv"
+                in finetuning_args.pipeline_parallel_config
             ), "Should set '--pipeline_parallel_config disable_partial_send_recv' in bash script for pp with sp."
         if finetuning_args.tensor_parallel_degree <= 1:
             finetuning_args.sequence_parallel = False
@@ -125,7 +137,9 @@ def run_dpo(
         logger.info("LoRA does not support fuse_linear. Set fuse_linear to False.")
     if model_args.lora:
         finetuning_args.ref_model_update_steps = -1
-        logger.warning("LoRA does not support ref_model_update_steps. Set ref_model_update_steps to -1.")
+        logger.warning(
+            "LoRA does not support ref_model_update_steps. Set ref_model_update_steps to -1."
+        )
 
     if finetuning_args.sharding_parallel_degree > 1:
         if (
@@ -156,7 +170,8 @@ def run_dpo(
         and not finetuning_args.overwrite_output_dir
     ):
         uc_async_save = (
-            finetuning_args.unified_checkpoint and "async_save" in finetuning_args.unified_checkpoint_config
+            finetuning_args.unified_checkpoint
+            and "async_save" in finetuning_args.unified_checkpoint_config
         )
         last_checkpoint = get_last_checkpoint(
             finetuning_args.output_dir,
@@ -164,7 +179,10 @@ def run_dpo(
             uc_async_save=uc_async_save,
         )
 
-        if last_checkpoint is not None and finetuning_args.resume_from_checkpoint is None:
+        if (
+            last_checkpoint is not None
+            and finetuning_args.resume_from_checkpoint is None
+        ):
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
@@ -185,7 +203,9 @@ def run_dpo(
     with open(config_path, "r", encoding="utf-8") as f:
         config_dict = json.load(f)
     if "torch_dtype" in config_dict:
-        raise ValueError("Unsupported weight format: Torch weights are not compatible with Paddle model currently.")
+        raise ValueError(
+            "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
+        )
 
     # fuse_softmax_mask only support for rocm.
     if not paddle.is_compiled_with_rocm():
@@ -195,7 +215,11 @@ def run_dpo(
             )
             model_args.fuse_softmax_mask = False
 
-    check_refined_recompute(finetuning_args.refined_recompute, finetuning_args.sequence_parallel, lora=model_args.lora)
+    check_refined_recompute(
+        finetuning_args.refined_recompute,
+        finetuning_args.sequence_parallel,
+        lora=model_args.lora,
+    )
 
     if finetuning_args.weight_quantize_algo is not None:
         if finetuning_args.weight_quantize_algo == "weight_only_mix":
@@ -217,7 +241,9 @@ def run_dpo(
                 ignore_modules=[".*out_linear.*"],
             )
     else:
-        quantization_config = dict(weight_quantize_algo=finetuning_args.weight_quantize_algo)
+        quantization_config = dict(
+            weight_quantize_algo=finetuning_args.weight_quantize_algo
+        )
 
     model_kwargs = dict(
         pretrained_model_name_or_path=model_args.model_name_or_path,
@@ -263,8 +289,21 @@ def run_dpo(
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": model_args.moe_use_aux_free})
     config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+
+    if (
+        finetuning_args.pipeline_parallel_degree > 1
+        and finetuning_args.weight_quantize_algo is not None
+        and config.tie_word_embeddings
+    ):
+        raise NotImplementedError(
+            "Quantization is not supported for models with tied lm_head and word_embedding \
+            weights when using Pipeline Parallelism (PP)."
+        )
+
     if config.moe_num_experts is None or config.moe_num_experts == 0:
-        config.moe_group = "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        config.moe_group = (
+            "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        )
 
     if finetuning_args.pipeline_parallel_degree > 1:
         model_class = Ernie4_5_MoeForCausalLMPipe
@@ -272,27 +311,24 @@ def run_dpo(
         model_class = Ernie4_5_MoeForCausalLM
 
     if model_args.continue_training:
-        model = model_class.from_pretrained(model_args.model_name_or_path, config=config)
-        # for DPO save
-        if not finetuning_args.reference_free and not model_args.lora:
-            # (LiuTing): config.moe_group will change in `model_class.from_pretrained`
-            # so need to re-create new ref_config.
-            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-            ref_model = model_class._from_config(ref_config, dtype=dtype)
-            ref_model.set_state_dict(model.state_dict())
-        else:
-            ref_model = None
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path, config=config
+        )
     else:
         model = model_class._from_config(config, dtype=dtype)
-        if not finetuning_args.reference_free and not model_args.lora:
-            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-            if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
-                ref_config.moe_group = "dummy" if model_args.moe_group == "mp" else model_args.moe_group
-            ref_model = model_class._from_config(ref_config, dtype=dtype)
-            # make sure the state_dict is the same to get the same loss for first step
-            ref_model.set_state_dict(model.state_dict())
-        else:
-            ref_model = None
+
+    if not finetuning_args.reference_free and not model_args.lora:
+        ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+        if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
+            ref_config.moe_group = (
+                "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+            )
+        ref_model = model_class._from_config(ref_config, dtype=dtype)
+        # make sure the state_dict is the same to get the same loss for first step
+        ref_model.set_state_dict(model.state_dict())
+    else:
+        ref_model = None
+
     model.config.dpo_config = None
 
     if model.config.head_dim is None:
@@ -301,42 +337,15 @@ def run_dpo(
         del ref_model.config.head_dim
 
     if model_args.lora:
-        logger.info("Start to wrap model with LoRA config ...")
-        if model_args.lora_path is None:
-            target_modules = [
-                ".*qkv_proj.*",
-                ".*out_proj.*",
-                ".*linear1.*",
-                ".*linear2.*",
-            ]
-            if model_args.rslora_plus:
-                model_args.rslora = True
-                model_args.lora_plus_scale = 4
-                model_args.lora_alpha = 4
-            if finetuning_args.weight_quantize_algo is not None:
-                if model_args.rslora or model_args.lora_plus_scale != 1.0:
-                    logger.info("Weight quantization is not supported in LoRA+ and RsLoRA.")
-            if model_args.lora_alpha == -1:
-                if model_args.rslora:
-                    model_args.lora_alpha = 4
-                else:
-                    model_args.lora_alpha = 2 * model_args.lora_rank
-            lora_config = LoRAConfig(
-                target_modules=target_modules,
-                r=model_args.lora_rank,
-                lora_alpha=model_args.lora_alpha,
-                rslora=model_args.rslora,
-                lora_plus_scale=model_args.lora_plus_scale,
-                tensor_parallel_degree=finetuning_args.tensor_parallel_degree,
-                dtype=dtype,
-                head_dim=model.config.hidden_size // model.config.num_attention_heads,
-                base_model_name_or_path=model_args.model_name_or_path,
-            )
-            model = LoRAModel(model, lora_config)
-        else:
-            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
-        model.print_trainable_parameters()
-        logger.info("Wraping model with LoRA config successfully !")
+        from ernie.utils.peft_utils import initialize_lora_model
+
+        model = initialize_lora_model(
+            model=model,
+            training_args=finetuning_args,
+            model_args=model_args,
+            resume_from_checkpoint=last_checkpoint is not None,
+            dtype=dtype,
+        )
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
@@ -362,7 +371,9 @@ def run_dpo(
     if finetuning_args.max_steps == -1:
         if finetuning_args.should_load_dataset and paddle.distributed.get_rank() == 0:
             # NOTE(gongenlei): not to feed train_dataset, or the data will be wrong in next training.
-            finetuning_args, _ = dpo_estimate_training(tokenizer, data_args, finetuning_args, config=model.config)
+            finetuning_args, _ = dpo_estimate_training(
+                tokenizer, data_args, finetuning_args, config=model.config
+            )
 
         if paddle.distributed.get_world_size() > 1:
             paddle.distributed.barrier()
@@ -373,16 +384,24 @@ def run_dpo(
             f"Re-setting finetuning_args.max_steps to {finetuning_args.max_steps} ({finetuning_args.num_train_epochs})"
         )
         if finetuning_args.max_steps <= 0:
-            raise ValueError(f"Invalid max_steps: {finetuning_args.max_steps}. Please check your dataset")
+            raise ValueError(
+                f"Invalid max_steps: {finetuning_args.max_steps}. Please check your dataset"
+            )
     if finetuning_args.save_strategy == IntervalStrategy.EPOCH:
         finetuning_args.save_strategy = IntervalStrategy.STEPS
-        finetuning_args.save_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
+        finetuning_args.save_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
     if finetuning_args.evaluation_strategy == IntervalStrategy.EPOCH:
         finetuning_args.evaluation_strategy = IntervalStrategy.STEPS
-        finetuning_args.eval_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
+        finetuning_args.eval_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
     if finetuning_args.logging_strategy == IntervalStrategy.EPOCH:
         finetuning_args.logging_strategy = IntervalStrategy.STEPS
-        finetuning_args.logging_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
+        finetuning_args.logging_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
 
     if finetuning_args.should_load_dataset:
         train_dataset = create_dataset(
@@ -422,8 +441,16 @@ def run_dpo(
         ref_model=ref_model,
         dpo_config=dpo_config,
         args=finetuning_args,
-        train_dataset=(train_dataset if finetuning_args.do_train and finetuning_args.should_load_dataset else None),
-        eval_dataset=(eval_dataset if finetuning_args.do_eval and finetuning_args.should_load_dataset else None),
+        train_dataset=(
+            train_dataset
+            if finetuning_args.do_train and finetuning_args.should_load_dataset
+            else None
+        ),
+        eval_dataset=(
+            eval_dataset
+            if finetuning_args.do_eval and finetuning_args.should_load_dataset
+            else None
+        ),
         tokenizer=tokenizer,
         data_collator=partial(
             collate_fn,
@@ -436,7 +463,10 @@ def run_dpo(
         model_with_dpo_criterion=True,
     )
 
-    if finetuning_args.hidden_dropout_prob or finetuning_args.attention_probs_dropout_prob:
+    if (
+        finetuning_args.hidden_dropout_prob
+        or finetuning_args.attention_probs_dropout_prob
+    ):
         trainer.add_callback(LayerwiseDropoutCallback())
 
     if finetuning_args.do_train:
@@ -457,8 +487,12 @@ def run_dpo(
             total_effective_tokens, total_tokens = calculate_effective_tokens(
                 finetuning_args, train_dataset, data_args.max_seq_len
             )
-            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
-            total_tokens_per_second = total_tokens / train_result.metrics["train_runtime"]
+            effective_tokens_per_second = (
+                total_effective_tokens / train_result.metrics["train_runtime"]
+            )
+            total_tokens_per_second = (
+                total_tokens / train_result.metrics["train_runtime"]
+            )
             effective_ratio = 100 * total_effective_tokens / total_tokens
             logger.info(
                 "[timelog] {}: {:.2f} % ({}) ".format(
@@ -483,7 +517,9 @@ def run_dpo(
             )
 
         if not finetuning_args.dpo_benchmark:
-            trainer.save_model(merge_tensor_parallel=finetuning_args.tensor_parallel_degree > 1)
+            trainer.save_model(
+                merge_tensor_parallel=finetuning_args.tensor_parallel_degree > 1
+            )
             if paddle.distributed.get_world_size() > 1:
                 paddle.distributed.barrier()
             trainer.log_metrics("train", train_result.metrics)
