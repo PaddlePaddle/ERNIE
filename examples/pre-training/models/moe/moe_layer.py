@@ -476,7 +476,11 @@ class MOELayer(nn.Layer):
         if self.is_ep_moe:
             moe_grad_group = fleet.get_hybrid_communicate_group().get_moe_sharding_parallel_group()
             expert_color = {"color": "moe_expert", "group": moe_grad_group}
-        elif self.config.offline_quant_expert_weight and self.config.clear_origin_weight_when_offline_quant:
+        elif (
+            hasattr(self, "config")
+            and self.config.offline_quant_expert_weight
+            and self.config.clear_origin_weight_when_offline_quant
+        ):
             expert_color = {"color": "moe_expert"}
 
         self.world_size = dist.get_world_size(self.group)

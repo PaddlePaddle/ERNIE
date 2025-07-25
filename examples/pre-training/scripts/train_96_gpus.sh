@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export NNODES=1
+export PADDLE_TRAINERS_NUM=1
+
 export CUDA_MODULE_LOADING=LAZY
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export NCCL_DEBUG=INFO
@@ -27,6 +30,22 @@ export FLAGS_use_paddle_recall_error=0
 export FLAGS_tcp_max_syn_backlog=16384
 export FLAGS_call_stack_level=2
 
+
+# 屏蔽平台预设的环境变量，因为框架采用兼容升级，检测到这些配置会使用原方式启动
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+nnodes=$PADDLE_TRAINERS_NUM
+rank=$PADDLE_TRAINER_ID
+
+LAUNCH_CMD=`python scripts/selective_launch.py 36677`
+if [[ -z "$LAUNCH_CMD" ]]; then
+    exit 0
+fi
+
+
 SM=`nvidia-smi --query-gpu=compute_cap --format=csv | tail -n 1 | sed 's/\.//g'`
 if [ $SM -eq 90 ]
 then
@@ -37,9 +56,14 @@ fi
 
 export PYTHONPATH=$PYTHONPATH:./ernie
 
+LOG_DIR=output/paddle_distributed_logs
+
+rm -rf output
+rm -rf core.*
+
 python -m paddle.distributed.launch \
-    --master <master_ip>:<port> \
-    --nnodes 12 \
+    --log_dir $LOG_DIR \
+    $LAUNCH_CMD \
     --run_mode=collective \
     ${script:-ernie/pretrain.py}  \
     --config yamls/pretrain_96_gpus.yaml
