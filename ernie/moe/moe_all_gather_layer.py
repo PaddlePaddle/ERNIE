@@ -341,17 +341,20 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
 
             output_ptr += recv_counts_num[i_local_expert]
 
-            tasks.append(
-                dist.stream.alltoall_single(
-                    output_local_expert,
-                    input_local_expert,
-                    recv_count,
-                    send_count,
-                    group=group,
-                    sync_op=False,
-                    use_calc_stream=False,
+            if group.nranks <= 1:
+                output_local_expert[:] = input_local_expert[:]
+            else:
+                tasks.append(
+                    dist.stream.alltoall_single(
+                        output_local_expert,
+                        input_local_expert,
+                        recv_count,
+                        send_count,
+                        group=group,
+                        sync_op=False,
+                        use_calc_stream=False,
+                    )
                 )
-            )
         ctx.router_loss_bwfn, (router_loss,) = manual_backward(
             router_loss_fn, is_first_fwd, *router_loss_args
         )
@@ -477,16 +480,19 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
                 g = ctx.dummy_input
             tmp_g.append(g)
             out_ptr += recv_counts_num[i_local_expert]
-            task = dist.stream.alltoall_single(
-                g,
-                out_g,
-                send_count,
-                recv_count,
-                group=ctx.group,
-                sync_op=False,
-                use_calc_stream=False,
-            )
-            tasks.append(task)
+            if ctx.group.nranks <= 1:
+                g[:] = out_g[:]
+            else:
+                task = dist.stream.alltoall_single(
+                    g,
+                    out_g,
+                    send_count,
+                    recv_count,
+                    group=ctx.group,
+                    sync_op=False,
+                    use_calc_stream=False,
+                )
+                tasks.append(task)
         router_fn_args_grad = ctx.router_loss_bwfn(d_routerloss)
 
         for i_local_expert, t in enumerate(tasks):
@@ -498,6 +504,319 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
 
         grads = [g for g in grads if g is not None]
         return tuple(grads) + tuple(router_fn_args_grad)
+
+
+class AlltoAllSmartXPU(paddle.autograd.PyLayer):
+    """
+    Perform dispatch inputs alltoall. (XPU VERSION)
+    """
+
+    @staticmethod
+    def forward(
+        ctx,
+        *inputs,
+        router_loss_fn: Optional[Callable],
+        forward_func_dict: Optional[Dict[int, Callable]],
+        local_expert_id=None,
+        send_rank_global=None,
+        recv_rank_global=None,
+        num_local_experts=None,
+        capacity=None,
+        use_padding=True,
+        expert_num_global=None,
+        is_first_fwd=None,
+        group=None,
+        recv_size=None,
+        send_counts=None,
+        recv_counts=None,
+        send_counts_num=None,
+        recv_counts_num=None,
+    ):
+        if group is None:
+            group = _get_global_group()
+        router_loss_args = inputs[num_local_experts:]
+        inputs = inputs[:num_local_experts]
+
+        ctx.group = group
+        ctx.use_padding = use_padding
+        ctx.num_local_experts = num_local_experts
+        ctx.input_shape = [i.shape if i is not None else None for i in inputs]
+        ctx.send_counts = send_counts
+        ctx.recv_counts = recv_counts
+        ctx.send_counts_num = send_counts_num
+        ctx.recv_counts_num = recv_counts_num
+
+        world_size = dist.get_world_size(group)
+        this_rank = dist.get_rank(group)
+        if use_padding and capacity is None:
+            capacity = len(send_rank_global) // world_size // num_local_experts
+
+        for i in inputs:
+            if i is not None:
+                input_dtype = i.dtype
+                input_shape = i.shape
+                break
+        else:
+            first_expert = forward_func_dict[0]
+            input_dtype = first_expert.up_gate_proj.weight.dtype
+            hidden_size = first_expert.up_gate_proj.weight.shape[0]
+            input_shape = [0, hidden_size]
+
+        dummy_input = paddle.empty([0] + input_shape[1:], dtype=input_dtype)
+        ctx.dummy_input = dummy_input
+        ctx.bw_funcs = {}
+
+        processed_inputs = []
+        no_tokens_expert_outputs = []
+
+        for i_local_expert in range(num_local_experts):
+            if send_counts_num[i_local_expert] > 0:
+                input_local_expert = inputs[i_local_expert].slice(
+                    (0,), 0, send_counts_num[i_local_expert]
+                )
+                if forward_func_dict is not None:
+                    input_local_expert.stop_gradient = False
+                    bwf, (processed_input,) = manual_backward(
+                        forward_func_dict[i_local_expert],
+                        is_first_fwd,
+                        input_local_expert,
+                    )
+                    ctx.bw_funcs[i_local_expert] = bwf
+                    processed_input.stop_gradient = True
+                else:
+                    processed_input = input_local_expert
+                processed_inputs.append(processed_input)
+            elif forward_func_dict is not None:
+                expert_func = forward_func_dict[i_local_expert]
+                fake_chunk = paddle.zeros(
+                    [1, expert_func.up_gate_proj.weight.shape[0]],
+                    dtype=expert_func.up_gate_proj.weight.dtype,
+                )
+                if expert_func.training:
+                    fake_chunk.stop_gradient = False
+
+                _, (expert_out,) = manual_backward(
+                    expert_func, is_first_fwd, fake_chunk
+                )
+
+                no_tokens_expert_outputs.append(expert_out * 0.0)
+
+        all_processed_inputs = (
+            paddle.concat(processed_inputs, axis=0) if processed_inputs else dummy_input
+        )
+
+        if no_tokens_expert_outputs:
+            if all_processed_inputs.shape[0] > 0:
+                all_processed_inputs[0] = all_processed_inputs[0] + sum(
+                    no_tokens_expert_outputs
+                )
+            else:
+                router_loss_args = list(router_loss_args)
+                router_loss_args[0] = (
+                    router_loss_args[0] + sum(no_tokens_expert_outputs).mean() * 0.0
+                )
+
+        in_tensors_by_rank = [[] for _ in range(world_size)]
+        processed_input_ptr = 0
+        for i_local_expert in range(num_local_experts):
+            num_tokens = send_counts_num[i_local_expert]
+            if num_tokens > 0:
+                expert_input = all_processed_inputs.slice(
+                    [0], processed_input_ptr, processed_input_ptr + num_tokens
+                )
+                processed_input_ptr += num_tokens
+                splits = expert_input.split(
+                    send_counts[i_local_expert].tolist(), axis=0
+                )
+                for j_rank in range(world_size):
+                    in_tensors_by_rank[j_rank].append(splits[j_rank])
+
+        in_tensor_list = [
+            paddle.concat(tensors, 0) if tensors else dummy_input
+            for tensors in in_tensors_by_rank
+        ]
+
+        all_to_all_input = paddle.concat(in_tensor_list, 0)
+        send_counts_for_api = [t.shape[0] for t in in_tensor_list]
+
+        recv_counts_tensor = paddle.to_tensor(recv_counts)
+        recv_counts_for_api = [
+            int(recv_counts_tensor[:, j_rank].sum()) for j_rank in range(world_size)
+        ]
+        temp_output = paddle.empty(
+            [recv_size.item()] + input_shape[1:], dtype=input_dtype
+        )
+
+        task = dist.stream.alltoall_single(
+            temp_output,
+            all_to_all_input,
+            recv_counts_for_api,
+            send_counts_for_api,
+            group=group,
+            sync_op=False,
+            use_calc_stream=False,
+        )
+
+        ctx.router_loss_bwfn, (router_loss,) = manual_backward(
+            router_loss_fn, is_first_fwd, *router_loss_args
+        )
+        ctx.router_loss_bwfn, (router_loss,) = manual_backward(
+            router_loss_fn, is_first_fwd, *router_loss_args
+        )
+        with paddle.no_grad():
+            recv_mask = (recv_rank_global == this_rank).astype(send_rank_global.dtype)
+            if ctx.use_padding:
+                recv_mask_alltoall_out = (
+                    recv_mask.reshape([-1, num_local_experts, capacity])
+                    .transpose([1, 0, 2])
+                    .reshape([-1])
+                )
+                distributed_input_to_alltoall_out = paddle.maximum(
+                    recv_mask_alltoall_out.cumsum() - 1,
+                    paddle.zeros([1], dtype=recv_mask_alltoall_out.dtype),
+                )
+                distributed_input_to_alltoall_out = (
+                    distributed_input_to_alltoall_out.view(
+                        [num_local_experts, -1, capacity]
+                    )
+                    .transpose([1, 0, 2])
+                    .reshape([-1])
+                )
+            else:
+                recv_mask_alltoall_out = recv_mask.split(expert_num_global)
+                recv_mask_alltoall_out = [
+                    recv_mask_alltoall_out[
+                        (iexpert % world_size) * num_local_experts
+                        + (iexpert // world_size)
+                    ]
+                    for iexpert in range(world_size * num_local_experts)
+                ]
+                alltoall_shape = [i.shape[0] for i in recv_mask_alltoall_out]
+                recv_mask_alltoall_out = paddle.concat(recv_mask_alltoall_out, 0)
+                distributed_input_to_alltoall_out = paddle.maximum(
+                    recv_mask_alltoall_out.cumsum() - 1,
+                    paddle.zeros([1], dtype=recv_mask_alltoall_out.dtype),
+                )
+                distributed_input_to_alltoall_out = (
+                    distributed_input_to_alltoall_out.split(alltoall_shape)
+                )
+                distributed_input_to_alltoall_out = paddle.concat(
+                    [
+                        distributed_input_to_alltoall_out[
+                            (iexpert % num_local_experts) * world_size
+                            + (iexpert // num_local_experts)
+                        ]
+                        for iexpert in range(world_size * num_local_experts)
+                    ],
+                    0,
+                )
+
+        distributed_input_to_alltoall_out.stop_gradient = True
+        task.wait()
+
+        temp_output_splits_by_src_rank = temp_output.split(recv_counts_for_api, 0)
+        chunks_by_expert = [[] for _ in range(num_local_experts)]
+        for j_rank in range(world_size):
+            data_from_j = temp_output_splits_by_src_rank[j_rank]
+            expert_chunks_from_j = data_from_j.split(recv_counts[:, j_rank].tolist(), 0)
+            for i_expert in range(num_local_experts):
+                chunks_by_expert[i_expert].append(expert_chunks_from_j[i_expert])
+
+        output_chunks = []
+        for i_expert in range(num_local_experts):
+            if recv_counts_num[i_expert] > 0:
+                output_chunks.append(paddle.concat(chunks_by_expert[i_expert], 0))
+        output = paddle.concat(output_chunks, 0) if output_chunks else dummy_input
+
+        return output, router_loss, distributed_input_to_alltoall_out
+
+    @staticmethod
+    def backward(
+        ctx,
+        out_grad,
+        d_routerloss,
+        _,  # scatter-idx no grad
+    ):
+        world_size = dist.get_world_size(ctx.group)
+        num_local_experts = ctx.num_local_experts
+        dummy_input = ctx.dummy_input
+        out_grad = out_grad.contiguous()
+
+        send_counts_bw = ctx.recv_counts
+        send_counts_num_bw = ctx.recv_counts_num
+        in_tensors_by_rank_bw = [[] for _ in range(world_size)]
+        grad_ptr = 0
+        for i_expert in range(num_local_experts):
+            num_tokens = send_counts_num_bw[i_expert]
+            if num_tokens > 0:
+                expert_grad = out_grad.slice([0], grad_ptr, grad_ptr + num_tokens)
+                grad_ptr += num_tokens
+                splits = expert_grad.split(send_counts_bw[i_expert].tolist(), 0)
+                for j_rank in range(world_size):
+                    in_tensors_by_rank_bw[j_rank].append(splits[j_rank])
+        in_tensor_list_bw = [
+            paddle.concat(tensors, 0) if tensors else dummy_input
+            for tensors in in_tensors_by_rank_bw
+        ]
+
+        all_to_all_grad_input = paddle.concat(in_tensor_list_bw, 0)
+        send_counts_bw_for_api = [t.shape[0] for t in in_tensor_list_bw]
+
+        recv_counts_bw = ctx.send_counts
+        recv_counts_tensor_bw = paddle.to_tensor(recv_counts_bw)
+        recv_counts_bw_for_api = [
+            int(recv_counts_tensor_bw[:, j_rank].sum()) for j_rank in range(world_size)
+        ]
+        total_output_grad_size = int(ctx.send_counts_num.sum())
+        temp_grad_output = paddle.empty(
+            [total_output_grad_size] + list(out_grad.shape[1:]), dtype=out_grad.dtype
+        )
+
+        task = dist.stream.alltoall_single(
+            temp_grad_output,
+            all_to_all_grad_input,
+            recv_counts_bw_for_api,
+            send_counts_bw_for_api,
+            group=ctx.group,
+            sync_op=False,
+            use_calc_stream=False,
+        )
+
+        router_fn_args_grad = ctx.router_loss_bwfn(d_routerloss)
+        task.wait()
+
+        temp_grad_output_splits = temp_grad_output.split(recv_counts_bw_for_api, 0)
+        grad_chunks_by_expert = [[] for _ in range(num_local_experts)]
+        for j_rank in range(world_size):
+            data_from_j = temp_grad_output_splits[j_rank]
+            expert_chunks_from_j = data_from_j.split(
+                recv_counts_bw[:, j_rank].tolist(), 0
+            )
+            for i_expert in range(num_local_experts):
+                grad_chunks_by_expert[i_expert].append(expert_chunks_from_j[i_expert])
+
+        grads = [
+            paddle.zeros(s, dtype=out_grad.dtype) if s is not None else None
+            for s in ctx.input_shape
+        ]
+        for i_expert in range(num_local_experts):
+            num_tokens = ctx.send_counts_num[i_expert]
+            if num_tokens > 0:
+                reconstructed_grad = paddle.concat(grad_chunks_by_expert[i_expert], 0)
+                if i_expert in ctx.bw_funcs:
+                    (final_grad,) = ctx.bw_funcs[i_expert](reconstructed_grad)
+                else:
+                    final_grad = reconstructed_grad
+                if grads[i_expert] is not None:
+                    grads[i_expert][:num_tokens] = final_grad
+
+        grads = [g for g in grads if g is not None]
+        return tuple(grads) + tuple(router_fn_args_grad)
+
+
+# Conditionally select the AlltoAllSmart implementation
+if paddle.is_compiled_with_xpu():
+    AlltoAllSmart = AlltoAllSmartXPU
 
 
 class MOEAllGatherLayerV2(MOELayer):
@@ -668,26 +987,31 @@ class MOEAllGatherLayerV2(MOELayer):
 
         else:
             all_expert_num = sum(expert_num_global_list)
-            recv_rank = paddle.empty([all_expert_num], dtype=recv_rank_local.dtype)
             # 非常慢
-            recv_rank_task = dist.stream.alltoall_single(
-                recv_rank,
-                recv_rank_local.tile(self.config.moe_world_size),
-                [
-                    sum(
-                        expert_num_global_list[
-                            i
-                            * self.num_local_experts : (i + 1)
-                            * self.num_local_experts
-                        ]
-                    )
-                    for i in range(self.config.moe_world_size)
-                ],  # output-size
-                [len(recv_rank_local)] * self.config.moe_world_size,  # input-size
-                group=self.config.moe_group,
-                sync_op=False,
-                use_calc_stream=False,
-            )
+            if self.config.moe_group.nranks > 1:
+                recv_rank = paddle.empty([all_expert_num], dtype=recv_rank_local.dtype)
+                # 非常慢
+                recv_rank_task = dist.stream.alltoall_single(
+                    recv_rank,
+                    recv_rank_local.tile(self.config.moe_world_size),
+                    [
+                        sum(
+                            expert_num_global_list[
+                                i
+                                * self.num_local_experts : (i + 1)
+                                * self.num_local_experts
+                            ]
+                        )
+                        for i in range(self.config.moe_world_size)
+                    ],  # output-size
+                    [len(recv_rank_local)] * self.config.moe_world_size,  # input-size
+                    group=self.config.moe_group,
+                    sync_op=False,
+                    use_calc_stream=False,
+                )
+            else:
+                recv_rank_task = None
+                recv_rank = recv_rank_local.tile(self.config.moe_world_size)
 
             # send_rank_cpu = np.concatenate(
             #     [
@@ -1237,9 +1561,6 @@ class MOEAllGatherLayerV2(MOELayer):
                 )
                 if true_experts[iexpert].training:
                     chunk.stop_gradient = False
-                logger.warning(
-                    f"local-expert: {iexpert} does not process data, we give a zero input to expert"
-                )
                 expert_out = true_experts[iexpert](chunk.contiguous())
                 no_tokens_expert_outputs.append(
                     expert_out * 0.0

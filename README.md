@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview) 
+[ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview)
 
 📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)  | 🛠️ [Training](./docs/erniekit.md)  | ⚡️ [Deploy](https://github.com/PaddlePaddle/FastDeploy)
 
@@ -187,6 +187,9 @@ erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
 
 For detailed guides on installation, CLI usage, WebUI, multi-node training, and advanced features, please refer to [ERNIEKit Training Document](./docs/erniekit.md).
 
+For detailed guides on High-performance pre-training, please refer to [Pre-Training Document](./examples/pre-training/README.md).
+
+
 **ERNIEKit WebUI demo:**
 
 https://github.com/user-attachments/assets/6d44cb92-0826-42df-aa80-7656445e0f73
@@ -264,7 +267,7 @@ If you find ERNIE 4.5 useful or wish to use it in your projects, please kindly c
 ```bibtex
 @misc{ernie2025technicalreport,
       title={ERNIE 4.5 Technical Report},
-      author={Baidu ERNIE Team},
+      author={Baidu-ERNIE-Team},
       year={2025},
       eprint={},
       archivePrefix={arXiv},

@@ -141,6 +141,7 @@ class ErnieMoEConfig(PretrainedConfig):
         moe_num_experts: Union[int, list] = 0,
         use_recompute_moe=False,
         moe_capacity=(),
+        moe_orthogonal_loss_lambda=0,
         moe_layer_interval=2,
         moe_layer_start_index: Union[int, list] = 0,
         moe_layer_end_index: Union[int, list] = -1,
@@ -177,6 +178,7 @@ class ErnieMoEConfig(PretrainedConfig):
         use_rms_qkv_recompute: bool = False,
         use_combine_before_a2a=False,
         use_quant_before_a2a=False,
+        use_async_a2a=False,
         **kwargs,
     ):
         if "tie_word_embeddings" not in kwargs:
@@ -187,6 +189,7 @@ class ErnieMoEConfig(PretrainedConfig):
             eos_token_id=eos_token_id,
             **kwargs,
         )
+        self.moe_orthogonal_loss_lambda = moe_orthogonal_loss_lambda
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
@@ -216,7 +219,9 @@ class ErnieMoEConfig(PretrainedConfig):
         self.use_rmsnorm = use_rmsnorm
         self.using_dynamic_sequence_length = using_dynamic_sequence_length
         if using_dynamic_sequence_length:
-            assert micro_batch_size > 0, "micro_batch_size should be set when using_dynamic_sequence_length"
+            assert (
+                micro_batch_size > 0
+            ), "micro_batch_size should be set when using_dynamic_sequence_length"
         self.micro_batch_size = micro_batch_size
         self.use_qk_norm = use_qk_norm
 
@@ -258,10 +263,18 @@ class ErnieMoEConfig(PretrainedConfig):
         self.decoderlayer_act_offload_settings = decoderlayer_act_offload_settings
         self.loss_subbatch_seqlen = loss_subbatch_seqlen
         self.use_combine_before_a2a = use_combine_before_a2a
-        
-        # Fuse activation quantization into the dispatch kernel, using FP8 for All-to-All (A2A) communication.
+
+        # Fuse activation quantization into the dispatch kernel, using FP8 for All-to-All communication.
         # Additionally, overlap the A2A operation with weight gradient computation during backward propagation.
         self.use_quant_before_a2a = use_quant_before_a2a
+
+        # Use async All-to-All for backward to overlap with expert GEMM’s weight gradient computation (dW),
+        # trading off memory for improved throughput.
+        self.use_async_a2a = use_async_a2a
+        if self.use_async_a2a:
+            assert (
+                self.use_quant_before_a2a
+            ), "use_quant_before_a2a must be True when use_async_a2a is True"
 
         default_fp8_configs = {
             "quant_scheme": "DelayedScaling",
@@ -288,7 +301,11 @@ class ErnieMoEConfig(PretrainedConfig):
 
         def update_nested_dict(default_dict, update_dict):
             for key, value in update_dict.items():
-                if isinstance(value, dict) and key in default_dict and isinstance(default_dict[key], dict):
+                if (
+                    isinstance(value, dict)
+                    and key in default_dict
+                    and isinstance(default_dict[key], dict)
+                ):
                     update_nested_dict(default_dict[key], value)
                 else:
                     default_dict[key] = value
@@ -351,13 +368,19 @@ class ErnieMoEConfig(PretrainedConfig):
         self.enable_delay_scale_loss = enable_delay_scale_loss
         self.num_acc_steps = num_acc_steps
         self.moe_layer_start_index = moe_layer_start_index
-        self.moe_layer_end_index = self.num_hidden_layers - 1 if moe_layer_end_index == -1 else moe_layer_end_index
+        self.moe_layer_end_index = (
+            self.num_hidden_layers - 1
+            if moe_layer_end_index == -1
+            else moe_layer_end_index
+        )
         self.moe_gate_act = moe_gate_act
         self.moe_norm_gate_logits = moe_norm_gate_logits
         self.moe_use_aux_free = moe_use_aux_free
         self.fuse_gate_detach_matmul = fuse_gate_detach_matmul
         if insert_empty_layer is not None:
-            assert isinstance(insert_empty_layer, list), "insert_empty_layer should be a list"
+            assert isinstance(
+                insert_empty_layer, list
+            ), "insert_empty_layer should be a list"
         else:
             insert_empty_layer = []
 
@@ -376,7 +399,9 @@ class ErnieMoEConfig(PretrainedConfig):
         self.aux_loss_type = aux_loss_type
 
         if pp_no_recompute_layer is not None:
-            assert isinstance(insert_empty_layer, list), "pp_no_recompute_layer should be a list"
+            assert isinstance(
+                insert_empty_layer, list
+            ), "pp_no_recompute_layer should be a list"
 
         self.pp_no_recompute_layer = pp_no_recompute_layer
         self.register_nonsaveable_keys("moe_group")
@@ -405,7 +430,9 @@ class ErnieMoEConfig(PretrainedConfig):
         elif hasattr(super(), "register_unsavable_keys"):
             return super().register_unsavable_keys(keys)
         else:
-            raise AttributeError("register_nonsaveable_keys not found in PretrainedConfig")
+            raise AttributeError(
+                "register_nonsaveable_keys not found in PretrainedConfig"
+            )
 
     @property
     def use_moe(self) -> bool:

@@ -3,7 +3,7 @@
 
 
 .PHONY: all
-all : lint test
+all : lint gpu_ci_test xpu_ci_test
 check_dirs := cookbook data_processor ernie erniekit examples tools tests requirements
 
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # #
@@ -28,6 +28,10 @@ install:
 	pip install -e.
 
 # # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # #
-.PHONY: test
-test:
-	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/
+.PHONY: gpu_ci_test
+gpu_ci_test:
+	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/gpu/
+
+.PHONY: xpu_ci_test
+xpu_ci_test:
+	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/xpu/

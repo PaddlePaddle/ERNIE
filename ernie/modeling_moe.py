@@ -279,17 +279,19 @@ def _parse_moe_group(
         "all",
     }, f"moe-group not supported, got: {moe_group}"
     logger.info(f"using moe-group: {moe_group}")
-    if not hasattr(fleet.fleet, "_hcg"):
-        assert moe_group in {
-            "dummy",
-            "none",
-            "world",
-            "data",
-        }, "only support dummy gate in `single-model`"
     if moe_group in {"data", "dp"}:
         moe_group = fleet.get_hybrid_communicate_group().get_data_parallel_group()
     elif moe_group in {"mp", "model", "tp"}:
-        moe_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
+        try:
+            moe_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
+            # (LiuTing): multi-gpu but tp=1
+            # need use dummy group for `moe_gate_dispatch_partial_nosoftmaxtopk` kernel.
+            if moe_group.nranks <= 1:
+                moe_group = paddle.distributed.communication.group.Group(0, None, [0])
+        except Exception as _:
+            # (LiuTing): just single-gpu
+            moe_group = paddle.distributed.communication.group.Group(0, None, [0])
+
     elif moe_group in {"dummy"}:  # 4.5t_mm infer run this
         dummy_group = paddle.distributed.communication.group.Group(0, None, [0])
         moe_group = dummy_group
@@ -665,7 +667,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
             is_multimodel_token_cpu, is_multimodel_token_task = async_offload(
                 is_multimodel_token, async_loader
             )
-            has_dense_experts_token_cpu, has_dense_experts_token_task = async_offload(
+            _, has_dense_experts_token_task = async_offload(
                 has_dense_experts_token, async_loader
             )
         else:
@@ -1112,10 +1114,10 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
         Args:
             config (Ernie4_5_MoeConfig): Model configuration.
         """
-        if config.moe_group in {"mp", "model", "tp"}:  # "dummy" in 4.5t_mm infer
-            assert (
-                config.tensor_parallel_degree > 1
-            ), f"tensor_parallel_degree must be > 1 when moe_group is '{config.moe_group}'"
+        if (
+            config.moe_group in {"mp", "model", "tp"}
+            and config.tensor_parallel_degree > 1
+        ):
             logger.info(
                 f"disable FFN tensor model parallel, moe-group={config.moe_group}"
             )

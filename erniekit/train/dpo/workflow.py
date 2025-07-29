@@ -32,7 +32,6 @@ if importlib.util.find_spec("triton") is not None:
         )
 
 import paddle
-from paddleformers.peft import LoRAConfig, LoRAModel
 from paddleformers.trainer import (
     IntervalStrategy,
     get_last_checkpoint,
@@ -315,28 +314,21 @@ def run_dpo(
         model = model_class.from_pretrained(
             model_args.model_name_or_path, config=config
         )
-        # for DPO save
-        if not finetuning_args.reference_free and not model_args.lora:
-            # (LiuTing): config.moe_group will change in `model_class.from_pretrained`
-            # so need to re-create new ref_config.
-            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-            ref_model = model_class._from_config(ref_config, dtype=dtype)
-            ref_model.set_state_dict(model.state_dict())
-        else:
-            ref_model = None
     else:
         model = model_class._from_config(config, dtype=dtype)
-        if not finetuning_args.reference_free and not model_args.lora:
-            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-            if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
-                ref_config.moe_group = (
-                    "dummy" if model_args.moe_group == "mp" else model_args.moe_group
-                )
-            ref_model = model_class._from_config(ref_config, dtype=dtype)
-            # make sure the state_dict is the same to get the same loss for first step
-            ref_model.set_state_dict(model.state_dict())
-        else:
-            ref_model = None
+
+    if not finetuning_args.reference_free and not model_args.lora:
+        ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+        if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
+            ref_config.moe_group = (
+                "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+            )
+        ref_model = model_class._from_config(ref_config, dtype=dtype)
+        # make sure the state_dict is the same to get the same loss for first step
+        ref_model.set_state_dict(model.state_dict())
+    else:
+        ref_model = None
+
     model.config.dpo_config = None
 
     if model.config.head_dim is None:
@@ -345,46 +337,15 @@ def run_dpo(
         del ref_model.config.head_dim
 
     if model_args.lora:
-        logger.info("Start to wrap model with LoRA config ...")
-        if model_args.lora_path is None:
-            target_modules = [
-                ".*qkv_proj.*",
-                ".*out_proj.*",
-                ".*linear1.*",
-                ".*linear2.*",
-            ]
-            if model_args.rslora_plus:
-                model_args.rslora = True
-                model_args.lora_plus_scale = 4
-                model_args.lora_alpha = 4
-            if finetuning_args.weight_quantize_algo is not None:
-                if model_args.rslora or model_args.lora_plus_scale != 1.0:
-                    logger.info(
-                        "Weight quantization is not supported in LoRA+ and RsLoRA."
-                    )
-            if model_args.lora_alpha == -1:
-                if model_args.rslora:
-                    model_args.lora_alpha = 4
-                else:
-                    model_args.lora_alpha = 2 * model_args.lora_rank
-            lora_config = LoRAConfig(
-                target_modules=target_modules,
-                r=model_args.lora_rank,
-                lora_alpha=model_args.lora_alpha,
-                rslora=model_args.rslora,
-                lora_plus_scale=model_args.lora_plus_scale,
-                tensor_parallel_degree=finetuning_args.tensor_parallel_degree,
-                dtype=dtype,
-                head_dim=model.config.hidden_size // model.config.num_attention_heads,
-                base_model_name_or_path=model_args.model_name_or_path,
-            )
-            model = LoRAModel(model, lora_config)
-        else:
-            model = LoRAModel.from_pretrained(
-                model=model, lora_path=model_args.lora_path
-            )
-        model.print_trainable_parameters()
-        logger.info("Wraping model with LoRA config successfully !")
+        from ernie.utils.peft_utils import initialize_lora_model
+
+        model = initialize_lora_model(
+            model=model,
+            training_args=finetuning_args,
+            model_args=model_args,
+            resume_from_checkpoint=last_checkpoint is not None,
+            dtype=dtype,
+        )
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
