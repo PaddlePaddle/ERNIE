@@ -53,6 +53,7 @@ from paddleformers.data.causal_dataset import (
 from src.callbacks import (
     GlobalRNGCallback,
     MoECorrectionBiasAdjustCallback,
+    OrthogonalCallback,
 )
 from src.tokenizers.tokenization_eb_v2 import ErnieBotTokenizer
 from src.trainers import PreTrainingArguments, PretrainingTrainer
@@ -69,7 +70,9 @@ except ImportError:
     def log_trainer_start():
         if "MAIN_PROCESS_STARTED" not in os.environ:
             start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            logger.info(f"The Training Main Process Started Successfully. time: {start_time}, pid: {os.getpid()}")
+            logger.info(
+                f"The Training Main Process Started Successfully. time: {start_time}, pid: {os.getpid()}"
+            )
             os.environ["MAIN_PROCESS_STARTED"] = "1"
 
 
@@ -91,7 +94,9 @@ def get_tp_split_ckpt(args, path):
     tp_rank = max(args.tensor_parallel_rank, 0)
 
     if tp_degree > 1:
-        ckpt_path = os.path.join(path, f"tp{tp_degree:02d}", f"model_state.tp{tp_rank:02d}.pdparams")
+        ckpt_path = os.path.join(
+            path, f"tp{tp_degree:02d}", f"model_state.tp{tp_rank:02d}.pdparams"
+        )
     else:
         ckpt_path = os.path.join(path, "model_state.pdparams")
     return ckpt_path
@@ -121,7 +126,10 @@ def create_pretrained_dataset(args):
     )
 
     train_val_test_num_samples = [
-        args.per_device_train_batch_size * args.dataset_world_size * args.max_steps * args.gradient_accumulation_steps,
+        args.per_device_train_batch_size
+        * args.dataset_world_size
+        * args.max_steps
+        * args.gradient_accumulation_steps,
         args.per_device_eval_batch_size
         * args.dataset_world_size
         * args.eval_iters
@@ -171,12 +179,15 @@ def main():
         config.trainer_args.pipeline_parallel_config = ""
 
     if getattr(config.model_args, "sequence_parallel", 0):
-        logger.warning("disabling `disable_partial_send_recv` when using sequence parallel")
+        logger.warning(
+            "disabling `disable_partial_send_recv` when using sequence parallel"
+        )
         config.trainer_args.pipeline_parallel_config += " disable_partial_send_recv"
 
     if (
         getattr(config.trainer_args, "bf16", False)
-        and "enable_delay_scale_loss" not in config.trainer_args.pipeline_parallel_config
+        and "enable_delay_scale_loss"
+        not in config.trainer_args.pipeline_parallel_config
     ):
         logger.warning(
             "It is recommended to enable delay_scale_loss for better performance "
@@ -185,7 +196,10 @@ def main():
         config.trainer_args.pipeline_parallel_config += " enable_delay_scale_loss"
 
     if "enable_dp_comm_overlap" in config.trainer_args.pipeline_parallel_config:
-        logger.warning("Pipeline dp_comm_overlap and FusedLinearWithGradAdd can not be used at " "the same time.")
+        logger.warning(
+            "Pipeline dp_comm_overlap and FusedLinearWithGradAdd can not be used at "
+            "the same time."
+        )
 
     if "enable_timer" in config.trainer_args.pipeline_parallel_config:
         from paddle.distributed.fleet.meta_parallel.pipeline_parallel import (
@@ -210,25 +224,37 @@ def main():
         assert (
             trainer_args.get("sharding_parallel_degree", -1) > 1
         ), "sharding_parallel_degree should > 1 in when moe_group is 'ep'."
-        assert trainer_args.get("sharding") == "stage1", "Hybrid expert parallel only supports sharding stage1 now."
         assert (
-            "sharding_parallel_config" in trainer_args and "split_param" in trainer_args["sharding_parallel_config"]
+            trainer_args.get("sharding") == "stage1"
+        ), "Hybrid expert parallel only supports sharding stage1 now."
+        assert (
+            "sharding_parallel_config" in trainer_args
+            and "split_param" in trainer_args["sharding_parallel_config"]
         ), "Hybrid expert parallel only supports Sharding stage1 V2 now."
         assert (
             trainer_args.get("data_parallel_degree", 1) == 1
         ), "Now, moe_group = 'ep' cannot be used with data_parallel_degree > 1."
 
-    data_processor_args = {k: formatv(v) for k, v in dict(getattr(config, "data_processor_args", {})).items()}
-    (args,) = parser.parse_dict(dict(**model_args, **trainer_args, **data_processor_args))
-    args.audio_config = dict(model_args).get("model_config", {}).get("audio_config", {})
-    args.use_moe = dict(**dict(config.model_args), **dict(config.trainer_args)).get("use_moe", False)
-    args.moe_with_send_router_loss = dict(**dict(config.model_args), **dict(config.trainer_args)).get(
-        "moe_with_send_router_loss", True
+    data_processor_args = {
+        k: formatv(v)
+        for k, v in dict(getattr(config, "data_processor_args", {})).items()
+    }
+    (args,) = parser.parse_dict(
+        dict(**model_args, **trainer_args, **data_processor_args)
     )
+    args.audio_config = dict(model_args).get("model_config", {}).get("audio_config", {})
+    args.use_moe = dict(**dict(config.model_args), **dict(config.trainer_args)).get(
+        "use_moe", False
+    )
+    args.moe_with_send_router_loss = dict(
+        **dict(config.model_args), **dict(config.trainer_args)
+    ).get("moe_with_send_router_loss", True)
     args.eval_iters = 10
     args.test_iters = args.eval_iters * 10
 
-    args.enable_delay_scale_loss = "enable_delay_scale_loss" in config.trainer_args.pipeline_parallel_config
+    args.enable_delay_scale_loss = (
+        "enable_delay_scale_loss" in config.trainer_args.pipeline_parallel_config
+    )
 
     model_config = dict(getattr(config.model_args, "model_config", {}))
     model_config = {k: formatv(v) for k, v in model_config.items()}
@@ -242,24 +268,33 @@ def main():
 
     if args.enable_optimizer_timer and hasattr(fleet.fleet, "_user_defined_strategy"):
         strategy = fleet.fleet._user_defined_strategy
-        strategy.strategy.hybrid_configs.enable_optimizer_timer = args.enable_optimizer_timer
+        strategy.strategy.hybrid_configs.enable_optimizer_timer = (
+            args.enable_optimizer_timer
+        )
         assert strategy.hybrid_configs["enable_optimizer_timer"] is True
         logger.info("set enable_optimizer_timer to True")
 
     if get_env_device() == "gpu":
         prop = paddle.device.cuda.get_device_properties()
         if prop.total_memory < args.pre_alloc_memory * 1024 * 1024 * 1024:
-            logger.warning("Invalid value for `pre_alloc_memory`, so pre-allocating just failed.")
+            logger.warning(
+                "Invalid value for `pre_alloc_memory`, so pre-allocating just failed."
+            )
         elif args.pre_alloc_memory > 0:
             logger.warning(
-                f"pre-allocating a tensor whose memory capacity is {args.pre_alloc_memory} GB " "and then release it."
+                f"pre-allocating a tensor whose memory capacity is {args.pre_alloc_memory} GB "
+                "and then release it."
             )
             memory_size = int(args.pre_alloc_memory * 1024 * 1024 * 1024)
             x = paddle.empty([memory_size], dtype=paddle.uint8)
             del x
 
     last_checkpoint = None
-    if os.path.isdir(args.output_dir) and args.do_train and not args.overwrite_output_dir:
+    if (
+        os.path.isdir(args.output_dir)
+        and args.do_train
+        and not args.overwrite_output_dir
+    ):
         last_checkpoint = get_last_checkpoint(args.output_dir)
         if last_checkpoint is None and len(os.listdir(args.output_dir)) > 0:
             raise ValueError(
@@ -280,7 +315,9 @@ def main():
         output = [t.astype("float32").cuda() for t in output]
         labels = [t[t != tokenizer.ignored_index] for t in labels]
         labels = [t.cuda() for t in labels]
-        all_numel = (paddle.concat(labels, 0) != tokenizer.ignored_index).astype("int64").sum()
+        all_numel = (
+            (paddle.concat(labels, 0) != tokenizer.ignored_index).astype("int64").sum()
+        )
         ignored = (paddle.concat(labels, 0) == -100).astype("int64").sum()
         labels = all_numel - ignored
         output = sum(output)
@@ -406,10 +443,23 @@ def main():
     cfg.use_fp8 = args.use_fp8
     cfg.enable_mtp_magic_send = args.enable_mtp_magic_send
 
+    ortho_loss_lambda = (
+        cfg.moe_orthogonal_loss_lambda
+        if hasattr(cfg, "moe_orthogonal_loss_lambda")
+        else 0.0
+    )
+    if args.use_ortho_loss_callback:
+        logger.info("using orthogonal loss callback")
+        cfg.moe_orthogonal_loss_lambda = 0.0
+
     if args.tensor_parallel_degree > 1:
         cfg.sequence_parallel = args.sequence_parallel
-        cfg.tensor_parallel_degree = max(fleet.get_hybrid_communicate_group().get_model_parallel_world_size(), 1)
-        cfg.tensor_parallel_rank = max(fleet.get_hybrid_communicate_group().get_model_parallel_rank(), 0)
+        cfg.tensor_parallel_degree = max(
+            fleet.get_hybrid_communicate_group().get_model_parallel_world_size(), 1
+        )
+        cfg.tensor_parallel_rank = max(
+            fleet.get_hybrid_communicate_group().get_model_parallel_rank(), 0
+        )
     else:
         cfg.sequence_parallel = False
         cfg.tensor_parallel_degree = 1
@@ -454,14 +504,23 @@ def main():
 
     logger.info(f"using model={type(model)}, cfg={cfg}")
 
-    train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(args)
+    train_dataset, eval_dataset, test_dataset, data_collator = (
+        create_pretrained_dataset(args)
+    )
 
     callbacks = []
     callbacks += [GlobalRNGCallback()]
+    callbacks += (
+        [OrthogonalCallback(ortho_loss_lambda)] if args.use_ortho_loss_callback else []
+    )
 
     if getattr(cfg, "moe_use_aux_free", 0.0) > 0.0:
         logger.info("adding aux free callback")
-        callbacks += [MoECorrectionBiasAdjustCallback(args.moe_use_aux_free_update_coef, args.sequence_parallel)]
+        callbacks += [
+            MoECorrectionBiasAdjustCallback(
+                args.moe_use_aux_free_update_coef, args.sequence_parallel
+            )
+        ]
 
     trainer = PretrainingTrainer(
         model=model,

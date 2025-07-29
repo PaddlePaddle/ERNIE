@@ -174,6 +174,13 @@ class MoEStatics(nn.Layer):
             self.e_score_correction_bias = p
             self.e_score_correction_bias.is_distributed = True
             self.e_score_correction_bias.unused_param = True
+            if getattr(config, "build_skip_comm_buffer", False):
+                self.e_score_correction_bias.color = {
+                    "color": "skip_comm",
+                    "group": paddle.distributed.new_group(
+                        [paddle.distributed.get_rank()]
+                    ),
+                }
             p = paddle.zeros(
                 shape=[num_experts_groups, num_experts],
                 dtype="int64",
@@ -513,24 +520,12 @@ class MOELayer(nn.Layer):
             hasattr(self.gate, "dispatch_by_task") and self.gate.dispatch_by_task
         )
 
-        if self.dispatch_by_task:
-            assert 0, "no supported, checkout earylier code"
-            assert self.num_local_experts == 1
+        assert not self.dispatch_by_task, "no dispatch_by_task for now"
 
         self.input_preprocess = self.output_postprocess = None
         self.group_experts = group_experts
         self.config = self.gate.config
         self.zero = paddle.to_tensor(0, dtype=paddle.float32)
-
-        if hasattr(fleet.fleet, "_hcg"):
-            hcg = fleet.get_hybrid_communicate_group()
-            if (
-                hasattr(hcg, "get_moe_sharding_parallel_world_size")
-                and hcg.get_moe_sharding_parallel_world_size() > 0
-            ):
-                moe_grad_group = hcg.get_moe_sharding_parallel_group()
-                for p in self.experts.parameters():
-                    p.color = {"color": "moe_expert", "group": moe_grad_group}
 
     def forward_experts(self, dispatched_input):
         with profile("fwd-expert"):

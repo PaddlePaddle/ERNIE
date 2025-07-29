@@ -115,12 +115,18 @@ def distributed_optimizer_maybe_overwrite(
 
         fleet_env = fleet.fleet
         fleet_env.user_defined_optimizer = optimizer
-        hp_optim = MoEHybridParallelOptimizer(optimizer, fleet_env._hcg, fleet_env._user_defined_strategy)
+        hp_optim = MoEHybridParallelOptimizer(
+            optimizer, fleet_env._hcg, fleet_env._user_defined_strategy
+        )
 
-        if fleet_env._user_defined_strategy.hybrid_configs["pp_configs"].dp_comm_overlap:
+        if fleet_env._user_defined_strategy.hybrid_configs[
+            "pp_configs"
+        ].dp_comm_overlap:
             hp_optim._dp_enable = False
 
-        if fleet_env._user_defined_strategy.hybrid_configs["pp_configs"].sharding_comm_overlap:
+        if fleet_env._user_defined_strategy.hybrid_configs[
+            "pp_configs"
+        ].sharding_comm_overlap:
             hp_optim._sharding_enable = False
         return hp_optim
     else:
@@ -130,7 +136,9 @@ def distributed_optimizer_maybe_overwrite(
 @dataclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class PreTrainingArguments(TrainingArguments):
-    vocab_path: str = field(default=None, metadata={"help": "eb35 streaming data vocab"})
+    vocab_path: str = field(
+        default=None, metadata={"help": "eb35 streaming data vocab"}
+    )
     model_name_or_path: str = field(
         default=None,
         metadata={
@@ -160,7 +168,9 @@ class PreTrainingArguments(TrainingArguments):
     )
 
     input_dir: str = field(default=None, metadata={"help": "data path"})
-    split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split ratio"})
+    split: str = field(
+        default="949,50,1", metadata={"help": "Train/valid/test data split ratio"}
+    )
 
     max_seq_length: int = field(
         default=512,
@@ -178,7 +188,9 @@ class PreTrainingArguments(TrainingArguments):
     )
     tokenizer_name: Optional[str] = field(
         default=None,
-        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
+        metadata={
+            "help": "Pretrained tokenizer name or path if not the same as model_name"
+        },
     )
     sequence_parallel: Optional[int] = field(
         default=0,
@@ -190,12 +202,16 @@ class PreTrainingArguments(TrainingArguments):
             "help": "vpp",
         },
     )
-    from_scratch: Optional[int] = field(default=1, metadata={"help": "train from scratch"})
+    from_scratch: Optional[int] = field(
+        default=1, metadata={"help": "train from scratch"}
+    )
     same_data: Optional[bool] = field(
         default=None,
         metadata={"help": "when resume from checkpoint, keey data same with the ckpt"},
     )
-    base_seq_length: Optional[int] = field(default=4096, metadata={"help": "reeao min seq_length"})
+    base_seq_length: Optional[int] = field(
+        default=4096, metadata={"help": "reeao min seq_length"}
+    )
     shuffle_consecutive: Optional[bool] = field(
         default=False,
         metadata={"help": "shuffle num_consecutive or not"},
@@ -204,7 +220,9 @@ class PreTrainingArguments(TrainingArguments):
         default=0,
         metadata={"help": "max num of shuffling among different parts"},
     )
-    use_async_save: Optional[bool] = field(default=False, metadata={"help": "use async save or not"})
+    use_async_save: Optional[bool] = field(
+        default=False, metadata={"help": "use async save or not"}
+    )
     pre_alloc_memory: float = field(
         default=0.0,
         metadata={
@@ -212,9 +230,13 @@ class PreTrainingArguments(TrainingArguments):
             "and release it for avoiding memory fragmentation"
         },
     )
-    enable_global_training_logs: bool = field(default=False, metadata={"help": "use global_training_logs or not"})
+    enable_global_training_logs: bool = field(
+        default=False, metadata={"help": "use global_training_logs or not"}
+    )
     moe_group: Optional[str] = field(default="dp", metadata={"help": "moe comm group"})
-    use_moe: Optional[bool] = field(default=False, metadata={"help": "enable expert parallel"})
+    use_moe: Optional[bool] = field(
+        default=False, metadata={"help": "enable expert parallel"}
+    )
     log_global_grad_norm: Optional[bool] = field(
         default=False,
         metadata={"help": "print global grad-norm"},
@@ -224,14 +246,20 @@ class PreTrainingArguments(TrainingArguments):
         metadata={},
     )
     enable_mtp_magic_send: Optional[bool] = field(default=False, metadata={"help": ""})
-    enable_optimizer_timer: Optional[bool] = field(default=False, metadata={"help": "enable timer in zero-1"})
+    enable_optimizer_timer: Optional[bool] = field(
+        default=False, metadata={"help": "enable timer in zero-1"}
+    )
     lr_scheduler: str = field(
         default="cosine",
-        metadata={"help": "The scheduler type to use. support linear, cosine, constant, constant_with_warmup"},
+        metadata={
+            "help": "The scheduler type to use. support linear, cosine, constant, constant_with_warmup"
+        },
     )
     decay_function: str = field(
         default="half_life",
-        metadata={"help": "The decay function for WSD LR scheduler. support half_life(default), 1-sqrt"},
+        metadata={
+            "help": "The decay function for WSD LR scheduler. support half_life(default), 1-sqrt"
+        },
     )
     moe_gate_lr_ratio: float = field(
         default=None,
@@ -255,7 +283,12 @@ class PreTrainingArguments(TrainingArguments):
         default=1,
         metadata={"help": "the logging interval of global_training_logs"},
     )
-    train_moe_only: int = field(default=None, metadata={"help": "train moe params only"})
+    train_moe_only: int = field(
+        default=None, metadata={"help": "train moe params only"}
+    )
+    use_ortho_loss_callback: bool = field(
+        default=False, metadata={"help": "Use orthogonal loss callback or not"}
+    )
 
     @property
     def use_moe(self):  # noqa: F811
@@ -291,7 +324,9 @@ class PreTrainingArguments(TrainingArguments):
                 self.per_device_train_batch_size,
                 self.dataset_world_size,
             )
-            logger.info(f"global_batch={self.global_batch_size} micro-bsz:{micro_bsz}, accumulate_steps:{acc_steps}")
+            logger.info(
+                f"global_batch={self.global_batch_size} micro-bsz:{micro_bsz}, accumulate_steps:{acc_steps}"
+            )
             if (
                 acc_steps != 1
                 and self.gradient_accumulation_steps != 1
@@ -309,10 +344,16 @@ class PreTrainingArguments(TrainingArguments):
         self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
 
         if self.pipeline_parallel_degree > 1:
-            self.per_device_eval_batch_size = self.per_device_train_batch_size * self.gradient_accumulation_steps
-            logger.warn(f"eval_batch_size set to {self.per_device_eval_batch_size} in Pipeline Parallel!")
+            self.per_device_eval_batch_size = (
+                self.per_device_train_batch_size * self.gradient_accumulation_steps
+            )
+            logger.warn(
+                f"eval_batch_size set to {self.per_device_eval_batch_size} in Pipeline Parallel!"
+            )
             user_defined_strategy = fleet.fleet._user_defined_strategy
-            user_defined_strategy.strategy.pipeline_configs.accumulate_steps = self.gradient_accumulation_steps
+            user_defined_strategy.strategy.pipeline_configs.accumulate_steps = (
+                self.gradient_accumulation_steps
+            )
             self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
             logger.info(f"fixing pp configs: {user_defined_strategy.pipeline_configs}")
         else:
@@ -321,7 +362,9 @@ class PreTrainingArguments(TrainingArguments):
 
         if self.sharding_parallel_degree > 1:
             sharding_parallel_config = (
-                set(self.sharding_parallel_config.split(" ")) if self.sharding_parallel_config else set()
+                set(self.sharding_parallel_config.split(" "))
+                if self.sharding_parallel_config
+                else set()
             )
             sharding_comm_overlap_non_pp = (
                 True
@@ -332,9 +375,9 @@ class PreTrainingArguments(TrainingArguments):
             if sharding_comm_overlap_non_pp:
                 assert hasattr(fleet.fleet, "_user_defined_strategy")
                 user_defined_strategy = fleet.fleet._user_defined_strategy
-                user_defined_strategy.hybrid_configs["sharding_configs"].accumulate_steps = (
-                    self.gradient_accumulation_steps
-                )
+                user_defined_strategy.hybrid_configs[
+                    "sharding_configs"
+                ].accumulate_steps = self.gradient_accumulation_steps
 
         if hasattr(fleet.fleet, "_user_defined_strategy"):
             user_defined_strategy = fleet.fleet._user_defined_strategy
@@ -353,7 +396,10 @@ class PreTrainingArguments(TrainingArguments):
                         f"local_batch_size[{lbs}] should be divisible by "
                         f"per_device_train_batch_size[{self.per_device_train_batch_size}]"
                     )
-                    assert lbs // self.per_device_train_batch_size == sd_configs.accumulate_steps, (
+                    assert (
+                        lbs // self.per_device_train_batch_size
+                        == sd_configs.accumulate_steps
+                    ), (
                         f"local_batch_size[{lbs}] should be equal to "
                         f"accumulate_steps[{sd_configs.accumulate_steps}] * "
                         f"per_device_train_batch_size[{self.per_device_train_batch_size}]"
@@ -420,7 +466,9 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
         total = []
         for ex in self.inner_dataset.exs:
             total.extend([(ex.part, 0, i) for i in range(ex.data_status, len(ex))])
-        assert len(total) > self.num_consecutive, f"total={total} < num_consecutive={self.num_consecutive}"
+        assert (
+            len(total) > self.num_consecutive
+        ), f"total={total} < num_consecutive={self.num_consecutive}"
         indices = np.array_split(np.array(total), len(total) // self.num_consecutive)
         if self.shuffle:
             self.rng.shuffle(indices)
@@ -443,16 +491,22 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
         return None
 
     def gen_data_seq_weighted(self, num_examples, data_type=None):
-        assert self.load_data_seq is False, "需要保证所有epoch的data_seq都从文件加载，否则下次删data_seq无法控住随机性"
+        assert (
+            self.load_data_seq is False
+        ), "需要保证所有epoch的data_seq都从文件加载，否则下次删data_seq无法控住随机性"
         logger.info(
             f"generating data sequence... #non_consecutive_data_chunks={num_examples},"
             f" num_consecutive={self.num_consecutive}"
         )
 
         if num_examples > 1e5:
-            logger.info("generating data sequence for very large data, consider use large `num_consecutive`")
+            logger.info(
+                "generating data sequence for very large data, consider use large `num_consecutive`"
+            )
         if data_type is not None:
-            weights = [ex.weights for ex in self.inner_dataset.exs if ex.data_type == data_type]
+            weights = [
+                ex.weights for ex in self.inner_dataset.exs if ex.data_type == data_type
+            ]
             exs = [ex for ex in self.inner_dataset.exs if ex.data_type == data_type]
         else:
             weights = [ex.weights for ex in self.inner_dataset.exs]
@@ -470,12 +524,16 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
         indices = []
         for i, ex in enumerate(exs):
             sample_size = int(weights[i] * num_examples)
-            logger.info(f"part_data_pre_sampling--[part-{ex.part}]-[sampler-size-{sample_size}]")
+            logger.info(
+                f"part_data_pre_sampling--[part-{ex.part}]-[sampler-size-{sample_size}]"
+            )
             assert ex.combine_batch == self.combine_batch
             part_indices_gen[ex.part] = ex.sampler()
             indices.extend([ex.part] * sample_size)
 
-        logger.info(f"shuffle part placeholder index, size={len(indices)}, exmaple={indices[0]}")
+        logger.info(
+            f"shuffle part placeholder index, size={len(indices)}, exmaple={indices[0]}"
+        )
         if self.shuffle:
             self.rng.shuffle(indices)
         logger.info("shuffle done")
@@ -506,7 +564,9 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
             logger.info("consecutive placeholder 2 shuffle..........")
             self.rng.shuffle(placeholder_indices)
             logger.info("consecutive placeholder 2 shuffle.............")
-            placeholder_indices = [item for sublist in placeholder_indices for item in sublist]
+            placeholder_indices = [
+                item for sublist in placeholder_indices for item in sublist
+            ]
             logger.info("consecutive placeholder 2 shuffle................")
             indices_ret = [next(part_data_gen_iter[i]) for i in placeholder_indices]
             logger.info("consecutive placeholder 2 shuffle done")
@@ -523,14 +583,18 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
             return indices
 
         padding_size = self.total_size - len(indices)
-        logger.info(f"padding-size={padding_size}, total_size={self.total_size} shard={self.local_rank}/{self.nranks}")
+        logger.info(
+            f"padding-size={padding_size}, total_size={self.total_size} shard={self.local_rank}/{self.nranks}"
+        )
         if padding_size < 0:
             indices = indices[:padding_size]
         else:
             indices = np.concatenate(
                 [
                     indices,
-                    np.tile(indices, math.ceil(padding_size / len(indices)))[:padding_size],
+                    np.tile(indices, math.ceil(padding_size / len(indices)))[
+                        :padding_size
+                    ],
                 ]
             )
 
@@ -557,7 +621,9 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
 
             if self.global_shuffle_num_examples > 0:
                 num_examples = min([self.global_shuffle_num_examples, num_examples])
-                logger.info(f"using global shuffle num examples: {self.global_shuffle_num_examples}")
+                logger.info(
+                    f"using global shuffle num examples: {self.global_shuffle_num_examples}"
+                )
             indices = self.load_data_seq_from_cache()
             if indices is None:
                 indices = self.gen_data_seq_weighted(num_examples)
@@ -588,7 +654,9 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
                         buf.append(indices[i].tolist())
                     self.consumed_samples = 0
                 self.epoch += 1
-                logger.info(f"epoch done, #data={self.total_size}, reshuffle-sequence: epoch={self.epoch}")
+                logger.info(
+                    f"epoch done, #data={self.total_size}, reshuffle-sequence: epoch={self.epoch}"
+                )
 
                 self.rng = random.Random(self.seed + self.epoch)
                 if self.weights:
@@ -628,11 +696,15 @@ class PretrainingTrainer(Trainer):
         callbacks = [
             FP8QuantWeightCallback(),
             LoggingCallback(),
-            TensorBoardCallback(args, model=model, log_tokens_per_step=True, log_flops_per_step=False),
+            TensorBoardCallback(
+                args, model=model, log_tokens_per_step=True, log_flops_per_step=False
+            ),
             GCCallback(),
         ] + callbacks
 
-        args.use_async_save = args.use_async_save and args.save_sharded_model and args.load_sharded_model
+        args.use_async_save = (
+            args.use_async_save and args.save_sharded_model and args.load_sharded_model
+        )
         super().__init__(args=args, model=model, callbacks=callbacks, **kwargs)
         self.pop_callback(PrinterCallback)
         self.pp_data_buffer = []
@@ -641,9 +713,13 @@ class PretrainingTrainer(Trainer):
         self._end_save_time = time.time()
         self._first_end_save_time = time.time()
         self.resume_global_step = -1
-        self.first_skip_step = 5 if self.args.save_steps > 5 else self.args.save_steps / 2
+        self.first_skip_step = (
+            5 if self.args.save_steps > 5 else self.args.save_steps / 2
+        )
         global_training_logs.enable_skip_zero([r".*aux_loss.*"])
-        global_training_logs.set_trainer_interval(self, self.args.global_logging_interval)
+        global_training_logs.set_trainer_interval(
+            self, self.args.global_logging_interval
+        )
 
     def autocast_smart_context_manager(self):
         if self.enable_autocast_context_manager:
@@ -681,7 +757,11 @@ class PretrainingTrainer(Trainer):
         def _broadcast_moe_optimizer_state(state_dict):
             base_state_dict = {"master_weights": {}}
             buf = [
-                {i: j.shape for i, j in state_dict.items() if i not in ["master_weights", "LR_Scheduler"]},
+                {
+                    i: j.shape
+                    for i, j in state_dict.items()
+                    if i not in ["master_weights", "LR_Scheduler"]
+                },
                 {i: j.shape for i, j in state_dict["master_weights"].items()},
                 {"LR_Scheduler": state_dict.get("LR_Scheduler", {})},
             ]
@@ -702,10 +782,16 @@ class PretrainingTrainer(Trainer):
                 logger.info(f"broadcast moe optimizer {k} from {src_rank}")
                 base_state_dict[k] = v.cpu()
             for k, s in buf[1].items():
-                v = state_dict["master_weights"].get(k, paddle.zeros(s, "float32")).to(get_env_device())
+                v = (
+                    state_dict["master_weights"]
+                    .get(k, paddle.zeros(s, "float32"))
+                    .to(get_env_device())
+                )
                 v.name = k
                 dist.broadcast(v, src=src_rank, group=group)
-                logger.info(f"broadcast moe optimizer-master_weights {k} from {src_rank}")
+                logger.info(
+                    f"broadcast moe optimizer-master_weights {k} from {src_rank}"
+                )
                 base_state_dict["master_weights"][k] = v.cpu()
             base_state_dict.update(buf[2])
             return base_state_dict
@@ -727,7 +813,9 @@ class PretrainingTrainer(Trainer):
         return state_dict
 
     def _save_moe_weights(self, output_dir):
-        optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        optimizer_name = _add_variant(
+            PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix
+        )
         saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
         os.makedirs(output_dir, exist_ok=True)
@@ -737,16 +825,20 @@ class PretrainingTrainer(Trainer):
         filtered_state_dict = OrderedDict()
         filter_optimzier_state_dict = OrderedDict()
 
-        param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys()) if self.args.bf16 else []
+        param_names_in_master_weights = (
+            list(optimzier_state_dict["master_weights"].keys())
+            if self.args.bf16
+            else []
+        )
         filter_optimzier_state_dict["master_weights"] = OrderedDict()
 
         for k, v in state_dict.items():
             if getattr(v, "no_sync", False):
 
                 if v.name in param_names_in_master_weights:
-                    filter_optimzier_state_dict["master_weights"][v.name] = optimzier_state_dict["master_weights"][
-                        v.name
-                    ]
+                    filter_optimzier_state_dict["master_weights"][v.name] = (
+                        optimzier_state_dict["master_weights"][v.name]
+                    )
                 if not (
                     getattr(self.args, "should_save_sharding_stage1_model", False)
                     or getattr(self.args, "save_sharding_stage1_model", False)
@@ -769,7 +861,9 @@ class PretrainingTrainer(Trainer):
                         _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix),
                     ),
                 )
-        paddle.save(filter_optimzier_state_dict, os.path.join(output_dir, optimizer_name))
+        paddle.save(
+            filter_optimzier_state_dict, os.path.join(output_dir, optimizer_name)
+        )
         with open(saved_signal_path, mode="w+") as f:
             f.write("1")
 
@@ -779,7 +873,9 @@ class PretrainingTrainer(Trainer):
         if not training:
             return model
         if self.args.fp16 or self.args.bf16:
-            model = paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
+            model = paddle.amp.decorate(
+                models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype
+            )
 
         if self.args.use_moe:
             from src.trainers.data_parallel import DataParallel as MoEDDP
@@ -809,7 +905,9 @@ class PretrainingTrainer(Trainer):
                     dtype=self.amp_dtype if hasattr(self, "amp_dtype") else "float16",
                 )
             prepare_pipeline_inputs_func = (
-                model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
+                model._prepare_pipeline_inputs_func
+                if hasattr(model, "_prepare_pipeline_inputs_func")
+                else None
             )
             model = fleet.distributed_model(model)
             if is_dp_moe:
@@ -836,7 +934,9 @@ class PretrainingTrainer(Trainer):
                         ]
 
                     keys = list(inputs[0].keys())
-                    inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
+                    inputs_batch = {
+                        key: [data.pop(key) for data in inputs] for key in keys
+                    }
                     return [
                         get_expected_keys(inputs_batch, first_stage_keys),
                         get_expected_keys(inputs_batch, last_stage_keys),
@@ -849,18 +949,27 @@ class PretrainingTrainer(Trainer):
 
             enable_sequence_parallel(model)
 
-            assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
+            assert (
+                self.optimizer is not None
+            ), "Pipeline mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
-                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-            self.optimizer = distributed_optimizer_maybe_overwrite(self.optimizer, self.args.use_moe)
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(
+                    self.optimizer
+                )
+            self.optimizer = distributed_optimizer_maybe_overwrite(
+                self.optimizer, self.args.use_moe
+            )
 
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
                 assert (
-                    ShardingOption.SHARD_GRAD_OP in self.args.sharding or ShardingOption.SHARD_OP in self.args.sharding
+                    ShardingOption.SHARD_GRAD_OP in self.args.sharding
+                    or ShardingOption.SHARD_OP in self.args.sharding
                 ), "Only support tensor parallel + sharding stage1/stage2 hybrid parallel now."
-                model = paddle.distributed.fleet.meta_parallel.TensorParallel(model, hcg, strategy=None)
+                model = paddle.distributed.fleet.meta_parallel.TensorParallel(
+                    model, hcg, strategy=None
+                )
                 model.accumulate_steps = self.args.gradient_accumulation_steps
                 enable_sequence_parallel(model)
 
@@ -869,11 +978,17 @@ class PretrainingTrainer(Trainer):
                     mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
                 model = fleet.distributed_model(model)
                 if is_dp_moe:
-                    logger.info("start broadcast dp moe parameters across sharding group")
+                    logger.info(
+                        "start broadcast dp moe parameters across sharding group"
+                    )
                     sync_dp_moe_params_across_sharding(model._layers)
                 if self.args.amp_master_grad:
-                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-                self.optimizer = distributed_optimizer_maybe_overwrite(self.optimizer, self.args.use_moe)
+                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(
+                        self.optimizer
+                    )
+                self.optimizer = distributed_optimizer_maybe_overwrite(
+                    self.optimizer, self.args.use_moe
+                )
 
             else:
                 if (self.args.use_moe) and self.args.data_parallel_degree > 1:
@@ -884,10 +999,14 @@ class PretrainingTrainer(Trainer):
 
                     hcg = fleet.get_hybrid_communicate_group()
                     dp_group = hcg.get_data_parallel_group()
-                    sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
+                    sync_params_buffers(
+                        model, comm_group=dp_group, src_rank=dp_group.ranks[0]
+                    )
 
                 if is_dp_moe:
-                    logger.info("start broadcast dp moe parameters across sharding group")
+                    logger.info(
+                        "start broadcast dp moe parameters across sharding group"
+                    )
                     sync_dp_moe_params_across_sharding(model)
 
                 cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
@@ -916,21 +1035,33 @@ class PretrainingTrainer(Trainer):
                 )
                 self.optimizer = optimizer
 
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
+        if (
+            not in_pipeline_parallel_mode
+            and not in_sharding_parallel_mode
+            and in_tensor_parallel_model
+        ):
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
 
             model = fleet.distributed_model(model)
             model.accumulate_steps = self.args.gradient_accumulation_steps
             enable_sequence_parallel(model)
-            assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
+            assert (
+                self.optimizer is not None
+            ), "Tensor parallel mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
-                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(
+                    self.optimizer
+                )
 
-            self.optimizer = distributed_optimizer_maybe_overwrite(self.optimizer, self.args.use_moe)
+            self.optimizer = distributed_optimizer_maybe_overwrite(
+                self.optimizer, self.args.use_moe
+            )
 
         if self.args.use_moe:
-            self.callback_handler.callbacks.insert(0, MoeLoggingCallback(self.optimizer))
+            self.callback_handler.callbacks.insert(
+                0, MoeLoggingCallback(self.optimizer)
+            )
 
         try:
             from paddle.fluid.dygraph.parallel import sync_params_buffers
@@ -964,10 +1095,16 @@ class PretrainingTrainer(Trainer):
                     for p, g in params_grads:
                         if getattr(p, "need_clip", True) == "pp_non_distributed":
                             g.scale_(np.sqrt(num_pp))
-                ret = oldcomm(params_grads, global_norm_var_dist, global_norm_var_not_dist, *args)
-                global_norm_var_fp32 = paddle.sqrt(global_norm_var_dist + global_norm_var_not_dist)
+                ret = oldcomm(
+                    params_grads, global_norm_var_dist, global_norm_var_not_dist, *args
+                )
+                global_norm_var_fp32 = paddle.sqrt(
+                    global_norm_var_dist + global_norm_var_not_dist
+                )
                 if global_training_logs_enabled():
-                    global_training_logs.update(global_grad_norm=global_norm_var_fp32.item())
+                    global_training_logs.update(
+                        global_grad_norm=global_norm_var_fp32.item()
+                    )
                 return ret
 
             @paddle.no_grad()
@@ -986,7 +1123,9 @@ class PretrainingTrainer(Trainer):
                 new_dygraph_clip, self.optimizer._inner_opt._grad_clip
             )
 
-    def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix: str = "eval"):
+    def evaluate(
+        self, eval_dataset=None, ignore_keys=None, metric_key_prefix: str = "eval"
+    ):
         self.model_wrapped.accumulate_steps = self.args.gradient_accumulation_steps
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
 
@@ -1014,11 +1153,17 @@ class PretrainingTrainer(Trainer):
 
         self.log(output.metrics)
 
-        self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, output.metrics)
+        self.control = self.callback_handler.on_evaluate(
+            self.args, self.state, self.control, output.metrics
+        )
         return output.metrics
 
-    def prediction_pipeline_step(self, model, inputs, prediction_loss_only, ignore_keys):
-        loss, _, labels = super().prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
+    def prediction_pipeline_step(
+        self, model, inputs, prediction_loss_only, ignore_keys
+    ):
+        loss, _, labels = super().prediction_pipeline_step(
+            model, inputs, prediction_loss_only, ignore_keys
+        )
         num_tokens = (labels != self.tokenizer.ignored_index).sum().item()
         loss_avg = loss * self.model_wrapped.accumulate_steps / num_tokens
         return loss_avg, loss, labels
@@ -1026,14 +1171,18 @@ class PretrainingTrainer(Trainer):
     def restore_dataloader_status(self):
         if self.args.same_data is None or self.args.same_data == "":
             if self.args.resume_from_checkpoint is not None:
-                train_bin_file = os.path.join(self.args.resume_from_checkpoint, TRAINING_ARGS_NAME)
+                train_bin_file = os.path.join(
+                    self.args.resume_from_checkpoint, TRAINING_ARGS_NAME
+                )
                 assert os.path.exists(train_bin_file), f"{train_bin_file} not found."
                 train_bin = paddle.load(train_bin_file)
                 old_data_filelist = train_bin.data_filelist
                 old_data_weights = train_bin.data_weights
                 old_sharding_degree = train_bin.sharding_parallel_degree
                 old_data_parallel_degree = train_bin.data_parallel_degree
-                old_reeao_data_world_size = getattr(train_bin, "reeao_data_world_size", None)
+                old_reeao_data_world_size = getattr(
+                    train_bin, "reeao_data_world_size", None
+                )
                 new_data_filelist = self.args.data_filelist
                 new_data_weights = self.args.data_weights
                 new_sharding_degree = self.args.sharding_parallel_degree
@@ -1049,10 +1198,14 @@ class PretrainingTrainer(Trainer):
                         or old_reeao_data_world_size == self.args.reeao_data_world_size
                     )
                 )
-                logger.info(f"Automatically setting same_data value: {self.args.same_data}")
+                logger.info(
+                    f"Automatically setting same_data value: {self.args.same_data}"
+                )
             else:
                 self.args.same_data = False
-                logger.info(f"Training from scratch, setting same_data value: {self.args.same_data}")
+                logger.info(
+                    f"Training from scratch, setting same_data value: {self.args.same_data}"
+                )
         else:
             logger.info(f"User has defined same_data value: {self.args.same_data}")
 
@@ -1088,7 +1241,9 @@ class PretrainingTrainer(Trainer):
             drop_last=self.args.dataloader_drop_last,
         )
 
-    def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
+    def _maybe_log_save_evaluate(
+        self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs
+    ):
         flag_log = self.control.should_log
         if self.control.should_log:
             logs = {}
@@ -1097,8 +1252,12 @@ class PretrainingTrainer(Trainer):
             tr_loss_scalar = tr_loss.item() / dist.get_world_size()
             tr_loss.zero_()
 
-            logs["loss"] = tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged)
-            logs["loss_cur_dp"] = tr_loss_single_dp_scalar / (self.state.global_step - self._globalstep_last_logged)
+            logs["loss"] = tr_loss_scalar / (
+                self.state.global_step - self._globalstep_last_logged
+            )
+            logs["loss_cur_dp"] = tr_loss_single_dp_scalar / (
+                self.state.global_step - self._globalstep_last_logged
+            )
             logs["learning_rate"] = float(self._get_learning_rate())
             logs["global_step"] = int(self.state.global_step)
 
@@ -1106,10 +1265,18 @@ class PretrainingTrainer(Trainer):
 
             current_device = framework._current_expected_place_()
             device_id = current_device.get_device_id()
-            current_memory_allocated = core.device_memory_stat_current_value("Allocated", device_id)
-            current_memory_reserved = core.device_memory_stat_current_value("Reserved", device_id)
-            max_memory_allocated = core.device_memory_stat_peak_value("Allocated", device_id)
-            max_memory_reserved = core.device_memory_stat_peak_value("Reserved", device_id)
+            current_memory_allocated = core.device_memory_stat_current_value(
+                "Allocated", device_id
+            )
+            current_memory_reserved = core.device_memory_stat_current_value(
+                "Reserved", device_id
+            )
+            max_memory_allocated = core.device_memory_stat_peak_value(
+                "Allocated", device_id
+            )
+            max_memory_reserved = core.device_memory_stat_peak_value(
+                "Reserved", device_id
+            )
             logs["mem_allocated_gb"] = current_memory_allocated / divisor
             logs["max_mem_allocated_gb"] = max_memory_allocated / divisor
             logs["mem_reserved_gb"] = current_memory_reserved / divisor
@@ -1125,7 +1292,9 @@ class PretrainingTrainer(Trainer):
                 logs["loss_scale"] = float(f"{self.scaler._scale.item():.3e}")
 
             total_train_batch_size = (
-                self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.reeao_dataset_world_size
+                self.args.train_batch_size
+                * self.args.gradient_accumulation_steps
+                * self.args.reeao_dataset_world_size
             )
             num_steps = self.state.global_step - self._globalstep_last_logged
             logs.update(
@@ -1140,7 +1309,9 @@ class PretrainingTrainer(Trainer):
                 model_numel = sum(
                     p.numel().item()
                     for n, p in model.named_parameters()
-                    if not p.stop_gradient and "embeddings" not in n and "embed_tokens" not in n
+                    if not p.stop_gradient
+                    and "embeddings" not in n
+                    and "embed_tokens" not in n
                 )
                 numel_tensor = paddle.to_tensor(model_numel)
                 dist.all_reduce(numel_tensor)
@@ -1159,11 +1330,15 @@ class PretrainingTrainer(Trainer):
                 3,
             )
             logs["tokens_per_sec_per_card"] = round(
-                tokens_per_steps * logs["global_steps_per_second"] / self.args.world_size,
+                tokens_per_steps
+                * logs["global_steps_per_second"]
+                / self.args.world_size,
                 1,
             )
             self._tokens_per_sec_per_card_buffer.append(logs["tokens_per_sec_per_card"])
-            logs["tokens_per_sec_per_card_average"] = round(np.mean(self._tokens_per_sec_per_card_buffer), 1)
+            logs["tokens_per_sec_per_card_average"] = round(
+                np.mean(self._tokens_per_sec_per_card_buffer), 1
+            )
             if self.resume_global_step == -1:
                 self.resume_global_step = self.state.global_step - 1
             if self.state.global_step <= self.resume_global_step + self.first_skip_step:
@@ -1195,8 +1370,13 @@ class PretrainingTrainer(Trainer):
             metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
-            if hasattr(self.args, "flash_device_save_steps") and self.args.flash_device_save_steps > 0:
-                is_persistent_ckpt = 1 if self.state.global_step % self.args.save_steps == 0 else 0
+            if (
+                hasattr(self.args, "flash_device_save_steps")
+                and self.args.flash_device_save_steps > 0
+            ):
+                is_persistent_ckpt = (
+                    1 if self.state.global_step % self.args.save_steps == 0 else 0
+                )
             else:
                 is_persistent_ckpt = 1
 
@@ -1206,17 +1386,34 @@ class PretrainingTrainer(Trainer):
                 zcc_start_save_time = time.time()
             self._save_checkpoint(model, metrics=metrics)
             paddle.distributed.barrier()
-            self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+            self.control = self.callback_handler.on_save(
+                self.args, self.state, self.control
+            )
             if flag_log:
                 logs = {"is_persistent_ckpt": is_persistent_ckpt}
                 tbk = self._start_save_time - self._end_save_time
-                if (self.state.global_step == self.resume_global_step + self.args.save_steps) or (
+                if (
+                    self.state.global_step
+                    == self.resume_global_step + self.args.save_steps
+                ) or (
                     hasattr(self.args, "flash_device_save_steps")
-                    and (self.state.global_step == self.resume_global_step + self.args.flash_device_save_steps)
+                    and (
+                        self.state.global_step
+                        == self.resume_global_step + self.args.flash_device_save_steps
+                    )
                 ):
                     actual_tbk = self._start_save_time - self._first_end_save_time
-                    actual_avg_speed_step = self.args.save_steps * tokens_per_steps / actual_tbk / self.args.world_size
-                    tbk = tbk / (self.args.save_steps - self.first_skip_step) * self.args.save_steps
+                    actual_avg_speed_step = (
+                        self.args.save_steps
+                        * tokens_per_steps
+                        / actual_tbk
+                        / self.args.world_size
+                    )
+                    tbk = (
+                        tbk
+                        / (self.args.save_steps - self.first_skip_step)
+                        * self.args.save_steps
+                    )
                 if is_persistent_ckpt:
                     ts = time.time() - self._start_save_time
                 else:
@@ -1225,24 +1422,47 @@ class PretrainingTrainer(Trainer):
                 logs["global_save_step"] = self.state.global_step
                 if is_persistent_ckpt:
                     tokens_per_steps = self.args.max_seq_length * total_train_batch_size
-                    avg_speed_step = self.args.save_steps * tokens_per_steps / tbk / self.args.world_size
+                    avg_speed_step = (
+                        self.args.save_steps
+                        * tokens_per_steps
+                        / tbk
+                        / self.args.world_size
+                    )
                     logs["train_time_sec_without_save"] = tbk
-                    logs["average_tokens_per_sec_per_card_without_save"] = round(avg_speed_step, 1)
+                    logs["average_tokens_per_sec_per_card_without_save"] = round(
+                        avg_speed_step, 1
+                    )
                     logs["average_tokens_per_sec_per_card_with_save"] = round(
-                        self.args.save_steps * tokens_per_steps / (tbk + ts) / self.args.world_size,
+                        self.args.save_steps
+                        * tokens_per_steps
+                        / (tbk + ts)
+                        / self.args.world_size,
                         2,
                     )
-                    if self.state.global_step == self.resume_global_step + self.args.save_steps:
-                        logs["actual_average_tokens_per_sec_per_card_without_save"] = round(actual_avg_speed_step, 1)
-                        logs["actual_average_tokens_per_sec_per_card_with_save"] = round(
-                            self.args.save_steps * tokens_per_steps / (actual_tbk + ts) / self.args.world_size,
-                            2,
+                    if (
+                        self.state.global_step
+                        == self.resume_global_step + self.args.save_steps
+                    ):
+                        logs["actual_average_tokens_per_sec_per_card_without_save"] = (
+                            round(actual_avg_speed_step, 1)
+                        )
+                        logs["actual_average_tokens_per_sec_per_card_with_save"] = (
+                            round(
+                                self.args.save_steps
+                                * tokens_per_steps
+                                / (actual_tbk + ts)
+                                / self.args.world_size,
+                                2,
+                            )
                         )
                     logs["one_day_billion_tokens_without_save"] = round(
                         0.0000864 * self.args.save_steps * tokens_per_steps / tbk, 2
                     )
                     logs["one_day_billion_tokens_with_save"] = round(
-                        0.0000864 * self.args.save_steps * tokens_per_steps / (tbk + ts),
+                        0.0000864
+                        * self.args.save_steps
+                        * tokens_per_steps
+                        / (tbk + ts),
                         2,
                     )
                 self.log(logs, **kwargs)
@@ -1277,12 +1497,22 @@ class PretrainingTrainer(Trainer):
         return self.lr_scheduler
 
     def create_optimizer(self, lr_scheduler=None):
-        optimizer_params = [p for n, p in self.model.named_parameters() if p.stop_gradient is False]
+        optimizer_params = [
+            p for n, p in self.model.named_parameters() if p.stop_gradient is False
+        ]
         if self.args.train_moe_only:
             optimizer_params = (
-                [p for n, p in self.model.named_parameters() if "mlp.experts" in n or "mlp.gate" in n]
+                [
+                    p
+                    for n, p in self.model.named_parameters()
+                    if "mlp.experts" in n or "mlp.gate" in n
+                ]
                 if self.args.train_moe_only
-                else [p for n, p in self.model.named_parameters() if p.stop_gradient is False]
+                else [
+                    p
+                    for n, p in self.model.named_parameters()
+                    if p.stop_gradient is False
+                ]
             )
             logger.info(f"using `train_moe-only`, #moe params={len(optimizer_params)}")
         elif len(optimizer_params) < len(self.model.parameters()):
@@ -1292,13 +1522,17 @@ class PretrainingTrainer(Trainer):
             )
         if self.optimizer is None:
             decay_parameters = [
-                p.name for n, p in self.model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])
+                p.name
+                for n, p in self.model.named_parameters()
+                if not any(nd in n for nd in ["bias", "norm"])
             ]
 
             def apply_decay_param_fun(x):
                 return x in decay_parameters
 
-            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(
+                self.args
+            )
 
             if self.args.use_moe and not self.args.use_hybrid_parallel:
                 logger.info("using moe Global clip")
@@ -1313,26 +1547,38 @@ class PretrainingTrainer(Trainer):
                     local_clip=False,
                 )
             else:
-                grad_clip = nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None
+                grad_clip = (
+                    nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
+                    if self.args.max_grad_norm > 0
+                    else None
+                )
 
-            self.static_name_to_dyg_name = {p.name: n for n, p in self.model.state_dict().items()}
+            self.static_name_to_dyg_name = {
+                p.name: n for n, p in self.model.state_dict().items()
+            }
             gate_pattern = re.compile(r"ernie\.layers\.0\.mlp\.gate\.weight")
 
             def lr_ratio_fn(param):
                 name = self.static_name_to_dyg_name[param.name]
                 if self.args.moe_gate_lr_ratio is not None and gate_pattern.match(name):
-                    logger.info(f"apply moe_gate_lr_ratio to {name}, ratio={self.args.moe_gate_lr_ratio}")
+                    logger.info(
+                        f"apply moe_gate_lr_ratio to {name}, ratio={self.args.moe_gate_lr_ratio}"
+                    )
                     return float(self.args.moe_gate_lr_ratio)
                 return 1.0
 
             self.optimizer = optimizer_cls(
-                learning_rate=(self.lr_scheduler if lr_scheduler is None else lr_scheduler),
+                learning_rate=(
+                    self.lr_scheduler if lr_scheduler is None else lr_scheduler
+                ),
                 apply_decay_param_fun=apply_decay_param_fun,
                 parameters=optimizer_params,
                 weight_decay=self.args.weight_decay,
                 grad_clip=grad_clip,
                 multi_precision=True,
-                lr_ratio=(lr_ratio_fn if (self.args.moe_gate_lr_ratio is not None) else None),
+                lr_ratio=(
+                    lr_ratio_fn if (self.args.moe_gate_lr_ratio is not None) else None
+                ),
                 **optimizer_kwargs,
             )
 
@@ -1341,7 +1587,9 @@ class PretrainingTrainer(Trainer):
     def save_model(self, output_dir=None):
         super().save_model(output_dir)
         if self.args.should_save:
-            with open(os.path.join(output_dir, "static_name_to_dyg_name.json"), "w") as of:
+            with open(
+                os.path.join(output_dir, "static_name_to_dyg_name.json"), "w"
+            ) as of:
                 of.write(json.dumps(self.static_name_to_dyg_name))
 
     def _load_rng_state(self, checkpoint):
