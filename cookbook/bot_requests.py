@@ -17,7 +17,6 @@
 import argparse
 import json
 import logging
-import traceback
 
 import jieba
 import requests
@@ -141,18 +140,20 @@ class BotClient:
         req_data["temperature"] = temperature
         req_data["top_p"] = top_p
         req_data["messages"] = self.truncate_messages(req_data["messages"])
+
+        self.logger.info(f"[MODEL] {model_url}")
+        self.logger.info("[req_data]====>")
+        self.logger.info(json.dumps(req_data, ensure_ascii=False))
         for _ in range(self.max_retry_num):
             try:
-                self.logger.info(f"[MODEL] {model_url}")
-                self.logger.info("[req_data]====>")
-                self.logger.info(json.dumps(req_data, ensure_ascii=False))
                 res = self.call_back(model_url, req_data)
                 self.logger.info("model response")
                 self.logger.info(res)
                 self.logger.info("-" * 30)
             except Exception as e:
-                self.logger.info(e)
-                self.logger.info(traceback.format_exc())
+                self.logger.error(
+                    f"Request failed (attempt {_ + 1}/{self.max_retry_num}): {e}"
+                )
                 res = {}
             if len(res) != 0 and "error" not in res:
                 break
@@ -190,12 +191,11 @@ class BotClient:
         req_data["messages"] = self.truncate_messages(req_data["messages"])
 
         last_error = None
+        self.logger.info(f"[MODEL] {model_url}")
+        self.logger.info("[req_data]====>")
+        self.logger.info(json.dumps(req_data, ensure_ascii=False))
         for _ in range(self.max_retry_num):
             try:
-                self.logger.info(f"[MODEL] {model_url}")
-                self.logger.info("[req_data]====>")
-                self.logger.info(json.dumps(req_data, ensure_ascii=False))
-
                 yield from self.call_back_stream(model_url, req_data)
                 return
 
