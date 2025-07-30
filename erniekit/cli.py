@@ -23,7 +23,7 @@ from functools import partial
 from pathlib import Path
 
 from .utils.env import VERSION
-from .utils.process import terminate_process_tree
+from .utils.process import terminate_process_tree, detect_device, set_ascend_environment
 
 script_dir = Path(__file__).parent.resolve()
 parent_dir = script_dir.parent
@@ -94,12 +94,15 @@ def main():
     nnodes = os.getenv("NNODES", "1")
     master_ip = os.getenv("MASTER_ADDR", "127.0.0.1")
     master_port = os.getenv("MASTER_PORT", "8080")
-    is_xpu = os.getenv("XPU_ENABLED", False)
-
-    if is_xpu:
+    current_device = detect_device()
+    if current_device == "xpu":
         num_xpus = paddle.device.xpu.device_count()
         default_xpus = ",".join(map(str, range(0, num_xpus)))
         visible_cards = os.getenv("XPU_VISIBLE_DEVICES", default_xpus)
+    elif current_device == "npu":
+        num_npus = len(paddle.device.get_available_custom_device())
+        default_npus = ",".join(map(str, range(0, num_npus)))
+        visible_cards = os.getenv("ASCEND_RT_VISIBLE_DEVICES", default_npus)
     else:
         import GPUtil
 
@@ -129,7 +132,7 @@ def main():
     os.environ["NVIDIA_TF32_OVERRIDE"] = "0"
     os.environ["FLAGS_dataloader_use_file_descriptor"] = "False"
 
-    if is_xpu:
+    if current_device == "xpu":
         os.environ["FLAGS_use_stride_kernel"] = "0"
         os.environ["XPU_PADDLE_L3_SIZE"] = "0"
         os.environ["XPUAPI_DEFAULT_SIZE"] = "2205258752"
@@ -149,6 +152,13 @@ def main():
         os.environ["XPU_PADDLE_FC_LOCAL_INT16"] = "1"
         os.environ["XPU_AUTO_BF16_TF32_RADIO"] = "10"
         os.environ["XPU_AUTO_BF16_TF32"] = "1"
+    elif current_device == "npu":
+        os.environ["FLAGS_allocator_strategy_kernel"] = "auto_growth"
+        os.environ["FLAGS_npu_jit_compile"] = "0"
+        try:
+            set_ascend_environment()
+        except Exception as e:
+            print("Unexpected error setting Ascend environment: %s", e)
 
     if command in distributed_funcs:
 
@@ -162,18 +172,11 @@ def main():
         # launch distributed training
         env = deepcopy(os.environ)
         args_to_pass = " ".join(shlex.quote(arg) for arg in sys.argv[1:])
-        if is_xpu:
-            command = (
-                f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
-                f"--xpus {visible_cards} --master {master_ip}:{master_port} "
-                f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
-            )
-        else:
-            command = (
-                f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
-                f"--gpus {visible_cards} --master {master_ip}:{master_port} "
-                f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
-            )
+        command = (
+            f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
+            f"--{current_device}s {visible_cards} --master {master_ip}:{master_port} "
+            f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
+        )
         command = shlex.split(command)
         process = subprocess.Popen(
             command,
