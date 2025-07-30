@@ -112,6 +112,14 @@ def _fusion_flash_attention(
         weights = None
     else:
         if rr_flash_attn is None:
+
+            sk0, b0, ng0, hn0 = q.shape
+            sk, b, ng, hn = k.shape
+            repeat = ng0 // ng
+            if repeat > 1:
+                k = k.view([sk, b, ng, 1, hn]).expand([sk, b, ng, repeat, hn]).contiguous().view([sk, b, repeat * ng, hn])
+                v = v.view([sk, b, ng, 1, hn]).expand([sk, b, ng, repeat, hn]).contiguous().view([sk, b, repeat * ng, hn])
+
             out = F.scaled_dot_product_attention(
                 q,
                 k,
