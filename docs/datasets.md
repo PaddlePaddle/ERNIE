@@ -15,7 +15,7 @@ train_dataset_path: "./examples/data/sft-train.jsonl"
 train_dataset_prob: "1.0"
 
 # multi-source
-train_dataset_type: "erniekit,erniekit"
+train_dataset_type: "erniekit"
 train_dataset_path: "./examples/data/sft-train1.jsonl,./examples/data/sft-train2.jsonl"
 train_dataset_prob: "0.8,0.2"
 ```
@@ -37,7 +37,7 @@ train_dataset_path: "BelleGroup/train_2M_CN"
 train_dataset_prob: "1.0"
 
 # multi-source
-train_dataset_type: "alpaca,alpaca"
+train_dataset_type: "alpaca"
 train_dataset_path: "llamafactory/alpaca_gpt4_zh,BelleGroup/train_2M_CN"
 train_dataset_prob: "0.8,0.2"
 ```
