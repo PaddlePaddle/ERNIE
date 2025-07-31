@@ -1,7 +1,7 @@
 # -----------环境变量----------------------#
 env:
     HOME: null
- 
+
 # ---------------------------model args-------------------------------------------------#
 model_args:
     model_name_or_path: model_configs/
@@ -11,12 +11,12 @@ model_args:
     max_seq_length: 4096
     base_seq_length: 4096
     num_consecutive: 32
- 
+
     enable_global_training_logs: False
     moe_use_aux_free_update_coef: 0.001
     global_logging_interval: 10
     enable_mtp_magic_send: True
- 
+
     model_config:
         num_hidden_layers: 24
         moe_num_experts: 16
@@ -27,7 +27,7 @@ model_args:
         use_quant_before_a2a: true
         use_async_a2a: false
         use_rms_qkv_recompute: true
- 
+
         moe_logging: True
         moe_use_aux_free: true
         use_recompute: false
@@ -45,16 +45,16 @@ model_args:
             split_group_gemm: false
             spaq: true
             transpose_split_quant: true
- 
+
         moe_gate: top2_fused
- 
- 
- 
+
+
+
 # ---------------------------trainer args-------------------------------------------------#
 trainer_args:
     input_dir: "0.4 ./demo_data/data-1-part0 0.6 ./demo_data/data-1-part0"
     split: "998,1,1"
- 
+
     use_sp_callback: true
     moe_gate_lr_ratio: 0.01
     do_train: True
@@ -72,16 +72,16 @@ trainer_args:
     adam_epsilon: 1e-8
     learning_rate: 2.2e-4
     min_lr: 2.2e-5
- 
+
     gradient_accumulation_steps: 90
     per_device_train_batch_size: 2
     per_device_eval_batch_size: 1
- 
+
     lr_scheduler: wsd:231084
     decay_function: 1-sqrt
     max_grad_norm: 1.0
     use_async_save: True
- 
+
     weight_decay: 0.1
     warmup_steps: 200
     save_total_limit: 5
@@ -93,7 +93,7 @@ trainer_args:
     use_train_part_sharding: 1
     pre_alloc_memory: 70
     offload_optim: True
- 
+
     pipeline_parallel_degree: 4
     tensor_parallel_degree: 1
     virtual_pp_degree: 1
@@ -107,13 +107,10 @@ trainer_args:
     sharding_comm_buffer_size_MB: 2048
     tensor_parallel_config: sync_param sync_grad sync_moment
     hybrid_parallel_topo_order: sharding_first
- 
+
     skip_profile_timer: True
     ignore_data_skip: 0
     shuffle_consecutive: True
-    load_sharded_model: True
-    save_sharded_model: True
-    save_sharding_stage1_model_include_freeze_params: True
     ignore_load_lr_and_optim: False
     metrics_output_path: ./output/paddle_distributed_logs/
     pdc_download_ckpt: true
@@ -124,3 +121,7 @@ trainer_args:
     log_global_grad_norm: True
     enable_optimizer_timer: False
     gc_interval: 100000
+
+    unified_checkpoint: true
+    use_expert_parallel: true
+    unified_checkpoint_config: "skip_save_model_weight"
