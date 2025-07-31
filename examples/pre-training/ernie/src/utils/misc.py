@@ -12,20 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import logging
-import re
+# -*- coding: utf-8 -*-
+# !/usr/bin/env python3
 
-import numpy as np
+import re
+import logging
 import paddle
 import paddle.distributed as dist
+import numpy as np
+import copy
 
 logger = logging.getLogger(__name__)
 
 try:
-    from models.sequence_parallel_utils import get_async_loader
+    from ernie_core.models.sequence_parallel_utils import get_async_loader
     from paddle.incubate.tensor.manipulation import async_offload
 except ImportError:
+    logger.warning("cannot import async_loader, upgrate to fleety 10.8+")
     get_async_loader = async_offload = None
 
 __all__ = (
@@ -36,7 +39,11 @@ __all__ = (
 ZERO = paddle.zeros([], dtype="float32")
 
 
-class SmoothedValue:
+class SmoothedValue(object):
+    """Track a series of values and provide access to smoothed values over a
+    window or the global series average.
+    """
+
     def __init__(
         self,
         skip_zero,
@@ -47,6 +54,11 @@ class SmoothedValue:
 
     @paddle.no_grad()
     def update(self, value):
+        """update
+
+        Args:
+            value (_type_): _description_
+        """
         if isinstance(value, paddle.Tensor):
             value = value.astype("float32").detach()
             if value.shape == [1]:
@@ -58,14 +70,32 @@ class SmoothedValue:
 
     @property
     def global_avg(self):
+        """global avg
+
+        Returns:
+            _type_: _description_
+        """
         return self.total / max(self.count, 1e-6)
 
     def reset(self):
+        """reset"""
         self.total = 0.0
         self.count = 0
 
 
-class TrainingLogs:
+class TrainingLogs(object):
+    """TrainingLogs
+
+    Args:
+        object (_type_): _description_
+
+    Raises:
+        AttributeError: _description_
+
+    Returns:
+        _type_: _description_
+    """
+
     _instance = None
 
     def __new__(cls, *args, **kw):
@@ -82,18 +112,24 @@ class TrainingLogs:
         self._skip_zero_keys = []
 
     def set_trainer_interval(self, trainer, logging_interval):
+        """
+        set_trainer_interval
+        """
         self.trainer = trainer
         self.logging_interval = logging_interval
 
     @property
     def global_meters_keys(self):
+        """set global meters keys"""
         return self._global_meters_keys
 
     @global_meters_keys.setter
     def global_meters_keys(self, lst):
+        """set global meters keys"""
         self._global_meters_keys = lst
 
     def enable_skip_zero(self, keys=[]):
+        """skip logging zero tensor"""
         logger.info("global_training_logs: use skip zero")
         self._skip_zero_keys = keys
         for m in self.meters.keys():
@@ -102,11 +138,18 @@ class TrainingLogs:
                     m._skip_zero = True
 
     def update(self, **kwargs):
+        """update"""
         for k, v in kwargs.items():
             self[k] = v
 
     def is_enabled(self):
-        return self.trainer is None or (self.trainer.state.global_step + 1) % self.logging_interval == 0
+        """
+        is_enabled
+        """
+        return (
+            self.trainer is None
+            or (self.trainer.state.global_step + 1) % self.logging_interval == 0
+        )
 
     def __setitem__(self, k, v):
         skip_zero = False
@@ -117,17 +160,40 @@ class TrainingLogs:
         metric.update(v)
 
     def __getitem__(self, v):
+        """pass"""
         return self.meters[v]
 
     def __getattr__(self, attr):
+        """gate attr
+
+        Args:
+            attr (_type_): _description_
+
+        Raises:
+            AttributeError: _description_
+
+        Returns:
+            _type_: _description_
+        """
         if attr in self.meters:
             return self.meters[attr]
         if attr in self.__dict__:
             return self.__dict__[attr]
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{attr}'")
+        raise AttributeError(
+            "'{}' object has no attribute '{}'".format(type(self).__name__, attr)
+        )
 
     def dict(self, use_async=False):
-        avg_metric = {k: v.global_avg for k, v in self.meters.items() if k not in self.global_meters_keys}
+        """序列化
+
+        Returns:
+            _type_: _description_
+        """
+        avg_metric = {
+            k: v.global_avg
+            for k, v in self.meters.items()
+            if k not in self.global_meters_keys
+        }
 
         if self.global_meters_keys:
             tensor_lst = []
@@ -138,22 +204,30 @@ class TrainingLogs:
             dist.gather(paddle.stack(tensor_lst), gathered_v, 0)
             if gathered_v:
                 for i, k in enumerate(self.global_meters_keys):
-                    avg_metric[k] = np.mean([t[i] for t in gathered_v if t[i] != -100]).item()
+                    avg_metric[k] = np.mean(
+                        [t[i] for t in gathered_v if t[i] != -100]
+                    ).item()
 
         if not use_async:
-            ret = {k: v.item() if isinstance(v, paddle.Tensor) else v for k, v in avg_metric.items()}
+            ret = {
+                k: v.item() if isinstance(v, paddle.Tensor) else v
+                for k, v in avg_metric.items()
+            }
             global_info = {k: v for k, v in ret.items() if k in self.global_meters_keys}
             ret = {
                 k: v
                 for k, v in ret.items()
-                if (k not in self.global_meters_keys) and ((not self.meters[k]._skip_zero) or v != 0.0)
+                if (k not in self.global_meters_keys)
+                and ((not self.meters[k]._skip_zero) or v != 0.0)
             }
             return ret, global_info
-        assert get_async_loader is not None, "async logging requires latest paddle"
+        assert get_async_loader is not None, "async logging requires fleety > 10.8"
         if not avg_metric:
             return lambda: ({}, {})
         keys, values = zip(*avg_metric.items())
-        tensor_list = [(i, t) for i, t in enumerate(values) if isinstance(t, paddle.Tensor)]
+        tensor_list = [
+            (i, t) for i, t in enumerate(values) if isinstance(t, paddle.Tensor)
+        ]
         if tensor_list:
             async_loader = get_async_loader()
             tensor_id, tensor_list = zip(*tensor_list)
@@ -174,22 +248,28 @@ class TrainingLogs:
             ret = {
                 k: v
                 for k, v in ret.items()
-                if (k not in self.global_meters_keys) and ((not self.meters[k]._skip_zero) or v != 0.0)
+                if (k not in self.global_meters_keys)
+                and ((not self.meters[k]._skip_zero) or v != 0.0)
             }
             return ret, global_info
 
         return _ret
 
     def reset(self):
+        """reset"""
         for k in list(self.meters.keys()):
             self.meters[k].reset()
             self.meters.pop(k)
 
     def take_snapshot(self):
+        """take_snapshot"""
         self.snapshot = copy.deepcopy(self.meters)
 
     def restore_snapshot(self):
-        assert self.snapshot is not None, "you should use take_snapshot before restore_snapshot"
+        """restore_snapshot"""
+        assert (
+            self.snapshot is not None
+        ), "you should use take_snapshot before restore_snapshot"
         self.meters = copy.deepcopy(self.snapshot)
         self.snapshot = None
 

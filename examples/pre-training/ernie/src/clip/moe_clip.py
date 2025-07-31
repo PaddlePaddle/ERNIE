@@ -12,8 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
+
+# !/usr/bin/env python3
+"""
+该文件从 `https://github.com/PaddlePaddle/Paddle/blob/03a2f1878cc37efabe55e3dbdf9c08f80019c0e1/python/paddle/distributed/parallel.py#L463`
+移植而来，主要在moe场景下增加了 grad-norm 的打印功能。
+"""
 import math
+import logging
 
 import paddle
 import paddle.distributed as dist
@@ -26,6 +32,67 @@ logger = logging.getLogger(__name__)
 
 
 class ClipGradForMOEByGlobalNorm(ClipGradBase):
+    r"""
+    The Algrithm is the same as paddle.nn.ClipGradByGlobalNorm
+    Given a list of Tensor :math:`t\_list` , calculate the global norm for the elements of all tensors in
+    :math:`t\_list` , and limit it to ``clip_norm`` .
+
+    - If the global norm is greater than ``clip_norm`` , all elements of :math:`t\_list` will be compressed by a ratio.
+
+    - If the global norm is less than or equal to ``clip_norm`` , nothing will be done.
+
+    The list of Tensor :math:`t\_list` is not passed from this class, but the gradients of all parameters set in ``optimizer``.
+    If ``need_clip`` of specific param is ``False`` in its ``ParamAttr``, then the gradients of this param will not be clipped.
+
+    Gradient clip will takes effect after being set in ``optimizer`` , see the document ``optimizer``
+    (for example: :ref:`api_paddle_optimizer_SGD`).
+
+    The clipping formula is:
+
+    .. math::
+
+        t\_list[i] = t\_list[i] * \frac{clip\_norm}{\max(global\_norm, clip\_norm)}
+
+    where:
+
+    .. math::
+
+        global\_norm = \sqrt{\sum_{i=0}^{N-1}(l2norm(t\_list[i]))^2}
+
+    Note:
+        ``need_clip`` of ``ClipGradyGlobalNorm`` HAS BEEN DEPRECATED since 2.0.
+        Please use ``need_clip`` in ``ParamAttr`` to speficiy the clip scope.
+
+    Reference:
+        https://github.com/laekov/fastmoe/blob/master/examples/megatron/clip-grad-v2.2.patch
+        Git commit hash: 295a615aacce7e54a37e7935274ba15e901c78e4
+
+
+    Args:
+        clip_norm (float): The maximum norm value.
+        is_expert_param_func (function): a function to decide whether a param should be put into moe_params_grads
+        moe_group (Group): group for moe experts communication.
+        group_name (str, optional): The group name for this clip. Default value is ``default_moe_group``.
+
+    Examples:
+        .. code-block:: python
+
+            import paddle
+
+            x = paddle.uniform([10, 10], min=-1.0, max=1.0, dtype='float32')
+            linear = paddle.nn.Linear(in_features=10, out_features=10,
+                                      weight_attr=paddle.ParamAttr(need_clip=True),
+                                      bias_attr=paddle.ParamAttr(need_clip=False))
+            out = linear(x)
+            loss = paddle.mean(out)
+            loss.backward()
+
+            is_expert_func = lambda param: "expert_" in param.name
+            clip = paddle.nn.ClipGradForMOEByGlobalNorm(clip_norm=1.0,is_expert_func, None)
+            sdg = paddle.optimizer.SGD(learning_rate=0.1, parameters=linear.parameters(), grad_clip=clip)
+            sdg.step()
+    """
+
     def __init__(
         self,
         clip_norm,
@@ -51,6 +118,9 @@ class ClipGradForMOEByGlobalNorm(ClipGradBase):
 
     @staticmethod
     def get_l2_norm_pow(params_grads, sum_dtype=None):
+        """
+        从 paddle 框架中移植而来
+        """
         sum_square_list = []
         sum_square_list_fp16 = []
         sum_square_list_fp32 = []
@@ -71,7 +141,11 @@ class ClipGradForMOEByGlobalNorm(ClipGradBase):
             else:
                 sum_square_list.append(sum_square.cast("float64"))
 
-        if len(sum_square_list) + len(sum_square_list_fp16) + len(sum_square_list_fp32) == 0:
+        # all parameters have been filterd out
+        if (
+            len(sum_square_list) + len(sum_square_list_fp16) + len(sum_square_list_fp32)
+            == 0
+        ):
             return None, None
         assert sum_dtype in [
             "float64",
@@ -102,6 +176,7 @@ class ClipGradForMOEByGlobalNorm(ClipGradBase):
         normal_params_grads = []
         moe_params_grads = []
 
+        # separate moe params from normal params
         if self.moe_group is not None and self.moe_group.nranks > 1:
             for p, g in params_grads:
                 if self.is_expert_param_func(p):
@@ -111,6 +186,9 @@ class ClipGradForMOEByGlobalNorm(ClipGradBase):
         else:
             normal_params_grads = params_grads
 
+        # why to return sum_dtype?
+        # we will call `get_l2_norm_pow` twice and the precisions may be different.
+        # For convenience and simplification, we use sum_dtype directly instead of global_norm_var_normal.dtype
         global_norm_var_normal, sum_dtype = self.get_l2_norm_pow(normal_params_grads)
         global_norm_var_moe = None
         if len(moe_params_grads) > 0:
@@ -130,18 +208,30 @@ class ClipGradForMOEByGlobalNorm(ClipGradBase):
             global_norm_var = global_norm_var_normal
         else:
             if global_norm_var_normal.dtype != global_norm_var_moe.dtype:
-                global_norm_var_normal = global_norm_var_normal.astype(global_norm_var_moe.dtype)
+                # compared with normal norm, moe norm is the later one,
+                # so its precision is no lower than normal norm
+                global_norm_var_normal = global_norm_var_normal.astype(
+                    global_norm_var_moe.dtype
+                )
             if self.local_clip:
                 global_norm_var = global_norm_var_normal
             else:
                 global_norm_var = global_norm_var_normal + global_norm_var_moe
-            self.stat["local_grad_norm"] = math.sqrt(global_norm_var_normal.astype("float32").item())
-            self.stat["moe_grad_norm"] = math.sqrt(global_norm_var_moe.astype("float32").item())
-            self.stat["global_grad_norm"] = math.sqrt(global_norm_var.astype("float32").item())
+            self.stat["local_grad_norm"] = math.sqrt(
+                global_norm_var_normal.astype("float32").item()
+            )
+            self.stat["moe_grad_norm"] = math.sqrt(
+                global_norm_var_moe.astype("float32").item()
+            )
+            self.stat["global_grad_norm"] = math.sqrt(
+                global_norm_var.astype("float32").item()
+            )
 
         params_and_grads = []
         global_norm_var = paddle.sqrt(global_norm_var)
-        max_global_norm = paddle.full(shape=[1], dtype=global_norm_var.dtype, fill_value=self.clip_norm)
+        max_global_norm = paddle.full(
+            shape=[1], dtype=global_norm_var.dtype, fill_value=self.clip_norm
+        )
         clip_var = paddle.divide(
             x=max_global_norm,
             y=paddle.maximum(x=global_norm_var, y=max_global_norm),
@@ -152,7 +242,12 @@ class ClipGradForMOEByGlobalNorm(ClipGradBase):
             if getattr(p, "need_clip", True) is False:
                 params_and_grads.append((p, g))
                 continue
-            clip_input = clip_var.astype("float16") if g.dtype == core.VarDesc.VarType.FP16 else clip_var
+            # TODO(wangxi): use inplace elementwise_mul
+            clip_input = (
+                clip_var.astype("float16")
+                if g.dtype == core.VarDesc.VarType.FP16
+                else clip_var
+            )
             new_grad = paddle.multiply(x=g, y=clip_input.astype(g.dtype))
             params_and_grads.append((p, new_grad))
         return params_and_grads

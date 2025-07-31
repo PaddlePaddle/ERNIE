@@ -1,0 +1,1 @@
+{"bos_token": "<s>", "cls_token": "<unk>", "eos_token": "</s>", "mask_token": "<unk>", "pad_token": "<unk>", "sep_token": "<unk>", "unk_token": "<unk>", "additional_special_tokens": null, "tokenizer_class": "ErnieBotTokenizer"}

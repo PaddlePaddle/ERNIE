@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .clip import ClipGradByAdaptiveNorm
 from .moe_clip import ClipGradForMOEByGlobalNorm
 
-__all__ = ['ClipGradForMOEByGlobalNorm']
+__all__ = [
+    "ClipGradForMOEByGlobalNorm",
+    "ClipGradByAdaptiveNorm",
+]

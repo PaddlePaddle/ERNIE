@@ -1,0 +1,3632 @@
+# !/usr/bin/env python3
+
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Paddle Ernie model"""
+import math
+from functools import partial
+import logging
+from typing import Optional, Tuple
+import contextlib
+import inspect
+
+try:
+    from fast_ln import fast_ln
+except ImportError:
+    fast_ln = None
+
+from copy import deepcopy
+from dataclasses import dataclass
+import numpy as np
+import paddle
+import paddle.distributed as dist
+import paddle.nn.functional as F
+from paddle import nn
+from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import recompute
+from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
+from paddle.incubate.nn.memory_efficient_attention import (
+    memory_efficient_attention,
+    BlockDiagonalCausalMask,
+)
+
+
+# from src/ops which is install in build_envs
+
+from paddleformers.transformers.conversion_utils import (
+    StateDictNameMapping,
+    init_name_mappings,
+)
+
+from paddleformers.transformers.model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions as _BaseModelOutput,
+)
+from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAttentions
+
+from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
+
+from models.ernie.modeling import FusedDropoutImpl
+from models.sequence_parallel_utils import (
+    sequence_parallel_sparse_mask_labels,
+)
+from models.moe.moe_layer_auto import (
+    MOELayerAuto,
+)
+from .configuration import ErnieMoEConfig
+from models.moe.moe_utils import get_mesh
+
+# Because param_name is generated based on the class name,
+# when changes in distributed strategies result in class modifications,
+# there may be mismatches during parameter loading.
+# You can achieve class name changes by importing the following environment variables.
+# Example: `export rowcol_parallel_linear_class_name_convert_map="tpsp->smp"`
+
+
+@dataclass
+class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
+    """doc"""
+
+    router_loss: Optional[paddle.Tensor] = None
+    gate_logits: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
+    """doc"""
+
+    router_loss: Optional[paddle.Tensor] = None
+
+
+from models.refined_recompute.flash_attn import RefinedRcomputeFlashAttention
+from models.comm_utils import subbatch
+
+from models.moe.top2_gate import Top2Gate
+from models.moe.top2_gate_auto import TopKGateFusedAuto
+from models.moe.round_robin_gate import RoundRobinGate, RoundRobinGateFused
+from models.moe.random_gate import RandomGate
+from models.moe.sinkhorn_gate import SinkHornGate, SinkHornGateFused
+from models.moe.task_gate import TaskGate
+
+
+logger = logging.getLogger(__name__)
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+
+    logger.warning(
+        "Use flash attention in scaled-dot-product. Attention mask is deprecated"
+    )
+except (ImportError, ModuleNotFoundError):
+    flash_attention = None
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention_with_mask
+except (ImportError, ModuleNotFoundError):
+    try:
+        from paddle.nn.functional.flash_attention import (
+            scaled_dot_product_attention as flash_attention_with_mask,
+        )
+    except (ImportError, ModuleNotFoundError):
+        logger.warning(
+            "flash_attention_with_mask not found. Use FleetY8.2 SFT instead."
+        )
+        flash_attention_with_mask = None
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention_with_sparse_mask
+except (ImportError, ModuleNotFoundError):
+    logger.warning("flash_attention_with_sparse_mask not found. Use FleetY8.9 instead.")
+    flash_attention_with_sparse_mask = None
+
+try:
+    from to_block_diag_causal_mask import to_block_diag_causal_mask
+except (ImportError, ModuleNotFoundError):
+    logger.warning("to_block_diag_causal_mask not found. Use FleetY8.2 SFT instead.")
+    to_block_diag_causal_mask = None
+
+try:
+    import fused_ln as fused
+except ImportError:
+    logger.warning(
+        "fused-ln not found, run `python src/ops/fused_ln_setup.py install` to build fused ln"
+    )
+    fused = None
+
+try:
+    from paddle.incubate.nn.functional import (
+        fused_rotary_position_embedding as fused_rope,
+    )
+except (ImportError, ModuleNotFoundError):
+    logger.warning("fused_rotary_position_embedding not found")
+    fused_rope = None
+
+try:
+    from paddle.incubate.nn.functional import swiglu as fused_swiglu
+except (ImportError, ModuleNotFoundError):
+    fused_swiglu = None
+
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
+
+ERNIE_PRETRAINED_MODEL_ARCHIVE_LIST = []
+
+__all__ = [
+    "ErnieModelAuto",
+    "ErniePretrainedModelAuto",
+    "ErnieForCausalLMAuto",
+]
+
+
+gate_class = dict(
+    round_robin=RoundRobinGate,
+    round_robin_fused=RoundRobinGateFused,
+    random=RandomGate,
+    top2=Top2Gate,
+    top2_fused=TopKGateFusedAuto,
+    sinkhorn=SinkHornGate,
+    sinkhorn_fused=SinkHornGateFused,
+    task_gate=TaskGate,
+)
+
+
+def is_pp_enable():
+    """
+    判断是否使用pp
+    """
+    mesh = fleet.auto.get_mesh()
+    return "pp" in mesh.dim_names
+
+
+def global_mesh_starts_with_pp():
+    """
+    获得以pp为开始顺序的全局mesh
+    """
+    mesh = fleet.auto.get_mesh()
+    if is_pp_enable():
+        return mesh.get_mesh_with_dim("pp")
+    else:
+        return mesh
+
+
+# NOTE(zengjinle): do not use this method!
+def is_fleety_func():
+    """
+    Check whether it is PaddlePaddle FleetY version.
+    """
+    if flash_attention_with_sparse_mask is None:
+        return True
+
+    args = inspect.getfullargspec(flash_attention_with_sparse_mask).args
+    return "causal" in args
+
+
+IS_FLEETY = is_fleety_func()
+
+
+def get_triangle_upper_mask(x, mask=None):
+    """
+    生成上三角矩阵掩码，用于注意力机制中避免对自身的关注。
+
+    Args:
+        x (Tensor): 输入的Tensor，用于确定掩码的形状，形状应为 [bsz, n_head, q_len, kv_seq_len]。
+        mask (Tensor, optional): 如果已经存在掩码，则直接返回该掩码。默认为None。
+
+    Returns:
+        Tensor: 上三角矩阵掩码，形状为 [bsz, 1, q_len, kv_seq_len]，数据类型与输入Tensor相同。
+
+    """
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, -np.inf, dtype=x.dtype)
+    mask.stop_gradient = True
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
+
+
+def naive_fuse_split_tp(
+    weight,
+    tensor_parallel_degree,
+    tensor_parallel_rank=None,
+    is_column=True,
+    fuse_tensor_parts=2,
+):
+    """doc"""
+    logging.info(f"spliting fused-ffn: {weight.shape}")
+    axis = -1 if is_column else 0
+    splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+    return np.concatenate(
+        splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis
+    )
+
+
+def parallel_matmul(
+    x,
+    y,
+    bias=None,
+    transpose_y=False,
+    tensor_parallel_degree=1,
+    tensor_parallel_output=True,
+):
+    """doc"""
+    if transpose_y:
+        logits = paddle.matmul(x, y, transpose_y=True)
+        if bias is not None:
+            logits += bias
+    else:
+        logits = F.linear(x, y, bias)
+
+    if tensor_parallel_degree > 1 and not tensor_parallel_output:
+        logits = dist.reshard(logits, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
+
+    return logits
+
+
+def calc_lm_head_logits(
+    config,
+    hidden_states,
+    weight,
+    bias,
+    sparse_label_idx=None,
+    tensor_parallel_output=None,
+):
+    """the core function to calc lm head"""
+    if config.sequence_parallel or config.submatrix_parallel:
+
+        assert (
+            not config.use_sparse_head_and_loss_fn
+        ), "use_sparse_head_and_loss_fn is not supported now."
+
+        # do all gather
+        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+        dp_rank = hcg.get_data_parallel_rank()
+        sharding_rank = hcg.get_sharding_parallel_rank()
+        if dp_rank <= 1 and sharding_rank <= 1:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(-1),
+                [dist.Replicate(), dist.Replicate()],
+            )
+        else:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(-1),
+                [dist.Shard(1), dist.Replicate()],
+            )
+        # [S, B, H] to [B, S, H]
+        hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+        if not config.using_dynamic_sequence_length:
+            hidden_states = hidden_states.reshape(
+                [-1, config.seqlen, hidden_states.shape[-1]]
+            )
+        else:
+            assert (
+                config.micro_batch_size
+            ), "micro_batch_size should be set when using dygramic sequence length."
+            hidden_states = hidden_states.reshape(
+                [config.micro_batch_size, -1, hidden_states.shape[-1]]
+            )
+    if tensor_parallel_output is None:
+        tensor_parallel_output = config.tensor_parallel_output
+    logits = parallel_matmul(
+        hidden_states,
+        weight,
+        bias=bias,
+        transpose_y=config.tie_word_embeddings,
+        tensor_parallel_degree=config.tensor_parallel_degree,
+        tensor_parallel_output=tensor_parallel_output,
+    )
+
+    return logits
+
+
+def finfo(dtype: paddle.dtype = None):
+    """
+    返回与给定Paddle数据类型相对应的Numpy finfo对象。
+
+    Args:
+        dtype (paddle.dtype, optional): 要查询的Paddle数据类型。如果为None，则使用Paddle的默认数据类型。
+
+    Returns:
+        Union[BFloatFInfo, np.finfo]:
+        - BFloatFInfo: 当dtype为paddle.bfloat16时，返回自定义的BFloatFInfo类，其中包含bfloat16的最小值。
+        - np.finfo: 当dtype为paddle.float32, paddle.float16或paddle.float64时，返回与Numpy对应数据类型的finfo对象。
+
+    Raises:
+        无特定异常。
+
+    """
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+
+        class BFloatFInfo:
+            """
+            Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+            """
+
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
+    if dtype == paddle.float32:
+        return np.finfo(np.float32)
+    if dtype == paddle.float16:
+        return np.finfo(np.float16)
+    if dtype == paddle.float64:
+        return np.finfo(np.float64)
+
+
+def masked_fill(x, mask, value):
+    """
+    对输入的张量x进行按位填充操作，将mask为True的位置填充为value。
+
+    Args:
+        x (Tensor): 需要进行填充操作的输入张量，数据类型可以是float32、float64、int32、int64等。
+        mask (Tensor): 布尔类型的张量，形状与x相同，用于指示哪些位置需要进行填充。
+        value (float或int): 需要填充的值，数据类型与x相同。
+
+    Returns:
+        Tensor: 经过填充后的张量，与x具有相同的形状和数据类型。
+
+    """
+    y = paddle.full(x.shape, value, x.dtype)
+    return paddle.where(mask, y, x)
+
+
+def mem_eff_attn(
+    query, key, value, pack_offset, drop_prob=0.0, dtype=paddle.bfloat16, training=True
+):
+    """doc"""
+    pack_offset = pack_offset.numpy()
+    shape = pack_offset.shape
+    assert len(shape) == 2, len(shape)
+    assert shape[0] == 1, shape[0]
+    n = pack_offset.size
+    pack_offset = pack_offset.flatten()
+    seqlens = []
+    assert pack_offset[0] == 0, pack_offset[0]
+    for i in range(1, n):
+        if pack_offset[i] < 0:
+            break
+        cur = pack_offset[i] - pack_offset[i - 1]
+        assert cur > 0
+        seqlens.append(cur)
+
+    assert drop_prob == 0.0, drop_prob
+    assert dtype == paddle.bfloat16, dtype
+
+    def cast(x):
+        return x.astype(dtype) if x.dtype != dtype else x
+
+    if len(seqlens) == 1:
+        out, _ = flash_attention(
+            query, key, value, drop_prob, causal=True, training=training
+        )
+    else:
+        mask = BlockDiagonalCausalMask.from_seqlens(seqlens)
+        out = memory_efficient_attention(
+            cast(query),
+            cast(key),
+            cast(value),
+            attn_bias=mask,
+            p=drop_prob,
+            training=training,
+        )
+    return out
+
+
+def inbatch_pack_offset_to_attn_mask_start_row_indices(inbatch_pack_offset):
+    """convert inbatch_pack_offset to attn_mask_start_row_indices"""
+    inbatch_pack_offset = inbatch_pack_offset.numpy()
+    attn_mask_row_start_indices = []
+    min_start_row = np.inf
+    for bidx in range(inbatch_pack_offset.shape[0]):
+        item = inbatch_pack_offset[bidx]
+        cumsum_item = item[item != -1]
+        record_lens = cumsum_item[1:] - cumsum_item[0:-1]
+        min_start_row = min(cumsum_item[1], min_start_row)
+        row_start_indices = np.repeat(cumsum_item[1:], record_lens)
+        attn_mask_row_start_indices.append(row_start_indices[None, None, ...])
+    attn_mask_row_start_indices = np.concatenate(attn_mask_row_start_indices, axis=0)
+    return paddle.to_tensor(attn_mask_row_start_indices, dtype=paddle.int32), int(
+        min_start_row
+    )
+
+
+def scaled_dot_product_attention(
+    query_states,
+    key_states,
+    value_states,
+    attention_mask,
+    output_attentions,
+    config,
+    is_causal=True,
+    rr_flash_attn=None,
+    inbatch_pack_offset=None,
+    training=True,
+):
+    """doc"""
+    bsz, q_len, num_heads, head_dim = query_states.shape
+    _, kv_seq_len, num_key_value_heads, _ = value_states.shape
+
+    can_use_fa = config.use_flash_attn and flash_attention is not None
+    can_use_fa_sparse_mask = (
+        config.use_mem_eff_attn
+        and inbatch_pack_offset is not None
+        and flash_attention_with_sparse_mask is not None
+    )
+
+    if not can_use_fa and not can_use_fa_sparse_mask:
+        if query_states.shape[-2] != key_states.shape[-2]:
+            key_states = key_states.repeat_interleave(
+                num_heads // num_key_value_heads, axis=-2
+            )
+        if query_states.shape[-2] != value_states.shape[-2]:
+            value_states = value_states.repeat_interleave(
+                num_heads // num_key_value_heads, axis=-2
+            )
+
+    if can_use_fa:
+        # Flash Attention now ignore attention mask
+        # Current Flash Attention doesn't support attn maskt
+        # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+        # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+        # without past keys
+        if rr_flash_attn is not None:
+            attn_output, attn_weights = rr_flash_attn(
+                query_states,
+                key_states,
+                value_states,
+                dropout=config.attention_probs_dropout_prob,
+                causal=is_causal and query_states.shape[1] != 1,
+                return_softmax=output_attentions,
+            )
+        else:
+            attn_output, attn_weights = flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                dropout=config.attention_probs_dropout_prob,
+                causal=is_causal and query_states.shape[1] != 1,
+                return_softmax=output_attentions,
+            )
+
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        return attn_output, attn_weights
+    elif config.use_mem_eff_attn and inbatch_pack_offset is not None:
+        assert (
+            not output_attentions
+        ), "output_attentions should be False when use_mem_eff_attn=True"
+        if config.use_flash_attn_with_mask:
+            if flash_attention_with_sparse_mask is not None:
+                causal_mask_indices, attn_mask_min_start_row = (
+                    inbatch_pack_offset_to_attn_mask_start_row_indices(
+                        inbatch_pack_offset
+                    )
+                )
+                if IS_FLEETY:
+                    kwargs = {
+                        "causal": True,
+                        "dropout": config.attention_probs_dropout_prob,
+                    }
+                else:
+                    kwargs = {
+                        "is_causal": True,
+                        "dropout_p": config.attention_probs_dropout_prob,
+                    }
+                attn_output = flash_attention_with_sparse_mask(
+                    query_states.astype(value_states.dtype),
+                    key_states.astype(value_states.dtype),
+                    value_states.astype(value_states.dtype),
+                    attn_mask_start_row_indices=causal_mask_indices,
+                    attn_mask_start_row=attn_mask_min_start_row,
+                    **kwargs,
+                )
+            else:
+                attn_mask = to_block_diag_causal_mask(
+                    inbatch_pack_offset, q_len, float("-inf"), "bfloat16"
+                )
+                attn_output = flash_attention_with_mask(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask,
+                    config.attention_probs_dropout_prob,
+                )
+        else:
+            attn_output = mem_eff_attn(
+                query_states,
+                key_states,
+                value_states,
+                inbatch_pack_offset,
+                drop_prob=config.attention_probs_dropout_prob,
+            )
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        return attn_output, None
+    else:
+
+        query_states = paddle.transpose(query_states, [0, 2, 1, 3]) / math.sqrt(
+            head_dim
+        )
+        # merge with the next tranpose
+        key_states = paddle.transpose(key_states, [0, 2, 1, 3])
+        value_states = paddle.transpose(value_states, [0, 2, 1, 3])
+
+        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2]))
+
+        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                f" {attn_weights.shape}"
+            )
+
+        # Pipeline 的Attention mask不能从外面传。
+        if attention_mask is None:
+            attention_mask = get_triangle_upper_mask(attn_weights)
+
+        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
+        if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
+            )
+        # logger.info(attention_mask)
+        if training:
+            attn_weights = attention_mask + attn_weights
+            attn_weights = paddle.maximum(
+                attn_weights,
+                paddle.to_tensor(
+                    float(finfo(query_states.dtype).min), dtype=query_states.dtype
+                ),
+            )
+
+            if paddle.in_dynamic_mode():
+                with paddle.amp.auto_cast(False):
+                    attn_weights = F.softmax(
+                        attn_weights, axis=-1, dtype="float32"
+                    ).astype(query_states.dtype)
+            else:
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(
+                    query_states.dtype
+                )
+        else:  # use inplace operation to save memory
+            attn_weights = attn_weights.cast(paddle.float32)
+            attention_mask = attention_mask.cast(paddle.float32)
+            attn_weights = attn_weights.add_(attention_mask)
+            attn_weights = F.softmax_(attn_weights, axis=-1).astype(query_states.dtype)
+
+        if config.attention_probs_dropout_prob > 0.0:
+            if config.tensor_parallel_degree > 1:
+                with get_rng_state_tracker().rng_state("local_seed"):
+                    attn_weights = F.dropout(
+                        attn_weights,
+                        config.attention_probs_dropout_prob,
+                        training=training,
+                        mode="upscale_in_train",
+                    )
+            else:
+                attn_weights = F.dropout(
+                    attn_weights,
+                    config.attention_probs_dropout_prob,
+                    training=training,
+                    mode="upscale_in_train",
+                )
+
+        attn_output = paddle.matmul(attn_weights, value_states)
+        attn_output = attn_output.transpose([0, 2, 1, 3])
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        if output_attentions:
+            return attn_output, attn_weights
+        return attn_output, None
+
+
+def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
+    """
+    Make causal mask used for self-attention.
+    """
+    batch_size, target_length = input_ids_shape
+
+    mask = paddle.full((target_length, target_length), float(finfo(dtype).min))
+
+    mask_cond = paddle.arange(mask.shape[-1])
+    mask = masked_fill(
+        mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0
+    )
+
+    if past_key_values_length > 0:
+        mask = paddle.concat(
+            [paddle.zeros([target_length, past_key_values_length]), mask], axis=-1
+        )
+
+    return mask[None, None, :, :].expand(
+        [batch_size, 1, target_length, target_length + past_key_values_length]
+    )
+
+
+def _expand_mask(mask, dtype, tgt_length):
+    """
+    Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
+    """
+    if mask.ndim == 4:
+        expanded_mask = mask
+    elif mask.ndim == 3:
+        expanded_mask = mask[:, None, :, :]
+    else:
+        batch_size, src_length = mask.shape[0], mask.shape[-1]
+        tgt_length = tgt_length if tgt_length is not None else src_length
+
+        expanded_mask = mask[:, None, None, :].expand(
+            [batch_size, 1, tgt_length, src_length]
+        )
+
+    inverted_mask = 1.0 - expanded_mask
+    return masked_fill(
+        inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min)
+    )
+
+
+def slice_experts(experts, moe_world_size):
+    moe_num_experts_per_device = len(experts) // moe_world_size
+    experts_per_device = [[] for _ in range(moe_world_size)]
+
+    for i, expert in enumerate(experts):
+        ep_group_id = i // moe_num_experts_per_device
+        experts_per_device[ep_group_id].append(expert)
+
+    lm_experts = nn.LayerList([])
+    for experts_list in experts_per_device:
+        # 每个device上, 前一半为lm expert
+        lm_experts.extend(experts_list[: moe_num_experts_per_device // 2])
+    return lm_experts
+
+
+def get_gate(
+    config: ErnieMoEConfig,
+    expert: Tuple[Tuple[int, nn.Layer]],
+    layer_idx: int,
+    ipp: int = 0,
+) -> Tuple[nn.Layer, nn.LayerList]:
+    """
+    自动构建gate, 目前支持 {gate_class.keys()}
+    """
+    moe_num_experts = (
+        sum(config.moe_num_experts)
+        if config.multimodel_experts
+        else config.moe_num_experts
+    )
+    print("lzx debug moe_num_experts:", moe_num_experts)
+    print("lzx debug config.moe_world_size:", config.moe_world_size)
+    assert (
+        moe_num_experts >= config.moe_world_size
+    ), f"expert moe_num_experts={moe_num_experts} >= moe_world_size={config.moe_world_size}"
+    assert (
+        moe_num_experts % config.moe_world_size == 0
+    ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={config.moe_world_size} == 0"
+    moe_num_experts_per_device = moe_num_experts // config.moe_world_size
+    experts = nn.LayerList([])
+    # 自动并行下, expert在每路dp(ep)下是全局视角, 在每个设备上都会创建全量的experts
+    # 然后再调用redistribute_expert通过shard_tensor每个expert的weight标记到不同的设备上。
+    for expert_id, (experts_num, fc) in enumerate(expert):
+        assert experts_num % config.moe_world_size == 0
+        experts_to_append = []
+        if not hasattr(fc, "__len__"):
+            experts_to_append.append(fc)
+            if expert_id == 1:
+                with paddle.utils.unique_name.guard("_mm_deepcopy"):
+                    for _ in range(experts_num - 1):
+                        experts_to_append.append(deepcopy(fc))
+            else:
+                for _ in range(experts_num - 1):
+                    experts_to_append.append(deepcopy(fc))
+        else:
+            experts_to_append = fc
+        for ex in experts_to_append:
+            for p in ex.parameters():
+                p.expert_type = f"expert_type_{expert_id}"  # 不同的 `expert_type` 可以有不同的 intermediate-size
+        experts.extend(experts_to_append)
+
+    logger.info(
+        f"using moe-world-size: {config.moe_world_size} "
+        f"expert-per-device: {moe_num_experts_per_device} "
+    )
+    if config.moe_use_hard_gate and moe_num_experts <= 2:
+        # TODO 3种类型，hard-gate问题
+        gate = None
+        logger.info("MOE-GATE:-hard-gate")
+    else:
+        logger.info(f"MOE-GATE:-{config.moe_gate}")
+        gate = gate_class[config.moe_gate.lower()](
+            config, layer_idx=layer_idx, group=config.moe_group, ipp=ipp
+        )
+
+    # 多模下, config.moe_num_experts是[48, 48]
+    # 动手会在每个设备创建 96 / moe_world_size 个专家, 命名为experts。然后在每台设备上将前一半的专家的切片命名为lm_experts。
+    # 动半的专家在ep_group内为全局视角, 每台设备都会创建96个专家, 后续通过redistribute_expert将专家标记到ep_group内的不同设备。
+    if config.multimodel_experts and config.moe_use_hard_gate and moe_num_experts > 2:
+        lm_experts = slice_experts(experts, config.moe_world_size)
+        lm_cfg = deepcopy(config)
+        lm_cfg.moe_num_experts = config.moe_num_experts[0]
+        lm_gate = gate_class[config.moe_gate.lower()](
+            lm_cfg, layer_idx=layer_idx, group=config.moe_group, gate_weight=gate.weight
+        )
+    else:
+        lm_gate, lm_experts = None, None
+    logger.info(f"LM-experts-{lm_experts} -- experts-{experts}")
+
+    index = 0 if config.moe_group == "dp" else 1
+    ep_sub_meshes = dist.auto_parallel.api.split_mesh(get_mesh(ipp), index)
+
+    for i, expert in enumerate(experts):
+        ep_group_id = i // moe_num_experts_per_device
+        if isinstance(expert, (ErnieMoeMLPFused, ErnieMoeMLP)):
+            experts[i].redistribute_expert(
+                ep_sub_meshes[ep_group_id], [dist.Replicate(), dist.Replicate()]
+            )
+            experts[i].ep_group_id = ep_group_id
+
+    return gate, experts, lm_gate, lm_experts
+
+
+def _parse_moe_group(moe_group: str):
+    """
+    Args:
+        moe_group (str): 目前支持："dp|mp|none"
+    Returns:
+        str: 返回 moe_group
+    """
+    moe_group = moe_group.lower()
+    assert moe_group in {
+        "dp",
+        "mp",
+        "none",
+    }, f"moe-group not supported, got: {moe_group}"
+    logger.info(f"using moe-group: {moe_group}")
+
+    return moe_group
+
+
+class RMSNorm(nn.Layer):
+    r"""
+    RMSNorm is a variant of layer normalization.
+    """
+
+    def __init__(self, config, ipp=0):
+        super().__init__()
+        self.hidden_size = config.hidden_size
+        self.weight = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.Constant(1.0),
+        )
+        self.variance_epsilon = config.rms_norm_eps
+        self.config = config
+
+    def forward(self, hidden_states):
+        """
+        计算 RMSNorm 后的隐藏状态。
+
+        Args:
+            hidden_states (Tensor): 输入的隐藏状态，shape 为 [batch_size, sequence_length, num_features]。
+
+        Returns:
+            Tensor: 经过 RMSNorm 后的隐藏状态，shape 为 [batch_size, sequence_length, num_features]。
+
+        """
+        if self.config.fuse_rms_norm:
+            return fused.fused_rms_norm(
+                hidden_states, self.weight, self.variance_epsilon
+            )[0]
+        if paddle.in_dynamic_mode():
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = (
+                    paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+                )
+        else:
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+            hidden_states = (
+                paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+            )
+
+        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+        return hidden_states * self.weight
+
+
+class LayerNorm(nn.LayerNorm):
+    r"""
+    layer normalization.
+    """
+
+    def __init__(self, config, ipp=0):
+        super().__init__(config.hidden_size, epsilon=config.rms_norm_eps)
+
+        self.use_fast_ln = config.use_fast_ln
+        if self.use_fast_ln:
+            assert fast_ln is not None
+        self.ipp = ipp
+        if config.pipeline_parallel_degree > 1:
+            self.weight = dist.shard_tensor(
+                self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
+            )
+            self.bias = dist.shard_tensor(
+                self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
+            )
+
+    def forward(self, hidden_states):
+        """
+        The layer normalization operator.
+        """
+        if self.use_fast_ln:
+            return fast_ln(hidden_states, self.weight, self.bias, self._epsilon)[0]
+        else:
+            return super().forward(hidden_states)
+
+
+class FusedLayerNorm(nn.Layer):
+    r"""
+    FusedLayerNorm is a variant of layer normalization.
+    """
+
+    def __init__(self, config, ipp=0):
+        super().__init__()
+        self.config = config
+        self.hidden_size = config.hidden_size
+        self.weight = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.Constant(1.0),
+        )
+        self.bias = paddle.create_parameter(
+            shape=[self.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True
+        )
+        self.variance_epsilon = config.rms_norm_eps
+        self.ipp = ipp
+        if config.pipeline_parallel_degree > 1:
+            self.weight = dist.shard_tensor(
+                self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
+            )
+            self.bias = dist.shard_tensor(
+                self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
+            )
+
+    def forward(self, hidden_states):
+        """
+        对输入hidden_states进行Layer Normalization操作并返回结果。
+
+        Args:
+            hidden_states (torch.Tensor): 输入的隐藏状态，形状为(batch_size, sequence_length, embedding_dim)。
+
+        Returns:
+            torch.Tensor: 经过Layer Normalization处理后的隐藏状态，形状与输入hidden_states相同。
+
+        """
+        return fused.fused_ln(
+            hidden_states, self.weight, self.bias, self.variance_epsilon
+        )[0]
+
+
+class RotaryEmbedding(nn.Layer):
+    r"""
+    RotaryEmbedding Layer
+    """
+
+    def __init__(self, dim, max_position_embeddings=4096, base=10000):
+        """
+        `self.sin_cached` 和`self.cos_cached` 的初始化最后会用numpy再做一遍！
+        """
+        super().__init__()
+        # dtype = paddle.get_default_dtype()
+        self.base = base
+        self.max_position_embeddings = max_position_embeddings
+        inv_freq = 1.0 / (
+            base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim)
+        )
+
+        # self.register_buffer("inv_freq", inv_freq.cast(dtype))
+
+        # higher acc using float32
+        t = paddle.arange(max_position_embeddings, dtype="float32")
+        freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        emb = paddle.concat([freqs, freqs], axis=-1)
+
+        # [bs, seqlen, nhead, head_dim]
+        self.cos_cached = emb.cos()  # [None, :, None, :]  # .astype(dtype)
+        self.sin_cached = emb.sin()  # [None, :, None, :]  # .astype(dtype)
+
+        self._cast_to_low_precision = False  # 兼容develop分支paddle
+        self._cast_to_low_precison = False
+
+    def forward(self, x, seq_len=None):
+        """
+        根据输入的张量x和序列长度seq_len，返回对应的缓存的余弦和正弦值。
+
+        Args:
+            x (Tensor): 输入的张量，但在本函数中并不使用。
+            seq_len (int, optional): 序列长度。默认为None，表示使用缓存中的所有值。
+
+        Returns:
+            tuple: 包含两个张量的元组。
+
+                - cos_cached (Tensor): 缓存的余弦值，其形状为(seq_len, *)。
+                - sin_cached (Tensor): 缓存的正弦值，其形状为(seq_len, *)。
+
+        """
+
+        return (
+            self.cos_cached[:seq_len, :],
+            self.sin_cached[:seq_len, :],
+        )
+
+    @classmethod
+    def rotate_half(cls, x):
+        """Rotates half the hidden dims of the input."""
+
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return paddle.concat([-x2, x1], axis=-1)
+
+    @classmethod
+    def apply_rotary_pos_emb(cls, q, k, cos, sin, offset: int = 0, position_ids=None):
+        """doc"""
+        if position_ids is not None:
+            # logger.info(f'applying pos:{position_ids}')
+            assert offset == 0, offset
+            cos = F.embedding(position_ids, cos)
+            sin = F.embedding(position_ids, sin)
+        else:
+            cos = cos.unsqueeze(0)
+            sin = sin.unsqueeze(0)
+        cos = cos[:, offset : q.shape[1] + offset, None, :]
+        sin = sin[:, offset : q.shape[1] + offset, None, :]
+
+        # q_embed = (q * cos) + (rotate_half(q) * sin)
+        # k_embed = (k * cos) + (rotate_half(k) * sin)
+        # 不使用操作符，防止Paddle 不同精度之间的结合导致问题。
+        q_embed = paddle.add(
+            paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin)
+        )
+        k_embed = paddle.add(
+            paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin)
+        )
+        q_embed = q_embed.astype(q.dtype)  # fp32->bf16
+        k_embed = k_embed.astype(k.dtype)
+        return q_embed, k_embed
+
+
+class RopeEmbeddingLegacy(nn.Layer):
+    """
+    从`EB65B`代码搬运而来，在线算cos、sin。算出来的结果和上面有蛮大的diff，
+    """
+
+    def __init__(self, head_dim, compression_ratio=1.0, base=10000):
+        super().__init__()
+        self.head_dim = head_dim
+        self.compression_ratio = compression_ratio
+        self.base = base
+
+    def forward(self, seq_length, position_ids=None):
+        """
+        计算位置嵌入。
+
+        Args:
+            seq_length (int): 序列长度。
+            position_ids (paddle.Tensor, optional): 可选参数，表示位置ID的Tensor，形状为[batch_size, seq_length]，
+                数据类型为float32。如果为None，则使用从0到seq_length-1的连续整数生成位置ID。
+
+        Returns:
+            paddle.Tensor: 形状为[batch_size, 1, seq_length, head_dim]的位置嵌入Tensor，数据类型为float32，
+                并且不计算梯度。
+
+        """
+        indices = paddle.arange(0, self.head_dim, 2, dtype="float32")
+        indices = 1 / self.base ** (indices / self.head_dim)
+        if position_ids is None:
+            position_ids = paddle.arange(0, seq_length, 1, dtype="float32").unsqueeze(1)
+            position_ids = position_ids / self.compression_ratio
+            sinusoid_inp = position_ids * indices.unsqueeze(0)
+        else:
+            position_ids = position_ids / self.compression_ratio
+            seq_length = position_ids.shape[-1]
+            sinusoid_inp = position_ids.unsqueeze(-1).astype(
+                "float32"
+            ) * indices.unsqueeze(
+                0
+            )  # [b, s, 1] * [1, d/2] -> [b, s, d/2]
+        pos_emb = paddle.concat(
+            [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1
+        )
+        pos_emb = paddle.reshape(pos_emb, (-1, 1, seq_length, self.head_dim))
+        pos_emb.stop_gradient = True
+        return pos_emb
+
+    def apply_rotary(self, rp, q, k):
+        """
+        应用旋转位置编码(Rotary Position Encoding)到查询(q)和键(k)上。
+
+        Args:
+            rp (paddle.Tensor): 旋转位置编码张量，形状为 [sequence_length, embed_size_per_head]。
+            q (paddle.Tensor): 查询张量，形状为 [batch_size, sequence_length, num_heads, embed_size_per_head]。
+            k (paddle.Tensor): 键张量，形状为 [batch_size, sequence_length, num_heads, embed_size_per_head]。
+
+        Returns:
+            tuple: 包含两个paddle.Tensor元素的元组，分别代表旋转后的查询和键。
+            - query (paddle.Tensor): 旋转后的查询张量，形状与输入q相同。
+            - key (paddle.Tensor): 旋转后的键张量，形状与输入k相同。
+
+        """
+        # sin [sequence_length, embed_size_per_head//2]
+        # cos [sequence_length, embed_size_per_head//2]
+        sin, cos = paddle.chunk(rp, 2, axis=-1)
+        # sin [θ0,θ1,θ2......θd/2-1] -> sin_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
+        sin_pos = paddle.reshape(paddle.stack([sin, sin], axis=-1), rp.shape)
+        # cos [θ0,θ1,θ2......θd/2-1] -> cos_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
+        cos_pos = paddle.reshape(paddle.stack([cos, cos], axis=-1), rp.shape)
+        # rotate_half_query_layer [-q1,q0,-q3,q2......,-qd-1,qd-2]
+        rotate_half_q = paddle.reshape(
+            paddle.stack([-q[:, :, :, 1::2], q[:, :, :, 0::2]], axis=-1),
+            paddle.shape(q),
+        )
+        query = paddle.add(
+            paddle.multiply(q.astype("float32"), cos_pos),
+            paddle.multiply(rotate_half_q.astype("float32"), sin_pos),
+        )
+        # rotate_half_key_layer [-k1,k0,-k3,k2......,-kd-1,kd-2]
+        rotate_half_k = paddle.reshape(
+            paddle.stack([-k[:, :, :, 1::2], k[:, :, :, 0::2]], axis=-1),
+            paddle.shape(k),
+        )
+        key = paddle.add(
+            paddle.multiply(k.astype("float32"), cos_pos),
+            paddle.multiply(rotate_half_k.astype("float32"), sin_pos),
+        )
+        return query, key
+
+    def forward_single(self, position_ids):
+        """
+        计算单个位置嵌入的罗盘编码（rope embedding）。
+
+        Args:
+            position_ids (paddle.Tensor): 包含位置信息的张量，形状为[B, S]，其中B为批处理大小，S为序列长度。
+
+        Returns:
+            paddle.Tensor: 罗盘编码，形状为[2, B, S, 1, D]，其中B为批处理大小，S为序列长度，D为头维度。
+
+        """
+        """
+        计算单个位置嵌入的旋转编码（rope embedding）。
+
+        Args:
+            position_ids (paddle.Tensor): 包含位置信息的张量，形状为[B, S]，其中B为批处理大小，S为序列长度。
+
+        Returns:
+            paddle.Tensor: 罗盘编码，形状为[2, B, S, 1, D]，其中B为批处理大小，S为序列长度，D为头维度。
+
+        """
+        batch_size, seq_length = position_ids.shape[:2]
+        rope_emb = paddle.zeros(
+            (2, batch_size, seq_length, 1, self.head_dim), dtype="float32"
+        )
+        inv_freq = self.base ** (
+            -paddle.arange(0, self.head_dim, 2, dtype="float32") / self.head_dim
+        )
+        position_ids = position_ids.cast("float32")
+        position_ids = position_ids / self.compression_ratio
+        # shape: [B, S, D/2]
+        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
+        # shape: [B, S, D]
+        emb = paddle.stack([freqs, freqs], axis=-1).reshape(
+            (batch_size, seq_length, self.head_dim)
+        )
+        # shape: [B, S, 1, D]
+        emb = paddle.unsqueeze(emb, 2)
+
+        rope_emb[0] = paddle.cos(emb)
+        rope_emb[1] = paddle.sin(emb)
+        return rope_emb
+
+    @staticmethod
+    def apply_rotary_single(x, rope_emb):
+        """
+        对输入张量x进行单通道旋转增强操作。
+
+        Args:
+            x (paddle.Tensor): 输入张量，形状为[N, C, H, W]，其中N为批量大小，C为通道数，H和W分别为高度和宽度。
+            rope_emb (List[paddle.Tensor]): 包含两个元素的列表，每个元素为形状为[1]的paddle.Tensor，用于与输入张量x和旋转后的张量相乘。
+
+        Returns:
+            paddle.Tensor: 形状与输入张量x相同的增强后的张量。
+
+        """
+        rotate_half_x = paddle.reshape(
+            paddle.stack([-x[:, :, :, 1::2], x[:, :, :, 0::2]], axis=-1),
+            paddle.shape(x),
+        )
+        return x * rope_emb[0] + rotate_half_x * rope_emb[1]
+
+
+class ErnieLinear(nn.Layer):
+    """
+    ErnieLinear层。用于适配ernie-core中的RowSequenceParallelLinear。
+
+    将自动并行中Linear的逻辑从 matmul, all-reduce, add, scatter 变成 matmul, reduce-satter, add
+    """
+
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        weight_attr=None,
+        bias_attr=None,
+        name=None,
+        ipp=0,
+    ):
+        super(ErnieLinear, self).__init__()
+        self._dtype = self._helper.get_default_dtype()
+        self._weight_attr = weight_attr
+        self._bias_attr = bias_attr
+        self.weight = self.create_parameter(
+            shape=[in_features, out_features],
+            attr=self._weight_attr,
+            dtype=self._dtype,
+            is_bias=False,
+        )
+        self.bias = self.create_parameter(
+            shape=[out_features],
+            attr=self._bias_attr,
+            dtype=self._dtype,
+            is_bias=True,
+        )
+        self.name = name
+        self.ipp = ipp
+
+    def forward(self, input):
+        """
+        执行前向传播操作。
+
+        Args:
+            input (Tensor): 输入张量，其形状应为 (seq_length, batch_size, input_dim)。
+
+        Returns:
+            Tensor: 输出张量，其形状为 (seq_length, batch_size, input_dim)。
+
+        """
+        out = F.linear(x=input, weight=self.weight, bias=None, name=self.name)
+        # do resuce-scatter, [Shard(1), Partial(ReduceSum)] -> [Shard(1), Shard(0)]
+        out = dist.reshard(
+            out,
+            get_mesh(self.ipp),
+            [dist.Shard(1), dist.Shard(0)],
+        )
+        if self.bias:
+            print("lzx debug += self.bias")
+            out += self.bias
+        # out += self.bias
+        return out
+
+
+class ErnieMLP(nn.Layer):
+    """
+    ErnieMLP层，用于实现Ernie模型中的MLP操作。
+    """
+
+    def __init__(self, config, ipp=None, do_shard_tensor=True):
+        super().__init__()
+        self.config = config
+        self.ipp = ipp
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+
+        assert not config.submatrix_parallel, "submatrix parallel is not supported now."
+
+        LinearFN = nn.Linear
+        self.gate_proj = LinearFN(
+            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+        )
+        self.up_proj = LinearFN(
+            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+        )
+
+        if config.sequence_parallel:
+            self.down_proj = ErnieLinear(
+                self.intermediate_size,
+                self.hidden_size,
+                bias_attr=config.use_bias,
+                ipp=self.ipp,
+            )
+        else:
+            self.down_proj = LinearFN(
+                self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
+            )
+
+        if do_shard_tensor and (
+            self.config.tensor_parallel_degree > 1
+            or self.config.pipeline_parallel_degree > 1
+        ):
+            self.gate_proj.weight = dist.shard_tensor(
+                self.gate_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+            self.up_proj.weight = dist.shard_tensor(
+                self.up_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+            if config.use_bias:
+                self.gate_proj.bias = dist.shard_tensor(
+                    self.gate_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+                self.up_proj.bias = dist.shard_tensor(
+                    self.up_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+            self.down_proj.weight = dist.shard_tensor(
+                self.down_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(0)],
+            )
+            if config.use_bias:
+                print("lzx debug use_bias")
+                self.down_proj.bias = dist.shard_tensor(
+                    self.down_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Replicate()],
+                )
+
+        self.fuse_swiglu = config.fuse_swiglu
+        if self.fuse_swiglu:
+            assert fused_swiglu is not None, "fused_swiglu operator is not found."
+
+    def forward(self, x):
+        """
+        执行前向传播操作。
+
+        Args:
+            x (Tensor): 输入张量，其形状应为 (batch_size, seq_length, input_dim)。
+
+        Returns:
+            Tensor: 输出张量，其形状为 (batch_size, seq_length, output_dim)。
+
+        """
+        if self.fuse_swiglu:
+            x = fused_swiglu(self.gate_proj(x), self.up_proj(x))
+        else:
+            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
+        return self.down_proj(x)
+
+
+class ErnieAttentionAuto(nn.Layer):
+    """Multi-headed attention from 'Attention Is All You Need' paper"""
+
+    def __init__(self, config, ipp: Optional[int] = None):
+        super().__init__()
+        self.ipp = ipp
+        self.hidden_size = config.hidden_size
+        self.num_heads = config.num_attention_heads
+        self.num_key_value_heads = config.num_key_value_heads
+        self.head_dim = self.hidden_size // self.num_heads
+        self.use_recompute_attn = config.use_recompute_attn  # aka recompute core-attn
+        self.is_gqa = (
+            config.num_key_value_heads is not None
+            and config.num_key_value_heads != self.num_heads
+        )
+        if config.fuse_rope:
+            assert fused_rope is not None, "fused_rope is not supported"
+        self.fuse_rope = config.fuse_rope
+
+        if self.is_gqa:
+            logger.info(
+                f"use GQA - num_heads: {self.num_heads}- num_key_value_heads: {self.num_key_value_heads}"
+            )
+            assert (
+                self.num_heads % self.num_key_value_heads == 0
+            ), f"num_heads: {self.num_heads}, num_key_value_heads: {self.num_key_value_heads}"
+            kv_hidden_size = (
+                self.hidden_size // self.num_heads * self.num_key_value_heads
+            )
+
+        LinearFN = nn.Linear
+        self.q_proj = LinearFN(
+            self.hidden_size,
+            self.hidden_size,
+            bias_attr=config.use_bias,
+        )
+        self.k_proj = LinearFN(
+            self.hidden_size,
+            self.hidden_size if not self.is_gqa else kv_hidden_size,
+            bias_attr=config.use_bias,
+        )
+        self.v_proj = LinearFN(
+            self.hidden_size,
+            self.hidden_size if not self.is_gqa else kv_hidden_size,
+            bias_attr=config.use_bias,
+        )
+
+        if config.sequence_parallel:
+            self.o_proj = ErnieLinear(
+                self.hidden_size,
+                self.hidden_size,
+                bias_attr=config.use_bias,
+                ipp=self.ipp,
+            )
+        else:
+            self.o_proj = LinearFN(
+                self.hidden_size,
+                self.hidden_size,
+                bias_attr=config.use_bias,
+            )
+        if config.rope_reorder:
+            self.rotary_emb = RotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=config.max_position_embeddings,
+                base=config.rope_theta,
+            )
+        else:
+            self.rotary_emb = RopeEmbeddingLegacy(
+                self.head_dim,
+                compression_ratio=config.compression_ratio,
+                base=config.rope_theta,
+            )
+        self.config = config
+
+        self._rr_flash_attn = None
+        if config.use_recompute and config.skip_recompute_ops.get("flash_attn", False):
+            self._rr_flash_attn = RefinedRcomputeFlashAttention()
+
+        if (
+            self.config.tensor_parallel_degree > 1
+            or self.config.pipeline_parallel_degree > 1
+        ):
+            self.q_proj.weight = dist.shard_tensor(
+                self.q_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+            self.k_proj.weight = dist.shard_tensor(
+                self.k_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+            self.v_proj.weight = dist.shard_tensor(
+                self.v_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+            if config.use_bias:
+                self.q_proj.bias = dist.shard_tensor(
+                    self.q_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+                self.k_proj.bias = dist.shard_tensor(
+                    self.k_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+                self.v_proj.bias = dist.shard_tensor(
+                    self.v_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+            self.o_proj.weight = dist.shard_tensor(
+                self.o_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(0)],
+            )
+            # self.o_proj.bias = dist.shard_tensor(
+            #     self.o_proj.bias,
+            #     get_mesh(self.ipp),
+            #     [dist.Replicate(), dist.Replicate()],
+            # )
+
+    def forward(
+        self,
+        hidden_states,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        position_ids: Optional[Tuple[paddle.Tensor]] = None,
+        output_attentions: bool = False,
+        use_cache: bool = False,
+        inbatch_pack_offset: Optional[Tuple[paddle.Tensor]] = None,
+    ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
+        """Input shape: Batch x Time x Channel"""
+        if self.config.sequence_parallel:
+            # do all-gather
+            hidden_states = dist.reshard(
+                hidden_states, get_mesh(self.ipp), [dist.Shard(1), dist.Replicate()]
+            )
+
+        query_states = (
+            self.q_proj(hidden_states).reshape(
+                shape=[0, 0, self.num_heads, self.head_dim]
+            )
+            # .transpose([0, 2, 1, 3])
+        )
+        key_states = (
+            self.k_proj(hidden_states).reshape(
+                shape=[
+                    0,
+                    0,
+                    self.num_key_value_heads if self.is_gqa else self.num_heads,
+                    self.head_dim,
+                ]
+            )
+            # .transpose([0, 2, 1, 3])
+        )
+        value_states = (
+            self.v_proj(hidden_states).reshape(
+                shape=[
+                    0,
+                    0,
+                    self.num_key_value_heads if self.is_gqa else self.num_heads,
+                    self.head_dim,
+                ]
+            )
+            # .transpose([0, 2, 1, 3])
+        )
+
+        # print(f"query_states = {query_states}")
+        # print(f"key_states = {key_states}")
+        # print(f"value_states = {value_states}")
+        if self.config.sequence_parallel:
+            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
+
+        if self.use_recompute_attn:
+            assert past_key_value is None, "do not use kv cache in recompute"
+            assert not use_cache
+            attn_output, attn_weights, past_key_value = recompute(
+                self.rope_attn,
+                None,
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                position_ids,
+                output_attentions,
+                past_key_value,
+                use_cache,
+                inbatch_pack_offset,
+                use_reentrant=False,
+            )
+        else:
+            attn_output, attn_weights, past_key_value = self.rope_attn(
+                mix_layer=None,
+                query_states=query_states,
+                key_states=key_states,
+                value_states=value_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                output_attentions=output_attentions,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                inbatch_pack_offset=inbatch_pack_offset,
+            )
+
+        if self.config.sequence_parallel or self.config.submatrix_parallel:
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+
+        attn_output = self.o_proj(attn_output)
+
+        if not output_attentions:
+            attn_weights = None
+
+        return attn_output, attn_weights, past_key_value
+
+    def rope_attn(
+        self,
+        mix_layer,
+        query_states,
+        key_states,
+        value_states,
+        attention_mask,
+        position_ids,
+        output_attentions=False,
+        past_key_value=None,
+        use_cache=False,
+        inbatch_pack_offset=None,
+    ):
+        """
+        在recompute区域内进行fuse-split， rope, matmul等操作。
+        """
+        if mix_layer is not None:
+            query_states, key_states, value_states = paddle.split(mix_layer, 3, axis=-1)
+        query_states_dtype = query_states.dtype
+
+        kv_seq_len = key_states.shape[-3]
+        offset = 0
+        if past_key_value is not None:
+            offset = past_key_value[0].shape[-3]
+            kv_seq_len += offset
+
+        if self.config.rope_reorder:
+            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+            query_states, key_states = self.rotary_emb.apply_rotary_pos_emb(
+                query_states,
+                key_states,
+                cos,
+                sin,
+                position_ids=position_ids,
+                offset=offset if position_ids is None else 0,
+            )
+        else:
+            # 2.
+            # cos_sin = self.rotary_emb.forward_single(paddle.arange(kv_seq_len).unsqueeze(0).astype('float32'))
+            # query_states = self.rotary_emb.apply_rotary_single(query_states, cos_sin)
+            # key_states = self.rotary_emb.apply_rotary_single(key_states, cos_sin)
+            #
+            # 3.
+            if offset > 0 or position_ids is not None or not self.fuse_rope:
+                cos_sin = self.rotary_emb(kv_seq_len, position_ids).transpose(
+                    [0, 2, 1, 3]
+                )  # [b,h,s,d]->[b,s,h,d]
+                if offset > 0 and position_ids is None:
+                    # position_ids has been sliced in prepare_inputs_for_generation
+                    cos_sin = cos_sin[:, offset:]
+                query_states, key_states = self.rotary_emb.apply_rotary(
+                    cos_sin, query_states, key_states
+                )
+            else:
+                bsz, q_len, num_heads, head_dim = query_states.shape
+                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
+                if num_heads != num_key_value_heads:
+                    query_states, _, _ = fused_rope(query_states, None, None)
+                    key_states, _, _ = fused_rope(key_states, None, None)
+                else:
+                    query_states, key_states, _ = fused_rope(
+                        query_states, key_states, None
+                    )
+
+        # [bsz, nh, t, hd]
+
+        if use_cache:
+            query_states = query_states.astype(query_states_dtype)
+            key_states = key_states.astype(query_states_dtype)
+        if past_key_value is not None:
+            # reuse k, v, self_attention
+            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
+            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
+
+        # NOTE(for generation): use list instead of tuple to store the cache
+        # tensors, so that we can clear the cache tensors for memory efficiency.
+        past_key_value = [key_states, value_states] if use_cache else None
+
+        attn_output, attn_weights = scaled_dot_product_attention(
+            query_states=query_states,
+            key_states=key_states,
+            value_states=value_states,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            config=self.config,
+            rr_flash_attn=(
+                self._rr_flash_attn if self.training else None
+            ),  # in eval mode, no using rr
+            inbatch_pack_offset=inbatch_pack_offset,
+            training=self.training,
+        )
+        return attn_output, attn_weights, past_key_value
+
+
+class ErnieMoeMLP(ErnieMLP):
+    """_summary_
+
+    Args:
+        ErnieMoeMLP (_type_): _description_
+    """
+
+    def __init__(self, config, ipp=0):
+        """
+        doc
+        """
+        disable_ffn_model_parallel = getattr(
+            config, "disable_ffn_model_parallel", False
+        )
+        if disable_ffn_model_parallel:
+            # assert config.moe_group == "mp", f"when using mp_moe, expect moe-group == mp, but get {config.moe_group}"
+            config = deepcopy(config)
+            config.tensor_parallel_degree = 1
+            config.sequence_parallel = False
+
+        super().__init__(config, ipp, do_shard_tensor=not disable_ffn_model_parallel)
+        self.moe_dropout_prob = config.moe_dropout_prob
+        self.fuse_swiglu = config.fuse_swiglu
+        if self.fuse_swiglu:
+            assert fused_swiglu is not None, "fused_swiglu operator is not found."
+
+    def redistribute_expert(self, mesh, placements):
+        """
+        Place the experts on different devices.
+        """
+        self.gate_proj.weight = dist.shard_tensor(
+            self.gate_proj.weight, mesh, placements
+        )
+        # self.gate_proj.bias = dist.shard_tensor(self.gate_proj.bias, mesh, placements)
+        self.up_proj.weight = dist.shard_tensor(self.up_proj.weight, mesh, placements)
+        # self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
+        self.down_proj.weight = dist.shard_tensor(
+            self.down_proj.weight, mesh, placements
+        )
+        if self.config.use_bias:
+            self.gate_proj.bias = dist.shard_tensor(
+                self.gate_proj.bias, mesh, placements
+            )
+            self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
+            self.down_proj.bias = dist.shard_tensor(
+                self.down_proj.bias, mesh, placements
+            )
+
+    def forward(self, x):
+        """
+        将输入张量通过自我和下游项目层次化到一个通道数更高的输出。
+
+        Args:
+            x (Tensor): 输入张量，形状为[batch_size, channels, height, width]。
+
+        Returns:
+            Tensor: 通过自我和下游项目层次化后的输出张量，形状为[batch_size, num_classes, height', width']。其中，height'和width'分别是上游项目的输出高度和宽度。
+
+        """
+        if self.fuse_swiglu:
+            x = fused_swiglu(self.gate_proj(x), self.up_proj(x))
+        else:
+            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
+        if self.moe_dropout_prob > 0:
+            with get_rng_state_tracker().rng_state("local_seed"):
+                x = F.dropout(x=x, p=self.moe_dropout_prob)
+        ret = self.down_proj(x)
+        return ret
+
+
+class BMMLinear(nn.Layer):
+    """BMM 实现的 SwishGLU 层, 实现expert-fusion"""
+
+    def __init__(self, experts, d_in, d_out, use_bias=False):
+        super().__init__()
+        self.weight = self.create_parameter(
+            [experts, d_in, d_out], dtype=paddle.get_default_dtype()
+        )
+        if use_bias:
+            self.bias = self.create_parameter(
+                [experts, d_out], dtype=paddle.get_default_dtype(), is_bias=True
+            )
+        else:
+            self.bias = None
+
+    def forward(self, x):
+        """x: [num_experts, Seq, dim]"""
+        if self.bias is not None:
+            return paddle.bmm(x, self.weight) + self.bias
+        return paddle.bmm(x, self.weight)
+
+
+class ErnieMoeMLPFused(nn.Layer):
+    """Fused Implement of ErnieMoeMLP"""
+
+    def __init__(self, config):
+        """doc"""
+        assert (
+            hasattr(config, "disable_ffn_model_parallel")
+            or config.tensor_parallel_degree == 1
+        ), f"fused mlp only suport mp-moe, mp={config.tensor_parallel_degree}"  # 还不吃支持  expert 内的mp 通信。
+        assert config.fuse_attn_ffn, "fused mlp only support fuse_attn_ffn"
+        # config = deepcopy(config)
+        # config.tensor_parallel_degree = 1
+        super().__init__()
+        self.moe_dropout_prob = config.moe_dropout_prob
+        self.num_local_experts = config.moe_num_experts // config.moe_world_size
+        logger.info(
+            f"fused-expert-weight-shape: {[self.num_local_experts, config.hidden_size, config.intermediate_size]}"
+        )
+
+        self.up_gate_proj = BMMLinear(
+            self.num_local_experts, config.hidden_size, config.intermediate_size * 2
+        )
+        self.down_proj = BMMLinear(
+            self.num_local_experts, config.intermediate_size, config.hidden_size
+        )
+        self.fuse_swiglu = config.fuse_swiglu
+        if self.fuse_swiglu:
+            assert fused_swiglu is not None, "fused_swiglu operator is not found."
+
+    def __len__(self):
+        return self.num_local_experts
+
+    def __iter__(self):
+        return (self for _ in range(1))
+
+    def forward(self, x):
+        """x"""
+        if self.fuse_swiglu:
+            x = fused_swiglu(self.up_gate_proj(x))
+        else:
+            gate, x = self.up_gate_proj(x).chunk(2, axis=-1)
+            x = F.silu(gate) * x
+        x = self.down_proj(x)
+        return x
+
+
+class ErnieDecoderLayerAuto(nn.Layer):
+    """
+    ErnieDecoderLayerAuto is a decoder layer in Ernie model.
+    It is composed of self-attention, cross-attention and feedforward layers.
+    """
+
+    def __init__(self, config, layer_idx=0, ipp=0):
+        """
+            Initializes the ErnieBlock module.
+
+        Args:
+            config (ErnieConfig): The model configuration.
+            layer_idx (int, optional): The index of this block in the model. Defaults to 0.
+            ipp (int, optional): The index of this block in the pipeline parallelism. Defaults to 0.
+        """
+        super().__init__()
+        self.config = config
+        self.layer_idx = layer_idx
+        self.ipp = ipp
+        self.hidden_size = config.hidden_size
+        self.self_attn = ErnieAttentionAuto(config, ipp)
+        self.use_moe = config.use_moe if hasattr(config, "use_moe") else False
+
+        if self.use_moe:
+            moe_layer_start_index = (
+                min(config.moe_layer_start_index)
+                if isinstance(config.moe_layer_start_index, (tuple, list))
+                else config.moe_layer_start_index
+            )
+            moe_layer_end_index = (
+                max(config.moe_layer_end_index)
+                if isinstance(config.moe_layer_end_index, (tuple, list))
+                else config.moe_layer_end_index
+            )
+            print(
+                f"[liyamei check moe] self.use_moe={self.use_moe} layer_idx={layer_idx} config.moe_layer_interval={config.moe_layer_interval} moe_layer_start_index={moe_layer_start_index} moe_layer_end_index={moe_layer_end_index}"
+            )
+
+        if (
+            self.use_moe
+            and ((layer_idx + 1) % config.moe_layer_interval == 0)
+            and layer_idx >= moe_layer_start_index
+            and layer_idx <= moe_layer_end_index
+        ):
+            print("lzx debug create_moe_mlp_layer")
+            self.create_moe_mlp_layer(layer_idx, ipp)
+        else:
+            self.mlp = ErnieMLP(config, ipp)
+        Norm = RMSNorm if config.use_rmsnorm else LayerNorm
+        if not config.use_rmsnorm and config.fuse_ln:
+            Norm = FusedLayerNorm
+        self.input_layernorm = Norm(config, ipp)
+        self.post_attention_layernorm = Norm(config, ipp)
+        self.residual_add1 = FusedDropoutImpl(
+            config.hidden_dropout_prob, mode="upscale_in_train"
+        )
+        self.residual_add2 = FusedDropoutImpl(
+            config.hidden_dropout_prob, mode="upscale_in_train"
+        )
+
+    def create_moe_mlp_layer(self, layer_idx, ipp):
+        """创建MoE模型中的MLP层"""
+        _ex_cfg = deepcopy(self.config)
+        fc_cls = ErnieMoeMLPFused if _ex_cfg.moe_fuse_experts else ErnieMoeMLP
+        if _ex_cfg.moe_intermediate_size:
+            if isinstance(_ex_cfg.moe_intermediate_size, (tuple, list)):
+                assert isinstance(_ex_cfg.moe_num_experts, (tuple, list)) and len(
+                    _ex_cfg.moe_num_experts
+                ) == len(_ex_cfg.moe_intermediate_size)
+                fc = []
+                for _i, (num_experts, intermediate_size) in enumerate(
+                    zip(_ex_cfg.moe_num_experts, _ex_cfg.moe_intermediate_size)
+                ):
+                    _ex_cfg_real = deepcopy(_ex_cfg)
+                    _ex_cfg_real.intermediate_size = intermediate_size
+                    cur_modality_start_layer_idx = (
+                        self.config.moe_layer_start_index[_i]
+                        if isinstance(self.config.moe_layer_start_index, (tuple, list))
+                        else self.config.moe_layer_start_index
+                    )
+                    cur_modality_end_layer_idx = (
+                        self.config.moe_layer_end_index[_i]
+                        if isinstance(self.config.moe_layer_end_index, (tuple, list))
+                        else self.config.moe_layer_end_index
+                    )
+                    if (
+                        layer_idx >= cur_modality_start_layer_idx
+                        and layer_idx <= cur_modality_end_layer_idx
+                    ):
+                        if _i == 1:
+                            with paddle.utils.unique_name.guard(
+                                f"mm_expert_{layer_idx}_"
+                            ):
+                                fc.append((num_experts, fc_cls(_ex_cfg_real)))
+                        else:
+                            fc.append((num_experts, fc_cls(_ex_cfg_real)))
+                    else:
+                        logger.info(
+                            f"moe multimodal experts use Identity layer_idx: {layer_idx}"
+                        )
+                        fc.append((num_experts, nn.Identity()))
+            else:
+                _ex_cfg.intermediate_size = _ex_cfg.moe_intermediate_size
+                fc = [(_ex_cfg.moe_num_experts, fc_cls(_ex_cfg))]
+        else:
+            fc = [(_ex_cfg.moe_num_experts, fc_cls(_ex_cfg))]
+        gate, experts, lm_gate, lm_experts = get_gate(
+            self.config, fc, layer_idx, self.ipp
+        )
+        _sh_cfg = deepcopy(self.config)
+
+        # 创建 shared_experts
+        if _sh_cfg.moe_num_shared_experts > 0:
+            if _sh_cfg.moe_intermediate_size:
+                _sh_inter_size = (
+                    _sh_cfg.moe_intermediate_size[0]
+                    if isinstance(_sh_cfg.moe_intermediate_size, (tuple, list))
+                    else _sh_cfg.moe_intermediate_size
+                )
+                _sh_cfg.intermediate_size = (
+                    _sh_inter_size * _sh_cfg.moe_num_shared_experts
+                )
+            else:
+                _sh_cfg.intermediate_size = (
+                    _sh_cfg.intermediate_size * _sh_cfg.moe_num_shared_experts
+                )
+            _sh_cfg.disable_ffn_model_parallel = False  # split shared epxert
+            shared_experts = ErnieMoeMLP(_sh_cfg, ipp)
+        else:
+            shared_experts = None
+
+        is_moe_infer = self.config.get("is_moe_infer", False)
+        if is_moe_infer:
+            raise NotImplementedError
+        elif self.config.moe_use_size_all2all:
+            raise NotImplementedError
+        else:
+            logger.info(f"moe-logging:{self.config.moe_logging}")
+            moe_cls = MOELayerAuto
+            self.mlp = moe_cls(
+                gate,
+                experts,
+                layer_idx=layer_idx,
+                shared_experts=shared_experts,
+                group=self.config.moe_group,
+                recompute=self.config.use_recompute_moe,
+                enable_logging=self.config.moe_logging,
+                k=self.config.moe_k,
+                enable_pbr=self.config.moe_use_bpr,
+                all_to_all_dropout=self.config.moe_all_to_all_dropout,
+                group_experts=self.config.moe_group_experts,
+                config=self.config,
+                ipp=self.ipp,
+            )
+            if self.config.multimodel_experts and self.config.moe_use_hard_gate:
+                _mlp_text = MOELayerAuto(
+                    lm_gate,
+                    lm_experts,
+                    layer_idx=layer_idx,
+                    shared_experts=shared_experts,
+                    group=self.config.moe_group,
+                    recompute=self.config.use_recompute_moe,
+                    enable_logging=self.config.moe_logging,
+                    k=self.config.moe_k,
+                    enable_pbr=self.config.moe_use_bpr,
+                    all_to_all_dropout=self.config.moe_all_to_all_dropout,
+                    group_experts=self.config.moe_group_experts,
+                    config=self.config,
+                    ipp=self.ipp,
+                )
+                self.mlp_text = (
+                    lambda: _mlp_text
+                )  # 这个lambd防止 text部分参数被扫进state-dict
+
+    def forward(
+        self,
+        hidden_states: paddle.Tensor,
+        attention_mask: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        inbatch_pack_offset: Optional[paddle.Tensor] = None,
+        token_type_ids: Optional[paddle.Tensor] = None,
+        output_gate_logits=True,  # PP model should not output gate logits,
+    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
+        """
+        Args:
+            hidden_states (`paddle.Tensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
+            attention_mask (`paddle.Tensor`, *optional*): attention mask of size
+                `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under
+                returned tensors for more detail.
+            use_cache (`bool`, *optional*):
+                If set to `True`, `cache` key value states are returned and can be used to speed up decoding
+                (see `cache`).
+            cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
+        """
+        # print(f"In decoder layers")
+        # print(f"before ln, hidden_states : {hidden_states}")
+
+        residual = hidden_states
+        # logger.debug(f'layer-hidden-dtype:{hidden_states.dtype}, norm={hidden_states.astype("float32").norm()}')
+        hidden_states = self.input_layernorm(hidden_states)
+        # logger.debug(f'after-norm-1:{hidden_states.dtype}, norm={hidden_states.astype("float32").norm()}')
+
+        # print(f"after ln, hidden_states : {hidden_states}")
+
+        # Self Attention
+        (hidden_states, self_attn_weights, present_key_value, *router_loss_attn) = (
+            self.self_attn(
+                hidden_states=hidden_states,
+                past_key_value=past_key_value,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                inbatch_pack_offset=inbatch_pack_offset,
+            )
+        )
+
+        if (
+            self.config.tensor_parallel_degree > 1
+            and self.config.hidden_dropout_prob > 0.0
+        ):
+            current_seed = (
+                "local_seed" if self.config.sequence_parallel else "global_seed"
+            )
+            with get_rng_state_tracker().rng_state(current_seed):
+                hidden_states = self.residual_add1(hidden_states, residual)
+        else:
+            hidden_states = self.residual_add1(hidden_states, residual)
+
+        # Fully Connected
+        residual = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)
+
+        if isinstance(
+            self.mlp,
+            (MOELayerAuto),
+        ):
+            if (
+                self.config.multimodel_experts
+                and self.config.moe_use_hard_gate
+                and token_type_ids is not None
+                and not token_type_ids.any()
+            ):
+                # from models.comm_utils import md5
+                hidden_states, _, router_loss, gate_logits = self.mlp_text()(
+                    hidden_states, None
+                )
+            else:
+                hidden_states, _, router_loss, gate_logits = self.mlp(
+                    hidden_states, token_type_ids
+                )
+        else:
+            if self.config.sequence_parallel:
+                # do all-gather
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(self.ipp),
+                    [dist.Shard(1), dist.Replicate()],
+                )
+            hidden_states = self.mlp(hidden_states)
+            gate_logits = None
+
+        if (
+            self.config.tensor_parallel_degree > 1
+            and self.config.hidden_dropout_prob > 0.0
+        ):
+            current_seed = (
+                "local_seed" if self.config.sequence_parallel else "global_seed"
+            )
+            with get_rng_state_tracker().rng_state(current_seed):
+                hidden_states = self.residual_add2(hidden_states, residual)
+        else:
+            hidden_states = self.residual_add2(hidden_states, residual)
+
+        outputs = (hidden_states,)
+
+        if output_attentions:
+            outputs += (self_attn_weights,)
+
+        if use_cache:
+            outputs += (present_key_value,)
+
+        if hasattr(self.config, "use_moe") and self.config.use_moe:
+            # 只有 `use_moe` 时为非空
+            if router_loss_attn:
+                router_loss_attn = router_loss_attn[0]
+                # if self.config.moe_logging:
+                #     global_training_logs.update(
+                #         **{
+                #             f"router_loss_attn_{self.layer_idx}": router_loss_attn,
+                #             f"router_loss_{self.layer_idx}": router_loss,
+                #         }
+                #     )
+                router_loss = router_loss + router_loss_attn
+
+            # use-moe 时无论这一层有没有 moe layer，都会额外增加一个返回值
+            if isinstance(self.mlp, (MOELayerAuto)):
+                outputs += (router_loss,)
+            else:
+                outputs += (paddle.zeros([1], dtype=paddle.float32),)
+
+            if output_gate_logits:
+                outputs += (gate_logits,)
+
+        # remove empty tuple for pipeline parallel
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+        return outputs
+
+
+class ErniePretrainedModelAuto(PretrainedModel):
+    """
+    ErniePretrainedModelAuto is a pretrained model class for Ernie model.
+    It is composed of a encoder and a decoder.
+    """
+
+    config_class = ErnieMoEConfig
+    base_model_prefix = "ernie"
+
+    @classmethod
+    def _get_name_mappings(cls, config: ErnieMoEConfig) -> StateDictNameMapping:
+        """
+            获取模型的名称映射，包括模型参数和额外的映射关系。
+
+        Args:
+            config (ErnieMoEConfig): ErnieMoE配置类实例，包含了模型的相关信息。
+
+        Returns:
+            StateDictNameMapping (List[Tuple[str, str, Optional[str], int]]): 一个列表，每个元素是一个四元组，分别表示：
+                1. 原始模型中的参数名；
+                2. 转换后的参数名；
+                3. 如果需要进行转换（可选），则为转换操作类型；
+                4. 索引值，用于标识当前参数在所有参数中的位置。
+
+        """
+        mappings: StateDictNameMapping = []
+        model_mappings = [
+            ["embed_tokens.weight"],
+            ["norm.weight"],
+        ]
+        for layer_index in range(
+            config.num_hidden_layers
+            if not config.remove_tail_layer
+            else config.num_hidden_layers - 1
+        ):
+            layer_mappings = [
+                [
+                    f"layers.{layer_index}.self_attn.q_proj.weight",
+                    None,
+                    "transpose",
+                ],
+                [
+                    f"layers.{layer_index}.self_attn.k_proj.weight",
+                    None,
+                    "transpose",
+                ],
+                [
+                    f"layers.{layer_index}.self_attn.v_proj.weight",
+                    None,
+                    "transpose",
+                ],
+                [
+                    f"layers.{layer_index}.self_attn.o_proj.weight",
+                    None,
+                    "transpose",
+                ],
+                [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
+                [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.input_layernorm.weight"],
+                [f"layers.{layer_index}.post_attention_layernorm.weight"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        init_name_mappings(mappings=model_mappings)
+        if "ErnieModelAuto" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "model." + mapping[0]
+                mapping[1] = "ernie." + mapping[1]
+            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+
+        mappings = [
+            StateDictNameMapping(*mapping, index=index)
+            for index, mapping in enumerate(model_mappings)
+        ]
+        return mappings
+
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+        """
+        根据配置和分割或合并的方式，获取张量并行映射关系。
+
+        Args:
+            config (TensorParallelConfig): TensorParallel的配置对象。
+            is_split (bool, optional): 是否为分割操作。默认为True。
+
+        Returns:
+            Dict: 包含张量并行映射关系的字典。
+        """
+
+        from paddleformers.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
+                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
+                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                "lm_head.weight": partial(fn, is_column=not config.tie_word_embeddings),
+                # Row Linear
+                "embed_tokens.weight": partial(fn, is_column=False),
+                "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
+                "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+            }
+            if config.use_bias:
+                base_actions.update(
+                    {
+                        # Column Linear
+                        "layers.0.self_attn.q_proj.bias": partial(fn, is_column=True),
+                        "layers.0.self_attn.k_proj.bias": partial(fn, is_column=True),
+                        "layers.0.self_attn.v_proj.bias": partial(fn, is_column=True),
+                        "layers.0.mlp.gate_proj.bias": partial(fn, is_column=True),
+                        "layers.0.mlp.up_proj.bias": partial(fn, is_column=True),
+                        "lm_head.bias": partial(fn, is_column=True),
+                    }
+                )
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(
+            config.num_hidden_layers
+            if not config.remove_tail_layer
+            else config.num_hidden_layers - 1
+        )
+
+        return mappings
+
+    def init_weights(self, layer):
+        """Initialization hook"""
+        if self.config.tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
+        else:
+            rng_tracker = contextlib.nullcontext
+
+        if isinstance(
+            layer,
+            (
+                ErnieLMHead,
+                nn.Embedding,
+                nn.Linear,
+                paddle.incubate.nn.FusedLinear,
+            ),
+        ):
+            # In the dygraph mode, use the `set_value` to reset the parameter directly,
+            # and reset the `state_dict` to update parameter in static mode.
+            # logger.info(f'initializing pp:{type(layer)}')
+
+            with rng_tracker():
+                dtype = paddle.get_default_dtype()
+                paddle.set_default_dtype("float32")
+                # 在defualt dtype为bfloat16的情况下调用randn会报错，
+                # 实际上randn已经支持bfloat16了，只是API检测层面的错误。
+                if layer.weight._is_initialized():
+                    if layer.weight.is_dist():
+                        # 对于DistTensor，应采用local_shape来初始化
+                        # 当模型规模较大时，paddle.randn的输出索引可能会超出int最大值，导致生成的数据为0
+                        layer.weight._local_value().set_value(
+                            paddle.randn(
+                                layer.weight._local_shape, dtype=layer.weight.dtype
+                            ).scale(self.config.initializer_range)
+                        )
+                    else:
+                        layer.weight.set_value(
+                            paddle.randn(
+                                layer.weight.shape, dtype=layer.weight.dtype
+                            ).scale(self.config.initializer_range)
+                        )
+                    paddle.set_default_dtype(dtype)
+                    logger.info(
+                        f"dist-init-fc: shape={layer.weight.shape}, "
+                        f" range={self.config.initializer_range},"
+                        f' type={type(layer)},norm={layer.weight.astype("float32").norm()}'
+                    )
+
+        elif isinstance(layer, RotaryEmbedding):
+            head_dim = self.config.hidden_size // self.config.num_attention_heads
+            inv_freq = 1.0 / (
+                layer.base ** (np.arange(0, head_dim, 2).astype("float32") / head_dim)
+            )
+            # self.register_buffer("inv_freq", inv_freq.cast(dtype))
+
+            # higher acc using float32
+            t = np.arange(layer.max_position_embeddings, dtype="float32")
+            freqs = np.einsum("i,j->ij", t, inv_freq)
+            # Different from paper, but it uses a different permutation in order to obtain the same calculation
+            emb = np.concatenate([freqs, freqs], axis=-1)
+            # [bs, seqlen, nhead, head_dim]
+            cos_cached = np.cos(emb)[:, :]  # .astype(dtype)
+            sin_cached = np.sin(emb)[:, :]  # .astype(dtype)
+            layer.cos_cached.set_value(cos_cached)  # model后续会被cast成half/bfloat16
+            layer.sin_cached.set_value(sin_cached)
+        elif isinstance(layer, Top2Gate):
+            if not hasattr(
+                layer, "weight"
+            ):  # no weight to initialie : moe-round-robin-gate
+                return
+            with rng_tracker("model_parallel_rng"):
+                dtype = paddle.get_default_dtype()  # layer.weight.dtype  #
+                paddle.set_default_dtype("float32")
+                print("lzx debug layer name,", layer)
+                # print("lzx debug layer name,", layer.weight)
+                print("self.config.moe_group_experts:", self.config.moe_group_experts)
+                if self.config.moe_group_experts:
+                    if layer.weight._is_initialized():
+                        layer.weight.set_value(
+                            paddle.randn(
+                                layer.weight.shape, dtype=layer.weight.dtype
+                            ).scale(self.config.initializer_range)
+                        )
+                else:
+                    if layer.weight._is_initialized():
+                        granularity = (
+                            1
+                            if self.config.moe_intermediate_size == 0
+                            else self.config.intermediate_size
+                            // self.config.moe_intermediate_size
+                        )
+                        layer.weight.set_value(
+                            paddle.randn(
+                                [
+                                    self.config.hidden_size,
+                                    self.config.moe_num_experts // granularity,
+                                ],
+                                dtype="float32",
+                            )
+                            .scale(self.config.initializer_range)
+                            .repeat_interleave(granularity, axis=-1)
+                        )
+                logger.info(
+                    f"dist-init-moe_gate: shape={layer.weight.shape}, dtype={layer.weight.dtype} "
+                    f"range={self.config.initializer_range},type={type(layer)}, "
+                    f'norm={layer.weight.astype("float32").norm()}'
+                )
+
+
+@register_base_model
+class ErnieModelAuto(ErniePretrainedModelAuto):
+    """
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`ErnieDecoderLayerAuto`]
+    Args:
+        config: ErnieMoEConfig
+    """
+
+    def __init__(self, config: ErnieMoEConfig):
+        """
+            初始化ErnieDecoderAuto实例。
+
+        Args:
+            config (ErnieMoEConfig): ErnieMoE配置类，包含模型的相关参数，如隐藏单元大小、词表大小等。
+
+        Returns:
+            None.
+
+        Raises:
+            None.
+        """
+        if hasattr(config, "use_moe") and config.use_moe:
+            if config.moe_group in {"mp", "model", "tp", "mpdp"}:
+                assert config.sequence_parallel
+                logger.info(
+                    f"disable FFN tensor model parallel, moe-group={config.moe_group}"
+                )
+                config.disable_ffn_model_parallel = True
+
+            config.moe_group = _parse_moe_group(config.moe_group)
+            if config.moe_group in fleet.auto.get_mesh().dim_names:
+                config.moe_world_size = fleet.auto.get_mesh().get_dim_size(
+                    config.moe_group
+                )
+                if config.moe_world_size < 0:
+                    config.moe_world_size = 1
+            else:
+                config.moe_world_size = 1
+
+        super().__init__(config)
+        self.padding_idx = config.pad_token_id
+        self.vocab_size = config.vocab_size
+        self.hidden_size = config.hidden_size
+        self.config = config
+
+        self.embed_tokens = nn.Embedding(
+            self.vocab_size,
+            self.hidden_size,
+        )
+
+        if (
+            self.config.tensor_parallel_degree > 1
+            or self.config.pipeline_parallel_degree > 1
+        ):
+            if not in_auto_parallel_align_mode():
+                self.embed_tokens.weight = dist.shard_tensor(
+                    self.embed_tokens.weight,
+                    get_mesh(),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
+
+        layers_list = []
+
+        def get_layer_pp_info(ipp):
+            mesh = fleet.auto.get_mesh()
+            if is_pp_enable() is False:
+                return None, False
+            else:
+                pp_degree = mesh.get_dim_size("pp")
+                layer_num = (
+                    config.num_hidden_layers - 1
+                    if config.remove_tail_layer
+                    else config.num_hidden_layers
+                )
+                layer_per_stage = math.ceil(layer_num / pp_degree)
+                input_need_reshard = ipp % layer_per_stage == 0
+                return ipp // layer_per_stage, input_need_reshard
+
+        self.next_pp_stage_indexes = []
+        for layer_idx in range(
+            config.num_hidden_layers - 1
+            if config.remove_tail_layer
+            else config.num_hidden_layers
+        ):
+            pp_stage_id, input_need_reshard = get_layer_pp_info(layer_idx)
+            layers_list.append(ErnieDecoderLayerAuto(config, layer_idx, pp_stage_id))
+            if input_need_reshard:
+                self.next_pp_stage_indexes.append(layer_idx)
+        self.layers = nn.LayerList(layers_list)
+        Norm = RMSNorm if config.use_rmsnorm else LayerNorm
+        if not config.use_rmsnorm and config.fuse_ln:
+            Norm = FusedLayerNorm
+        self.norm = Norm(config, -1)
+
+        self.gradient_checkpointing = False
+
+        # Initialize weights and apply final processing
+
+        self.placements = (
+            [dist.Shard(1), dist.Shard(0)]
+            if self.config.sequence_parallel
+            else [dist.Shard(0), dist.Replicate()]
+        )
+
+    def get_input_embeddings(self):
+        """
+        获取输入的词嵌入表示。
+
+        Args:
+            无。
+
+        Returns:
+            torch.Tensor: 输入的词嵌入表示，形状为 (vocab_size, embed_dim)，其中 vocab_size 是词汇表大小，
+            embed_dim 是词嵌入的维度。
+
+        """
+        return self.embed_tokens
+
+    def set_input_embeddings(self, value):
+        """
+        设置模型的输入嵌入层权重。
+
+        Args:
+            value (nn.Embedding): 一个预训练的词嵌入层对象，用于替换模型当前的输入嵌入层。
+
+        Returns:
+            None: 此函数不返回任何值，但会更新模型内部的 `embed_tokens` 属性。
+
+        """
+        self.embed_tokens = value
+
+    @classmethod
+    def _prepare_decoder_attention_mask(
+        cls, attention_mask, input_shape, past_key_values_length, dtype
+    ):
+        # create causal mask
+        # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+        combined_attention_mask = None
+        if input_shape[-1] > 1:
+            combined_attention_mask = _make_causal_mask(
+                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
+            )
+
+        if attention_mask is not None:
+            # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+            expanded_attn_mask = _expand_mask(
+                attention_mask, dtype, tgt_length=input_shape[-1]
+            )
+            combined_attention_mask = (
+                expanded_attn_mask
+                if combined_attention_mask is None
+                else expanded_attn_mask + combined_attention_mask
+            )
+        combined_attention_mask = paddle.maximum(
+            combined_attention_mask.astype(dtype),
+            paddle.to_tensor(float(finfo(dtype).min), dtype=dtype),
+        )
+        return combined_attention_mask
+
+    # NOTE: 存在控制流和Pylayer的逻辑时不能使用not_to_static
+    # @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        layer_module,
+        hidden_states,
+        attention_mask,
+        position_ids,
+        output_attentions,
+        past_key_value,
+        use_cache,
+        inbatch_pack_offset,
+        token_type_ids,
+    ):
+        """
+        重新计算模型的训练过程。
+
+        Args:
+            layer_module (torch.nn.Module): 包含前馈神经网络和注意力机制的层模块。
+            hidden_states (torch.Tensor): 形状为 (batch_size, sequence_length, hidden_size) 的隐藏状态张量。
+            attention_mask (torch.Tensor): 形状为 (batch_size, sequence_length) 的注意力掩码张量。
+            position_ids (torch.Tensor): 形状为 (batch_size, sequence_length) 的位置ID张量。
+            output_attentions (bool): 如果为 True，则输出注意力权重。
+            past_key_value (tuple): 包含过去键值对的元组。
+            use_cache (bool): 如果为 True，则在前向传播中保存已缓存的张量。
+            inbatch_pack_offset (int): 批次内的打包偏移量。
+
+        Returns:
+            torch.Tensor: 经过重新计算的隐藏状态张量。
+
+        """
+
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs, output_gate_logits=False)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            position_ids,
+            output_attentions,
+            past_key_value,
+            use_cache,
+            inbatch_pack_offset,
+            token_type_ids,
+            use_reentrant=False,
+        )
+        return hidden_states
+
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        use_cache=None,
+        past_key_values=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        inbatch_pack_offset=None,
+        token_type_ids=None,
+        **kwargs,
+    ):
+        """
+        模型的前向传播函数。
+        """
+        # print(f"ErnieModelAuto forward")
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
+
+        # print(f"retrieve input ids and inputs_embeds")
+        # print(f"input_ids:{input_ids}\ninputs_embeds:{inputs_embeds}")
+        # retrieve input_ids and inputs_embeds
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time"
+            )
+        elif input_ids is not None:
+            batch_size, seq_length = input_ids.shape
+        elif inputs_embeds is not None:
+            batch_size, seq_length, _ = inputs_embeds.shape
+        else:
+            raise ValueError(
+                "You have to specify either decoder_input_ids or decoder_inputs_embeds"
+            )
+
+        if past_key_values is None:
+            past_key_values = tuple([None] * len(self.layers))
+
+        seq_length_with_past = seq_length
+        cache_length = 0
+
+        if past_key_values[0] is not None:
+            cache_length = paddle.shape(past_key_values[0][0])[1]
+            seq_length_with_past += cache_length
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids).astype(
+                self.embed_tokens.weight.dtype
+            )
+            # print(f'emb out:{inputs_embeds} \n emb-weight:{self.embed_tokens.weight}')
+
+        global_mesh = global_mesh_starts_with_pp()
+        if self.config.sequence_parallel or self.config.submatrix_parallel:
+            # [B, S, H] -> [S, B, H]
+            inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
+            # if token_type_ids is not None:
+            # token_type_ids = token_type_ids.reshape([-1, 1])
+            # token_type_ids = dist.reshard(
+            #     token_type_ids, global_mesh, [dist.Replicate() for _ in range(len(global_mesh._shape))]
+            # )
+            # token_type_ids = token_type_ids.reshape([-1])
+
+        if position_ids is not None:
+            position_ids = dist.shard_tensor(
+                position_ids,
+                global_mesh,
+                [dist.Replicate() for _ in range(len(global_mesh._shape))],
+            )
+        # embed positions
+        can_use_fa = self.config.use_flash_attn and flash_attention is not None
+        can_mem_eff_attn = (
+            self.config.use_mem_eff_attn and inbatch_pack_offset is not None
+        )
+        if can_use_fa or can_mem_eff_attn:
+            if attention_mask is not None:
+                attention_mask = None
+                # logger.warning无法动转静
+                # logger.warning(
+                #    f"set attention_mask = None when (can_use_fa or can_mem_eff_attn) and attention_mask is not None, "
+                #    f"can_use_fa = {can_use_fa}, can_mem_eff_attn = {can_mem_eff_attn}, "
+                #    f"attention_mask is not None = {attention_mask is not None}"
+                # )
+        elif attention_mask is None:
+            attention_mask = paddle.ones(
+                (batch_size, seq_length_with_past), dtype=paddle.bool
+            )
+
+        if attention_mask is not None:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask,
+                (batch_size, seq_length),
+                cache_length,
+                inputs_embeds.dtype,
+            )
+            attention_mask = dist.shard_tensor(
+                attention_mask,
+                global_mesh,
+                [dist.Replicate() for _ in range(len(global_mesh._shape))],
+            )
+
+        hidden_states = inputs_embeds
+        if self.config.tensor_parallel_degree > 1:
+            hidden_states = dist.reshard(hidden_states, get_mesh(0), self.placements)
+
+        # decoder layers
+        # print(f"decoder layers")
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+        next_decoder_cache = () if use_cache else None
+
+        all_router_loss = None
+        if hasattr(self.config, "use_moe") and self.config.use_moe:
+            all_router_loss = paddle.to_tensor(0.0)
+            all_router_loss = dist.shard_tensor(
+                all_router_loss, get_mesh(0), dist.Replicate()
+            )
+        all_gate_logits = () if hasattr(self.config, "use_moe") else None
+        for idx, (decoder_layer) in enumerate(self.layers):
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+
+            past_key_value = (
+                past_key_values[idx] if past_key_values is not None else None
+            )
+
+            has_gradient = not hidden_states.stop_gradient
+            ipp = decoder_layer.ipp
+            if not is_pp_enable():
+                position_ids_input = position_ids
+                attention_mask_input = attention_mask
+                token_type_ids_input = token_type_ids
+            else:
+                if position_ids is not None:
+                    position_ids_input = dist.reshard(
+                        position_ids,
+                        get_mesh(ipp),
+                        [dist.Replicate(), dist.Replicate()],
+                    )
+                else:
+                    position_ids_input = position_ids
+                attention_mask_input = (
+                    dist.reshard(
+                        attention_mask,
+                        get_mesh(ipp),
+                        [dist.Replicate(), dist.Replicate()],
+                    )
+                    if attention_mask is not None
+                    else None
+                )
+                token_type_ids_input = (
+                    dist.reshard(
+                        token_type_ids,
+                        get_mesh(ipp),
+                        [dist.Replicate(), dist.Replicate()],
+                    )
+                    if token_type_ids is not None
+                    else None
+                )
+
+            if idx in self.next_pp_stage_indexes:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(ipp),
+                    self.placements,
+                )
+                if hasattr(self.config, "use_moe") and self.config.use_moe:
+                    all_router_loss = dist.reshard(
+                        all_router_loss,
+                        get_mesh(ipp),
+                        [dist.Replicate()],
+                    )
+            if self.config.use_recompute and has_gradient:
+                layer_outputs = self.recompute_training(
+                    decoder_layer,
+                    hidden_states,
+                    attention_mask_input,
+                    position_ids_input,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    inbatch_pack_offset,
+                    token_type_ids_input,
+                )
+            else:
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask_input,
+                    position_ids_input,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    inbatch_pack_offset,
+                    token_type_ids_input,
+                )
+
+            if isinstance(layer_outputs, (tuple, list)):
+                hidden_states = layer_outputs[0]
+            else:
+                hidden_states = layer_outputs
+
+            if use_cache:
+                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+
+            if output_attentions:
+                all_self_attns += (layer_outputs[1],)
+            if hasattr(self.config, "use_moe") and self.config.use_moe:
+                if not (self.config.use_recompute and has_gradient):
+                    layer_outputs, gate_logits = layer_outputs[:-1], layer_outputs[-1]
+                    all_gate_logits = all_gate_logits + (gate_logits,)
+                router_loss = layer_outputs[-1]
+                all_router_loss += router_loss
+
+        if use_cache and not (hasattr(self.config, "use_moe") and self.config.use_moe):
+            hidden_states = paddle.unsqueeze(hidden_states[:, -1, :], 1)
+
+        if self.config.pipeline_parallel_degree > 1:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(-1),
+                self.placements,
+            )
+        hidden_states = self.norm(hidden_states)
+
+        # print(f"after decoder layer, hidden_states is : {hidden_states}")
+
+        # add hidden states from the last decoder layer
+        # print(f"add hidden states from the last decoder layer")
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        next_cache = next_decoder_cache if use_cache else None
+
+        if not return_dict:
+            return tuple(
+                v
+                for v in [
+                    hidden_states,
+                    next_cache,
+                    all_hidden_states,
+                    all_self_attns,
+                    all_router_loss,
+                    all_gate_logits,
+                ]
+                if v is not None
+            )
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=next_cache,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+            cross_attentions=None,
+            router_loss=all_router_loss,
+            gate_logits=all_gate_logits,
+        )
+
+
+class ErniePretrainingCriterionBase(paddle.nn.Layer):
+    """
+    Criterion for Ernie.
+    It calculates the final loss.
+    """
+
+    def __init__(self, config, return_tuple=True):
+        super(ErniePretrainingCriterionBase, self).__init__()
+        self.ignored_index = getattr(config, "ignored_index", -100)
+        self.config = config
+        self.return_tuple = return_tuple
+        self.enable_parallel_cross_entropy = (
+            config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+        )
+
+        self.loss_func = paddle.nn.CrossEntropyLoss(
+            reduction="none",
+        )
+
+    def forward(self, prediction_scores, masked_lm_labels):
+        """
+        计算模型的前向传播过程。
+
+        Args:
+            prediction_scores (tuple 或 paddle.Tensor): 模型预测的得分，当config.use_sparse_head_and_loss_fn为True时，
+                应为包含hidden_states, outlinear_weight, outlinear_bias的元组；否则为paddle.Tensor。
+            masked_lm_labels (paddle.Tensor): 经过mask的token对应的真实标签，用于计算损失函数。
+
+        Returns:
+            paddle.Tensor: 前向传播的计算结果，包含损失值和其它可能的输出。
+
+        """
+        if self.config.use_sparse_head_and_loss_fn:
+            hidden_states, outlinear_weight, outlinear_bias = prediction_scores
+
+            if self.config.sequence_parallel or self.config.submatrix_parallel:
+                masked_lm_labels, sparse_label_idx = (
+                    sequence_parallel_sparse_mask_labels(
+                        masked_lm_labels, self.ignored_index
+                    )
+                )
+            else:
+                masked_lm_labels = masked_lm_labels.flatten()
+                sparse_label_idx = paddle.nonzero(
+                    masked_lm_labels != self.ignored_index
+                ).flatten()
+                masked_lm_labels = paddle.take_along_axis(
+                    masked_lm_labels, sparse_label_idx, axis=0
+                )
+
+                hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
+                hidden_states = paddle.take_along_axis(
+                    hidden_states, sparse_label_idx.reshape([-1, 1]), axis=0
+                )
+
+            if self.config.use_recompute_loss_fn:
+                res = recompute(
+                    self.forward_impl_with_calc_logits,
+                    masked_lm_labels,
+                    hidden_states,
+                    outlinear_weight,
+                    outlinear_bias,
+                    sparse_label_idx,
+                )
+            else:
+                logits = calc_lm_head_logits(
+                    self.config,
+                    hidden_states,
+                    outlinear_weight,
+                    outlinear_bias,
+                    sparse_label_idx,
+                )
+                res = self.forward_impl(logits, masked_lm_labels)
+        elif self.config.use_recompute_loss_fn:
+            assert isinstance(prediction_scores, tuple) and len(prediction_scores) in [
+                3,
+                4,
+            ]
+            res = recompute(
+                self.forward_impl_with_calc_logits, masked_lm_labels, *prediction_scores
+            )
+        else:
+            res = self.forward_impl(prediction_scores, masked_lm_labels)
+
+        return res
+
+    def forward_impl_with_calc_logits(
+        self,
+        masked_lm_labels,
+        hidden_states,
+        outlinear_weight,
+        outlinear_bias,
+        sparse_label_idx=None,
+        tensor_parallel_output=None,
+    ):
+        """doc"""
+
+        logits = calc_lm_head_logits(
+            self.config,
+            hidden_states,
+            outlinear_weight,
+            outlinear_bias,
+            sparse_label_idx,
+            tensor_parallel_output,
+        )
+
+        return self.forward_impl(logits, masked_lm_labels)
+
+    def loss_impl(self, prediction_scores, masked_lm_labels):
+        """extract loss impl for subbatch"""
+        masked_lm_loss = self.loss_func(
+            prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(-1)
+        )
+        return masked_lm_loss
+
+    def forward_impl(self, prediction_scores, masked_lm_labels):
+        """
+        计算masked language modeling的损失函数。
+
+        Args:
+            prediction_scores (paddle.Tensor): 预测得分张量，其形状为[batch_size, sequence_length, vocab_size]。
+            masked_lm_labels (paddle.Tensor): masked language modeling的目标标签张量，其形状为[batch_size, sequence_length]。
+
+        Returns:
+            tuple or paddle.Tensor: 如果self.return_tuple为True，则返回包含两个元素的元组，第一个元素为损失值，第二个元素为损失总和；
+            如果self.return_tuple为False，则只返回损失值。
+
+            - 损失值 (paddle.Tensor): 形状为[]的张量，表示masked language modeling的损失。
+            - 损失总和 (paddle.Tensor): 形状为[]的张量，表示masked language modeling的损失总和（不包含mask）。
+
+        """
+
+        with paddle.amp.auto_cast(False):
+            if self.config.use_sparse_head_and_loss_fn and prediction_scores.shape[
+                0
+            ] > self.config.get("loss_subbatch_seqlen", 32768):
+                sb_loss_func = subbatch(
+                    self.loss_impl,
+                    [0, 1],
+                    [0, 0],
+                    self.config.get("loss_subbatch_seqlen", 32768),
+                    0,
+                )
+                masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
+            else:
+                masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
+            # print(f"after calc cross entropy, masked_lm_loss is : {masked_lm_loss}")
+            lossmask = masked_lm_labels != self.ignored_index
+
+            if (~lossmask).all():  # empty span
+                logger.warning(
+                    f"encounter empty span when calculate loss, ignored_index={self.ignored_index}"
+                )
+                loss = paddle.mean(masked_lm_loss) * 0.0
+                loss_sum = masked_lm_loss.sum().detach()
+            else:
+                lossmask_ = lossmask.reshape([-1]).cast(paddle.float32)
+                # 逐位对齐, 全精度聚合
+                masked_lm_loss_ = paddle.sum(
+                    masked_lm_loss.cast(paddle.float32).reshape([-1]) * lossmask_
+                )
+                loss = masked_lm_loss_ / lossmask_.sum()
+                loss_sum = masked_lm_loss_.sum().detach()
+
+        if not self.return_tuple:  # only used in pp
+            if self.training:
+                return loss
+            return loss_sum
+        return loss, loss_sum
+
+
+class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
+    """
+    Criterion for Ernie.
+    It calculates the final loss.
+    """
+
+    def __init__(self, config, return_tuple=True):
+        """
+        用于ERNIE预训练任务的损失函数基类。
+
+        Args:
+            config (PretrainingConfig): ERNIE模型的配置对象。
+            return_tuple (bool，可选): 如果为True，则返回损失函数的值为一个元组（loss），否则返回标量值。默认值为True。
+
+        Returns:
+            None
+        """
+        super(ErniePretrainingCriterion, self).__init__(
+            config, return_tuple=return_tuple
+        )
+
+    def forward(self, prediction_scores, masked_lm_labels, router_loss=None):
+        """
+        calculates the final loss
+        """
+        res = super().forward(
+            prediction_scores,
+            masked_lm_labels,
+        )
+        if self.return_tuple:
+            loss, loss_sum = res
+        else:
+            loss, loss_sum = res, None
+        # global_training_logs.update(lm_loss=loss.clone().detach())
+        if router_loss is not None and not in_auto_parallel_align_mode():
+            global_mesh = global_mesh_starts_with_pp()
+            if self.config.pipeline_parallel_degree > 1:
+                loss = dist.reshard(
+                    loss,
+                    global_mesh,
+                    [dist.Replicate() for _ in range(len(global_mesh._shape))],
+                )
+                router_loss = dist.reshard(
+                    router_loss,
+                    global_mesh,
+                    [dist.Replicate() for _ in range(len(global_mesh._shape))],
+                )
+            loss = loss + router_loss - router_loss.detach()
+            # if isinstance(router_loss, paddle.Tensor):
+            #     global_training_logs.update(router_loss=router_loss.detach())
+        return loss, loss_sum
+
+
+class ErnieLMHead(nn.Layer):
+    """
+    ErnieLMHead is the linear layer used to project hidden state of decoder into word embeddings.
+    """
+
+    def __init__(self, config):
+        super(ErnieLMHead, self).__init__()
+        self.config = config
+        vocab_size = config.vocab_size
+        self.weight = self.create_parameter(
+            shape=(
+                [vocab_size, config.hidden_size]
+                if config.tie_word_embeddings
+                else [config.hidden_size, vocab_size]
+            ),
+            dtype=paddle.get_default_dtype(),
+        )
+
+        if (
+            self.config.tensor_parallel_degree > 1
+            or self.config.pipeline_parallel_degree > 1
+        ):
+            self.weight = dist.shard_tensor(
+                self.weight,
+                get_mesh(-1),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+
+        logger.info(
+            f"output-weight:{self.weight.shape} config.tie_word_embeddings={config.tie_word_embeddings}"
+        )
+        if config.weight_share_add_bias and config.use_bias:
+            self.bias = self.create_parameter(
+                shape=[vocab_size],
+                dtype=paddle.get_default_dtype(),
+                attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.constant.Constant(0.0)
+                ),
+            )
+            if (
+                self.config.tensor_parallel_degree > 1
+                or self.config.pipeline_parallel_degree > 1
+            ):
+                self.bias = dist.shard_tensor(
+                    self.bias,
+                    get_mesh(-1),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+        else:
+            self.bias = None
+
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = (
+            True if (vocab_size != config.vocab_size) else False
+        )
+        if config.weight_share_add_bias and config.use_bias:
+            self.bias.is_distributed = (
+                True if (vocab_size != config.vocab_size) else False
+            )
+
+        if self.weight.is_distributed:
+            self.weight.split_axis = 1
+        if (
+            config.weight_share_add_bias
+            and config.use_bias
+            and self.bias.is_distributed
+        ):
+            self.bias.split_axis = 0
+
+        if self.config.use_recompute_loss_fn:
+            logger.info(
+                "Using recompute_loss_fn, the calculation of logits will be moved into "
+                "loss_fn for memory optimization"
+            )
+
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        """
+        根据给定的隐藏状态计算模型的前向传播输出。
+
+        Args:
+            hidden_states (torch.Tensor): 模型的隐藏状态，形状为 [batch_size, sequence_length, hidden_size]。
+            tensor_parallel_output (Union[None, Tuple[Any, ...]], optional): 用于并行计算输出的张量元组。默认为None。
+
+        Returns:
+            Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Union[None, Tuple[Any, ...]]], torch.Tensor]:
+                如果启用了重新计算损失函数或使用了稀疏头和损失函数，则返回包含隐藏状态、权重、偏置和并行输出元组的元组。
+                否则，返回通过calc_lm_head_logits函数计算得到的logits张量。
+
+        """
+        if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
+            out_tensors = (
+                (hidden_states, self.weight, self.bias)
+                if tensor_parallel_output is None
+                else (hidden_states, self.weight, self.bias, tensor_parallel_output)
+            )
+
+            return out_tensors
+
+        return calc_lm_head_logits(
+            self.config,
+            hidden_states,
+            self.weight,
+            self.bias,
+            None,
+            tensor_parallel_output,
+        )
+
+
+class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
+    """
+    ErnieForCausalLMAuto is the model class for causal language modeling.
+    """
+
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
+
+    def __init__(self, config):
+        super().__init__(config)
+
+        if config.sequence_parallel:
+            logger.info(f"using sequence_parallel, input seqlen={config.seqlen}")
+            if config.using_dynamic_sequence_length:
+                assert (
+                    not config.micro_batch_size
+                ), "sequence-parallel needs micro_batch_size setting when using dygramic_sequnence_length"
+            else:
+                assert config.seqlen is not None
+
+            assert (
+                config.tensor_parallel_degree > 1
+            ), f"sequence-parallel needs mp>1, got mp={config.tensor_parallel_degree}"
+
+        if config.submatrix_parallel:
+            assert config.seqlen is not None
+            assert (
+                config.tensor_parallel_degree > 1
+            ), f"submatrix_parallel only works in mp, got mp={self.tensor_parallel_degree}"
+            assert (
+                config.sequence_parallel == 0
+            ), "enable submatrix_parallel must disable sequence-parallel"
+
+        # initialize-trick for big model, see
+        # https://github.com/bigscience-workshop/bigscience/blob/master/train/tr11-176B-ml/README.md#std-init
+        new_initializer_range = math.sqrt(0.3333 / config.hidden_size)
+        logger.info(
+            f"change initializer-range from {config.initializer_range} to {new_initializer_range}"
+        )
+        config.initializer_range = new_initializer_range
+        self.config = config
+        self.ernie = ErnieModelAuto(config)
+        self.lm_head = ErnieLMHead(config)
+        self.criterion = ErniePretrainingCriterion(config)
+
+        self.tie_weights()  # maybe weight share
+
+        if self.config.use_rmsnorm:
+            if self.config.fuse_rms_norm:
+                logger.info("Use fusedRMSNorm")
+            else:
+                logger.info("Use normal RMSNorm")
+        else:
+            if self.config.fuse_ln:
+                logger.info("Use fusedLN")
+            else:
+                logger.info("Use normal LayerNorm")
+
+    # Initialize weights and apply final processing
+    def _post_init(self, original_init, *args, **kwargs):
+        """
+        Initialize weights and apply final processing
+        """
+        super()._post_init(self, original_init, *args, **kwargs)
+        factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
+        logger.info(f"using post init div: factor:{factor}")
+
+        # NOTE: if LazyGuard is enabled, all the weights will not be initialized here,
+        # so w._is_initialized() must be False, _post_init do nothing here.
+        # We should do scale weight into init_weights() if LazyGuard is enabled.
+        def scale_by_factor_if_valid(w):
+            if w.is_dist() and w._is_initialized():
+                w.scale_(factor)
+
+        if hasattr(self.config, "use_moe") and self.config.use_moe:
+            with paddle.no_grad():
+                for l in self.ernie.layers:
+                    if isinstance(
+                        l.self_attn.o_proj,
+                        (MOELayerAuto),
+                    ):
+                        for e in l.self_attn.o_proj.experts:
+                            if isinstance(e, ErnieMoeMLP):
+                                scale_by_factor_if_valid(e.weight)
+                    else:
+                        scale_by_factor_if_valid(l.self_attn.o_proj.weight)
+
+                    if isinstance(
+                        l.mlp,
+                        (MOELayerAuto),
+                    ):
+                        for e in l.mlp.experts:
+                            if isinstance(e, ErnieMoeMLP):
+                                scale_by_factor_if_valid(e.down_proj.weight)
+                    else:
+                        scale_by_factor_if_valid(l.mlp.down_proj.weight)
+        else:
+            with paddle.no_grad():
+                for l in self.ernie.layers:
+                    scale_by_factor_if_valid(l.self_attn.o_proj.weight)
+                    scale_by_factor_if_valid(l.mlp.down_proj.weight)
+
+    def get_input_embeddings(self):
+        """
+        获取输入嵌入层（embedding layer）的权重。
+
+        Args:
+            无。
+
+        Returns:
+            torch.nn.Embedding: ERNIE模型中的嵌入层权重。
+
+        """
+        return self.ernie.embed_tokens
+
+    def set_input_embeddings(self, value):
+        """
+        设置模型输入的词嵌入权重。
+
+        Args:
+            value (torch.Tensor): 形状为 [vocab_size, embed_dim] 的词嵌入权重张量。
+
+        Returns:
+            None: 该函数不返回任何值，而是直接修改模型的内部状态。
+
+        """
+        self.ernie.embed_tokens = value
+
+    def get_output_embeddings(self):
+        """
+        获取输出嵌入表示（Output Embeddings）
+
+        Args:
+            无
+
+        Returns:
+            torch.nn.Module: 输出嵌入层（LM Head）的实例，用于将模型最后一层的隐藏状态转换为输出嵌入表示。
+
+        """
+        return self.lm_head
+
+    def set_output_embeddings(self, new_embeddings):
+        """
+        设置模型的输出嵌入层。
+
+        Args:
+            new_embeddings (torch.nn.Module): 新的输出嵌入层模块。
+
+        Returns:
+            None: 此方法没有返回值，直接修改模型的状态。
+
+        """
+        self.lm_head = new_embeddings
+
+    def set_decoder(self, decoder):
+        """
+        设置解码器。
+
+        Args:
+            decoder: 一个解码器对象，用于后续生成文本或进行其他解码操作。
+
+        Returns:
+            None
+
+        """
+        self.ernie = decoder
+
+    def get_decoder(self):
+        """
+        获取解码器对象。
+
+        Args:
+            无
+
+        Returns:
+            解码器对象（self.ernie）：模型中的解码器对象，用于生成文本或其他解码任务。
+
+        """
+        return self.ernie
+
+    @staticmethod
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
+        """
+        为生成任务准备注意力掩码（attention mask）。
+
+        Args:
+            input_ids (Tensor): 输入的token IDs，形状为[batch_size, sequence_length]。
+            pad_token_id (int, optional): 填充token的ID。默认为None，表示不使用填充。
+            eos_token_id (int, optional): 结束token的ID。默认为None，表示不使用结束token。
+
+        Returns:
+            Tensor: 注意力掩码，与input_ids形状相同，数据类型为int64。
+                值为1表示对应的token应被考虑在注意力计算中，值为0表示忽略。
+
+        """
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
+            input_ids == pad_token_id
+        ).numpy().item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id)
+        )
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            attention_mask = (input_ids != pad_token_id).astype("int64")
+        else:
+            attention_mask = paddle.ones_like(input_ids, dtype="int64")
+        return attention_mask
+
+    def prepare_inputs_for_generation(
+        self,
+        input_ids,
+        use_cache=False,
+        past_key_values=None,
+        inputs_embeds=None,
+        **kwargs,
+    ):
+        """
+        准备生成模型的输入参数。
+
+        Args:
+            input_ids (torch.Tensor): 输入的文本ID。
+            use_cache (bool, optional): 是否使用缓存。默认为False。
+            past_key_values (Tuple[Tuple[torch.Tensor]], optional): 包含预计算的键和值的元组列表。默认为None。
+            inputs_embeds (torch.Tensor, optional): 可选的，预先计算的输入嵌入。默认为None。
+            **kwargs: 额外的关键字参数。
+
+        Returns:
+            dict: 包含模型输入参数的字典，包括`input_ids`、`past_key_values`、`use_cache`、`attention_mask`和`return_dict`。
+
+        """
+        if past_key_values:
+            input_ids = input_ids[:, -1:]
+
+        attention_mask = kwargs.get("attention_mask", None)
+
+        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+        if inputs_embeds is not None and past_key_values is None:
+            model_inputs = {"inputs_embeds": inputs_embeds}
+        else:
+            model_inputs = {"input_ids": input_ids}
+
+        model_inputs.update(
+            {
+                "past_key_values": past_key_values,
+                "use_cache": True,  # use_cache,
+                "attention_mask": attention_mask,
+                "return_dict": True,
+            }
+        )
+        return model_inputs
+
+    @staticmethod
+    def update_model_kwargs_for_generation(
+        outputs, model_kwargs, is_encoder_decoder=False
+    ):
+        """
+        更新模型参数以进行文本生成。
+
+        Args:
+            outputs (Union[Tuple[paddle.Tensor, ...], CausalLMOutputWithCrossAttentions]):
+                模型的输出，可能是一个包含多个paddle.Tensor的元组，或者是一个CausalLMOutputWithCrossAttentions对象。
+            model_kwargs (Dict[str, paddle.Tensor]):
+                模型的关键字参数字典，包含需要更新的参数。
+            is_encoder_decoder (bool, optional):
+                是否是编码器-解码器模型。默认为False。
+
+        Returns:
+            Dict[str, paddle.Tensor]:
+                更新后的模型关键字参数字典。
+
+        """
+        # update cache
+        if (
+            isinstance(outputs, tuple)
+            and len(outputs) > 1
+            and not isinstance(outputs[1], paddle.Tensor)
+        ):
+            model_kwargs["past_key_values"] = outputs[1]
+
+        if (
+            isinstance(outputs, CausalLMOutputWithCrossAttentions)
+            and "past_key_values" in outputs
+        ):
+            model_kwargs["past_key_values"] = outputs.past_key_values
+
+        # update token_type_ids with last value
+        if (
+            "token_type_ids" in model_kwargs
+            and model_kwargs["token_type_ids"] is not None
+        ):
+            token_type_ids = model_kwargs["token_type_ids"]
+            model_kwargs["token_type_ids"] = paddle.concat(
+                [token_type_ids, token_type_ids[:, -1:]], axis=-1
+            )
+
+        if not is_encoder_decoder:
+            # update attention mask
+            if "attention_mask" in model_kwargs:
+                attention_mask = model_kwargs["attention_mask"]
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [
+                        attention_mask,
+                        paddle.ones([attention_mask.shape[0], 1], dtype="int64"),
+                    ],
+                    axis=-1,
+                )
+        # update role_ids
+        if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
+            role_ids = model_kwargs["role_ids"]
+            model_kwargs["role_ids"] = paddle.concat(
+                [role_ids, role_ids[:, -1:]], axis=-1
+            )
+
+        return model_kwargs
+
+    def forward(
+        self,
+        input_ids,
+        labels=None,
+        data_id=None,  # no use
+        src_id=None,  # no use
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        use_cache=False,
+        past_key_values=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=False,  # decode 时需要return-dict, pretrain & eval时不需要。
+        ignored_index=0,  # no use
+        inbatch_pack_offset=None,
+        token_type_ids=None,
+    ):
+        """
+        ErnieForCausalLMAuto模型的前向传播函数。
+
+        Args:
+            input_ids (torch.LongTensor): 输入的token IDs，形状为[batch_size, sequence_length]。
+            position_ids (torch.LongTensor, optional): 输入的token位置IDs，形状为[batch_size, sequence_length]。默认为None。
+            attention_mask (torch.FloatTensor, optional): 注意力掩码，用于避免对填充(padding)位置进行注意力计算。
+                形状为[batch_size, sequence_length]或[batch_size, 1, sequence_length, sequence_length]，
+                其中值为0表示忽略，值为1表示需要计算注意力。默认为None。
+            inputs_embeds (torch.FloatTensor, optional): 可选地，直接提供嵌入张量作为输入，而不用首先通过词汇表查找它们。
+                形状为[batch_size, sequence_length, hidden_size]。默认为None。
+            labels (torch.LongTensor, optional): 标签，用于计算损失。形状为[batch_size, sequence_length]。默认为None。
+            use_cache (bool, optional): 是否使用缓存。默认为False。
+            past_key_values (Tuple[Tuple[torch.FloatTensor]], optional): 来自之前的前向传播的键/值对的元组。
+                用于快速解码。默认为None。
+            output_attentions (bool, optional): 是否输出注意力权重。默认为None。
+            output_hidden_states (bool, optional): 是否输出隐藏状态。默认为None。
+            return_dict (bool, optional): 是否以模型输出字典的形式返回，还是返回一个元组。默认为False。
+            ignored_index (int, optional): 在计算损失时忽略的索引。默认为0。
+            data_id (Any, optional): 无用参数。默认为None。
+            src_id (Any, optional): 无用参数。默认为None。
+            inbatch_pack_offset (Any, optional): 无用参数。默认为None。
+
+        Returns:
+            Union[Tuple[torch.FloatTensor, torch.FloatTensor], CausalLMOutputWithCrossAttentions]:
+                - 如果`return_dict`为False，则返回包含损失和损失总和的元组。
+                - 如果`return_dict`为True，则返回包含以下字段的CausalLMOutputWithCrossAttentions命名元组：
+                    - loss (torch.FloatTensor): 损失张量，形状为[1,]。
+                    - logits (torch.FloatTensor): 预测的对数概率张量，形状为[batch_size, sequence_length, vocab_size]。
+                    - past_key_values (Tuple[Tuple[torch.FloatTensor]]): 来自当前前向传播的键/值对的元组。
+                    - hidden_states (Tuple[torch.FloatTensor], optional): 如果`output_hidden_states`为真，则返回隐藏状态。
+                    - attentions (Tuple[torch.FloatTensor], optional): 如果`output_attentions`为真，则返回注意力权重。
+
+        Raises:
+            AssertionError: 如果`return_dict`为False，并且没有提供`labels`，则会引发异常。
+        """
+        """
+        ErnieForCausalLMAuto模型的前向传播函数。
+
+        Args:
+            input_ids (torch.LongTensor): 输入的token IDs，形状为[batch_size, sequence_length]。
+            position_ids (torch.LongTensor, optional): 输入的token位置IDs，形状为[batch_size, sequence_length]。默认为None。
+            attention_mask (torch.FloatTensor, optional): 注意力掩码，用于避免对填充(padding)位置进行注意力计算。
+                形状为[batch_size, sequence_length]或[batch_size, 1, sequence_length, sequence_length]，
+                其中值为0表示忽略，值为1表示需要计算注意力。默认为None。
+            inputs_embeds (torch.FloatTensor, optional): 可选地，直接提供嵌入张量作为输入，而不用首先通过词汇表查找它们。
+                形状为[batch_size, sequence_length, hidden_size]。默认为None。
+            labels (torch.LongTensor, optional): 标签，用于计算损失。形状为[batch_size, sequence_length]。默认为None。
+            use_cache (bool, optional): 是否使用缓存。默认为False。
+            past_key_values (Tuple[Tuple[torch.FloatTensor]], optional): 来自之前的前向传播的键/值对的元组。
+                用于快速解码。默认为None。
+            output_attentions (bool, optional): 是否输出注意力权重。默认为None。
+            output_hidden_states (bool, optional): 是否输出隐藏状态。默认为None。
+            return_dict (bool, optional): 是否以模型输出字典的形式返回，还是返回一个元组。默认为False。
+            ignored_index (int, optional): 在计算损失时忽略的索引。默认为0。
+            data_id (Any, optional): 无用参数。默认为None。
+            src_id (Any, optional): 无用参数。默认为None。
+            inbatch_pack_offset (Any, optional): 无用参数。默认为None。
+
+        Returns:
+            Union[Tuple[torch.FloatTensor, torch.FloatTensor], CausalLMOutputWithCrossAttentions]:
+                - 如果`return_dict`为False，则返回包含损失和损失总和的元组。
+                - 如果`return_dict`为True，则返回包含以下字段的CausalLMOutputWithCrossAttentions命名元组：
+                    - loss (torch.FloatTensor): 损失张量，形状为[1,]。
+                    - logits (torch.FloatTensor): 预测的对数概率张量，形状为[batch_size, sequence_length, vocab_size]。
+                    - past_key_values (Tuple[Tuple[torch.FloatTensor]]): 来自当前前向传播的键/值对的元组。
+                    - hidden_states (Tuple[torch.FloatTensor], optional): 如果`output_hidden_states`为真，则返回隐藏状态。
+                    - attentions (Tuple[torch.FloatTensor], optional): 如果`output_attentions`为真，则返回注意力权重。
+
+        Raises:
+            AssertionError: 如果`return_dict`为False，并且没有提供`labels`，则会引发异常。
+        """
+        # from dataloader
+        if isinstance(input_ids, list):
+            if len(input_ids) == 4:
+                input_ids, labels, data_ids, src_ids = input_ids
+            else:
+                raise ValueError(f"Unexpected input length, inputs = {input_ids}")
+
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
+
+        outputs = self.ernie(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            past_key_values=past_key_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=True,
+            inbatch_pack_offset=inbatch_pack_offset,
+            token_type_ids=token_type_ids,
+        )
+
+        hidden_states = outputs.last_hidden_state
+        # if labels is None，means we need full output, instead of tensor_parallel_output
+        # tensor_parallel_output is togather with ParallelCrossEntropy
+        tensor_parallel_output = (
+            self.config.tensor_parallel_output
+            and labels is not None
+            and self.config.tensor_parallel_degree > 1
+        )
+
+        logits = self.lm_head(
+            hidden_states,
+        )  # tensor_parallel_output=tensor_parallel_output)
+
+        if return_dict:  # aka Generate Decoding
+            if labels is not None:
+                loss, _ = self.criterion(logits, labels)
+            else:
+                loss = None
+            return CausalLMOutputWithCrossAttentionsAuto(
+                loss=loss,
+                logits=logits,
+                past_key_values=outputs.past_key_values,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+                router_loss=outputs.router_loss if self.config.use_moe else None,
+            )
+
+        # Pretrain & Eval 必须有labels
+        assert labels is not None
+        router_loss = (
+            outputs.router_loss
+            if hasattr(self.config, "use_moe") and self.config.use_moe
+            else None
+        )
+        return self.criterion(logits, labels, router_loss)
