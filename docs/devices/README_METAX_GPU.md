@@ -66,7 +66,7 @@ Attached GPUs                                     : 8
 +---------------------------------------------------------------------------------+
 ```
 
-### (1)  Environment Preparation: (This will take you 5-15 minutes)
+### (1)  Environment Preparation: (This will take you 5-10 minutes)
 
 1. Pull the Image
 ```

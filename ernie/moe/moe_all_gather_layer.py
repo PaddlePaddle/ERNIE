@@ -1069,18 +1069,13 @@ class MOEAllGatherLayerV2(MOELayer):
                 recv_size, paddle.ones([], dtype=recv_size.dtype)
             )
 
-            #recv_size_cpu, recv_size_task = async_offload(recv_size, get_async_loader())
-            recv_size_cpu = recv_size
-            recv_size_task = None
-
+            recv_size_cpu, recv_size_task = async_offload(recv_size, get_async_loader())
 
             send_rank_this_rank = paddle.count_nonzero(send_rank == this_rank)
 
-            #send_rank_this_rank_cpu, send_rank_this_rank_task = async_offload(
-            #   send_rank_this_rank, get_async_loader()
-            #)
-            send_rank_this_rank_cpu = send_rank_this_rank
-            send_rank_this_rank_task = None
+            send_rank_this_rank_cpu, send_rank_this_rank_task = async_offload(
+               send_rank_this_rank, get_async_loader()
+            )
 
 
 
@@ -1427,11 +1422,8 @@ class MOEAllGatherLayerV2(MOELayer):
         last_local_expert = self.num_local_experts * self.config.moe_rank
         expert_offset_global = expert_num_global.cumsum()
 
-        #loader = get_async_loader()
-        #expert_num_global_list, offload_task = async_offload(expert_num_global, loader)
-        expert_num_global_list = expert_num_global
-        offload_task = None
-
+        loader = get_async_loader()
+        expert_num_global_list, offload_task = async_offload(expert_num_global, loader)
 
         if self.use_padding:
             offset = last_local_expert * capacity
