@@ -122,7 +122,9 @@ def get_parser():
         default=None,
         help="weight_only_int8",
     )
-    parser.add_argument("--input_file", type=str, default="./examples/inference/data/query-demo.jsonl")
+    parser.add_argument(
+        "--input_file", type=str, default="./examples/inference/data/query-demo.jsonl"
+    )
     parser.add_argument("--output_file", type=str, default="predict.json")
     parser.add_argument("--save_output_file_flush", type=int, default=10)
     return parser
@@ -200,6 +202,7 @@ class Predictor:
             tensor_parallel_rank=self.tensor_parallel_rank,
             use_flash_attention=True,
             moe_group="dummy",
+            num_nextn_predict_layers=0,
         )
         self.model = Ernie4_5_MoeForCausalLM.from_pretrained(
             args.model_name_or_path,
@@ -236,10 +239,18 @@ class Predictor:
         inputs["position_ids"] = []
         for item in input_ids:
             cur_len = len(item)
-            inputs["input_ids"].append([self.tokenizer.pad_token_id] * (max_len - cur_len) + item)
-            inputs["position_ids"].append([0] * (max_len - cur_len) + list(range(cur_len)))
-        inputs["input_ids"] = paddle.to_tensor(np.array(inputs["input_ids"], dtype="int64"))
-        inputs["position_ids"] = paddle.to_tensor(np.array(inputs["position_ids"], dtype="int64"))
+            inputs["input_ids"].append(
+                [self.tokenizer.pad_token_id] * (max_len - cur_len) + item
+            )
+            inputs["position_ids"].append(
+                [0] * (max_len - cur_len) + list(range(cur_len))
+            )
+        inputs["input_ids"] = paddle.to_tensor(
+            np.array(inputs["input_ids"], dtype="int64")
+        )
+        inputs["position_ids"] = paddle.to_tensor(
+            np.array(inputs["position_ids"], dtype="int64")
+        )
         return inputs
 
     def postprocess(self, infer_data):
@@ -306,7 +317,10 @@ class Predictor:
         input_map = self.preprocess(batch_dials)
         infer_result = self.infer(input_map)
         self.num_output_tokens += (
-            ((infer_result != self.tokenizer.eos_token_id) & (infer_result != self.tokenizer.cls_token_id))
+            (
+                (infer_result != self.tokenizer.eos_token_id)
+                & (infer_result != self.tokenizer.cls_token_id)
+            )
             .sum()
             .item()
         )
@@ -365,7 +379,11 @@ def main():
                 conversation_data = in_dial + [{"role": "bot", "content": out_resp}]
                 test_case.append(conversation_data)
 
-            if args.save_output_file_flush > 0 and idx % args.save_output_file_flush == 0 and idx > 0:
+            if (
+                args.save_output_file_flush > 0
+                and idx % args.save_output_file_flush == 0
+                and idx > 0
+            ):
                 if paddle.distributed.get_rank() == 0:
                     infer_save_test_case(
                         test_case[idx - args.save_output_file_flush : idx],
@@ -393,7 +411,11 @@ def main():
         if args.save_output_file_flush == 0:
             infer_save_test_case(test_case, args.output_file)
         else:
-            write_case_idx = len(test_case) // args.save_output_file_flush * args.save_output_file_flush
+            write_case_idx = (
+                len(test_case)
+                // args.save_output_file_flush
+                * args.save_output_file_flush
+            )
             if len(test_case) % args.save_output_file_flush == 0:
                 write_case_idx -= args.save_output_file_flush
             infer_save_test_case(test_case[write_case_idx:], args.output_file)

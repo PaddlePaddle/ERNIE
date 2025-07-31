@@ -44,11 +44,15 @@ class ModelArguments:
     )
     use_attn_mask_start_row_indices: bool = field(
         default=True,
-        metadata={"help": "Whether to use attn_mask_start_row_indices in flash attention."},
+        metadata={
+            "help": "Whether to use attn_mask_start_row_indices in flash attention."
+        },
     )
     use_sparse_flash_attn: bool = field(
         default=True,
-        metadata={"help": "Under use attn_mask_start_row_indices=True, whether use sparse flash attention or not."},
+        metadata={
+            "help": "Under use attn_mask_start_row_indices=True, whether use sparse flash attention or not."
+        },
     )
     use_sparse_head_and_loss_fn: bool = field(
         default=False,
@@ -70,13 +74,20 @@ class ModelArguments:
         default=False,
         metadata={"help": "Whether to fuse softmax and add"},
     )
-    fuse_rms_norm: bool = field(default=True, metadata={"help": "Whether to fuse RMSNorm for efficiency"})
+    fuse_rms_norm: bool = field(
+        default=True, metadata={"help": "Whether to fuse RMSNorm for efficiency"}
+    )
     fuse_swiglu: bool = field(
-        default=True, metadata={"help": "Whether to fuse SwiGLU projection and activation for efficiency"}
+        default=True,
+        metadata={
+            "help": "Whether to fuse SwiGLU projection and activation for efficiency"
+        },
     )
     fuse_gate_detach_matmul: bool = field(
         default=True,
-        metadata={"help": "Whether to use the fused gate-detach matmul implementation."},
+        metadata={
+            "help": "Whether to use the fused gate-detach matmul implementation."
+        },
     )
 
     # performance
@@ -103,7 +114,11 @@ class ModelArguments:
     )
     add_tail_layers: int = field(
         default=False,
-        metadata={"help": ("Add EmptyLayer after Ernie4_5_DecoderLayerPipe. Only for Pipeline Parallel")},
+        metadata={
+            "help": (
+                "Add EmptyLayer after Ernie4_5_DecoderLayerPipe. Only for Pipeline Parallel"
+            )
+        },
     )
 
     # MoE
@@ -120,7 +135,10 @@ class ModelArguments:
         metadata={"help": "Whether to apply recompute to MoE layers."},
     )
     moe_group_experts: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to apply group-wise processing to expert gate logits."}
+        default=False,
+        metadata={
+            "help": "Whether to apply group-wise processing to expert gate logits."
+        },
     )
     moe_aux_loss_lambda: Optional[float] = field(
         default=1e-5,
@@ -160,7 +178,9 @@ class ModelArguments:
         default=8,
         metadata={"help": "Lora rank."},
     )
-    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
+    lora_path: str = field(
+        default=None, metadata={"help": "Initialize lora state dict."}
+    )
     rslora: bool = field(
         default=False,
         metadata={"help": "Whether to use RsLoRA"},
@@ -191,11 +211,15 @@ class ModelArguments:
     )
     no_recompute_layers: Optional[int] = field(
         default=None,
-        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+        metadata={
+            "help": "Specify the full transformer layers that should not be recomputed."
+        },
     )
     offload_recompute_inputs: bool = field(
         default=False,
-        metadata={"help": "Whether to offload input Tensors of recompute to Pinned-Memory/CPU."},
+        metadata={
+            "help": "Whether to offload input Tensors of recompute to Pinned-Memory/CPU."
+        },
     )
     recompute_use_reentrant: bool = field(
         default=True,
@@ -210,6 +234,9 @@ class ModelArguments:
                 "Using the hook method of recompute can avoid calling the no_sync function separately"
             )
         },
+    )
+    num_nextn_predict_layers: int = field(
+        default=0, metadata={"help": "Number of nextn predict layers."}
     )
 
     def __post_init__(self):

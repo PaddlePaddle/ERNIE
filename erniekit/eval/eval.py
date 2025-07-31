@@ -27,7 +27,6 @@ from paddleformers.trainer import (
     set_seed,
 )
 from paddleformers.trainer.trainer_utils import ShardingOption
-from paddleformers.transformers.model_utils import unwrap_model
 from paddleformers.utils.log import logger
 
 from ernie.configuration import Ernie4_5_MoeConfig
@@ -58,7 +57,8 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         if finetuning_args.pipeline_parallel_degree > 1:
             assert (
                 hasattr(finetuning_args, "pipeline_parallel_config")
-                and "disable_partial_send_recv" in finetuning_args.pipeline_parallel_config
+                and "disable_partial_send_recv"
+                in finetuning_args.pipeline_parallel_config
             ), "Should set '--pipeline_parallel_config disable_partial_send_recv' in bash script for pp with sp."
         if finetuning_args.tensor_parallel_degree <= 1:
             finetuning_args.sequence_parallel = False
@@ -90,7 +90,11 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
                 finetuning_args.release_grads = False
 
     # checkpoint O1 quantization is open by default.
-    if not finetuning_args.disable_ckpt_quant and finetuning_args.ckpt_quant_stage == "O0" and not model_args.lora:
+    if (
+        not finetuning_args.disable_ckpt_quant
+        and finetuning_args.ckpt_quant_stage == "O0"
+        and not model_args.lora
+    ):
         finetuning_args.ckpt_quant_stage = "O1"
     elif finetuning_args.disable_ckpt_quant:
         finetuning_args.ckpt_quant_stage = "O0"
@@ -117,11 +121,19 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         else:
             last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
     if last_checkpoint is not None:
-        logger.info(f"Checkpoint detected, starting model eval from checkpoint: {last_checkpoint}")
+        logger.info(
+            f"Checkpoint detected, starting model eval from checkpoint: {last_checkpoint}"
+        )
 
-    if last_checkpoint is not None and model_args.continue_training and not model_args.lora:
+    if (
+        last_checkpoint is not None
+        and model_args.continue_training
+        and not model_args.lora
+    ):
         model_args.continue_training = False
-        logger.info(f"Checkpoint detected, resuming training at {last_checkpoint}. Set `continue_training` to False.")
+        logger.info(
+            f"Checkpoint detected, resuming training at {last_checkpoint}. Set `continue_training` to False."
+        )
 
     # Set the dtype for loading model
     dtype = paddle.get_default_dtype()
@@ -138,12 +150,17 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     with open(config_path, "r", encoding="utf-8") as f:
         config_dict = json.load(f)
     if "torch_dtype" in config_dict:
-        raise ValueError("Unsupported weight format: Torch weights are not compatible with Paddle model currently.")
+        raise ValueError(
+            "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
+        )
 
     model_class = Ernie4_5_MoeForCausalLM
     if finetuning_args.pipeline_parallel_degree > 1:
         model_class = Ernie4_5_MoeForCausalLMPipe
-    if model_args.moe_group.lower() in {"data", "dp"} and finetuning_args.data_parallel_degree > 1:
+    if (
+        model_args.moe_group.lower() in {"data", "dp"}
+        and finetuning_args.data_parallel_degree > 1
+    ):
         finetuning_args.use_expert_parallel = True
 
     # fuse_softmax_mask only support for rocm.
@@ -154,7 +171,11 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             )
             model_args.fuse_softmax_mask = False
 
-    check_refined_recompute(finetuning_args.refined_recompute, finetuning_args.sequence_parallel, lora=model_args.lora)
+    check_refined_recompute(
+        finetuning_args.refined_recompute,
+        finetuning_args.sequence_parallel,
+        lora=model_args.lora,
+    )
 
     runtime_timer.start("basemodel loading time")
     if finetuning_args.weight_quantize_algo is not None:
@@ -190,7 +211,9 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
                 }
             )
     else:
-        quantization_config = dict(weight_quantize_algo=finetuning_args.weight_quantize_algo)
+        quantization_config = dict(
+            weight_quantize_algo=finetuning_args.weight_quantize_algo
+        )
 
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
@@ -228,17 +251,23 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     model_config.moe_orthogonal_loss_lambda = model_args.moe_orthogonal_loss_lambda
     model_config.moe_z_loss_lambda = model_args.moe_z_loss_lambda
     model_config.moe_use_hard_gate = model_args.moe_use_hard_gate
-    model_config.moe_multimodal_dispatch_use_allgather = model_args.moe_multimodal_dispatch_use_allgather
+    model_config.moe_multimodal_dispatch_use_allgather = (
+        model_args.moe_multimodal_dispatch_use_allgather
+    )
     model_config.hidden_dropout_prob = finetuning_args.hidden_dropout_prob
-    model_config.attention_probs_dropout_prob = finetuning_args.attention_probs_dropout_prob
+    model_config.attention_probs_dropout_prob = (
+        finetuning_args.attention_probs_dropout_prob
+    )
     model_config.num_acc_steps = finetuning_args.gradient_accumulation_steps
-    model_config.num_nextn_predict_layers = finetuning_args.num_nextn_predict_layers
+    model_config.num_nextn_predict_layers = model_args.num_nextn_predict_layers
     model_config.multi_token_pred_lambda = finetuning_args.multi_token_pred_lambda
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
     if model_config.moe_num_experts is None or model_config.moe_num_experts == 0:
-        model_config.moe_group = "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        model_config.moe_group = (
+            "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        )
 
     if model_args.continue_training or finetuning_args.weight_quantize_algo is not None:
         model = model_class.from_pretrained(
@@ -308,7 +337,12 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     logger.info("Creating dataset successfully ...")
 
-    data_collator = partial(collate_fn, tokenizer=tokenizer, model_args=model_args, max_seq_len=data_args.max_seq_len)
+    data_collator = partial(
+        collate_fn,
+        tokenizer=tokenizer,
+        model_args=model_args,
+        max_seq_len=data_args.max_seq_len,
+    )
 
     if model_args.lora:
         logger.info("Start to wrap model with LoRA config ...")
@@ -328,38 +362,38 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     if finetuning_args.save_strategy == IntervalStrategy.EPOCH:
         finetuning_args.save_strategy = IntervalStrategy.STEPS
-        finetuning_args.save_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
+        finetuning_args.save_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
     if finetuning_args.evaluation_strategy == IntervalStrategy.EPOCH:
         finetuning_args.evaluation_strategy = IntervalStrategy.STEPS
-        finetuning_args.eval_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
+        finetuning_args.eval_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
     if finetuning_args.logging_strategy == IntervalStrategy.EPOCH:
         finetuning_args.logging_strategy = IntervalStrategy.STEPS
-        finetuning_args.logging_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
-
-    if not model_args.use_sparse_head_and_loss_fn and not finetuning_args.prediction_loss_only:
-        unwraped_model = unwrap_model(model)
-        if hasattr(model, "compute_metrics"):
-            compute_metrics = model.compute_metrics
-        elif hasattr(unwraped_model, "compute_metrics"):
-            # NOTE(liuting): if model is LoRAModel, we need to unwrap it first.
-            compute_metrics = unwraped_model.compute_metrics
-        else:
-            compute_metrics = None
-    else:
-        compute_metrics = None
+        finetuning_args.logging_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
 
     trainer = ErnieMoETrainer(
         model=model,
         args=finetuning_args,
         train_dataset=None,
-        eval_dataset=(eval_dataset if finetuning_args.do_eval and finetuning_args.should_load_dataset else None),
+        eval_dataset=(
+            eval_dataset
+            if finetuning_args.do_eval and finetuning_args.should_load_dataset
+            else None
+        ),
         tokenizer=tokenizer,
         do_generation=False,
         data_args=data_args,
         data_collator=data_collator,
     )
     trainable_parameters = [
-        p for p in model.parameters() if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
+        p
+        for p in model.parameters()
+        if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
     ]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
 

@@ -311,12 +311,12 @@ def run_sft(
     model_config.moe_multimodal_dispatch_use_allgather = (
         model_args.moe_multimodal_dispatch_use_allgather
     )
+    model_config.num_nextn_predict_layers = model_args.num_nextn_predict_layers
     model_config.hidden_dropout_prob = finetuning_args.hidden_dropout_prob
     model_config.attention_probs_dropout_prob = (
         finetuning_args.attention_probs_dropout_prob
     )
     model_config.num_acc_steps = finetuning_args.gradient_accumulation_steps
-    model_config.num_nextn_predict_layers = finetuning_args.num_nextn_predict_layers
     model_config.multi_token_pred_lambda = finetuning_args.multi_token_pred_lambda
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
@@ -410,7 +410,7 @@ def run_sft(
         collate_fn,
         tokenizer=tokenizer,
         model_args=model_args,
-        max_seq_len=data_args.max_seq_len,
+        max_seq_len=data_args.max_seq_len + model_config.num_nextn_predict_layers,
     )
 
     if model_args.lora:
