@@ -2410,8 +2410,6 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
         output_hidden_states=None,
         return_dict=False,
         ignored_index=0,
-        data_id=None,
-        src_id=None,
         inbatch_pack_offset=None,
     ):
         output_attentions = (

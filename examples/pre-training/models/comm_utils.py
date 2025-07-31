@@ -12,21 +12,73 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import logging
+import hashlib
+import functools
+import numpy as np
 from contextlib import contextmanager
 
-import numpy as np
 import paddle
-from paddle import distributed as dist
+from paddle.nn import functional as F
 from paddle.distributed import fleet
+from paddle import distributed as dist
 from paddle.distributed.communication.batch_isend_irecv import (
     _coalescing_manager as batch_isend_irecv_coalescing_manager,
 )
-from paddle.nn import functional as F
+from paddle.autograd import PyLayer
 from paddleformers.trainer.plugins.timer import get_timers
 
 logger = logging.getLogger(__name__)
+
+
+def md5(tensor):
+    """debug use"""
+    numpy_array = tensor.numpy()
+    array_bytes = numpy_array.tobytes()
+    return hashlib.md5(array_bytes).hexdigest()
+
+
+class ZLossOp(PyLayer):
+    """Z Loss OP."""
+
+    @staticmethod
+    def forward(ctx, logits, max_logits, z_loss_lambda=0, group=None):
+        """Z loss forward."""
+        exp_logits = (logits - max_logits).exp()
+        sum_exp_logits = exp_logits.sum(axis=-1, keepdim=True)
+        if group is not None:
+            dist.all_reduce(sum_exp_logits, op=dist.ReduceOp.SUM, group=group)
+        log_z = sum_exp_logits.log() + max_logits
+        z_loss = z_loss_lambda * log_z.square()
+
+        logits_grad = 2 * z_loss_lambda * log_z * exp_logits / sum_exp_logits
+        ctx.save_for_backward(logits_grad)
+        return z_loss, log_z
+
+    @staticmethod
+    def backward(ctx, grad, _):
+        """Z loss backward."""
+        logits_grad = grad * ctx.saved_tensor()[0]
+        return logits_grad
+
+
+class PrintOp(PyLayer):
+    """debug use"""
+
+    # input shape: [s, b, h], n is mp parallelism
+    # after forward shape: [s/n, b, h]
+    @staticmethod
+    def forward(ctx, x, name):
+        """doc"""
+        ctx.name = name
+        logger.info(f"{ctx.name}: {md5(x)[:5]} {x.abs().mean(-1)}")
+        return x
+
+    @staticmethod
+    def backward(ctx, x):
+        """doc"""
+        logger.info(f"grad@{ctx.name}: {md5(x)[:5]} {x.abs().mean(-1)}")
+        return x
 
 
 def scatter(input, group=None, axis=0):
@@ -39,10 +91,13 @@ def scatter(input, group=None, axis=0):
     rank = group.rank
     seq_len = input.shape[axis]
     assert seq_len % parallelism == 0, (
-        f"Input sequence length {seq_len} can't be divided exactly" f" by sequence parallelism {parallelism}"
+        f"Input sequence length {seq_len} can't be divided exactly"
+        f" by sequence parallelism {parallelism}"
     )
     interval = seq_len // parallelism
-    input = paddle.slice(input, axes=[axis], starts=[interval * rank], ends=[interval * (rank + 1)])
+    input = paddle.slice(
+        input, axes=[axis], starts=[interval * rank], ends=[interval * (rank + 1)]
+    )
     input = paddle.assign(input)
     return input
 
@@ -59,7 +114,9 @@ def mp_slice(x, indices=None, group=None, axis=0):
     rank = group.rank
     assert len(indices) == parallelism, (len(indices), parallelism)
     indices = F.pad(paddle.to_tensor(indices).cumsum(0), [1, 0])
-    input = paddle.slice(x, axes=[axis], starts=[indices[rank]], ends=[indices[rank + 1]])
+    input = paddle.slice(
+        x, axes=[axis], starts=[indices[rank]], ends=[indices[rank + 1]]
+    )
     input = paddle.assign(input)
     return input
 
@@ -121,7 +178,9 @@ def all_gather(input, group=None, axis=0):
         output = paddle.empty(shape=output_shape, dtype=input.dtype)
         dist.stream.all_gather(output, input, group=group, use_calc_stream=True)
         return output
-    outputs = [paddle.empty(output_shape, dtype=input.dtype) for _ in range(parallelism)]
+    outputs = [
+        paddle.empty(output_shape, dtype=input.dtype) for _ in range(parallelism)
+    ]
     dist.stream.all_gather(outputs, input, group=group, use_calc_stream=True)
     output = paddle.concat(outputs, axis=axis)
     return output
@@ -140,7 +199,9 @@ def reduce_scatter(input, group=None):
     ), f"Input sequence length {input.shape[0]} can't be divided exactly by sequence parallelism {parallelism}"
     output_shape[0] = output_shape[0] // parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
-    dist.stream.reduce_scatter(output, input, op=dist.ReduceOp.SUM, group=group, use_calc_stream=True)
+    dist.stream.reduce_scatter(
+        output, input, op=dist.ReduceOp.SUM, group=group, use_calc_stream=True
+    )
     return output
 
 
@@ -148,7 +209,9 @@ def subbatch(f, arg_idx, axis, bs, out_idx, use_recompute=False, same_arg_idx={}
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
 
-        assert len(arg_idx) == len(axis), "Number of batching args and number of batching dims should match."
+        assert len(arg_idx) == len(
+            axis
+        ), "Number of batching args and number of batching dims should match."
 
         inps = [args[i] for i in arg_idx]
         axis_width = [inp.shape[d] for inp, d in zip(inps, axis)]
@@ -189,7 +252,9 @@ def subbatch(f, arg_idx, axis, bs, out_idx, use_recompute=False, same_arg_idx={}
     return wrapper
 
 
-def gather_varlen(input, dst, group, offload_pp_data_chunk_size=0, all_shape_and_dtype=None):
+def gather_varlen(
+    input, dst, group, offload_pp_data_chunk_size=0, all_shape_and_dtype=None
+):
     if dist.get_world_size(group) <= 1:
         return input
     if group is None:
@@ -212,7 +277,9 @@ def gather_varlen(input, dst, group, offload_pp_data_chunk_size=0, all_shape_and
 
     output = []
     if offload_pp_data_chunk_size > 0:
-        assert (group.nranks >= offload_pp_data_chunk_size) and (group.nranks % offload_pp_data_chunk_size == 0), (
+        assert (group.nranks >= offload_pp_data_chunk_size) and (
+            group.nranks % offload_pp_data_chunk_size == 0
+        ), (
             f"group.nranks {group.nranks} must be greater than offload_pp_data_chunk_size {offload_pp_data_chunk_size} "
             f"and group.nranks % offload_pp_data_chunk_size == 0"
         )
@@ -225,7 +292,10 @@ def gather_varlen(input, dst, group, offload_pp_data_chunk_size=0, all_shape_and
                 output_ptr = len(output)
                 with batch_isend_irecv_coalescing_manager(group, tasks):
                     for src in range(start, end):
-                        if all_shape_and_dtype[src][0] is None or all_shape_and_dtype[src][0][0] == 0:
+                        if (
+                            all_shape_and_dtype[src][0] is None
+                            or all_shape_and_dtype[src][0][0] == 0
+                        ):
                             pass
                         elif src != group.rank:
                             recv_tensor = paddle.empty(
@@ -233,7 +303,9 @@ def gather_varlen(input, dst, group, offload_pp_data_chunk_size=0, all_shape_and
                                 dtype=all_shape_and_dtype[src][1],
                             )
                             output.append(recv_tensor)
-                            task = dist.irecv(recv_tensor, group.ranks[src], group=group)
+                            task = dist.irecv(
+                                recv_tensor, group.ranks[src], group=group
+                            )
                             tasks.append(task)
                         else:
                             output.append(input)
@@ -249,7 +321,11 @@ def gather_varlen(input, dst, group, offload_pp_data_chunk_size=0, all_shape_and
                 tasks = []
                 with batch_isend_irecv_coalescing_manager(group, tasks):
                     for _ in range(1):
-                        if group.rank in list(range(start, end)) and input is not None and input.shape[0] != 0:
+                        if (
+                            group.rank in list(range(start, end))
+                            and input is not None
+                            and input.shape[0] != 0
+                        ):
                             task = dist.isend(input, dst, group=group)
                             tasks.append(task)
                 for task in tasks:

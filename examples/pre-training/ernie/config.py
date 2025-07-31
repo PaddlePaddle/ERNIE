@@ -1,5 +1,3 @@
-# !/usr/bin/env python3
-
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,8 +21,12 @@ from omegaconf import OmegaConf
 
 def get_config(verbose=False):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--configs", action="store", nargs="+", required=True, help="config files")
-    parser.add_argument("--kwargs", action="store", nargs="+", default=[], help="extra k-v configs")
+    parser.add_argument(
+        "--configs", action="store", nargs="+", required=True, help="config files"
+    )
+    parser.add_argument(
+        "--kwargs", action="store", nargs="+", default=[], help="extra k-v configs"
+    )
     opt = parser.parse_args()
     configs = [OmegaConf.load(p) for p in opt.configs]
     configs.append(OmegaConf.from_dotlist(opt.kwargs))

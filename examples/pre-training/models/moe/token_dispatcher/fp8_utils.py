@@ -39,6 +39,8 @@ __all__ = [
     "ExpertsGroupGemmContiguousNode",
 ]
 
+FP8_ALIGN = 128
+
 
 def _get_fp8_weight_and_scale(weight, stacked=False, transpose=False):
     if stacked:
