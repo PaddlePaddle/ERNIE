@@ -150,7 +150,7 @@ def get_gate(
                 experts.append(None)
     assert (
         len(experts) == moe_num_experts
-    ), f"experts.len={len(experts)} != moe_num_experts_per_device={moe_num_experts}"
+    ), f"experts.len={len(experts)} != moe_num_experts={moe_num_experts}"
 
     logger.info(
         f"using moe-world-size: {config.moe_world_size} "
