@@ -20,6 +20,7 @@ import tempfile
 import allure
 import yaml
 
+# config
 OUTPUT_DIR = "./output/"
 LOG_DIR = "./erniekit_dist_log/"
 MODEL_PATH = "./ERNIE-4.5-0.3B-Paddle-dummy-dense"
