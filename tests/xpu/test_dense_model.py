@@ -126,9 +126,9 @@ def test_sft_lora_merge():
     attach_log_file()
     assert_result(ret_code, err_log)
 
-# The following configurations are currently not supported.
 
 # The following configurations are currently not supported.
+
 
 # def test_dpo():
 #     clean_output_dir()
