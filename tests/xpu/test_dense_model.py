@@ -128,6 +128,8 @@ def test_sft_lora_merge():
 
 # The following configurations are currently not supported.
 
+# The following configurations are currently not supported.
+
 # def test_dpo():
 #     clean_output_dir()
 #     yaml_path = os.path.join(DPO_CONFIG_PATH + "run_dpo_8k.yaml")
