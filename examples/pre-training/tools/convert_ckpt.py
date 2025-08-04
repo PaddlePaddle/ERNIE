@@ -154,16 +154,6 @@ class Checkpoint:
             print("{} not found in structure_name_mapping".format(tensor_name))
             return None, None
         matched_layer_name = self.map_to_org_model(layer_names[0])
-        if "mlp.experts" in matched_layer_name:
-            match = re.search(r"mlp\.experts\.(\d+)", matched_layer_name)
-            assert match is not None
-            expert_id = int(shard_num) * self.sharding_degree + int(match.group(1))
-            matched_layer_name = re.sub(
-                r"(mlp\.experts\.)\d+",
-                lambda m: m.group(1) + str(expert_id),
-                matched_layer_name,
-            )
-            print("adapt expert({} -> {})".format(int(match.group(1)), expert_id))
 
         if matched_layer_name in self.safetensors_index["weight_map"]:
             file_name = self.safetensors_index["weight_map"][matched_layer_name]
