@@ -13,14 +13,15 @@
 # limitations under the License.
 
 import json
+import os
 
 import numpy as np
 from paddleformers.trainer.argparser import strtobool
 from paddleformers.utils.log import logger
 
-from ernie.configuration import Ernie4_5_Config
 from ernie.dataset.finetuning import create_dataset
 from ernie.tokenizer import Ernie4_5_Tokenizer
+from ernie.utils.download_utils import check_download_repo
 
 
 def parse_arguments():
@@ -80,7 +81,9 @@ def parse_arguments():
         type=int,
         help="The maximum total input sequence length after tokenization",
     )
-    parser.add_argument("--num_train_epochs", type=int, help="Number of epochs to train.")
+    parser.add_argument(
+        "--num_train_epochs", type=int, help="Number of epochs to train."
+    )
     parser.add_argument(
         "--per_device_train_batch_size",
         default=1,
@@ -92,7 +95,9 @@ def parse_arguments():
         default="estimate_training.json",
         help="The file to save results.",
     )
-    parser.add_argument("--num_of_gpus", type=int, default=8, help="The number of GPUs.")
+    parser.add_argument(
+        "--num_of_gpus", type=int, default=8, help="The number of GPUs."
+    )
     parser.add_argument(
         "--tensor_parallel_degree",
         type=int,
@@ -117,6 +122,24 @@ def parse_arguments():
         type=int,
         default=0,
         help="Number of updates steps to accumulate before performing a backward/update pass.",
+    )
+    parser.add_argument(
+        "--from_hf_hub",
+        type=bool,
+        default=False,
+        help="Whether to download model from huggingface hub",
+    )
+    parser.add_argument(
+        "--from_aistudio",
+        type=bool,
+        default=False,
+        help="Whether to download model from aistudio",
+    )
+    parser.add_argument(
+        "--from_modelscope",
+        type=bool,
+        default=False,
+        help="Whether to download model from modelscope",
     )
 
     # Data args, should be same with training.
@@ -160,14 +183,31 @@ def estimate_training(args):
 
     """
     if len(args.train_dataset_path) > 1:
-        logger.warning("Suggest to use max_steps instead of num_train_epochs for multi source dataset.")
+        logger.warning(
+            "Suggest to use max_steps instead of num_train_epochs for multi source dataset."
+        )
         logger.info(
             "Multi source dataset detected, number of samples will be estimated by following rule. "
             "num_samples = (source1_num_samples * prob1 + source2_num_samples * prob2 + ...) * epochs)"
         )
 
-    tokenizer = Ernie4_5_Tokenizer.from_pretrained(args.model_name_or_path)
-    config = Ernie4_5_Config.from_pretrained(args.model_name_or_path)
+    # convert paddle model repo id
+    args.model_name_or_path = check_download_repo(
+        args.model_name_or_path,
+        from_hf_hub=args.from_hf_hub,
+        from_aistudio=args.from_aistudio,
+        from_modelscope=args.from_modelscope,
+    )
+
+    if getattr(args, "from_modelscope", False):
+        os.environ["from_modelscope"] = "True"
+
+    tokenizer = Ernie4_5_Tokenizer.from_pretrained(
+        args.model_name_or_path,
+        from_hf_hub=args.from_hf_hub,
+        from_aistudio=args.from_aistudio,
+        convert_from_torch=False,
+    )
     logger.info("Start to estimate max training steps...")
     dataset_config = {
         "tokenizer": tokenizer,
@@ -189,8 +229,12 @@ def estimate_training(args):
 
     if args.max_estimate_samples != -1:
         # Set estimate samples to max_estimate_samples
-        logger.warning("The results between sampling and non-sampling methods may differ.")
-        train_dataset.max_estimate_samples = min(args.max_estimate_samples, train_dataset.max_estimate_samples)
+        logger.warning(
+            "The results between sampling and non-sampling methods may differ."
+        )
+        train_dataset.max_estimate_samples = min(
+            args.max_estimate_samples, train_dataset.max_estimate_samples
+        )
 
     if train_dataset.max_estimate_samples > 0:
         train_batches = 0
@@ -216,15 +260,22 @@ def estimate_training(args):
             // args.pipeline_parallel_degree
         )
         global_batch_size = (
-            args.per_device_train_batch_size * grad_acc_steps * data_parallel_degree * args.sharding_parallel_degree
+            args.per_device_train_batch_size
+            * grad_acc_steps
+            * data_parallel_degree
+            * args.sharding_parallel_degree
         )
         max_steps = np.ceil(train_batches / global_batch_size)
 
         if max_samples != train_dataset.max_estimate_samples:
             max_steps *= max_samples / train_dataset.max_estimate_samples
             train_tokens *= max_samples / train_dataset.max_estimate_samples
-            train_dataset.used_samples *= max_samples / train_dataset.max_estimate_samples
-            train_dataset.unused_samples *= max_samples / train_dataset.max_estimate_samples
+            train_dataset.used_samples *= (
+                max_samples / train_dataset.max_estimate_samples
+            )
+            train_dataset.unused_samples *= (
+                max_samples / train_dataset.max_estimate_samples
+            )
 
         res = {
             "num_train_epochs": int(args.num_train_epochs),
@@ -244,11 +295,15 @@ def estimate_training(args):
             "valid": True,
             "train_samples": int(max_samples * args.num_train_epochs),
             "estimate_samples": int(train_dataset.max_estimate_samples),
-            "actual_train_samples": int(train_dataset.used_samples * args.num_train_epochs),
+            "actual_train_samples": int(
+                train_dataset.used_samples * args.num_train_epochs
+            ),
             "skip_samples": int(train_dataset.unused_samples * args.num_train_epochs),
         }
         if train_batches / args.num_train_epochs / global_batch_size < 1:
-            logger.warning("This dataset is too small, you'd better enlarge your dataset.")
+            logger.warning(
+                "This dataset is too small, you'd better enlarge your dataset."
+            )
             res["valid"] = False
     else:
         logger.error("No valid data found, please check your dataset format.")
@@ -267,7 +322,7 @@ def estimate_training(args):
             "valid": False,
             "train_samples": 0,
         }
-    out_file = getattr(args, 'out_file', None)
+    out_file = getattr(args, "out_file", None)
     if out_file:
         with open(args.out_file, "w", encoding="utf-8") as f:
             json.dump(res, f)

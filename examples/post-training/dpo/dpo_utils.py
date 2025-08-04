@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """DPO utils"""
+
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -43,12 +44,20 @@ class DPOTrainingArguments(TrainingArguments):
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
     num_of_gpus: int = field(default=-1, metadata={"help": "Number of gpus."})
-    pipeline_degree: int = field(default=1, metadata={"help": "pipeline_degree for estimate"})
-    tensor_degree: int = field(default=1, metadata={"help": "tensor_degree for estimate"})
-    sharding_degree: int = field(default=1, metadata={"help": "sharding_degree for estimate"})
+    pipeline_degree: int = field(
+        default=1, metadata={"help": "pipeline_degree for estimate"}
+    )
+    tensor_degree: int = field(
+        default=1, metadata={"help": "tensor_degree for estimate"}
+    )
+    sharding_degree: int = field(
+        default=1, metadata={"help": "sharding_degree for estimate"}
+    )
     dpo_benchmark: bool = field(
         default=False,
-        metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
+        metadata={
+            "help": "Whether to run benchmark by autotuner. True for from_scratch."
+        },
     )
     dropout_warmup_steps: int = field(
         default=0,
@@ -62,7 +71,9 @@ class DPOTrainingArguments(TrainingArguments):
         default=0.0,
         metadata={"help": "dropout probability for attention layers"},
     )
-    sequence_parallel: bool = field(default=True, metadata={"help": "Whether to use sequence_parallel"})
+    sequence_parallel: bool = field(
+        default=True, metadata={"help": "Whether to use sequence_parallel"}
+    )
     layerwise_lr_decay_bound: Optional[float] = field(
         default=1.0,
         metadata={
@@ -98,7 +109,10 @@ class DPOTrainingArguments(TrainingArguments):
 class DataArgument:
     """DataArgument"""
 
-    train_dataset_type: str = field(default="erniekit", metadata={"help": "List contains type of training datasets."})
+    train_dataset_type: str = field(
+        default="erniekit",
+        metadata={"help": "List contains type of training datasets."},
+    )
     train_dataset_path: str = field(
         default="examples/data/sft-train.jsonl",
         metadata={"help": "List contains path of training data sources."},
@@ -107,7 +121,9 @@ class DataArgument:
         default="1.0",
         metadata={"help": "List contains probabilities of training data sources."},
     )
-    eval_dataset_type: str = field(default="erniekit", metadata={"help": "List contains type of eval datasets."})
+    eval_dataset_type: str = field(
+        default="erniekit", metadata={"help": "List contains type of eval datasets."}
+    )
     eval_dataset_path: str = field(
         default="examples/data/sft-eval.jsonl",
         metadata={"help": "List contains path of eval data sources."},
@@ -116,15 +132,21 @@ class DataArgument:
         default="1.0",
         metadata={"help": "List contains probabilities of eval data sources."},
     )
-    max_seq_len: int = field(default=4096, metadata={"help": "Maximum sequence length."})
-    max_prompt_len: int = field(default=2048, metadata={"help": "Maximum prompt length."})
+    max_seq_len: int = field(
+        default=4096, metadata={"help": "Maximum sequence length."}
+    )
+    max_prompt_len: int = field(
+        default=2048, metadata={"help": "Maximum prompt length."}
+    )
     num_samples_each_epoch: int = field(
         default=6000000,
         metadata={"help": "Number of samples per epoch. Used for SFT."},
     )
     random_shuffle: bool = field(
         default=True,
-        metadata={"help": "Whether to enable authorize code for privatization. Defaults to False."},
+        metadata={
+            "help": "Whether to enable authorize code for privatization. Defaults to False."
+        },
     )
     greedy_intokens: bool = field(
         default=True,
@@ -134,7 +156,9 @@ class DataArgument:
         default=500,
         metadata={"help": "Buffer size for greedy_intokens strategy."},
     )
-    mask_out_eos_token: bool = field(default=True, metadata={"help": "Mask out eos token"})
+    mask_out_eos_token: bool = field(
+        default=True, metadata={"help": "Mask out eos token"}
+    )
 
 
 @dataclass
@@ -145,7 +169,21 @@ class ModelArgument:
         default="ernie-bot",
         metadata={"help": "Pretrained model name or path to local directory."},
     )
-    use_flash_attention: bool = field(default=True, metadata={"help": "Whether to use flash attention"})
+    from_hf_hub: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from huggingface hub"},
+    )
+    from_aistudio: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from aistudio"},
+    )
+    from_modelscope: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from modelscope"},
+    )
+    use_flash_attention: bool = field(
+        default=True, metadata={"help": "Whether to use flash attention"}
+    )
     recompute_granularity: str = field(
         default="full",
         metadata={
@@ -165,48 +203,79 @@ class ModelArgument:
             )
         },
     )
-    fuse_linear: bool = field(default=True, metadata={"help": "Whether to use fuse_linear"})
-    fuse_softmax_mask: bool = field(default=False, metadata={"help": "Whether to fuse softmax and add"})
-    fuse_rms_norm: bool = field(default=True, metadata={"help": "Whether to fuse RMSNorm for efficiency"})
+    fuse_linear: bool = field(
+        default=True, metadata={"help": "Whether to use fuse_linear"}
+    )
+    fuse_softmax_mask: bool = field(
+        default=False, metadata={"help": "Whether to fuse softmax and add"}
+    )
+    fuse_rms_norm: bool = field(
+        default=True, metadata={"help": "Whether to fuse RMSNorm for efficiency"}
+    )
     fuse_swiglu: bool = field(
-        default=True, metadata={"help": "Whether to fuse SwiGLU projection and activation for efficiency"}
+        default=True,
+        metadata={
+            "help": "Whether to fuse SwiGLU projection and activation for efficiency"
+        },
     )
     fuse_gate_detach_matmul: bool = field(
         default=True,
-        metadata={"help": "Whether to use the fused gate-detach matmul implementation."},
+        metadata={
+            "help": "Whether to use the fused gate-detach matmul implementation."
+        },
     )
-    tensor_parallel_output: bool = field(default=True, metadata={"help": "tensor_parallel_output"})
+    tensor_parallel_output: bool = field(
+        default=True, metadata={"help": "tensor_parallel_output"}
+    )
     use_sparse_head_and_loss_fn: bool = field(
         default=False,
         metadata={"help": "Whether to use sparse LM Head and loss function."},
     )
     use_sparse_flash_attn: bool = field(
         default=True,
-        metadata={"help": "Under use attn_mask_start_row_indices=True, whether use sparse flash attention or not."},
+        metadata={
+            "help": "Under use attn_mask_start_row_indices=True, whether use sparse flash attention or not."
+        },
     )
     use_attn_mask_start_row_indices: bool = field(
         default=True,
-        metadata={"help": "Whether to use attn_mask_start_row_indices in flash attention."},
+        metadata={
+            "help": "Whether to use attn_mask_start_row_indices in flash attention."
+        },
     )
     no_recompute_layers: Optional[int] = field(
         default=None,
-        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+        metadata={
+            "help": "Specify the full transformer layers that should not be recomputed."
+        },
     )
     weight_quantize_algo: str = field(
         default=None,
-        metadata={"help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."},
+        metadata={
+            "help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."
+        },
     )
     add_tail_layers: int = field(
         default=False,
-        metadata={"help": ("Add EmptyLayer after Ernie4_5_DecoderLayerPipe. Only for Pipeline Parallel")},
+        metadata={
+            "help": (
+                "Add EmptyLayer after Ernie4_5_DecoderLayerPipe. Only for Pipeline Parallel"
+            )
+        },
     )
     # LoRA
     lora_rank: int = field(default=8, metadata={"help": "Lora rank."})
-    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
+    lora_path: str = field(
+        default=None, metadata={"help": "Initialize lora state dict."}
+    )
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
-    lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
+    lora_plus_scale: float = field(
+        default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"}
+    )
     lora_alpha: int = field(default=-1, metadata={"help": "lora_alpha"})
-    rslora_plus: bool = field(default=False, metadata={"help": "Strengthen lora performance"})
+    rslora_plus: bool = field(
+        default=False, metadata={"help": "Strengthen lora performance"}
+    )
     use_fused_head_and_loss_fn: bool = field(
         default=False,
         metadata={"help": "Whether to fuse LM Head and loss function."},
@@ -229,15 +298,21 @@ class ModelArgument:
         metadata={"help": "Whether to fuse rotary postition embedding"},
     )
     # MoE
-    use_recompute_moe: Optional[bool] = field(default=False, metadata={"help": "Whether to use recompute moe"})
+    use_recompute_moe: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use recompute moe"}
+    )
     moe_group: Optional[str] = field(
-        default="dummy", metadata={"help": "MoE communication group, currently support 'mp|dummy'"}
+        default="dummy",
+        metadata={"help": "MoE communication group, currently support 'mp|dummy'"},
     )
     moe_multimodal_dispatch_use_allgather: Optional[str] = field(
         default="v2-alltoall-unpad", metadata={"help": "moe dispatch use allgather"}
     )
     moe_group_experts: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to apply group-wise processing to expert gate logits."}
+        default=False,
+        metadata={
+            "help": "Whether to apply group-wise processing to expert gate logits."
+        },
     )
     moe_aux_loss_lambda: Optional[float] = field(
         default=1e-5,
@@ -272,20 +347,33 @@ class ModelArgument:
 class DPOConfig:
     """DPOConfig"""
 
-    beta: float = field(default=0.1, metadata={"help": "the beta parameter for DPO loss"})
-    offset_alpha: float = field(default=0.0, metadata={"help": "the offset coefficient for score-based DPO loss"})
-    simpo_gamma: float = field(default=0.5, metadata={"help": "the gamma parameter for SimPO loss"})
+    beta: float = field(
+        default=0.1, metadata={"help": "the beta parameter for DPO loss"}
+    )
+    offset_alpha: float = field(
+        default=0.0,
+        metadata={"help": "the offset coefficient for score-based DPO loss"},
+    )
+    simpo_gamma: float = field(
+        default=0.5, metadata={"help": "the gamma parameter for SimPO loss"}
+    )
     normalize_logps: bool = field(
         default=True,
         metadata={"help": "Apply logprobs normalization."},
     )
-    label_smoothing: float = field(default=0.0, metadata={"help": "label_smoothing ratio"})
+    label_smoothing: float = field(
+        default=0.0, metadata={"help": "label_smoothing ratio"}
+    )
     loss_type: str = field(default="sigmoid", metadata={"help": "DPO loss type"})
     pref_loss_ratio: float = field(default=1.0, metadata={"help": "DPO loss ratio"})
     sft_loss_ratio: float = field(default=0.0, metadata={"help": "SFT loss ratio"})
     dpop_lambda: float = field(default=50, metadata={"help": "dpop_lambda"})
-    ref_model_update_steps: int = field(default=-1, metadata={"help": "Update ref model state dict "})
-    reference_free: bool = field(default=False, metadata={"help": "No reference model."})
+    ref_model_update_steps: int = field(
+        default=-1, metadata={"help": "Update ref model state dict "}
+    )
+    reference_free: bool = field(
+        default=False, metadata={"help": "No reference model."}
+    )
     lora: bool = field(default=False, metadata={"help": "Use LoRA model."})
 
     def __post_init__(self):
@@ -319,7 +407,7 @@ def calculate_effective_tokens(training_args, train_dataset, max_seq_len):
     total_effective_tokens = 0
     try:
         data_parallel_degree = training_args.data_parallel_degree
-    except:
+    except Exception:
         data_parallel_degree = 1
     if training_args.sharding_parallel_degree > 1:
         sharding_parallel_degree = training_args.sharding_parallel_degree

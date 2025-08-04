@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Training Ernie Model. """
+"""Training Ernie Model."""
 
 import gc
 import importlib.util
@@ -19,7 +19,6 @@ import math
 import os
 import sys
 import time
-import json
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Optional
@@ -60,6 +59,7 @@ from ernie.utils.common_utils import (
     estimate_training,
     save_stop_info,
 )
+from ernie.utils.download_utils import check_download_repo
 
 # isort: off
 from trainer import ErnieMoETrainer
@@ -240,6 +240,18 @@ class ModelArgument:
             "help": "If set to True, this option is used with fleet.meta_parallel. "
             "ParallelCrossEntropy to calculate cross-entropy loss for parallel model."
         },
+    )
+    from_hf_hub: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from huggingface hub"},
+    )
+    from_aistudio: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from aistudio"},
+    )
+    from_modelscope: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from modelscope"},
     )
     # LoRA
     lora: bool = field(
@@ -573,14 +585,15 @@ def main():
 
     logger.info("Start to load model ...")
 
-    # Detect torch model.
-    config_path = os.path.join(model_args.model_name_or_path, "config.json")
-    with open(config_path, "r", encoding="utf-8") as f:
-        config_dict = json.load(f)
-    if "torch_dtype" in config_dict:
-        raise ValueError(
-            "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
-        )
+    model_args.model_name_or_path = check_download_repo(
+        model_args.model_name_or_path,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        from_modelscope=model_args.from_modelscope,
+    )
+
+    if getattr(model_args, "from_modelscope", False):
+        os.environ["from_modelscope"] = "True"
 
     model_class = Ernie4_5_MoeForCausalLM
     if training_args.pipeline_parallel_degree > 1:
@@ -647,6 +660,9 @@ def main():
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        convert_from_torch=False,
     )
     model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -711,6 +727,9 @@ def main():
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
+            from_hf_hub=model_args.from_hf_hub,
+            from_aistudio=model_args.from_aistudio,
+            convert_from_torch=False,
         )
     else:
         model = model_class.from_config(model_config, dtype=dtype)
@@ -725,6 +744,9 @@ def main():
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        convert_from_torch=False,
     )
 
     logger.info("Start to create dataset ...")
@@ -738,9 +760,7 @@ def main():
     from ernie.dataset.finetuning import collate_fn
 
     if data_args.dataset_type == "map":
-        from ernie.dataset.finetuning import (
-            create_indexed_dataset as create_dataset,
-        )
+        from ernie.dataset.finetuning import create_indexed_dataset as create_dataset
     else:
         from ernie.dataset.finetuning import create_dataset
     dataset_config.update(
