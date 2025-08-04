@@ -33,6 +33,7 @@ from ernie.dataset.data_utils import convert_to_input_ids
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import infer_save_test_case
+from ernie.utils.download_utils import check_download_repo
 
 
 def deserialize_from_file(fp):
@@ -160,6 +161,16 @@ class Predictor:
             model (Optional): Pre-initialized model
             kwargs: Additional model initialization parameters
         """
+        args.model_name_or_path = check_download_repo(
+            args.model_name_or_path,
+            from_hf_hub=args.from_hf_hub,
+            from_aistudio=args.from_aistudio,
+            from_modelscope=args.from_modelscope,
+        )
+
+        if getattr(args, "from_modelscope", False):
+            os.environ["from_modelscope"] = "True"
+
         self.runtime_timer = RuntimeTimer("Predictor")
         self.num_input_tokens = 0
         self.num_output_tokens = 0
@@ -181,7 +192,12 @@ class Predictor:
             self.tensor_parallel_rank = hcg.get_model_parallel_rank()
 
         # init model & tokenizer
-        self.tokenizer = Ernie4_5_Tokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer = Ernie4_5_Tokenizer.from_pretrained(
+            args.model_name_or_path,
+            from_hf_hub=args.from_hf_hub,
+            from_aistudio=args.from_aistudio,
+            convert_from_torch=False,
+        )
         self.tokenizer.padding_side = "left"
         paddle.set_default_dtype(self.args.dtype)
         self.config = Ernie4_5_MoeConfig.from_pretrained(
@@ -203,10 +219,16 @@ class Predictor:
             use_flash_attention=True,
             moe_group="dummy",
             num_nextn_predict_layers=0,
+            from_hf_hub=args.from_hf_hub,
+            from_aistudio=args.from_aistudio,
+            convert_from_torch=False,
         )
         self.model = Ernie4_5_MoeForCausalLM.from_pretrained(
             args.model_name_or_path,
             config=self.config,
+            from_hf_hub=args.from_hf_hub,
+            from_aistudio=args.from_aistudio,
+            convert_from_torch=False,
         )
         gc.collect()
         paddle.device.cuda.empty_cache()

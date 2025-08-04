@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Eval Ernie Model. """
+"""Eval Ernie Model."""
 
-import os
 import json
+import os
 from functools import partial
 from typing import Any, Optional
 
@@ -33,10 +33,8 @@ from ernie.configuration import Ernie4_5_MoeConfig
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
-from ernie.utils.common_utils import (
-    check_refined_recompute,
-    save_stop_info,
-)
+from ernie.utils.common_utils import check_refined_recompute, save_stop_info
+from ernie.utils.download_utils import check_download_repo
 
 from ..hparams import get_eval_args, read_args
 from ..train.sft.trainer import ErnieMoETrainer
@@ -146,13 +144,17 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     logger.info("Start to load model ...")
 
     # Detect torch model.
-    config_path = os.path.join(model_args.model_name_or_path, "config.json")
-    with open(config_path, "r", encoding="utf-8") as f:
-        config_dict = json.load(f)
-    if "torch_dtype" in config_dict:
-        raise ValueError(
-            "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
-        )
+    is_local = os.path.isfile(model_args.model_name_or_path) or os.path.isdir(
+        model_args.model_name_or_path
+    )
+    if is_local:
+        config_path = os.path.join(model_args.model_name_or_path, "config.json")
+        with open(config_path, "r", encoding="utf-8") as f:
+            config_dict = json.load(f)
+        if "torch_dtype" in config_dict:
+            raise ValueError(
+                "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
+            )
 
     model_class = Ernie4_5_MoeForCausalLM
     if finetuning_args.pipeline_parallel_degree > 1:
@@ -215,10 +217,23 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             weight_quantize_algo=finetuning_args.weight_quantize_algo
         )
 
+    model_args.model_name_or_path = check_download_repo(
+        model_args.model_name_or_path,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        from_modelscope=model_args.from_modelscope,
+    )
+
+    if getattr(model_args, "from_modelscope", False):
+        os.environ["from_modelscope"] = "True"
+
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        convert_from_torch=False,
     )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = finetuning_args.tensor_parallel_rank
@@ -273,9 +288,18 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
+            from_hf_hub=model_args.from_hf_hub,
+            from_aistudio=model_args.from_aistudio,
+            convert_from_torch=False,
         )
     else:
-        model = model_class.from_config(model_config, dtype=dtype)
+        model = model_class.from_config(
+            model_config,
+            dtype=dtype,
+            from_hf_hub=model_args.from_hf_hub,
+            from_aistudio=model_args.from_aistudio,
+            convert_from_torch=False,
+        )
 
     if model.config.head_dim is None:
         del model.config.head_dim
@@ -296,6 +320,9 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        convert_from_torch=False,
     )
 
     logger.info("Start to create dataset ...")
@@ -309,9 +336,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     from ernie.dataset.finetuning import collate_fn
 
     if data_args.dataset_type == "map":
-        from ernie.dataset.finetuning import (
-            create_indexed_dataset as create_dataset,
-        )
+        from ernie.dataset.finetuning import create_indexed_dataset as create_dataset
     else:
         from ernie.dataset.finetuning import create_dataset
     dataset_config.update(

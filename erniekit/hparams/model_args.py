@@ -89,6 +89,18 @@ class ModelArguments:
             "help": "Whether to use the fused gate-detach matmul implementation."
         },
     )
+    from_hf_hub: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from huggingface hub"},
+    )
+    from_aistudio: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from aistudio"},
+    )
+    from_modelscope: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from modelscope"},
+    )
 
     # performance
     virtual_pp_degree: int = field(
