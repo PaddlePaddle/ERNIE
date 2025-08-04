@@ -78,7 +78,9 @@ class DPOTrainingArguments(TrainingArguments):
     )
     dpo_benchmark: bool = field(
         default=False,
-        metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
+        metadata={
+            "help": "Whether to run benchmark by autotuner. True for from_scratch."
+        },
     )
     # reference model
     ref_model_update_steps: int = field(
@@ -121,7 +123,12 @@ class DPOTrainingArguments(TrainingArguments):
 
 
 @dataclass
-class FinetuningArguments(SFTTrainingArguments, DPOTrainingArguments, CheckPointArguments, DistributedArguments):
+class FinetuningArguments(
+    SFTTrainingArguments,
+    DPOTrainingArguments,
+    CheckPointArguments,
+    DistributedArguments,
+):
     """Finetuning Argument"""
 
     # base
@@ -160,22 +167,40 @@ class FinetuningArguments(SFTTrainingArguments, DPOTrainingArguments, CheckPoint
     )
     weight_quantize_algo: str = field(
         default=None,
-        metadata={"help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."},
+        metadata={
+            "help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."
+        },
     )
 
     # fp8
-    apply_hadamard: bool = field(default=True, metadata={"help": "Whether to apply hadamard"})
-    hadamard_block_size: int = field(default=32, metadata={"help": "hadamard block size"})
-    quant_input_grad: bool = field(default=False, metadata={"help": "Whether to quantize input grad"})
-    quant_weight_grad: bool = field(default=False, metadata={"help": "Whether to quantize weight grad"})
-    apply_online_actscale_step: int = field(
-        default=200, metadata={"help": "Use online activation scale for first N step to keep stable training."}
+    apply_hadamard: bool = field(
+        default=True, metadata={"help": "Whether to apply hadamard"}
     )
-    actscale_moving_rate: float = field(default=0.01, metadata={"help": "EMA moving_rate for activation scale"})
+    hadamard_block_size: int = field(
+        default=32, metadata={"help": "hadamard block size"}
+    )
+    quant_input_grad: bool = field(
+        default=False, metadata={"help": "Whether to quantize input grad"}
+    )
+    quant_weight_grad: bool = field(
+        default=False, metadata={"help": "Whether to quantize weight grad"}
+    )
+    apply_online_actscale_step: int = field(
+        default=200,
+        metadata={
+            "help": "Use online activation scale for first N step to keep stable training."
+        },
+    )
+    actscale_moving_rate: float = field(
+        default=0.01, metadata={"help": "EMA moving_rate for activation scale"}
+    )
     fp8_format_type: str = field(default="hybrid", metadata={"help": "FP8 Format"})
-    num_nextn_predict_layers: int = field(default=0, metadata={"help": "Number of nextn predict layers."})
-    multi_token_pred_lambda: float = field(default=0.3, metadata={"help": "multi token pred lambda"})
-    use_recompute_mtp: bool = field(default=False, metadata={"help": "Whether to use recompute_mtp"})
+    multi_token_pred_lambda: float = field(
+        default=0.3, metadata={"help": "multi token pred lambda"}
+    )
+    use_recompute_mtp: bool = field(
+        default=False, metadata={"help": "Whether to use recompute_mtp"}
+    )
 
     def __post_init__(self):
         self.bf16 = True

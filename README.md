@@ -267,7 +267,7 @@ If you find ERNIE 4.5 useful or wish to use it in your projects, please kindly c
 ```bibtex
 @misc{ernie2025technicalreport,
       title={ERNIE 4.5 Technical Report},
-      author={Baidu ERNIE Team},
+      author={Baidu-ERNIE-Team},
       year={2025},
       eprint={},
       archivePrefix={arXiv},

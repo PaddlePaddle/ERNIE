@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Estimate DPO """
+"""Estimate DPO"""
 
 import json
 import os
@@ -30,6 +30,7 @@ from ernie.configuration import Ernie4_5_MoeConfig
 # isort: on
 
 from ernie.dataset.dpo import create_dataset
+from ernie.utils.download_utils import check_download_repo
 
 
 def calculate_acc_steps(num_samples, train_batch, dataset_world_size, per_device_train_batch_size):
@@ -194,12 +195,8 @@ def dpo_estimate_training(tokenizer, data_args, training_args, config, train_dat
 
 
 if __name__ == "__main__":
-    from dpo_utils import (
-        DataArgument,
-        DPOConfig,
-        DPOTrainingArguments,
-        ModelArgument,
-    )
+    from dpo_utils import (DataArgument, DPOConfig, DPOTrainingArguments,
+                           ModelArgument)
     parser = PdArgumentParser((ModelArgument, DataArgument, DPOTrainingArguments, DPOConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args, dpo_config = parser.parse_json_file_and_cmd_lines()
@@ -216,6 +213,21 @@ if __name__ == "__main__":
 
     if training_args.num_of_gpus < 0:
         raise ValueError(f"num_of_gpus must be positive, but got num_of_gpus={training_args.num_of_gpus}")
-    tokenizer = Ernie4_5_Tokenizer.from_pretrained(model_args.model_name_or_path)
-    config = Ernie4_5_MoeConfig.from_pretrained(model_args.model_name_or_path)
+
+    model_args.model_name_or_path = check_download_repo(model_args.model_name_or_path,
+                                                        from_hf_hub=model_args.from_hf_hub,
+                                                        from_aistudio=model_args.from_aistudio,
+                                                        from_modelscope=model_args.from_modelscope)
+
+    if getattr(model_args, "from_modelscope", False):
+        os.environ["from_modelscope"] = "True"
+
+    tokenizer = Ernie4_5_Tokenizer.from_pretrained(model_args.model_name_or_path,
+                                                from_hf_hub=model_args.from_hf_hub,
+                                                from_aistudio=model_args.from_aistudio,
+                                                convert_from_torch=False)
+    config = Ernie4_5_MoeConfig.from_pretrained(model_args.model_name_or_path,
+                                                from_hf_hub=model_args.from_hf_hub,
+                                                from_aistudio=model_args.from_aistudio,
+                                                convert_from_torch=False)
     dpo_estimate_training(tokenizer, data_args, training_args, config)
