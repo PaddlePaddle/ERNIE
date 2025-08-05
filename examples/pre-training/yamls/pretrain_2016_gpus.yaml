@@ -113,5 +113,4 @@ trainer_args:
     gc_interval: 100000
 
     unified_checkpoint: true
-    use_expert_parallel: true
     unified_checkpoint_config: "skip_save_model_weight"
