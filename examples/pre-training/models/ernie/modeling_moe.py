@@ -137,20 +137,33 @@ def get_gate(
         moe_num_experts % config.moe_world_size == 0
     ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={config.moe_world_size} == 0"
     moe_num_experts_per_device = moe_num_experts // config.moe_world_size
-    moe_rank = paddle.distributed.get_rank(config.moe_group)
-    if moe_rank < 0:
-        moe_rank = 0
-
-    experts = nn.LayerList([])
-    for expert_id, (experts_num, fc) in enumerate(expert):
-        for i in range(experts_num):
-            if i // moe_num_experts_per_device == moe_rank:
-                experts.append(deepcopy(fc))
+    if not config.moe_fuse_experts:
+        experts = nn.LayerList([])
+        for expert_id, (experts_num, fc) in enumerate(expert):
+            assert experts_num % config.moe_world_size == 0
+            num_experts_per_device = experts_num // config.moe_world_size
+            experts_to_append = []
+            if not hasattr(fc, "__len__"):
+                experts_to_append.append(fc)
+                if expert_id == 1:
+                    with paddle.utils.unique_name.guard("_mm_deepcopy"):
+                        for _ in range(num_experts_per_device - 1):
+                            experts_to_append.append(deepcopy(fc))
+                else:
+                    for _ in range(num_experts_per_device - 1):
+                        experts_to_append.append(deepcopy(fc))
             else:
-                experts.append(None)
-    assert (
-        len(experts) == moe_num_experts
-    ), f"experts.len={len(experts)} != moe_num_experts={moe_num_experts}"
+                experts_to_append = fc
+            for ex in experts_to_append:
+                for p in ex.parameters():
+                    p.expert_type = f"expert_type_{expert_id}"
+            experts.extend(experts_to_append)
+        assert (
+            len(experts) == moe_num_experts_per_device
+        ), f"experts.len={len(experts)} != moe_num_experts_per_device={moe_num_experts_per_device}"
+    else:
+        assert expert[0][0] == 1, "experts are fused and must be one"
+        experts = deepcopy(expert[0][1])
 
     logger.info(
         f"using moe-world-size: {config.moe_world_size} "
@@ -167,7 +180,6 @@ def get_gate(
 
     lm_gate, lm_experts = gate, experts
     logger.info(f"LM-experts-{lm_experts} -- experts-{experts}")
-
     return gate, experts, lm_gate, lm_experts
 
 
@@ -1169,7 +1181,11 @@ class ErnieDecoderLayer(nn.Layer):
 
     def _init_gate_and_experts(self, layer_idx):
         cfg = deepcopy(self.config)
-        fc_cls = ErnieMoeMLP
+        fc_cls = (
+            ErnieMoeMLPFused
+            if cfg.moe_fuse_experts and not cfg.use_fp8_mlp
+            else ErnieMoeMLP
+        )
         if self.config.expert_mlp_use_bias is not None:
             cfg.use_bias = self.config.expert_mlp_use_bias
 
@@ -1210,7 +1226,10 @@ class ErnieDecoderLayer(nn.Layer):
                         fc.append((num_experts, nn.Identity()))
             else:
                 cfg.intermediate_size = cfg.moe_intermediate_size
-                fc = [(cfg.moe_num_experts, fc_cls(cfg))]
+                if cfg.moe_fuse_experts:
+                    fc = [(1, fc_cls(cfg))]
+                else:
+                    fc = [(cfg.moe_num_experts, fc_cls(cfg))]
         else:
             fc = [(cfg.moe_num_experts, fc_cls(cfg))]
         gate, experts, lm_gate, lm_experts = get_gate(self.config, fc, layer_idx)
