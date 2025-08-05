@@ -42,10 +42,18 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
             last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
     if last_checkpoint is not None:
         server_model_path = last_checkpoint
-        logger.info(f"Checkpoint detected, launch server from {last_checkpoint} \
-                    (Only Full checkpoint is supported)")
+        logger.info(
+            f"Checkpoint detected, launch server from {last_checkpoint} \
+                    (Only Full checkpoint is supported)"
+        )
     else:
-        logger.info(f"No Checkpoint detected, launch server from {model_args.model_name_or_path}.")
+        logger.info(
+            f"No Checkpoint detected, launch server from {model_args.model_name_or_path}."
+        )
+
+    logger.info(
+        "The optimal configuration for model deployment can be referred: https://github.com/PaddlePaddle/FastDeploy/tree/develop/docs/zh/optimal_deployment"
+    )
 
     env = deepcopy(os.environ)
     command = (
@@ -62,6 +70,7 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
         f"--gpu-memory-utilization {server_args.gpu_memory_utilization} "
         f"--block-size {server_args.block_size} "
         f"--kv-cache-ratio {server_args.kv_cache_ratio} "
+        f"--quantization {server_args.quantization} "
     ).split()
 
     process = subprocess.Popen(
