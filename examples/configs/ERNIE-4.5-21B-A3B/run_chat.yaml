@@ -4,8 +4,10 @@ tensor_parallel_degree: 1
 output_dir: None
 
 ### server
+# ref: https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/zh/optimal_deployment/ERNIE-4.5-21B-A3B-Paddle.md
 max_model_len: 131072
 port: 8188
+quantization: wint4
 
 ### chat
 max_new_tokens: 8192

@@ -24,8 +24,11 @@ Each parameter is documented with its type, default value and detailed descripti
 | `max_num_seqs` | int | 8 | Maximum batch size during decode phase. Requests exceeding this will be queued. |
 | `use_warmup` | int | 0 | Whether to perform warmup on startup. Generates maximum-length data for warmup (used by default in KV Cache calculation). |
 | `gpu_memory_utilization` | float | 0.9 | GPU memory utilization rate |
+| `quantization` | str | None | Model quantization strategy, when loading BF16 CKPT, specifying wint4 or wint8 supports lossless online 4bit/8bit quantization |
 | `block_size` | int | 64 | Number of tokens per cache management block |
 | `kv_cache_ratio` | float | 0.75 | Ratio of KV Cache allocated to input. Recommended value = average input length/(average input length + average output length) |
+
+* Note: The optimal configuration for model deployment can be referred: https://github.com/PaddlePaddle/FastDeploy/tree/develop/docs/zh/optimal_deployment
 
 ## 2. Chat Request Configuration
 
