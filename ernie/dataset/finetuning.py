@@ -131,6 +131,8 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
             - loss_mask: Mask for computing loss
     """
     input_keys = ["input_ids", "labels", "loss_mask"]
+    if model_args.num_nextn_predict_layers > 0:
+        input_keys.append("nbatch_pack_offset")
     if model_args.use_attn_mask_start_row_indices:
         input_keys.append("attn_mask_start_row_indices")
     else:
@@ -141,7 +143,6 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
         token_ids = [sum(original_token_ids, [])]
         loss_mask = [sum([seq.loss_mask for seq in batch_sequence], [])]
         labels = [sum([seq.labels for seq in batch_sequence], [])]
-
         # padding
         padded_token_ids = pad_batch_data(
             token_ids, pad_idx=tokenizer.pad_token_id, max_seq_len=max_seq_len
@@ -158,6 +159,19 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
                 padded_loss_mask,
             ]
         )
+
+        if model_args.num_nextn_predict_layers > 0:
+            # each sequence end index
+            batch_sequence_len = [len(sequence) for sequence in original_token_ids]
+            nbatch_pack_offset = [0] * sum(batch_sequence_len)
+            prefix_sum = 0
+            for sequence_len in batch_sequence_len[:-1]:
+                prefix_sum += sequence_len
+                nbatch_pack_offset[prefix_sum - 1] = 1
+            padded_nbatch_pack_offset = pad_batch_data(
+                [nbatch_pack_offset], pad_idx=0, max_seq_len=max_seq_len
+            )
+            return_list[-1].append(padded_nbatch_pack_offset)
 
         if model_args.use_attn_mask_start_row_indices:
             return_list[-1].append(
@@ -551,7 +565,7 @@ class SequenceDataset(IterableDataset):
                     logger.warning(
                         f"even one turn, example_output:'{{'src':[{sub_src}, ……],'tgt':[……{sub_tgt}]}}'"
                     )
-            except Exception as _:
+            except Exception:
                 logger.warning(f"[SKIP] wrong example: {example}")
 
             return None
@@ -572,8 +586,8 @@ class SequenceDataset(IterableDataset):
         # end_of_response is a special token that indicates the end of the turn.
         # end_token is a special token that indicates the end of the answer.
         labels = [
-            la if la != self.end_of_response_id else self.tokenizer.eos_token_id
-            for la in labels
+            label if label != self.end_of_response_id else self.tokenizer.eos_token_id
+            for label in labels
         ]
 
         pos_ids = list(range(len(tokens)))

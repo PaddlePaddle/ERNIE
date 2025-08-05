@@ -29,18 +29,42 @@ class ServerArguments:
         metadata={"help": "HTTP port of service configuration."},
     )
     metrics_port: int = field(
-        default=8001, metadata={"help": "The port of the supervision metric in the model service."}
+        default=8001,
+        metadata={"help": "The port of the supervision metric in the model service."},
     )
     engine_worker_queue_port: int = field(
-        default=8002, metadata={"help": "The port used for inter-process communication within the engine."}
+        default=8002,
+        metadata={
+            "help": "The port used for inter-process communication within the engine."
+        },
     )
 
     # model
-    max_model_len: int = field(default=2048, metadata={"help": "Maximum context length supported by the model."})
-    max_num_seqs: int = field(default=8, metadata={"help": "Maximum number of sequences per iteration."})
-    use_warmup: int = field(default=0, metadata={"help": "Flag to indicate whether to use warm-up before inference."})
-    gpu_memory_utilization: float = field(default=0.9, metadata={"help": "The fraction of GPU memory to be utilized."})
+    max_model_len: int = field(
+        default=2048,
+        metadata={"help": "Maximum context length supported by the model."},
+    )
+    max_num_seqs: int = field(
+        default=8, metadata={"help": "Maximum number of sequences per iteration."}
+    )
+    use_warmup: int = field(
+        default=0,
+        metadata={"help": "Flag to indicate whether to use warm-up before inference."},
+    )
+    gpu_memory_utilization: float = field(
+        default=0.9, metadata={"help": "The fraction of GPU memory to be utilized."}
+    )
+    quantization: str = field(
+        default=None,
+        metadata={
+            "help": "Model quantization strategy, when loading BF16 CKPT, specifying wint4 or wint8 supports lossless online 4bit/8bit quantization."
+        },
+    )
 
     # cache
-    block_size: int = field(default=64, metadata={"help": "Number of tokens in one processing block."})
-    kv_cache_ratio: float = field(default=0.75, metadata={"help": "Ratio of tokens to process in a block."})
+    block_size: int = field(
+        default=64, metadata={"help": "Number of tokens in one processing block."}
+    )
+    kv_cache_ratio: float = field(
+        default=0.75, metadata={"help": "Ratio of tokens to process in a block."}
+    )
