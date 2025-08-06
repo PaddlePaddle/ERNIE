@@ -157,6 +157,7 @@ class ErnieMoEConfig(PretrainedConfig):
         moe_reverse_token_drop: bool = False,
         moe_gate_act: str = "softmax",
         moe_norm_gate_logits=True,
+        moe_fuse_experts: bool = False,
         moe_all_to_all_dropout: float = 0.0,
         moe_k=2,
         moe_use_aux_free: bool = False,
@@ -361,6 +362,7 @@ class ErnieMoEConfig(PretrainedConfig):
         self.moe_dense_experts_token_type_id = moe_dense_experts_token_type_id
         self.moe_intermediate_size = moe_intermediate_size
         self.moe_reverse_token_drop = moe_reverse_token_drop
+        self.moe_fuse_experts = moe_fuse_experts
         self.moe_k = moe_k
         self.moe_all_to_all_dropout = moe_all_to_all_dropout
         self.moe_group_experts = moe_group_experts

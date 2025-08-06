@@ -103,6 +103,9 @@ trainer_args:
     skip_profile_timer: True
     ignore_data_skip: 0
     shuffle_consecutive: True
+    load_sharded_model: True
+    save_sharded_model: True
+    save_sharding_stage1_model_include_freeze_params: True
     ignore_load_lr_and_optim: False
     metrics_output_path: ./output/paddle_distributed_logs/
     use_moe: true
@@ -111,6 +114,3 @@ trainer_args:
     log_global_grad_norm: True
     enable_optimizer_timer: False
     gc_interval: 100000
-
-    unified_checkpoint: true
-    unified_checkpoint_config: "skip_save_model_weight"

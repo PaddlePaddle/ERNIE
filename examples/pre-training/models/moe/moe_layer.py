@@ -515,7 +515,7 @@ class MOELayer(nn.Layer):
         if self.rank < 0:
             self.rank = 0
 
-        self.num_local_experts = len(self.experts) // self.world_size
+        self.num_local_experts = len(self.experts)
         self.dispatch_by_task = (
             hasattr(self.gate, "dispatch_by_task") and self.gate.dispatch_by_task
         )
@@ -529,11 +529,6 @@ class MOELayer(nn.Layer):
 
     def forward_experts(self, dispatched_input):
         with profile("fwd-expert"):
-            true_experts = self.experts[
-                self.rank
-                * self.num_local_experts : (self.rank + 1)
-                * self.num_local_experts
-            ]
             dispatched_input = dispatched_input.reshape(
                 [
                     self.world_size,
@@ -550,11 +545,11 @@ class MOELayer(nn.Layer):
                     chunks = (
                         dispatched_input.transpose([1, 0, 2, 3]).contiguous().unbind(0)
                     )
-                    assert len(chunks) == len(true_experts), (
+                    assert len(chunks) == len(self.experts), (
                         len(chunks),
-                        len(true_experts),
+                        len(self.experts),
                     )
-                    for chunk, expert in zip(chunks, true_experts):
+                    for chunk, expert in zip(chunks, self.experts):
                         expert_outputs += [expert(chunk)]
 
                     expert_output = paddle.stack(expert_outputs, axis=1)
