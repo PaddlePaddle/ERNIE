@@ -40,7 +40,6 @@ model_args:
             spaq: true
             transpose_split_quant: true
         use_combine_before_a2a: true
-        build_skip_comm_buffer: true
 
 # ---------------------------trainer args-------------------------------------------------#
 trainer_args:
@@ -86,7 +85,7 @@ trainer_args:
     expert_parallel_degree: 8
     sharding: "stage1"
     sharding_parallel_degree: 8
-    sharding_parallel_config: split_param enable_stage1_overlap
+    sharding_parallel_config: split_param
     amp_master_grad: 1
 
     ignore_data_skip: 0
