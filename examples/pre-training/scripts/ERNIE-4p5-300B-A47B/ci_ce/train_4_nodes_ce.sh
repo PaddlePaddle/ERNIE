@@ -62,4 +62,4 @@ python -m paddle.distributed.launch \
     --rank $rank \
     --run_mode=collective \
     ${script:-ernie/pretrain.py}  \
-    --config yamls/ci_ce/pretrain_4_nodes_ce.yaml
+    --config yamls/ERNIE-4p5-300B-A47B/ci_ce/pretrain_4_nodes_ce.yaml

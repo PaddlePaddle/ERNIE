@@ -4,7 +4,7 @@ env:
 
 # ---------------------------model args-------------------------------------------------#
 model_args:
-    model_name_or_path: model_configs/
+    model_name_or_path: model_configs/ERNIE-4p5-300B-A47B/
     tokenizer_name: ./ernie/src/tokenizers/tokenizer_model
     output_dir: ./output/
     data_load_process_num: 40
@@ -106,7 +106,6 @@ trainer_args:
     shuffle_consecutive: True
     load_sharded_model: True
     save_sharded_model: True
-    save_sharding_stage1_model_include_freeze_params: True
     ignore_load_lr_and_optim: False
     metrics_output_path: ./output/paddle_distributed_logs/
     use_moe: true
