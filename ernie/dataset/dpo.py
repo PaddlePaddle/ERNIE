@@ -720,7 +720,7 @@ class SequenceDataset(IterableDataset):
 
         # at least one turn
         if turn_index == len(chosen_encoded_messages) - 1:
-            sub_src = example.chosen[0]["content"].strip()[:5]
+            sub_src = example.chosen["messages"][0]["content"].strip()[:5]
             global LOGGER_COUNT
             LOGGER_COUNT += 1
             if LOGGER_COUNT <= 5:
