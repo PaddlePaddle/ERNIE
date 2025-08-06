@@ -39,7 +39,7 @@ export PYTHONPATH=$PYTHONPATH:./ernie
 
 python -m paddle.distributed.launch \
     --master <master_ip>:<port> \
-    --nnodes 252 \
+    --nnodes 12 \
     --run_mode=collective \
-    ${script:-ernie/pretrain.py} \
-    --config yamls/pretrain_2016_gpus.yaml
+    ${script:-ernie/pretrain.py}  \
+    --config yamls/ERNIE-4p5-300B-A47B/pretrain_96_gpus.yaml

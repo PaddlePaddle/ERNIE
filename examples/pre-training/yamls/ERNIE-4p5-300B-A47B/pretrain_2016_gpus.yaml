@@ -4,7 +4,7 @@ env:
 
 # ---------------------------model args-------------------------------------------------#
 model_args:
-    model_name_or_path: model_configs/
+    model_name_or_path: model_configs/ERNIE-4p5-300B-A47B/
     tokenizer_name: ./ernie/src/tokenizers/tokenizer_model
     output_dir: ./output/
     data_load_process_num: 40
@@ -18,16 +18,9 @@ model_args:
     enable_mtp_magic_send: True
 
     model_config:
-        num_hidden_layers: 6
-        moe_num_experts: 8
-        moe_k: 4
-        moe_capacity: [4,4,4]
-
         multi_token_pred_depth: 1
         use_ep_comm_overlap: false
         use_combine_before_a2a: true
-        use_quant_before_a2a: true
-        use_async_a2a: false
         use_rms_qkv_recompute: true
 
         moe_logging: True
@@ -37,16 +30,14 @@ model_args:
         use_fp8_fuse_node: true
         fp8_mem_configs:
             shared_expert: false
-            recompute_fwd_gate_up: [6, 7, 8, 11, 12, 13, 16, 17, 18]
+            recompute_fwd_gate_up: [4, 5, 6, 7, 8, 10, 11, 12, 13, 16, 17, 18]
             dequant_input: true
-            offline_quant_expert_weight: true
-            clear_origin_weight_when_offline_quant: true
         fp8_fused_ops_configs:
             stack_quant: true
             swiglu_probs_bwd: true
             split_group_gemm: false
             spaq: true
-        transpose_split_quant: true
+            transpose_split_quant: true
 
         moe_gate: top2_fused
 
@@ -75,7 +66,7 @@ trainer_args:
     learning_rate: 2.2e-4
     min_lr: 2.2e-5
 
-    gradient_accumulation_steps: 2
+    gradient_accumulation_steps: 90
     per_device_train_batch_size: 1
     per_device_eval_batch_size: 1
 
@@ -93,15 +84,15 @@ trainer_args:
     scale_loss: 4096
     seed: 666
     use_train_part_sharding: 1
-    offload_optim: True
+    pre_alloc_memory: 60
 
-    pipeline_parallel_degree: 2
+    pipeline_parallel_degree: 12
     tensor_parallel_degree: 1
     virtual_pp_degree: 1
     data_parallel_degree: 1
-    expert_parallel_degree: 4
+    expert_parallel_degree: 8
     sharding: "stage1"
-    sharding_parallel_degree: 4
+    sharding_parallel_degree: 168
     amp_master_grad: 1
     pipeline_parallel_config: enable_delay_scale_loss enable_overlap_p2p_comm best_unbalanced_scheduler
     sharding_parallel_config: split_param
@@ -114,7 +105,6 @@ trainer_args:
     shuffle_consecutive: True
     load_sharded_model: True
     save_sharded_model: True
-    save_sharding_stage1_model_include_freeze_params: True
     ignore_load_lr_and_optim: False
     metrics_output_path: ./output/paddle_distributed_logs/
     use_moe: true

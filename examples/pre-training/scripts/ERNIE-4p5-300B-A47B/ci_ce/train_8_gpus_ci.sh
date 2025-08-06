@@ -38,8 +38,8 @@ fi
 export PYTHONPATH=$PYTHONPATH:./ernie
 
 python -m paddle.distributed.launch \
-    --master <master_ip>:<port> \
-    --nnodes 12 \
+    --master $hostname:36677 \
+    --nnodes 1 \
     --run_mode=collective \
     ${script:-ernie/pretrain.py}  \
-    --config yamls/pretrain_96_gpus.yaml
+    --config yamls/ERNIE-4p5-300B-A47B/ci_ce/pretrain_8_gpus_ci.yaml
