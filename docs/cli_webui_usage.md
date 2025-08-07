@@ -85,6 +85,8 @@ erniekit server examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 erniekit chat examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 ```
 
+* Note: When using a VL model and wanting to input images and videos, please refer to the following format for input. `[{"type": "image_url", "image_url": {"url": "https://paddlenlp.bj.bcebos.com/datasets/paddlemix/demo_images/example2.jpg"}},{"type": "text", "text": "What's this?"},]`
+
 ## 1.2. Model Fine-tuning
 
 ### 1.2.1. SFT & LoRA Fine-tuning
