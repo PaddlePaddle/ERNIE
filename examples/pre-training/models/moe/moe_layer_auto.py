@@ -37,8 +37,6 @@ import paddle.distributed as dist
 from paddle import Tensor
 from paddleformers.trainer.plugins.timer import get_timers
 
-from models.moe.sinkhorn_gate import SinkHornGateFused
-from models.moe.round_robin_gate import RoundRobinGateFused
 from models.moe.top2_gate_auto import TopKGateFusedAuto
 from models.moe.moe_utils import get_flatten_mesh, get_mesh, _reshard
 from models.moe.moe_layer import MOELayer
@@ -107,87 +105,6 @@ def profile(name):
     yield
     if get_timers() is not None:
         get_timers()(name).stop()
-
-
-class GateCombineForStatic(PyLayer):
-    """GateCombine"""
-
-    @staticmethod
-    def forward(ctx, x, combine_weights, scatter_index):
-        """
-        Input:
-            x:  [seqlen * k, hidden_size]
-            combine_weights: [seqlen, k]
-            scatter_index: [seqlen, k]
-        Output:
-            y: [seqlen, hidden_size]
-        """
-        ctx.save_for_backward(x, combine_weights, scatter_index)
-        assert moe_combine_auto is not None
-        return moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
-
-    @staticmethod
-    def backward(ctx, grad_y, *_):
-        """
-        Input:
-            grad_y:  [seqlen, hidden_size]
-            combine_weights: [seqlen, k]
-            scatter_index: [seqlen, k]
-        Output:
-            grad_x: [seqlen * k, hidden_size]
-            grad_combine_weight: [seqlen, k]
-
-        """
-        x, combine_weights, scatter_index = ctx.saved_tensor()
-        assert moe_combine_auto is not None
-        grad_x, grad_combine_weight_helper = moe_combine_auto.moe_combine_bwd_auto(
-            x, combine_weights, scatter_index, grad_y
-        )
-
-        grad_combine_weight = grad_combine_weight_helper.sum(-1)
-        scatter_index_grad = paddle.zeros_like(scatter_index)
-        return grad_x, grad_combine_weight, scatter_index_grad
-
-
-class GateCombine(PyLayer):
-    """GateCombine"""
-
-    @staticmethod
-    def forward(ctx, x, combine_weights, scatter_index):
-        """
-        Input:
-            x:  [seqlen * k, hidden_size]
-            combine_weights: [seqlen, k]
-            scatter_index: [seqlen, k]
-        Output:
-            y: [seqlen, hidden_size]
-        """
-        ctx.x = x
-        ctx.combine_weights = combine_weights
-        ctx.scatter_index = scatter_index
-        assert moe_combine_auto is not None
-        return moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
-
-    @staticmethod
-    def backward(ctx, grad_y, *_):
-        """
-        Input:
-            grad_y:  [seqlen, hidden_size]
-            combine_weights: [seqlen, k]
-            scatter_index: [seqlen, k]
-        Output:
-            grad_x: [seqlen * k, hidden_size]
-            grad_combine_weight: [seqlen, k]
-
-        """
-
-        assert moe_combine_auto is not None
-        grad_x, grad_combine_weight_helper = moe_combine_auto.moe_combine_bwd_auto(
-            ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
-        )
-
-        grad_combine_weight = grad_combine_weight_helper.sum(-1)
-        return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
 
 
 def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
@@ -581,9 +498,7 @@ class MOELayerAuto(MOELayer):
             if token_type_ids is not None:
                 token_type_ids = token_type_ids.reshape([-1])
                 args = (token_type_ids,)
-            use_fuse = isinstance(
-                self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFusedAuto)
-            )
+            use_fuse = isinstance(self.gate, (TopKGateFusedAuto))
             if use_fuse:
                 (gate_logits, capacity, router_loss, local_capacity) = self.gate(
                     input, *args
@@ -604,7 +519,7 @@ class MOELayerAuto(MOELayer):
         with profile("moe-dispatch"):
             if use_fuse:
                 # capacity no use
-                k = 1 if isinstance(self.gate, SinkHornGateFused) else self.k
+                k = self.k
                 prob, max_prob = self.fused_gate_logits_process(
                     gate_logits, token_type_ids
                 )
@@ -694,9 +609,7 @@ class MOELayerAuto(MOELayer):
                     expert_output = dist.reshard(
                         expert_output, get_mesh(), [dist.Shard(0), dist.Replicate()]
                     )
-            use_fuse = isinstance(
-                self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFusedAuto)
-            )
+            use_fuse = isinstance(self.gate, (TopKGateFusedAuto))
             combine_fn = combining_fused_auto if use_fuse else combining
             combined_output = combine_fn(expert_output, combine_weights, scatter_index)
 

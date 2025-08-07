@@ -40,7 +40,6 @@ from models.ernie import (
 
 from src.trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
 from src.utils import (
-    load_model,
     setup_logger_output_file,
 )
 
@@ -276,7 +275,7 @@ def main():
         f"eos:{tokenizer.eos_token_id} pad:{tokenizer.pad_token_id} "
     )
 
-    cfg = update_model_config_from_args(cfg, model_config) 
+    cfg = update_model_config_from_args(cfg, model_config)
 
     if args.model_type == "ernie":
         model_class = ErnieForCausalLMAuto
@@ -300,8 +299,6 @@ def main():
     paddle.set_default_dtype("float32")
 
     logger.info(f"using model={type(model)}, cfg={cfg}")
-    if args.init_ckpt:
-        load_model(model, args.init_ckpt)
 
     freeze_config = set(args.freeze_config.split(" "))
     if "freeze_vision" in freeze_config and hasattr(model, "freeze_vision"):

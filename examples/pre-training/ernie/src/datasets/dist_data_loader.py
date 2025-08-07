@@ -18,6 +18,8 @@ It is used to support hybrid parallelism.
 It can replace paddle.io.DataLoader in most cases.
 """
 import logging
+import hashlib
+from collections import deque
 from collections import OrderedDict
 from itertools import groupby
 from functools import reduce
@@ -34,15 +36,12 @@ from paddleformers.utils.batch_sampler import DistributedBatchSampler
 from paddleformers.trainer.plugins.timer import get_timers
 from paddleformers.utils.tools import get_env_device
 
-from models.comm_utils import md5
 from src.utils.misc import global_training_logs
 
 logger = logging.getLogger(__name__)
-try:
-    from models.ernie_moe.modeling_pp import input_ids_for_mtp
-except ImportError:
-    logger.error("input_ids_for_mtp not found. Update ErnieCore to use this opt")
-    input_ids_for_mtp = None
+
+
+input_ids_for_mtp = deque()
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +49,12 @@ _MAX_DATA_DIM = 64
 
 VOCAB_SIZE = os.getenv("VOCAB_SIZE")
 G_DEBUG_DATA_MD5 = os.getenv("G_DEBUG_DATA_MD5")
+
+
+def md5(tensor):
+    numpy_array = tensor.numpy()
+    array_bytes = numpy_array.tobytes()
+    return hashlib.md5(array_bytes).hexdigest()
 
 
 class DummyDataset(paddle.io.Dataset):

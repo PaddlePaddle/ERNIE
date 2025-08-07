@@ -31,10 +31,7 @@ class ReshardSaveExitCallback(TrainerCallback):
                 if not hasattr(_C_ops, op):
                     continue
 
-                logger.info(f"[zengjinle debug] faking {op} ...")
-
                 def fake_func(*args, **kwargs):
-                    logger.info(f"[zengjinle debug] fake_func for {op}")
                     return [None] * 6
 
                 setattr(_C_ops, op, fake_func)

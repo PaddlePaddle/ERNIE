@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-from typing import List, Optional
 import logging
 from collections import namedtuple
 import inspect
@@ -26,25 +25,18 @@ from paddle.distributed.communication import stream
 import paddle.nn.functional as F
 
 from paddle.autograd import PyLayer
-from paddle.distributed.communication.group import Group
 from paddle.distributed.fleet.utils import recompute
 from paddle.distributed import fleet
 
 import paddle.distributed as dist
-from paddle import Tensor
-from paddleformers.utils.tools import get_env_device
 
-from models.moe.sinkhorn_gate import SinkHornGateFused
-from models.moe.top2_gate import (
-    TopKGateFused,
-)
+
 from models.utils import (
     manual_backward,
 )
 
 from models.comm_utils import profile
 
-from models.moe.moe_utils import MOEAllGatherDispatcher
 
 from models.moe.token_dispatcher.fp8_utils import (
     ExpertsGroupGemmNode,
@@ -204,6 +196,7 @@ class MoEStatics(nn.Layer):
             )
             p.stop_gradient = True
             self.expert_usage = p
+
 
 def combining(x, combine_weights, scatter_index):
 
@@ -1234,312 +1227,3 @@ class FP8FusedWLCHFunc(paddle.autograd.PyLayer):
         else:
             dx, probs_grad = ctx.node.backward(output_grad)
             return AlltoAll.apply(dx, ctx.group), probs_grad
-
-
-class MOEInferLayer(nn.Layer):
-
-    def __init__(
-        self,
-        gate: nn.Layer,
-        experts: List[nn.Layer],
-        group: Group = None,
-        recompute=False,
-    ) -> None:
-
-        super().__init__()
-        self.gate = gate
-        self.recompute = recompute
-        logger.info(f"using infer moe recompute={recompute}")
-        for p in self.gate.parameters():
-            p.is_gate = True
-
-        if isinstance(experts, nn.LayerList):
-            self.experts = experts
-        else:
-            self.experts = nn.LayerList([experts])
-        self.group = group
-        for p in experts.parameters():
-            p.expert = True  # type: ignore
-            p.no_sync = True
-
-        self.world_size = dist.get_world_size(self.group)
-        self.rank = dist.get_rank(self.group)
-
-        if self.world_size < 1:
-            self.world_size = 1
-        if self.rank < 0:
-            self.rank = 0
-        self.num_local_experts = len(self.experts)
-
-    def forward(
-        self,
-        input: Tensor,
-        token_type_ids=None,
-    ) -> Tensor:
-        """_summary_
-
-        Args:
-            input (Tensor): _description_
-
-        Returns:
-            Tensor: _description_
-        """
-        # assert len(input) == 1, "only single input Tensor supported"
-        if input.ndim == 3:
-            orig_shape = input.shape
-            input = input.reshape([-1, input.shape[-1]])
-        else:
-            orig_shape = None
-        assert (
-            len(input.shape) == 2
-        ), f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
-
-        # Implement Algorithm 2 from GShard paper.
-        seqlen, d_model = input.shape
-
-        # Reshape into S tokens by dropping sequence dimension.
-        # reshaped_input = input.reshape(-1, d_model)
-        # assert reshaped_input.shape[0] % len(self.experts) == 0,
-        # f'num tokens must be order of number of local experts, {input[0].shape[0]} vs {len(self.experts)}'
-        def fwdfn(dispatched_input):
-            chunks = dispatched_input.unbind(1)
-            expert_outputs = []
-            for chunk, expert in zip(chunks, self.experts):
-                expert_outputs += [expert(chunk)]
-            expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
-            return expert_output
-
-        assert self.gate is not None
-        (
-            capacity,
-            dispatch_mask,
-            combine_weights,
-            scatter_index,
-            router_loss,
-        ) = self.gate(input)
-
-        dispatched_input = dispatching(
-            input,
-            dispatch_mask,
-            scatter_index,
-            num_experts=self.world_size * self.num_local_experts,
-            capacity=capacity,
-        )
-        dispatched_input = dispatched_input.reshape(
-            [self.world_size * self.num_local_experts, capacity, d_model]
-        )
-        #  dispatched_input = _AllToAll.apply(dispatched_input, self.group) #[ecm]
-        dispatched_input = dispatched_input.reshape(
-            [self.world_size, self.num_local_experts, -1, d_model]
-        )  # [e,1,c,m]
-        dispatched_input = dispatched_input[
-            self.rank : (self.rank + 1)
-        ]  # [1, local_experts, c, m]
-
-        expert_output = (
-            recompute(fwdfn, dispatched_input)
-            if self.recompute and self.training
-            else fwdfn(dispatched_input)
-        )
-        # expert_output = fwdfn(dispatched_input)
-        #  expert_output = _AllToAll.apply(expert_output, self.group) #[ecm]
-        if self.world_size > 1:
-            tmp = []
-            dist.all_gather(tmp, expert_output, group=self.group)
-            expert_output = paddle.concat(tmp, axis=0)
-
-        expert_output = expert_output.reshape(
-            [self.world_size * self.num_local_experts * capacity, d_model]
-        )  # [e*1,c,m]
-        combined_output = combining(expert_output, combine_weights, scatter_index)
-
-        # combined_output = paddle.einsum("sec,ecm->sm", combine_weights, expert_output)
-        if orig_shape:
-            combined_output = combined_output.reshape(orig_shape)
-        top1_gate_experts_per_token = (
-            paddle.cast(dispatch_mask[0], dtype="float32").sum() / seqlen
-        )
-        top2_gate_experts_per_token = (
-            paddle.cast(dispatch_mask[1], dtype="float32").sum() / seqlen
-        )
-        leakage_experts_per_token = (
-            paddle.cast(
-                (~dispatch_mask[0]) & (~dispatch_mask[1]), dtype="float32"
-            ).sum()
-            / seqlen
-        )
-
-        experts_per_token = top1_gate_experts_per_token + top2_gate_experts_per_token
-        global_training_logs.update(
-            experts_per_token=experts_per_token.detach(),
-            top1_experts_per_token=top1_gate_experts_per_token.detach(),
-            top2_experts_per_token=top2_gate_experts_per_token.detach(),
-            leakage_experts_per_token=leakage_experts_per_token.detach(),
-        )
-        return combined_output, combine_weights, router_loss, None
-
-
-class MOELayerWithAllGatherDispatcher(MOELayer):
-    """
-    MOELayer with allgather dispatcher.
-    """
-
-    def __init__(
-        self,
-        gate: nn.Layer,
-        experts: List[nn.Layer],
-        layer_idx,
-        shared_experts: Optional[List[nn.Layer]] = None,
-        group: Group = None,
-        recompute=False,
-        enable_logging: bool = False,
-        k=2,
-        enable_bpr: bool = False,
-        all_to_all_dropout=0,
-        group_experts=False,
-    ):
-        super(MOELayerWithAllGatherDispatcher, self).__init__(
-            gate=gate,
-            experts=experts,
-            layer_idx=layer_idx,
-            shared_experts=shared_experts,
-            group=group,
-            recompute=recompute,
-            enable_logging=enable_logging,
-            k=k,
-            enable_bpr=enable_bpr,
-            all_to_all_dropout=all_to_all_dropout,
-            group_experts=group_experts,
-        )
-        logger.info("Using MOELayerWithAllGatherDispatcher")
-        assert get_env_device() == "xpu"
-        assert isinstance(self.gate, TopKGateFused)
-        assert self.shared_experts is not None
-        local_expert_indices_offset = self.rank * self.num_local_experts
-        self.expert_indices = [
-            local_expert_indices_offset + i for i in range(self.num_local_experts)
-        ]
-
-    def gate_and_distpach(self, input, token_type_ids):
-        """
-        gate and dispatch
-        """
-        args = ()
-
-        gate_logits, capacity, router_loss = self.gate(input, *args)
-
-        if self.input_preprocess is not None:
-            input, gate_logits = self.input_preprocess(input, gate_logits, capacity)
-
-        moe_allgather_dispatcher_return = MOEAllGatherDispatcher.token_dispatcher(
-            input,
-            gate_logits,
-            1 if isinstance(self.gate, SinkHornGateFused) else self.k,
-            self.expert_indices,
-            self.num_local_experts * self.world_size,
-            self.num_local_experts,
-        )
-        global_hidden_states = moe_allgather_dispatcher_return.global_hidden_states
-        dispatched_input = moe_allgather_dispatcher_return.dispatched_input
-        combine_weights = moe_allgather_dispatcher_return.combine_weights
-        scatter_index = moe_allgather_dispatcher_return.scatter_index
-        gather_scatter_mask = moe_allgather_dispatcher_return.gather_scatter_mask
-        dispatch_mask = moe_allgather_dispatcher_return.dispatch_mask
-        tokens_per_expert = moe_allgather_dispatcher_return.tokens_per_expert
-
-        dispatched_input.stop_gradient = False
-        combine_weights.stop_gradient = False
-        scatter_index.stop_gradient = True
-        gather_scatter_mask.stop_gradient = True
-        dispatch_mask.stop_gradient = True
-
-        return (
-            dispatched_input,
-            combine_weights,
-            gather_scatter_mask,
-            dispatch_mask,
-            scatter_index,
-            router_loss,
-            gate_logits,
-            global_hidden_states,
-            tokens_per_expert,
-        )
-
-    def forward_experts(
-        self, dispatched_input, global_hidden_states, tokens_per_expert
-    ):
-        """
-        call moe experts and share experts
-        """
-        tokens_per_expert_no_zero = list(
-            filter(lambda x: x != 0, tokens_per_expert.tolist())
-        )
-        chunks_per_expert = paddle.split(
-            dispatched_input, tokens_per_expert_no_zero, axis=0
-        )
-        assert len(chunks_per_expert) <= len(self.experts)
-        moe_output = []
-        offset = 0
-        for index, cur_tokens in enumerate(tokens_per_expert.tolist()):
-            if cur_tokens == 0:
-                offset += 1
-            else:
-                cur_expert = self.experts[index]
-                cur_chunk = chunks_per_expert[index - offset]
-                moe_output.append(cur_expert(cur_chunk))
-        hidden_states = paddle.concat(moe_output, axis=0)
-        shared_expert_out = self.shared_experts(global_hidden_states)
-        return hidden_states, shared_expert_out
-
-    def forward(self, input, token_type_ids):
-        """
-        forward function
-        """
-        assert (
-            len(input.shape) == 2
-        ), f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
-        orig_shape = input.shape
-        global_shape = [orig_shape[0] * self.world_size, orig_shape[1]]
-        if token_type_ids is not None:
-            token_type_ids.stop_gradient = True
-        assert self.gate is not None
-
-        (
-            dispatched_input,
-            combine_weights,
-            gather_scatter_mask,
-            dispatch_mask,
-            scatter_index,
-            router_loss,
-            gate_logits,
-            global_hidden_states,
-            tokens_per_expert,
-        ) = self.gate_and_distpach(input, token_type_ids)
-
-        expert_out, shared_out = (
-            recompute(
-                self.forward_experts,
-                dispatched_input,
-                global_hidden_states,
-                tokens_per_expert,
-            )
-            if self.recompute and self.training
-            else self.forward_experts(
-                dispatched_input, global_hidden_states, tokens_per_expert
-            )
-        )
-        combined_output = MOEAllGatherDispatcher.token_combine(
-            expert_out,
-            shared_out,
-            combine_weights,
-            scatter_index,
-            gather_scatter_mask,
-            global_shape,
-        )
-        if self.shared_experts.down_proj.bias is not None:
-            combined_output = combined_output + self.shared_experts.down_proj.bias
-        router_loss2 = self.calc_router_loss_and_logging(
-            router_loss, combine_weights, dispatch_mask, gate_logits, token_type_ids
-        )
-
-        return combined_output, combine_weights, router_loss2, gate_logits

@@ -14,12 +14,7 @@
 # limitations under the License.
 """Paddle Ernie model"""
 
-from models.moe.round_robin_gate import RoundRobinGate, RoundRobinGateFused
-from models.moe.sinkhorn_gate import SinkHornGateFused
 from models.moe.top2_gate_auto import TopKGateFusedAuto
-from models.moe.sinkhorn_gate import SinkHornGate
-from models.moe.task_gate import TaskGate
-from models.moe.random_gate import RandomGate
 from models.moe.top2_gate import Top2Gate
 from models.refined_recompute.flash_attn import RefinedRcomputeFlashAttention
 from models.comm_utils import subbatch
@@ -175,14 +170,7 @@ __all__ = [
 
 
 gate_class = dict(
-    round_robin=RoundRobinGate,
-    round_robin_fused=RoundRobinGateFused,
-    random=RandomGate,
-    top2=Top2Gate,
     top2_fused=TopKGateFusedAuto,
-    sinkhorn=SinkHornGate,
-    sinkhorn_fused=SinkHornGateFused,
-    task_gate=TaskGate,
 )
 
 
@@ -449,11 +437,6 @@ def scaled_dot_product_attention(
             )
 
     if can_use_fa:
-        # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn maskt
-        # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
-        # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        # without past keys
         if rr_flash_attn is not None:
             attn_output, attn_weights = rr_flash_attn(
                 query_states,
