@@ -24,7 +24,6 @@ from models.moe.top2_gate import Top2Gate
 from models.refined_recompute.flash_attn import RefinedRcomputeFlashAttention
 from models.comm_utils import subbatch
 
-
 import math
 from functools import partial
 import logging
@@ -67,7 +66,8 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 
 from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
 
-from models.ernie.modeling import FusedDropoutImpl
+from models.ernie.modeling import FusedDropoutImpl, RotaryEmbedding, RopeEmbeddingLegacy
+from models.ernie.modeling_moe import BMMLinear
 from models.sequence_parallel_utils import (
     sequence_parallel_sparse_mask_labels,
 )
@@ -551,7 +551,6 @@ def scaled_dot_product_attention(
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
-        # logger.info(attention_mask)
         if training:
             attn_weights = attention_mask + attn_weights
             attn_weights = paddle.maximum(
@@ -840,168 +839,6 @@ class FusedLayerNorm(nn.Layer):
         )[0]
 
 
-class RotaryEmbedding(nn.Layer):
-    """
-    RotaryEmbedding Layer
-    """
-
-    def __init__(self, dim, max_position_embeddings=4096, base=10000):
-
-        super().__init__()
-        self.base = base
-        self.max_position_embeddings = max_position_embeddings
-        inv_freq = 1.0 / (
-            base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim)
-        )
-
-        t = paddle.arange(max_position_embeddings, dtype="float32")
-        freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
-        # Different from paper, but it uses a different permutation in order to obtain the same calculation
-        emb = paddle.concat([freqs, freqs], axis=-1)
-
-        # [bs, seqlen, nhead, head_dim]
-        self.cos_cached = emb.cos()  # [None, :, None, :]
-        self.sin_cached = emb.sin()  # [None, :, None, :]
-
-        self._cast_to_low_precision = False  # 兼容develop分支paddle
-        self._cast_to_low_precison = False
-
-    def forward(self, x, seq_len=None):
-
-        return (
-            self.cos_cached[:seq_len, :],
-            self.sin_cached[:seq_len, :],
-        )
-
-    @classmethod
-    def rotate_half(cls, x):
-        """Rotates half the hidden dims of the input."""
-
-        x1 = x[..., : x.shape[-1] // 2]
-        x2 = x[..., x.shape[-1] // 2 :]
-        return paddle.concat([-x2, x1], axis=-1)
-
-    @classmethod
-    def apply_rotary_pos_emb(cls, q, k, cos, sin, offset: int = 0, position_ids=None):
-
-        if position_ids is not None:
-            assert offset == 0, offset
-            cos = F.embedding(position_ids, cos)
-            sin = F.embedding(position_ids, sin)
-        else:
-            cos = cos.unsqueeze(0)
-            sin = sin.unsqueeze(0)
-        cos = cos[:, offset : q.shape[1] + offset, None, :]
-        sin = sin[:, offset : q.shape[1] + offset, None, :]
-
-        # q_embed = (q * cos) + (rotate_half(q) * sin)
-        # k_embed = (k * cos) + (rotate_half(k) * sin)
-        # 不使用操作符，防止Paddle 不同精度之间的结合导致问题。
-        q_embed = paddle.add(
-            paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin)
-        )
-        k_embed = paddle.add(
-            paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin)
-        )
-        q_embed = q_embed.astype(q.dtype)  # fp32->bf16
-        k_embed = k_embed.astype(k.dtype)
-        return q_embed, k_embed
-
-
-class RopeEmbeddingLegacy(nn.Layer):
-
-    def __init__(self, head_dim, compression_ratio=1.0, base=10000):
-        super().__init__()
-        self.head_dim = head_dim
-        self.compression_ratio = compression_ratio
-        self.base = base
-
-    def forward(self, seq_length, position_ids=None):
-
-        indices = paddle.arange(0, self.head_dim, 2, dtype="float32")
-        indices = 1 / self.base ** (indices / self.head_dim)
-        if position_ids is None:
-            position_ids = paddle.arange(0, seq_length, 1, dtype="float32").unsqueeze(1)
-            position_ids = position_ids / self.compression_ratio
-            sinusoid_inp = position_ids * indices.unsqueeze(0)
-        else:
-            position_ids = position_ids / self.compression_ratio
-            seq_length = position_ids.shape[-1]
-            sinusoid_inp = position_ids.unsqueeze(-1).astype(
-                "float32"
-            ) * indices.unsqueeze(
-                0
-            )  # [b, s, 1] * [1, d/2] -> [b, s, d/2]
-        pos_emb = paddle.concat(
-            [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1
-        )
-        pos_emb = paddle.reshape(pos_emb, (-1, 1, seq_length, self.head_dim))
-        pos_emb.stop_gradient = True
-        return pos_emb
-
-    def apply_rotary(self, rp, q, k):
-
-        # sin [sequence_length, embed_size_per_head//2]
-        # cos [sequence_length, embed_size_per_head//2]
-        sin, cos = paddle.chunk(rp, 2, axis=-1)
-        # sin [θ0,θ1,θ2......θd/2-1] -> sin_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
-        sin_pos = paddle.reshape(paddle.stack([sin, sin], axis=-1), rp.shape)
-        # cos [θ0,θ1,θ2......θd/2-1] -> cos_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
-        cos_pos = paddle.reshape(paddle.stack([cos, cos], axis=-1), rp.shape)
-        # rotate_half_query_layer [-q1,q0,-q3,q2......,-qd-1,qd-2]
-        rotate_half_q = paddle.reshape(
-            paddle.stack([-q[:, :, :, 1::2], q[:, :, :, 0::2]], axis=-1),
-            paddle.shape(q),
-        )
-        query = paddle.add(
-            paddle.multiply(q.astype("float32"), cos_pos),
-            paddle.multiply(rotate_half_q.astype("float32"), sin_pos),
-        )
-        # rotate_half_key_layer [-k1,k0,-k3,k2......,-kd-1,kd-2]
-        rotate_half_k = paddle.reshape(
-            paddle.stack([-k[:, :, :, 1::2], k[:, :, :, 0::2]], axis=-1),
-            paddle.shape(k),
-        )
-        key = paddle.add(
-            paddle.multiply(k.astype("float32"), cos_pos),
-            paddle.multiply(rotate_half_k.astype("float32"), sin_pos),
-        )
-        return query, key
-
-    def forward_single(self, position_ids):
-
-        batch_size, seq_length = position_ids.shape[:2]
-        rope_emb = paddle.zeros(
-            (2, batch_size, seq_length, 1, self.head_dim), dtype="float32"
-        )
-        inv_freq = self.base ** (
-            -paddle.arange(0, self.head_dim, 2, dtype="float32") / self.head_dim
-        )
-        position_ids = position_ids.cast("float32")
-        position_ids = position_ids / self.compression_ratio
-        # shape: [B, S, D/2]
-        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
-        # shape: [B, S, D]
-        emb = paddle.stack([freqs, freqs], axis=-1).reshape(
-            (batch_size, seq_length, self.head_dim)
-        )
-        # shape: [B, S, 1, D]
-        emb = paddle.unsqueeze(emb, 2)
-
-        rope_emb[0] = paddle.cos(emb)
-        rope_emb[1] = paddle.sin(emb)
-        return rope_emb
-
-    @staticmethod
-    def apply_rotary_single(x, rope_emb):
-
-        rotate_half_x = paddle.reshape(
-            paddle.stack([-x[:, :, :, 1::2], x[:, :, :, 0::2]], axis=-1),
-            paddle.shape(x),
-        )
-        return x * rope_emb[0] + rotate_half_x * rope_emb[1]
-
-
 class ErnieLinear(nn.Layer):
 
     def __init__(
@@ -1288,9 +1125,6 @@ class ErnieAttentionAuto(nn.Layer):
             ]
         )
 
-        print(f"query_states = {query_states}")
-        print(f"key_states = {key_states}")
-        print(f"value_states = {value_states}")
         if self.config.sequence_parallel:
             query_states = paddle.transpose(query_states, [1, 0, 2, 3])
             key_states = paddle.transpose(key_states, [1, 0, 2, 3])
@@ -1477,27 +1311,6 @@ class ErnieMoeMLP(ErnieMLP):
         return ret
 
 
-class BMMLinear(nn.Layer):
-
-    def __init__(self, experts, d_in, d_out, use_bias=False):
-        super().__init__()
-        self.weight = self.create_parameter(
-            [experts, d_in, d_out], dtype=paddle.get_default_dtype()
-        )
-        if use_bias:
-            self.bias = self.create_parameter(
-                [experts, d_out], dtype=paddle.get_default_dtype(), is_bias=True
-            )
-        else:
-            self.bias = None
-
-    def forward(self, x):
-        """x: [num_experts, Seq, dim]"""
-        if self.bias is not None:
-            return paddle.bmm(x, self.weight) + self.bias
-        return paddle.bmm(x, self.weight)
-
-
 class ErnieMoeMLPFused(nn.Layer):
     """Fused Implement of ErnieMoeMLP"""
 
@@ -1574,9 +1387,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 max(config.moe_layer_end_index)
                 if isinstance(config.moe_layer_end_index, (tuple, list))
                 else config.moe_layer_end_index
-            )
-            print(
-                f"[liyamei check moe] self.use_moe={self.use_moe} layer_idx={layer_idx} config.moe_layer_interval={config.moe_layer_interval} moe_layer_start_index={moe_layer_start_index} moe_layer_end_index={moe_layer_end_index}"
             )
 
         if (
@@ -1718,13 +1528,9 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 (see `cache`).
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
-        print("In decoder layers")
-        print(f"before ln, hidden_states : {hidden_states}")
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
-
-        print(f"after ln, hidden_states : {hidden_states}")
 
         # Self Attention
         (hidden_states, self_attn_weights, present_key_value, *router_loss_attn) = (
@@ -1949,9 +1755,6 @@ class ErniePretrainedModelAuto(PretrainedModel):
                 paddle.incubate.nn.FusedLinear,
             ),
         ):
-            # In the dygraph mode, use the `set_value` to reset the parameter directly,
-            # and reset the `state_dict` to update parameter in static mode.
-            # logger.info(f'initializing pp:{type(layer)}')
 
             with rng_tracker():
                 dtype = paddle.get_default_dtype()
@@ -2249,7 +2052,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             inputs_embeds = self.embed_tokens(input_ids).astype(
                 self.embed_tokens.weight.dtype
             )
-            print(f"emb out:{inputs_embeds} \n emb-weight:{self.embed_tokens.weight}")
 
         global_mesh = global_mesh_starts_with_pp()
         if self.config.sequence_parallel or self.config.submatrix_parallel:
@@ -2305,7 +2107,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             hidden_states = dist.reshard(hidden_states, get_mesh(0), self.placements)
 
         # decoder layers
-        print("decoder layers")
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
@@ -2570,7 +2371,6 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
                 masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
             else:
                 masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
-            print(f"after calc cross entropy, masked_lm_loss is : {masked_lm_loss}")
             lossmask = masked_lm_labels != self.ignored_index
 
             if (~lossmask).all():  # empty span
@@ -2767,8 +2567,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                 config.sequence_parallel == 0
             ), "enable submatrix_parallel must disable sequence-parallel"
 
-        # initialize-trick for big model, see
-        # https://github.com/bigscience-workshop/bigscience/blob/master/train/tr11-176B-ml/README.md#std-init
         new_initializer_range = math.sqrt(0.3333 / config.hidden_size)
         logger.info(
             f"change initializer-range from {config.initializer_range} to {new_initializer_range}"
