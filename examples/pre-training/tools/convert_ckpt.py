@@ -170,7 +170,11 @@ class Checkpoint:
                     lambda m: m.group(1) + str(expert_id),
                     matched_org_structure_name,
                 )
-                print("adapt expert({} -> {})".format(int(match.group(1)), expert_id))
+                print(
+                    "adapt expert id from org {} to cur {}".format(
+                        expert_id, int(match.group(1))
+                    )
+                )
 
             if matched_org_structure_name in self.safetensors_index["weight_map"]:
                 file_name = self.safetensors_index["weight_map"][
@@ -282,8 +286,8 @@ class Checkpoint:
                 weight_t = paddle.concat([weight_t, zeros])
             pdopt["master_weights"][tensor_name].set_value(weight_t)
             print(
-                "successfully convert {} with shape of {}".format(
-                    matched_org_structure_name, tensor_data.shape
+                "successfully convert org name:{}, cur name{}, tensor shape {}.".format(
+                    matched_org_structure_name, cur_structure_name, tensor_data.shape
                 )
             )
             self.tensor_offset_map[tensor_name] += tensor_data_num
