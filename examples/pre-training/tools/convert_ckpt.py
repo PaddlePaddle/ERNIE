@@ -206,6 +206,7 @@ class Checkpoint:
             structure_name_mapping = self.meta["sharding_metas"][sharding_metas_key][
                 "structure_name_mapping"
             ]
+            param_meta = self.meta["sharding_metas"][sharding_metas_key]["param_meta"]
         else:
             match = re.search(r"shard(\d+)", pdopt_path)
             assert match is not None
@@ -215,10 +216,11 @@ class Checkpoint:
             structure_name_mapping = self.meta["sharding_metas"][sharding_metas_key][
                 "structure_name_mapping"
             ]
+            param_meta = self.meta["sharding_metas"][sharding_metas_key]["param_meta"]
 
         pdopt = paddle.load(pdopt_path)
         for tensor_name, tensor_data in pdopt["master_weights"].items():
-            matched_layer_name, loaded_value = (
+            matched_structure_name, loaded_value = (
                 self.load_from_org_model_with_tensor_name(
                     tensor_name, structure_name_mapping, shard_num
                 )
@@ -227,22 +229,44 @@ class Checkpoint:
                 continue
             if tensor_name not in self.tensor_offset_map.keys():
                 self.tensor_offset_map[tensor_name] = 0
-            if "mlp.experts" in matched_layer_name:
+            if "mlp.experts" in matched_structure_name:
                 self.tensor_offset_map[tensor_name] = 0
             offset = self.tensor_offset_map[tensor_name]
             tensor_data_num = tensor_data.flatten().shape[0]
-            assert loaded_value.flatten().shape[0] >= offset + tensor_data_num, (
-                f"Shape mismatch: org_shape={loaded_value.shape}, cur_shape={tensor_data.shape}"
-                f", tensor_name={tensor_name}, matched_layer_name={matched_layer_name}, offset={offset}"
-            )
+            real_data_num = -1
+            if loaded_value.flatten().shape[0] < offset + tensor_data_num:
+                assert matched_structure_name in param_meta
+                real_data_num = 1
+                for data_num in param_meta[matched_structure_name][0]:
+                    real_data_num *= data_num
+                print(
+                    f"Shape mismatch for {tensor_name}, change the data num from {tensor_data_num} to {real_data_num}"
+                )
+                assert loaded_value.flatten().shape[0] >= offset + real_data_num, (
+                    f"Shape mismatch: org_shape={loaded_value.shape}, cur_shape={tensor_data.shape}, "
+                    f"real_shape={real_data_num}, tensor_name={tensor_name}, "
+                    f"matched_layer_name={matched_structure_name}, offset={offset}"
+                )
+
             weight_t = paddle.cast(
-                loaded_value.flatten()[offset : offset + tensor_data_num],
+                loaded_value.flatten()[
+                    offset : (
+                        (offset + tensor_data_num)
+                        if real_data_num == -1
+                        else (offset + real_data_num)
+                    )
+                ],
                 tensor_data.dtype,
             )
+            if real_data_num != -1:
+                zeros = paddle.zeros(
+                    shape=[tensor_data_num - real_data_num], dtype=tensor_data.dtype
+                )
+                weight_t = paddle.concat([weight_t, zeros])
             pdopt["master_weights"][tensor_name].set_value(weight_t)
             print(
                 "successfully convert {} with shape of {}".format(
-                    matched_layer_name, tensor_data.shape
+                    matched_structure_name, tensor_data.shape
                 )
             )
             self.tensor_offset_map[tensor_name] += tensor_data_num
