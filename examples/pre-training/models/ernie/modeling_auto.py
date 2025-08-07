@@ -201,7 +201,6 @@ def global_mesh_starts_with_pp():
         return mesh
 
 
-# NOTE(zengjinle): do not use this method!
 def is_fleety_func():
     """
     Check whether it is PaddlePaddle FleetY version.
@@ -657,7 +656,6 @@ def slice_experts(experts, moe_world_size):
 
     lm_experts = nn.LayerList([])
     for experts_list in experts_per_device:
-        # 每个device上, 前一半为lm expert
         lm_experts.extend(experts_list[: moe_num_experts_per_device // 2])
     return lm_experts
 
@@ -728,12 +726,6 @@ def get_gate(
 
 
 def _parse_moe_group(moe_group: str):
-    """
-    Args:
-        moe_group (str): 目前支持："dp|mp|none"
-    Returns:
-        str: 返回 moe_group
-    """
     moe_group = moe_group.lower()
     assert moe_group in {
         "dp",
@@ -1043,16 +1035,13 @@ class ErnieLinear(nn.Layer):
     def forward(self, input):
 
         out = F.linear(x=input, weight=self.weight, bias=None, name=self.name)
-        # do resuce-scatter, [Shard(1), Partial(ReduceSum)] -> [Shard(1), Shard(0)]
         out = dist.reshard(
             out,
             get_mesh(self.ipp),
             [dist.Shard(1), dist.Shard(0)],
         )
         if self.bias:
-            print("lzx debug += self.bias")
             out += self.bias
-        # out += self.bias
         return out
 
 
@@ -1118,7 +1107,6 @@ class ErnieMLP(nn.Layer):
                 [dist.Replicate(), dist.Shard(0)],
             )
             if config.use_bias:
-                print("lzx debug use_bias")
                 self.down_proj.bias = dist.shard_tensor(
                     self.down_proj.bias,
                     get_mesh(self.ipp),
@@ -1409,12 +1397,9 @@ class ErnieAttentionAuto(nn.Layer):
             query_states = query_states.astype(query_states_dtype)
             key_states = key_states.astype(query_states_dtype)
         if past_key_value is not None:
-            # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
-        # NOTE(for generation): use list instead of tuple to store the cache
-        # tensors, so that we can clear the cache tensors for memory efficiency.
         past_key_value = [key_states, value_states] if use_cache else None
 
         attn_output, attn_weights = scaled_dot_product_attention(
@@ -1424,9 +1409,7 @@ class ErnieAttentionAuto(nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             config=self.config,
-            rr_flash_attn=(
-                self._rr_flash_attn if self.training else None
-            ),  # in eval mode, no using rr
+            rr_flash_attn=(self._rr_flash_attn if self.training else None),
             inbatch_pack_offset=inbatch_pack_offset,
             training=self.training,
         )
@@ -1602,7 +1585,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
             and layer_idx >= moe_layer_start_index
             and layer_idx <= moe_layer_end_index
         ):
-            print("lzx debug create_moe_mlp_layer")
             self.create_moe_mlp_layer(layer_idx, ipp)
         else:
             self.mlp = ErnieMLP(config, ipp)
@@ -2017,8 +1999,6 @@ class ErniePretrainedModelAuto(PretrainedModel):
             with rng_tracker("model_parallel_rng"):
                 dtype = paddle.get_default_dtype()
                 paddle.set_default_dtype("float32")
-                print("lzx debug layer name,", layer)
-                print("self.config.moe_group_experts:", self.config.moe_group_experts)
                 if self.config.moe_group_experts:
                     if layer.weight._is_initialized():
                         layer.weight.set_value(
@@ -2242,14 +2222,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             return_dict if return_dict is not None else self.config.use_return_dict
         )
 
-        print("retrieve input ids and inputs_embeds")
-        print(f"input_ids:{input_ids}\ninputs_embeds:{inputs_embeds}")
-        # retrieve input_ids and inputs_embeds
-        print(
-            "xxx ------------- embedding layer inpust : ",
-            input_ids.shape,
-            input_ids.placements,
-        )
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError(
                 "You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time"
@@ -2451,10 +2423,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             )
         hidden_states = self.norm(hidden_states)
 
-        print(f"after decoder layer, hidden_states is : {hidden_states}")
-
-        # add hidden states from the last decoder layer
-        print("add hidden states from the last decoder layer")
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
@@ -2642,9 +2610,7 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
         """
         calculates the final loss
         """
-        print(
-            "xxx calculates the final loss masked_lm_labels : ", masked_lm_labels.shape
-        )
+
         res = super().forward(
             prediction_scores,
             masked_lm_labels,
@@ -2826,7 +2792,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
             else:
                 logger.info("Use normal LayerNorm")
 
-    # Initialize weights and apply final processing
     def _post_init(self, original_init, *args, **kwargs):
         """
         Initialize weights and apply final processing
@@ -2835,9 +2800,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
         factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
         logger.info(f"using post init div: factor:{factor}")
 
-        # NOTE: if LazyGuard is enabled, all the weights will not be initialized here,
-        # so w._is_initialized() must be False, _post_init do nothing here.
-        # We should do scale weight into init_weights() if LazyGuard is enabled.
         def scale_by_factor_if_valid(w):
             if w.is_dist() and w._is_initialized():
                 w.scale_(factor)

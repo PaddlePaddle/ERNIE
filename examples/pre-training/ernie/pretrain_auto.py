@@ -230,7 +230,6 @@ def main():
             "num_token": labels.item(),
         }
 
-    # model
     dtype = "float32"
     if args.fp16 and args.fp16_opt_level == "O2":
         paddle.set_default_dtype("float16")
@@ -241,10 +240,7 @@ def main():
 
     if args.use_moe:
         global ErnieConfig, ErnieForCausalLMAuto
-        """moe 情况下 Config, Causal组网，CausalPP组网，接口与非moe情况完全一致。"""
-        # TODO：随着支持的网络越来越多，需要引入组网和 Config 的注册机制, 参考 Paddlenlp 的 `AutoModel`
         ErnieConfig = ErnieMoEConfig
-        # ErnieForCausalLMAuto = ErnieMoEForCausalLMAuto
 
     if args.moe_group.lower() in {"mp", "tp", "model", "dummy"}:
         logger.info(f"disable moe flag when using moe-group={args.moe_group}")

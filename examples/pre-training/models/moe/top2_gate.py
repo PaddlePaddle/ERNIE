@@ -82,7 +82,7 @@ class CalOrthogonalLossOptEachWeightFunctor(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, out_grad):
-        """backward"""
+
         gate_weight, wnorm, weight_scale, normed_weight, weight_matmul = (
             ctx.saved_tensor()
         )
@@ -122,7 +122,7 @@ class CalZLossFunctor(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, out_grad):
-        """backward"""
+
         logits, loss_mask, max_logits, safe_sumexp, logsumexp_per_token = (
             ctx.saved_tensor()
         )
@@ -176,7 +176,7 @@ class CalAuxLossFunctor(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, out_grad):
-        """backward"""
+
         gate_prob, seqlen_float, ce = ctx.saved_tensor()
         num_experts = ctx.num_experts
         use_group = ctx.use_group
@@ -188,7 +188,6 @@ class CalAuxLossFunctor(paddle.autograd.PyLayer):
 
 def cal_z_loss_func(logits, loss_mask):
     """cal_z_loss_func"""
-    # l_zloss = logits.exp().sum(1).log().square().mean()
     if loss_mask is not None:
         loss_mask = loss_mask.astype(logits.dtype)
         l_zloss = (logits.logsumexp(1).square() * loss_mask).sum() / paddle.clip(
@@ -196,7 +195,6 @@ def cal_z_loss_func(logits, loss_mask):
         )
     else:
         l_zloss = logits.logsumexp(1).square().mean()
-    # TODO group_experts 分group计算zloss
     return l_zloss
 
 

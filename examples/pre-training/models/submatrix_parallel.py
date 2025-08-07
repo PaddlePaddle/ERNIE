@@ -90,7 +90,7 @@ def reduce_scatter(input, group, sync_op=True):
 class _Split(PyLayer):
     @staticmethod
     def forward(ctx, tensor, axis, group):
-        """ """
+
         ctx.group = group
         ctx.axis = axis
 
@@ -102,7 +102,7 @@ class _Split(PyLayer):
 
     @staticmethod
     def backward(ctx, grad_output):
-        """ """
+
         tensor_list = []
         dist.all_gather(tensor_list, grad_output, group=ctx.group)
         grad = paddle.concat(tensor_list, axis=ctx.axis)
@@ -110,27 +110,25 @@ class _Split(PyLayer):
 
 
 class ReduceScatter(PyLayer):
-    """ """
 
     @staticmethod
     def forward(ctx, tensor, group, *input_tensor_list):
-        """ """
+
         ctx.group = group
         dist.reduce_scatter(tensor, list(input_tensor_list), group=group)
         return tensor
 
     @staticmethod
     def backward(ctx, grad_output):
-        """ """
+
         return (None) + AllGather.apply(grad_output, ctx.group)
 
 
 class AllGather(PyLayer):
-    """ """
 
     @staticmethod
     def forward(ctx, tensor, group):
-        """ """
+
         ctx.group = group
 
         out_tensor_list = []
@@ -139,7 +137,7 @@ class AllGather(PyLayer):
 
     @staticmethod
     def backward(ctx, *grad_outputs):
-        """ """
+
         rank = dist.get_rank()
         src_rank_in_group = ctx.group.get_group_rank(rank)
         gx = paddle.empty_like(grad_outputs[src_rank_in_group])
@@ -263,13 +261,11 @@ def smp_row_col_col_linear(
         yi = paddle.matmul(xi, weight, transpose_y=transpose_y)
 
         y.append(yi)
-        # we need to sync and get received xi
         if idx < mp_ranks - 1:
             task_send.wait()
             task_recv.wait()
             xi = x_recv
 
-    # shift results
     shift = mp_rank + 1
     y = y[shift:] + y[:shift]
     y = y[::-1]
@@ -301,9 +297,7 @@ def smp_col_row_row_linear(x, weight, bias=None, transpose_y=False, name=None):
     size = x.shape[-2]
     assert size % mp_ranks == 0, f"size {size} must be divided by mp_ranks {mp_ranks}"
     micro_size = size // mp_ranks
-    # reverse order [mp_ranks-1, ..., 1, 0]
     cal_index = list(range(mp_ranks - 1, -1, -1))
-    # shift
     shift = mp_ranks - mp_rank
     cal_index = cal_index[shift:] + cal_index[:shift]
 
@@ -363,9 +357,7 @@ def smp_row_col_col_cal_dw(x, dy, y=None, name=None):
     assert size % mp_ranks == 0, f"size {size} must be divided by mp_ranks {mp_ranks}"
     micro_size = size // mp_ranks
 
-    # reverse order [mp_ranks-1, ..., 1, 0]
     cal_index = list(range(mp_ranks - 1, -1, -1))
-    # shift
     shift = mp_ranks - mp_rank - 1
     cal_index = cal_index[shift:] + cal_index[:shift]
 
@@ -396,17 +388,15 @@ def smp_row_col_col_cal_dw(x, dy, y=None, name=None):
                 task_send = dist.isend(xi, dst=send_dst, group=send_group)
 
         # slice and calculate matmul
-        if False:  # len(x.shape) == 2:
+        if False:
             dyi = dy._slice(start, end)
         else:
             dyi = paddle.slice(dy, axes=[-2], starts=[start], ends=[end])
 
-        # TODO: fuse d_bias
         y, _ = paddle._C_ops.fused_linear_param_grad_add(
             xi, dyi, y, None, multi_precision, False
         )
 
-        # we need to sync and get received
         if idx < mp_ranks - 1:
             task_send.wait()
             task_recv.wait()
@@ -576,7 +566,6 @@ def smp_col_row_row_linear_grad(dy, x, weight, bias=None, low_memory=True, name=
 
 
 class SMPRowShardedLinearFunction(PyLayer):
-    """ """
 
     @staticmethod
     def forward(
@@ -591,8 +580,7 @@ class SMPRowShardedLinearFunction(PyLayer):
         low_memory=True,
         name=None,
     ):
-        """ """
-        # Note(GuoxiaWang): save input dtype to recover grad dtype for amp
+
         ctx.x_dtype = x.dtype
         ctx.weight_dtype = weight.dtype
         ctx.name = name
@@ -615,7 +603,6 @@ class SMPRowShardedLinearFunction(PyLayer):
         ctx.gather_axis = gather_axis
         ctx.low_memory = low_memory
 
-        # Note(GuoxiaWang): it will auto cast dtype when enabling amp
         y = smp_col_row_row_linear(x, weight, bias)
 
         if gather_y:
@@ -627,7 +614,7 @@ class SMPRowShardedLinearFunction(PyLayer):
 
     @staticmethod
     def backward(ctx, grad_output):
-        """ """
+
         if ctx.has_bias:
             x, weight, bias = ctx.saved_tensor()
         else:
@@ -640,7 +627,6 @@ class SMPRowShardedLinearFunction(PyLayer):
                 mp_rank
             ]
 
-        # Note(GuoxiaWang): it needs to be manually converted to the type when enabling the amp.
         if x.dtype != grad_output.dtype:
             x = x.astype(grad_output.dtype)
         if weight.dtype != grad_output.dtype:
@@ -658,7 +644,6 @@ class SMPRowShardedLinearFunction(PyLayer):
             dist.all_gather(tensor_list, x_grad, group=mp_group)
             x_grad = paddle.concat(tensor_list, axis=ctx.split_axis)
 
-        # Note(GuoxiaWang): recover the grad dtype
         if x_grad.dtype != ctx.x_dtype:
             x_grad = x_grad.astype(ctx.x_dtype)
         if weight_grad is not None and weight_grad.dtype != ctx.weight_dtype:
@@ -673,7 +658,6 @@ class SMPRowShardedLinearFunction(PyLayer):
 
 
 class SMPColumnShardedLinearFunction(PyLayer):
-    """ """
 
     @staticmethod
     def forward(
@@ -688,7 +672,7 @@ class SMPColumnShardedLinearFunction(PyLayer):
         low_memory=True,
         name=None,
     ):
-        """ """
+
         # Note(GuoxiaWang): save input dtype to recover grad dtype for amp
         ctx.x_dtype = x.dtype
         ctx.weight_dtype = weight.dtype
@@ -728,7 +712,7 @@ class SMPColumnShardedLinearFunction(PyLayer):
 
     @staticmethod
     def backward(ctx, grad_output):
-        """ """
+
         if ctx.has_bias:
             x, weight, bias = ctx.saved_tensor()
         else:
@@ -840,7 +824,7 @@ class SMPRowParallelLinear(paddle.nn.Layer):
         low_memory=True,
         name=None,
     ):
-        """ """
+
         super().__init__()
 
         self.model_parallel_group = (
@@ -907,7 +891,7 @@ class SMPRowParallelLinear(paddle.nn.Layer):
         self.linear = smp_row_parallel_linear
 
     def forward(self, x):
-        """ """
+
         output = self.linear(
             x,
             self.weight,
@@ -939,7 +923,7 @@ class SMPColumnParallelLinear(paddle.nn.Layer):
         low_memory=True,
         name=None,
     ):
-        """ """
+
         super().__init__()
 
         self.model_parallel_group = (
@@ -1006,7 +990,7 @@ class SMPColumnParallelLinear(paddle.nn.Layer):
         self.linear = smp_column_parallel_linear
 
     def forward(self, x):
-        """ """
+
         output = self.linear(
             x,
             self.weight,

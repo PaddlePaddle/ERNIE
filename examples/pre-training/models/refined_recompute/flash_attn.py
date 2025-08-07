@@ -247,7 +247,7 @@ class FlashMaskAttnFunctor(PyLayer):
 
     @staticmethod
     def backward(ctx, grad):
-        """backward"""
+
         (
             q,
             k,

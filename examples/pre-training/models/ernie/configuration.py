@@ -766,9 +766,6 @@ class ErnieMoEConfig(ErnieConfig):
                 insert_empty_layer, list
             ), "pp_no_recompute_layer should be a list"
 
-            # Indicating layers not do recompute under pipeline parallel.
-            # Note that, when insert_empty_layer is not None, the pp_no_recompute_layer should be indicating
-            # layers number in origin model structure, AKA model before insert empty layers.
         self.pp_no_recompute_layer = pp_no_recompute_layer
         self.register_nonsaveable_keys("moe_group")
         self.register_nonsaveable_keys("pp_no_recompute_layer")

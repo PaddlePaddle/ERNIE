@@ -837,8 +837,6 @@ class PipelinePretrainedModel(PretrainedModel):
                     first_key = k
                     break
             first_key = first_key.split(".")
-            # if use virtual pp_degree, the prefix is like 0.0.xxx
-            # else it will be like 0.xxx
             use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
 
             prefixes = self.get_sequential_name_prefixs()
@@ -1329,7 +1327,7 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             recompute_ctx={
                 "mp_group": get_hcg().get_model_parallel_group(),
                 "offload": False,
-                "partition": False,  # TODO：看看怎么 Partition recompute checkpoint。
+                "partition": False,
             },
             num_virtual_pipeline_stages=config.virtual_pp_degree,
         )
@@ -1341,18 +1339,15 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     def get_loss_fn(self, config):
         """get_loss_fn"""
-        return ErniePretrainingCriterionPipe(config)  # 默认Ignored Index == 0, 并未传参
+        return ErniePretrainingCriterionPipe(config)
 
-    # HACK op names, break everything
     def rename_model_params(self, func):
-        # 用于构造和静态图一样的statedict
         if self.config.virtual_pp_degree == 1:
             _layers = iter(self.run_function)
         else:
             _layers = (cc for c in self._model_chunks for cc in c.run_function)
         func(self.config, _layers)
 
-    # Initialize weights and apply final processing
     def _post_init(self, original_init, *args, **kwargs):
 
         super()._post_init(self, original_init, *args, **kwargs)
@@ -1413,7 +1408,6 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         finally:
             if ori_state:
                 self.train()
-            # NOTE(shenliang03): warmup阶段需要重置训练log，避免污染
             if isinstance(global_training_logs, dict):
                 global_training_logs.clear()
             else:

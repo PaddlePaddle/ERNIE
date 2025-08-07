@@ -142,7 +142,7 @@ class Fp8MoeGateDispatchAndQuant(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, *grads):
-        """backward"""
+
         out_grad, combine_weights_grad = grads[0], grads[1]
         x_grad, gate_logits_grad = paddle._C_ops.moe_gate_dispatch_grad(
             ctx.combine_weights,

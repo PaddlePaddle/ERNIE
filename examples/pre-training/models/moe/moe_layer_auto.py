@@ -122,7 +122,6 @@ class GateCombineForStatic(PyLayer):
         Output:
             y: [seqlen, hidden_size]
         """
-        # NOTE: Pylayer动静不统一: 动转静只支持使用ctx.save_for_backward, 而不支持ctx.x = x这样的写法
         ctx.save_for_backward(x, combine_weights, scatter_index)
         assert moe_combine_auto is not None
         return moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
@@ -144,12 +143,8 @@ class GateCombineForStatic(PyLayer):
         grad_x, grad_combine_weight_helper = moe_combine_auto.moe_combine_bwd_auto(
             x, combine_weights, scatter_index, grad_y
         )
-        # grad_combine_weight_helper is the same shape with grad x [seqlen * K, dim]
-        # reduce the hidden shape
-        # TODO: implement reduce in cuda ops
+
         grad_combine_weight = grad_combine_weight_helper.sum(-1)
-        # NOTE: PyLayer do not support some inputs with stop_gradient=True in static mode,
-        # this means that there must be a gradient for each input
         scatter_index_grad = paddle.zeros_like(scatter_index)
         return grad_x, grad_combine_weight, scatter_index_grad
 
@@ -190,9 +185,7 @@ class GateCombine(PyLayer):
         grad_x, grad_combine_weight_helper = moe_combine_auto.moe_combine_bwd_auto(
             ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
         )
-        # grad_combine_weight_helper is the same shape with grad x [seqlen * K, dim]
-        # reduce the hidden shape
-        # TODO: implement reduce in cuda ops
+
         grad_combine_weight = grad_combine_weight_helper.sum(-1)
         return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
 
@@ -208,14 +201,9 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
         y: Tensor[s, dim]
     """
     if hard_gate:
-        x_gatherd = F.embedding(scatter_index, x)  # [s,k,dim]
+        x_gatherd = F.embedding(scatter_index, x)
         return x_gatherd.squeeze(-2)
     ret = moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
-    # TODO: 支持Pylayer && Pylayer动静统一
-    # if to_static:
-    #     ret = GateCombineForStatic.apply(x, combine_weights, scatter_index)
-    # else:
-    #     ret = GateCombine.apply(x, combine_weights, scatter_index)
     ret.stop_gradient = False
     return ret
 
@@ -285,7 +273,7 @@ class AlltoAll(PyLayer):
 
     @staticmethod
     def backward(ctx, *dx):
-        """backward"""
+
         return AlltoAll.apply(*dx, group=ctx.group)
 
 
@@ -330,7 +318,7 @@ class AlltoAllAsync(PyLayer):
 
     @staticmethod
     def backward(ctx, dx_out, *fn_out_grads):
-        """backward"""
+
         if dist.get_world_size(ctx.group) <= 1:
             fn_args_grads = ctx.bwf(*fn_out_grads)
             return (dx_out,) + fn_args_grads
@@ -517,19 +505,7 @@ class MOELayerAuto(MOELayer):
     def _cal_multimodel_experts_prob(
         self, gate_logits, token_type_ids, group_experts, moe_k
     ):
-        """计算文group_experts 图非group experts 下的prob
 
-        Args:
-            gate_logits (_type_): _description_
-            token_type_ids (_type_): _description_
-            group_experts (_type_): _description_
-            moe_k (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-
-        # TODO(zhangyuqin): 不shard tensor的话会core dump, 需排查
         if not self.gate.experts_type_ids.is_dist():
             self.gate.experts_type_ids = dist.shard_tensor(
                 self.gate.experts_type_ids,
@@ -556,8 +532,6 @@ class MOELayerAuto(MOELayer):
                 self.moe_mesh_dim,
                 [dist.Shard(2), dist.Shard(0)],
             )
-            # 多模中, 如果当前是lm step, 会使用lm expert(48个); 如果是mm step, 会使用全量expert(96个)
-            # lm expert是从全量expert中切片得到的
             assert len(self.experts) % len(local_input_list) == 0, (
                 "num of experts must be divided by num of ep_group, "
                 f"but got {len(self.experts)} and {len(local_input_list)}"
@@ -645,12 +619,9 @@ class MOELayerAuto(MOELayer):
                 )
                 dispatched_input.stop_gradient = False
                 combine_weights_unnorm.stop_gradient = False
-                # NOTE: PyLayer do not support some inputs with stop_gradient=True in static mode
-                # it's a bug that will be fixed in the future
-                # scatter_index.stop_gradient = True
                 dispatch_mask.stop_gradient = True
 
-                scatter_index = scatter_index.transpose([1, 0])  # [k,s] ->[s,k]
+                scatter_index = scatter_index.transpose([1, 0])
 
                 if self.group_experts:
                     if max_prob is not None:
@@ -807,7 +778,6 @@ class MOELayerAuto(MOELayer):
                 dispatched_input, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(1)]
             )
         if self.config.moe_group == "mp":
-            # TODO(zhangyichen): 统一 moe_group 是 mp 和其他情况下的代码
             dispatched_input = dist.reshard(
                 dispatched_input, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)]
             )
@@ -819,7 +789,6 @@ class MOELayerAuto(MOELayer):
         )
         expert_out = self.forward_experts(dispatched_input)
         if self.config.moe_group == "mp":
-            # TODO(zhangyichen): 统一 moe_group 是 mp 和其他情况下的代码
             expert_out = dist.auto_parallel.api.moe_global_mesh_tensor(
                 expert_out,
                 get_mesh(self.ipp),
@@ -863,8 +832,6 @@ class MOELayerAuto(MOELayer):
             combined_output += shared_out
 
         if orig_shape:
-            # Todo: use clone in auto_parallel will cause an error
-            # combined_output = combined_output.reshape(orig_shape[:-1] + [combined_output.shape[-1]])
             if self.config.moe_use_all2all:
                 combined_output = dist.auto_parallel.moe_utils._dist_reshape(
                     combined_output,

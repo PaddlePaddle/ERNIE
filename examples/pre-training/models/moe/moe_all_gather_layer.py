@@ -275,28 +275,8 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
         send_counts_num=None,
         recv_counts_num=None,
     ):
-        """
-        批量点到点通信
-        Args:
-            input*: Tensor[*] permuted hidden before expert-fn
-            router_fn_args [*]: args to `router_loss_fn`
-            forward_func_dict: Optional[Dict[callable]],
-                expert forward fn dict, do expert/alltoall overlap if specified.
-            router_loss_fn:
-                func to perform router loss calc
-            send_rank: Tensor[int]: 发送 rank 列表， group 内必须保持一致。 use local-rank!
-            recv_rank: Tensor[int]: 接受 rank 列表， group 内必须保持一致。 use local-rank!
-            int: num_local_experts
-            group: process group
-        Returns:
-            output: Tensor[*]
-            send_counts: Tensor[local_expertnum, world_size]
-            recv_counts: Tensor[local_expertnum, world_size]
-        """
         if group is None:
             group = _get_global_group()
-        # ctx.send_rank = send_rank
-        # ctx.recv_rank = recv_rank
         router_loss_args = inputs[num_local_experts:]
         inputs = inputs[:num_local_experts]
 
@@ -323,8 +303,6 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
             raise RuntimeError("all inputs are None")
 
         output = paddle.zeros([recv_size] + input_shape[1:], dtype=input_dtype)
-        # send_counts, recv_counts = [], []
-        # assert len(local_expert_nums) == num_local_experts, (local_expert_nums, num_local_experts)
         output_ptr = 0
 
         tasks = []
@@ -333,25 +311,13 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
         ctx.bw_funcs = {}
 
         for i_local_expert in range(num_local_experts):
-            send_count = send_counts[i_local_expert]  # remove final worldsize
+            send_count = send_counts[i_local_expert]
             recv_count = recv_counts[i_local_expert]
             assert len(recv_count) == len(send_count) == (world_size), (
                 len(recv_count),
                 len(send_count),
             )
 
-            # sanity check
-            # recv_rank_this_rank = recv_rank_global[(local_expert_id == i_local_expert) &
-            # (send_rank_global == this_rank)& (recv_rank_global!=world_size)]
-
-            # # logger.info(f'recv_rank_this_rank:{recv_rank_this_rank.shape}
-            # # send_rank_this_rank:{send_rank_this_rank.shape}')
-            # if sum(send_count) > 0:
-            #     if len(recv_rank_this_rank) > 1:
-            #         logger.info(f'recv_rank_this_rank:{recv_rank_this_rank}')
-            #         assert (
-            #             paddle.diff(recv_rank_this_rank) >= 0
-            #         ).all(), f"recv_rank_this_rank: must in ascend order, got: {recv_rank_this_rank.tolist()}"
             if send_counts_num[i_local_expert] > 0:
                 input_local_expert = inputs[i_local_expert].slice(
                     (0,), 0, send_counts_num[i_local_expert]
@@ -378,11 +344,6 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
                 output_local_expert = dummy_input
 
             output_ptr += recv_counts_num[i_local_expert]
-            # logger.info(
-            #     f"alltoall[{i_local_expert}]: send:{input_local_expert.shape}/recv:{output_local_expert.shape} "
-            #     f"send-cnt:{send_count} / recv-cnt:{recv_count} "
-            # )
-            # logger.info(f"send_recv_count_global:{send_recv_count_global[i_local_expert]}")
 
             tasks.append(
                 all_to_all_unpadding(
@@ -396,7 +357,6 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
         ctx.router_loss_bwfn, (router_loss,) = manual_backward(
             router_loss_fn, is_first_fwd, *router_loss_args
         )
-        # `expert_out_to_combine` 相比 `global_experts_out` 缩短了，所以需要更改 `local_scatter_index`
         with paddle.no_grad():
             recv_mask = (recv_rank_global == this_rank).astype(send_rank_global.dtype)
             with profile("alltoall-prepare2"):
@@ -462,7 +422,7 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
         ctx,
         out_grad,
         d_routerloss,
-        _,  # scatter-idx no grad
+        _,
     ):
         """
         backward
@@ -502,19 +462,15 @@ class AlltoAllSmart(paddle.autograd.PyLayer):
             )
             tasks.append(task)
         router_fn_args_grad = ctx.router_loss_bwfn(d_routerloss)
-        # logger.info(f'd_routerloss:{d_routerloss} router_fn_args_grad:{router_fn_args_grad}')
 
         for i_local_expert, t in enumerate(tasks):
             t and t.wait()
             send_cnt = send_counts_num[i_local_expert]
             if send_cnt > 0 and ctx.bw_funcs:
-                # logger.info(f'before bw:[{i_local_expert}]: {grads[i_local_expert]}')
                 (g,) = ctx.bw_funcs[i_local_expert](tmp_g[i_local_expert])
                 grads[i_local_expert][:send_cnt] = g
-                # logger.info(f'after bw:[{i_local_expert}]: {grads[i_local_expert]}')
 
         grads = [g for g in grads if g is not None]
-        # router_fn_args_grad = [g for g in router_fn_args_grad if g is not None]
         return tuple(grads) + tuple(router_fn_args_grad)
 
 
@@ -576,10 +532,6 @@ class MOEAllGatherLayer(MOELayer):
             for chunk, expert in zip(chunks, self.experts):
                 chunk = chunk.contiguous()
                 expert_outputs += [expert(chunk)]
-                # logger.info(
-                #     f"moe-fwd-expert allgather: {chunk.shape}"
-                #     f'-> {expert_outputs[-1].shape}: {chunk.astype("float32").norm(axis=-1)}'
-                # )
             expert_output = paddle.stack(expert_outputs, axis=0)  # [ecm]
             return expert_output
 
@@ -678,19 +630,14 @@ class MOEAllGatherLayer(MOELayer):
             combined_output = self.combine_expert_output(
                 global_experts_out, local_combine_weights, local_scatter_index
             )
-        # global_experts_out = GatherOp.apply(expert_out)
-        # combined_output = self.combine_expert_output(global_experts_out, combine_weights, scatter_index)
-        # combined_output = ScatterOp.apply(combined_output)
         with profile("shared-expert"):
             if self.shared_experts is not None:
-                # 这里shared experts里面会再做一次allgather TODO 去掉
                 shared_out = self.shared_experts(input)
                 combined_output += shared_out
         if orig_shape:
             combined_output = combined_output.clone().reshape(
                 orig_shape[:-1] + [combined_output.shape[-1]]
             )
-        # local_dispatch_mask = ScatterOp.apply(dispatch_mask)
         with profile("calc_router_loss_and_logging"):
             router_loss2 = self.calc_router_loss_and_logging(
                 router_loss,
@@ -703,7 +650,6 @@ class MOEAllGatherLayer(MOELayer):
                 offload_helper,
             )
         return combined_output, local_combine_weights, router_loss2, gate_logits
-        # allgather
 
     def fused_gate_and_dispatch(self, input, token_type_ids):
         """_summary_

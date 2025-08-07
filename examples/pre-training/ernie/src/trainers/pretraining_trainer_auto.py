@@ -501,18 +501,7 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     @property
     def need_data(self):
-        """
-        判断当前进程是否需要加载数据。
 
-        Args:
-            无。
-
-        Returns:
-            bool: 如果当前进程为mp0和pp0状态（即主进程），则返回True，表示需要加载数据；
-                  否则返回False，表示不需要加载数据。
-
-        """
-        # mp0、pp0状态 卡才需要load数据
         if self.pp_need_data_degree:
             assert self.pipeline_parallel_degree > 1
             assert (
@@ -522,7 +511,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                 self.pp_need_data_degree,
                 self.pipeline_parallel_degree,
             )
-            # shift by 1 to avoid last pp no nee data
             no_need_data_range = list(
                 range(self.pp_need_data_degree - 1, self.pipeline_parallel_degree - 1)
             )
@@ -616,9 +604,7 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         if self.batch_size_warmup_steps > 0:
             assert self.global_batch_size > 0, self.global_batch_size
             assert self.init_global_batch_size > 0, self.init_global_batch_size
-            self.max_gradient_accumulation_steps = (
-                self.gradient_accumulation_steps
-            )  # hack add new
+            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
             (
                 self.per_device_train_batch_size,
                 self.gradient_accumulation_steps,
@@ -683,14 +669,12 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                 else False
             )
             if sharding_comm_overlap_non_pp:
-                # update grad acc steps
                 assert hasattr(fleet.fleet, "_user_defined_strategy")
                 user_defined_strategy = fleet.fleet._user_defined_strategy
                 user_defined_strategy.hybrid_configs[
                     "sharding_configs"
                 ].accumulate_steps = self.gradient_accumulation_steps
 
-        # NOTE(shenliang03): Check sanity of `accumulate_steps` when using sharding comm overlap.
         if hasattr(fleet.fleet, "_user_defined_strategy"):
             user_defined_strategy = fleet.fleet._user_defined_strategy
             if (
@@ -843,11 +827,9 @@ class AutoPretrainingTrainer(AutoTrainer):
                 group = None
 
             dist.broadcast_object_list(buf, src=src_rank, group=group)
-            # logger.info(f"moe-optimizer-gather-keys{buf}")
             for k, s in buf[0].items():
                 v = state_dict.get(k, paddle.zeros(s, "float32")).cuda()
                 v.name = k
-                # k = k.replace("_fp32_master_0", "")  # TODO 这一手replace待品
                 dist.broadcast(v, src=src_rank, group=group)
                 logger.info(f"broadcast moe optimizer {k} from {src_rank}")
                 base_state_dict[k] = v.cpu()
@@ -1274,7 +1256,6 @@ class AutoPretrainingTrainer(AutoTrainer):
             self.args.max_steps,
             min_lr=self.args.min_lr if self.args.min_lr else 0.0,
         )
-        print(f"lr_scheduler : {self.lr_scheduler}")
 
         return self.lr_scheduler
 
@@ -1366,7 +1347,7 @@ class AutoPretrainingTrainer(AutoTrainer):
                 grad_clip = ClipGradForMOEByGlobalNorm(
                     self.args.max_grad_norm,
                     is_expert_param_func=expert_fn,
-                    moe_group=_get_global_group(),  # None 为全局通信组,
+                    moe_group=_get_global_group(),
                     local_clip=False,
                 )
             else:
@@ -1379,9 +1360,7 @@ class AutoPretrainingTrainer(AutoTrainer):
             self.static_name_to_dyg_name = {
                 p.name: n for n, p in self.model.state_dict().items()
             }
-            gate_pattern = re.compile(
-                r"ernie\.layers\.0\.mlp\.gate\.weight"
-            )  # TODO 换成更加通配的方法
+            gate_pattern = re.compile(r"ernie\.layers\.0\.mlp\.gate\.weight")
             vit_pattern = re.compile(
                 r"vision_model\.(cls_token|pos_embed|patch_embed|blocks)"
             )
@@ -1390,7 +1369,6 @@ class AutoPretrainingTrainer(AutoTrainer):
             def lr_ratio_fn(param):
                 if param.name in self.static_name_to_dyg_name.keys():
                     name = self.static_name_to_dyg_name[param.name]
-                    # logger.info(f'search {param.name} -> {name}')
                     if self.args.moe_gate_lr_ratio is not None and gate_pattern.match(
                         name
                     ):

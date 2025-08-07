@@ -276,7 +276,6 @@ def get_gate(
         f"expert-per-device: {moe_num_experts_per_device} "
     )
     if config.moe_use_hard_gate and moe_num_experts <= 2:
-        # TODO 3种类型，hard-gate问题
         gate = None
         logger.info("MOE-GATE:-hard-gate")
     else:
@@ -317,13 +316,6 @@ def build_mpdp_group():
 def _parse_moe_group(
     moe_group: str,
 ) -> Union[str, paddle.distributed.communication.group.Group]:
-    """
-    Args:
-        moe_group (str): 目前支持："sharding|data|dp|tp|model|mp|dummy"
-
-    Returns:
-        Union[str, paddle.distributed.communication.group.Group]: 除了 dummy-moe 以外，返回对应的 progcess-group
-    """
     moe_group = moe_group.lower()
     assert moe_group in {
         "sharding",
@@ -554,7 +546,6 @@ def moe_statedict_upcycle(
     if not isinstance(config.moe_intermediate_size, int):
         logger.warning("moe upcycle only supports single modality expand !")
         return state_dict
-    # upcycling目前只处理单mo
 
     moe_layer_start_index = (
         min(config.moe_layer_start_index)
@@ -914,7 +905,7 @@ class ErnieMoEMultiModalPairedMLP(ErnieMoeMLP):
     """
 
     def __init__(self, config):
-        """ """
+
         cfg = deepcopy(config)
         cfg.intermediate_size = config.moe_intermediate_size[0]
         super().__init__(cfg)
@@ -1857,28 +1848,25 @@ class ErnieDecoderLayer(nn.Layer):
             _type_: _description_
         """
         cfg = deepcopy(self.config)
-        cfg.sequence_parallel = False  # dense experts 是全进全出。
+        cfg.sequence_parallel = False
         if cfg.moe_num_dense_experts > 0:
             logger.info("using dense experts")
             if cfg.moe_intermediate_size:
-                # hack dense experts 用intermediate_size里面小的。
                 inter_size = (
                     cfg.moe_intermediate_size[0]
                     if isinstance(cfg.moe_intermediate_size, (tuple, list))
                     else cfg.moe_intermediate_size
                 )
                 cfg.intermediate_size = inter_size * cfg.moe_num_dense_experts
-                # TODO dense experts 不切mp，手动reduce
             else:
                 cfg.intermediate_size = (
                     cfg.intermediate_size * cfg.moe_num_shared_experts
                 )
-            cfg.disable_ffn_model_parallel = False  # split shared epxert
+            cfg.disable_ffn_model_parallel = False
             with paddle.utils.unique_name.guard(f"audio_expert_{layer_idx}_"):
                 dense_experts = ErnieMoeDenseExpert(cfg)
             for p in dense_experts.parameters():
                 p.expert_type = "expert_type_3"
-                # p.name = unique_name.generate("shit")
         else:
             dense_experts = None
         return dense_experts
@@ -2617,14 +2605,12 @@ class ErnieModel(ErniePretrainedModel):
             return offload_kwargs
 
         layer_idx = layer_module.layer_idx
-        # NOTE: the first layer inputs will be used in mtp, so do not offload it
         if layer_idx == 0:
             offload_kwargs = {}
         else:
             offload_kwargs = get_offload_kwargs(layer_idx, setting_type, offload_value)
 
         recompute_func = te_recompute if self.config.use_fp8 else recompute
-        # Fleety11 下 recompute w/ use_cache=True 会出 core
         assert not use_cache, "should not use-recompute during infer(use-cache=True),"
 
         hidden_states = recompute_func(
@@ -3326,7 +3312,7 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
         ignored_index=0,  # no use
         inbatch_pack_offset=None,
     ):
-        """ """
+
         output_attentions = (
             output_attentions
             if output_attentions is not None

@@ -256,12 +256,10 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
                 config.moe_world_size = fleet.auto.get_mesh().get_dim_size(
                     config.moe_group
                 )
-                print("lzx debug config.moe_world_size 1111", config.moe_world_size)
                 if config.moe_world_size < 0:
                     config.moe_world_size = 1
             else:
                 config.moe_world_size = 1
-        print("lzx debug config.moe_world_size", config.moe_world_size)
 
         self.layer_idx = layer_idx
         self.ipp = ipp
@@ -337,7 +335,6 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
         use_cache = self.config.use_cache
         output_hidden_states = self.config.output_hidden_states
         return_dict = self.config.return_dict
-        # print("lzx debug return_dict:",return_dict)
         past_key_values = None
         past_key_value = None
         token_type_ids = None
@@ -346,7 +343,6 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
 
             input_ids, attention_mask, position_ids = parse_args(args)
             if isinstance(input_ids, list):
-                print("xxx  input_ids ----pp------ : ", len(input_ids))
                 if len(input_ids) == 2:
                     input_ids, labels = input_ids
                 else:
@@ -537,7 +533,6 @@ class ErniePretrainingCriterionPP(ErniePretrainingCriterion):
         calculates the final loss
         """
         losses = super().forward(prediction_scores, masked_lm_labels)
-        print("lzx debug losses:", losses)
         if losses is not None:
             loss = losses[0]
         else:

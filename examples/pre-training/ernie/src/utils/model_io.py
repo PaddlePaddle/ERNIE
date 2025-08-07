@@ -19,7 +19,7 @@ from .logging import logger
 
 def load_model(model, path, dtype=None):
     sd = paddle.load(str(path), return_numpy=True)
-    for k, v in sd.items():  # TODO: should not force cast
+    for k, v in sd.items():
         if k.endswith("position_ids"):
             sd[k] = v.astype(np.int64)
         if dtype and str(v.dtype) != dtype:

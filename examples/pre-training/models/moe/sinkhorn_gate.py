@@ -84,15 +84,12 @@ class SinkHornGate(Top2Gate):
                     -logits.cast("float32"), r, c, lam=self.sinkhorn_temp
                 )
             else:
-                # logits = logits.clone().detach()
                 if token_type_ids is not None:
                     with paddle.no_grad():
-                        # logger.info(f'using token-type-ids to rount: {token_type_ids}')
-                        # logger.info(f'logits-max:{logits.max().item()} input:{input}')
                         assert (
                             token_type_ids.max().item() < logits.shape[-1]
                         ), f"`token-type-id`={token_type_ids} oov, num-expert={logits.shape[-1]}"
-                        num_type = 2  # FIXME: 目前焊死虑文、图 两种 token。
+                        num_type = 2
                         scale = logits.shape[-1] // num_type
                         # [s] [0,1,2,3,4,5]
                         expert_id = paddle.arange(logits.shape[-1], dtype="int64")
@@ -112,9 +109,7 @@ class SinkHornGate(Top2Gate):
                     # Compute indices
                     offsets = paddle.arange(self.config.moe_k, dtype="int64") * scale
                     indices_s = ma + offsets.unsqueeze(0)
-                    # Generate one-hot encoding
                     ma_one_hot = F.one_hot(ma, num_classes=scale).astype(paddle.int64)
-                    # Generate final mask1
                     mask1 = F.one_hot(indices_s, num_classes=num_experts).astype(
                         paddle.int64
                     )  # [s, k, e]
@@ -126,8 +121,7 @@ class SinkHornGate(Top2Gate):
                     )  # [s, 1]
 
             l_zloss = self._cal_z_loss(logits.cast("float32"))
-            # TODO softmax 一起做/分片做。
-            # l_aux = 0.
+
             if self.config.moe_k > 1:
                 prob = F.softmax(
                     logits.reshape([-1, self.config.moe_k, scale]), axis=-1
@@ -261,12 +255,10 @@ class SinkHornGateFused(SinkHornGate):
 
             if token_type_ids is not None:
                 with paddle.no_grad():
-                    # logger.info(f'using token-type-ids to rount: {token_type_ids}')
-                    # logger.info(f'logits-max:{logits.max().item()} input:{input}')
                     assert (
                         token_type_ids.max().item() < logits.shape[-1]
                     ), f"`token-type-id`={token_type_ids} oov, num-expert={logits.shape[-1]}"
-                    num_type = 2  # FIXME: 目前焊死虑文、图 两种 token。
+                    num_type = 2
                     scale = logits.shape[-1] // num_type
                     # [s] [0,1,2,3,4,5]
                     expert_id = paddle.arange(logits.shape[-1], dtype="int64")
@@ -276,18 +268,10 @@ class SinkHornGateFused(SinkHornGate):
                     ).unsqueeze(-1)
                     mask = (expert_id < 0) | (expert_id >= scale)
                     logits[mask] = float("-inf")
-                    # logger.info(f"using token-type-gate: {token_type_ids} {mask}  {logits}")
 
             orthogonal_loss = self._cal_orthogonal_loss()
-            # l_zloss = self._cal_z_loss(logits)
-            # aux loss 拿到moe-layer里去计算
 
-            router_loss = (
-                # l_aux * self.config.moe_aux_loss_lambda +
-                # l_zloss * self.config.moe_z_loss_lambda +
-                orthogonal_loss
-                * self.config.moe_orthogonal_loss_lambda
-            )
+            router_loss = orthogonal_loss * self.config.moe_orthogonal_loss_lambda
             router_loss.stop_gradient = False
             if self.enable_logging:
                 _log = {

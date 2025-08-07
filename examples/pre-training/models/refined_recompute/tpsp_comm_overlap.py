@@ -90,7 +90,7 @@ class ColumnCommLNFunctor(PyLayer):
 
     @staticmethod
     def backward(ctx, y_grad):
-        """backward"""
+
         # backward for all_gather_gemm
         x_parallel, weight = ctx.saved_tensor()
         group = ctx.group
@@ -114,7 +114,7 @@ class RowCommLNFunctor(PyLayer):
 
     @staticmethod
     def backward(ctx, y_grad):
-        """backward"""
+
         # backward for gemm_reduce_scatter
         x, weight = ctx.saved_tensor()
         group = ctx.group

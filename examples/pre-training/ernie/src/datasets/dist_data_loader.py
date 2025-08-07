@@ -95,14 +95,12 @@ class DistDataLoader(paddle.io.DataLoader):
             num_workers=num_workers,
         )
         self.need_magic_trans = need_magic_trans
-        # log.info(f'DistDataloader using image-dtype: {self.image_dtype}')
         self._hcg = fleet.get_hybrid_communicate_group()
 
         # init pp data comm group
         if self._hcg.get_pipe_parallel_world_size() > 1 and pp_broadcast:
             self._pp_data_group = self._init_dataloader_comm_group()
         else:
-            log.info("skip pp broadcast")
             self._pp_data_group = None
 
         # tensor parallel message
@@ -134,7 +132,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 persistent_workers,
             )
 
-            # self._dataloder_iter = iter(self._dataloder)
             self._lazy_dataloader_iter = None
         else:
             log.info(
@@ -164,7 +161,6 @@ class DistDataLoader(paddle.io.DataLoader):
         parallel_groups = topo.get_comm_list("pipe")
 
         for group in parallel_groups:
-            # only first rank and last rank
             if self.need_magic_trans:
                 assert (
                     len(group) > 2
@@ -184,8 +180,6 @@ class DistDataLoader(paddle.io.DataLoader):
         get_timers() and get_timers()("read-raw-data").start()
         if self._need_data:
             data = next(self._dataloder_iter)
-            print("xxx -------- data: ")
-            print(data)
             if "data_not_valid" in data:
                 global_training_logs.update(
                     data_not_valid=data["data_not_valid"].astype("float32").mean()
@@ -361,21 +355,17 @@ class DistDataLoader(paddle.io.DataLoader):
             k for k, v in to_return.items() if v is None and k in optional_keys
         ]
         for k in none_keys:
-            to_return.pop(k)  # none key whill break paddlle mp broadcast
-        # debug_info = map_structure(lambda i: i.shape if i is not None else None, to_return)
-        # log.info(f"data out: {self._need_data} {debug_info}")
+            to_return.pop(k)
         if G_DEBUG_DATA_MD5 and int(G_DEBUG_DATA_MD5):
             printable = map_structure(lambda i: md5(i), to_return)
             logger.info(f"data-md5: {printable}")
         return to_return
 
 
-# TODO(shenliang): we should fused broadcast for better performance in future.
 def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_rank=0):
     """
     Broadcast data from src_rank to all ranks in comm_group.
     """
-    # Move to GPU and broadcast.
     size_cpu = []
     if comm_rank == 0:
         for data in data_list:
@@ -510,12 +500,9 @@ def broadcast_data_obj(data, src_rank, group):
                 data_buf = paddle.empty(
                     [sum(data_buf_shapes)], dtype=grouped_chunk[0][1].dtype
                 )
-            # log.info(f'[rank={dist.get_rank()}]: broadcast data:{data_buf.shape}')
             dist.broadcast(data_buf, src_rank, group)
-            # log.info(f'[rank={dist.get_rank()}]: done broadcast data:{data_buf.shape}')
 
             if this_rank != src_rank:
-                # log.info(f'[rank={dist.get_rank()}] split:{data_buf_shapes}')
                 if len(data_buf_shapes) == 1:
                     data_buf = [data_buf]
                 else:
