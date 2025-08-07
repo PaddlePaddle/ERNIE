@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# from .logging import logger, setup_logger_output_file
-
-# __all__ = ['logger', 'setup_logger_output_file']
 
 from .logging import *  # noqa
 from .model_io import *  # noqa

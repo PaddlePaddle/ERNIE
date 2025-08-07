@@ -129,35 +129,6 @@ except ImportError:
     logger.warning("Use TrainingArguments as an alternative but will lose some args!")
 
 
-def distributed_optimizer_maybe_hack(
-    optimizer,
-    use_moe,
-):
-    if use_moe:
-        from src.trainers.dygraph_optimizer.hybrid_parallel_optimizer import (
-            HybridParallelOptimizer as MoEHybridParallelOptimizer,
-        )
-
-        fleet_env = fleet.fleet
-        fleet_env.user_defined_optimizer = optimizer
-        hp_optim = MoEHybridParallelOptimizer(
-            optimizer, fleet_env._hcg, fleet_env._user_defined_strategy
-        )
-
-        if fleet_env._user_defined_strategy.hybrid_configs[
-            "pp_configs"
-        ].dp_comm_overlap:
-            hp_optim._dp_enable = False
-
-        if fleet_env._user_defined_strategy.hybrid_configs[
-            "pp_configs"
-        ].sharding_comm_overlap:
-            hp_optim._sharding_enable = False
-        return hp_optim
-    else:
-        return fleet.distributed_optimizer(optimizer)
-
-
 @dataclass
 @add_start_docstrings(AutoTrainingArguments.__doc__)
 class AutoPreTrainingArguments(AutoTrainingArguments):
