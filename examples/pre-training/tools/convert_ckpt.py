@@ -151,49 +151,61 @@ class Checkpoint:
     def load_from_org_model_with_tensor_name(
         self, tensor_name, structure_name_mapping, shard_num
     ):
-        layer_names = []
+        cur_structure_names = []
         for layer_name, value in structure_name_mapping.items():
             if tensor_name == value:
-                layer_names.append(layer_name)
-        matched_layer_name_and_tensor_pairs = []
-        if len(layer_names) == 0:
+                cur_structure_names.append(layer_name)
+        matched_name_pairs = []
+        if len(cur_structure_names) == 0:
             print("{} not found in structure_name_mapping".format(tensor_name))
-            return None, None
-        for i in range(len(layer_names)):
-            matched_layer_name = self.map_to_org_model(layer_names[i])
-            if "mlp.experts" in matched_layer_name:
-                match = re.search(r"mlp\.experts\.(\d+)", matched_layer_name)
+            return None, None, None
+        for i in range(len(cur_structure_names)):
+            matched_org_structure_name = self.map_to_org_model(cur_structure_names[i])
+            if "mlp.experts" in matched_org_structure_name:
+                match = re.search(r"mlp\.experts\.(\d+)", matched_org_structure_name)
                 assert match is not None
                 expert_id = int(shard_num) * self.sharding_degree + int(match.group(1))
-                matched_layer_name = re.sub(
+                matched_org_structure_name = re.sub(
                     r"(mlp\.experts\.)\d+",
                     lambda m: m.group(1) + str(expert_id),
-                    matched_layer_name,
+                    matched_org_structure_name,
                 )
                 print("adapt expert({} -> {})".format(int(match.group(1)), expert_id))
 
-            if matched_layer_name in self.safetensors_index["weight_map"]:
-                file_name = self.safetensors_index["weight_map"][matched_layer_name]
+            if matched_org_structure_name in self.safetensors_index["weight_map"]:
+                file_name = self.safetensors_index["weight_map"][
+                    matched_org_structure_name
+                ]
                 safetensor_file = os.path.join(self.args.org, file_name)
                 if not os.path.exists(safetensor_file):
                     print("{} not exists".format(safetensor_file))
                 ckpt = load_file(safetensor_file)
-                if matched_layer_name in ckpt.keys():
-                    print("{} found in safetensors".format(matched_layer_name))
-                    matched_layer_name_and_tensor_pairs.append(
-                        [matched_layer_name, paddle.to_tensor(ckpt[matched_layer_name])]
+                if matched_org_structure_name in ckpt.keys():
+                    print("{} found in safetensors".format(matched_org_structure_name))
+                    matched_name_pairs.append(
+                        [
+                            matched_org_structure_name,
+                            paddle.to_tensor(ckpt[matched_org_structure_name]),
+                            cur_structure_names[i],
+                        ]
                     )
                 else:
-                    print("{} not found in safetensors".format(matched_layer_name))
+                    print(
+                        "{} not found in safetensors".format(matched_org_structure_name)
+                    )
             else:
-                print("{} not found in safetensors index".format(matched_layer_name))
+                print(
+                    "{} not found in safetensors index".format(
+                        matched_org_structure_name
+                    )
+                )
         assert (
-            len(matched_layer_name_and_tensor_pairs) == 1
+            len(matched_name_pairs) == 1
         ), f"find multi values for tensor {tensor_name}"
-        if len(matched_layer_name_and_tensor_pairs) == 1:
-            return matched_layer_name_and_tensor_pairs[0]
+        if len(matched_name_pairs) == 1:
+            return matched_name_pairs[0]
         else:
-            return None, None
+            return None, None, None
 
     def process_one_pdopt(self, pdopt_path):
         if self.pp_degree > 1:
@@ -220,7 +232,7 @@ class Checkpoint:
 
         pdopt = paddle.load(pdopt_path)
         for tensor_name, tensor_data in pdopt["master_weights"].items():
-            matched_structure_name, loaded_value = (
+            matched_org_structure_name, loaded_value, cur_structure_name = (
                 self.load_from_org_model_with_tensor_name(
                     tensor_name, structure_name_mapping, shard_num
                 )
@@ -229,15 +241,19 @@ class Checkpoint:
                 continue
             if tensor_name not in self.tensor_offset_map.keys():
                 self.tensor_offset_map[tensor_name] = 0
-            if "mlp.experts" in matched_structure_name:
+            if "mlp.experts" in matched_org_structure_name:
                 self.tensor_offset_map[tensor_name] = 0
             offset = self.tensor_offset_map[tensor_name]
             tensor_data_num = tensor_data.flatten().shape[0]
             real_data_num = -1
             if loaded_value.flatten().shape[0] < offset + tensor_data_num:
-                assert matched_structure_name in param_meta
+                assert cur_structure_name in param_meta, (
+                    f"Shape mismatch for tensor_name={tensor_name}, "
+                    f"matched_org_structure_name={matched_org_structure_name}, "
+                    f"cur_structure_name={cur_structure_name}, and cannot find the real shape."
+                )
                 real_data_num = 1
-                for data_num in param_meta[matched_structure_name][0]:
+                for data_num in param_meta[cur_structure_name][0]:
                     real_data_num *= data_num
                 print(
                     f"Shape mismatch for {tensor_name}, change the data num from {tensor_data_num} to {real_data_num}"
@@ -245,7 +261,8 @@ class Checkpoint:
                 assert loaded_value.flatten().shape[0] >= offset + real_data_num, (
                     f"Shape mismatch: org_shape={loaded_value.shape}, cur_shape={tensor_data.shape}, "
                     f"real_shape={real_data_num}, tensor_name={tensor_name}, "
-                    f"matched_layer_name={matched_structure_name}, offset={offset}"
+                    f"matched_org_structure_name={matched_org_structure_name}, "
+                    f"cur_structure_name={cur_structure_name}, offset={offset}"
                 )
 
             weight_t = paddle.cast(
@@ -266,7 +283,7 @@ class Checkpoint:
             pdopt["master_weights"][tensor_name].set_value(weight_t)
             print(
                 "successfully convert {} with shape of {}".format(
-                    matched_structure_name, tensor_data.shape
+                    matched_org_structure_name, tensor_data.shape
                 )
             )
             self.tensor_offset_map[tensor_name] += tensor_data_num
