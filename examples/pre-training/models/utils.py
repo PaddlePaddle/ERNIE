@@ -84,9 +84,7 @@ def manual_backward(f: Callable, is_first_fwd: bool, *args: List[Any]):
         tracer._has_grad = True
 
     detached_args = detach_and_requires_grad_(*args)
-    detached_args_clone = [
-        FakeClone.apply(a) if a is not None else None for a in detached_args
-    ]
+    detached_args_clone = [FakeClone.apply(a) if a is not None else None for a in detached_args]
     out = f(*detached_args_clone)
     if isinstance(out, list):
         out = tuple(out)
@@ -108,12 +106,104 @@ def manual_backward(f: Callable, is_first_fwd: bool, *args: List[Any]):
         grad = list(grad)
         grad = [g for g in grad if g is not None]
         assert grad and out_cached, (len(grad), len(out_cached))
-        grad, out_cached = zip(
-            *[(g, o) for g, o in zip(grad, out_cached) if not o.stop_gradient]
-        )
+        grad, out_cached = zip(*[(g, o) for g, o in zip(grad, out_cached) if not o.stop_gradient])
 
         assert len(grad) == len(out_cached), (len(grad), len(out_cached), f)
         paddle.autograd.backward(out_cached, grad)
         return tuple([t.grad for t in detached_args if t is not None])
 
     return bwd_f, out
+
+
+class FakeGather(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, input, indices):
+        assert len(indices.shape) == 1
+        ctx.save_for_backward(indices, input.shape)
+        if indices.shape[0] == 0:
+            out_shape = input.shape
+            out_shape[0] = 0
+            return paddle.zeros(out_shape, dtype=input.dtype)
+        return paddle.index_select(input, axis=0, index=indices)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        indices, input_shape = ctx.saved_tensor()
+
+        grad_input = paddle.zeros(input_shape, dtype=grad_output.dtype)
+        if indices.shape[0] != 0:
+            paddle.scatter_(grad_input, indices.unsqueeze(-1), grad_output, overwrite=False)
+        return grad_input, None
+
+
+class FusedUnpermutation(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(
+        ctx,
+        output_tokens,
+        permuted_tokens,
+        token_permuted_indices,
+        dispatched_probs,
+        prob_permuted_indices,
+    ):
+        assert token_permuted_indices.stop_gradient, "token_permuted_indices must be stop_gradient"
+        if dispatched_probs is not None:
+            assert (
+                prob_permuted_indices is not None and prob_permuted_indices.stop_gradient
+            ), "dispatched_probs must be stop_gradient"
+
+        output_tokens.stop_gradient = False
+
+        src_token_num = permuted_tokens.shape[0]
+        if src_token_num > 0:
+            output_tokens = moe_permutation.unpermute(
+                output_tokens,
+                permuted_tokens,
+                token_permuted_indices,
+                dispatched_probs,
+                prob_permuted_indices,
+            )
+        else:
+            output_tokens = FakeClone.apply(output_tokens)
+
+        ctx.save_for_backward(
+            permuted_tokens,
+            token_permuted_indices,
+            dispatched_probs,
+            prob_permuted_indices,
+        )
+        return output_tokens
+
+    @staticmethod
+    def backward(ctx, output_tokens_grad):
+        (
+            permuted_tokens,
+            token_permuted_indices,
+            dispatched_probs,
+            prob_permuted_indices,
+        ) = ctx.saved_tensor()
+
+        src_token_num = permuted_tokens.shape[0]
+        if src_token_num > 0:
+            permuted_tokens_grad, dispatched_probs_grad = moe_permutation.unpermute_grad(
+                output_tokens_grad,
+                permuted_tokens,
+                token_permuted_indices,
+                dispatched_probs,
+                prob_permuted_indices,
+            )
+        else:
+            permuted_tokens_grad = paddle.zeros_like(permuted_tokens)
+            if dispatched_probs is not None:
+                dispatched_probs_grad = paddle.zeros_like(dispatched_probs)
+
+        if dispatched_probs is None:
+            return output_tokens_grad, permuted_tokens_grad, None
+        else:
+            return (
+                output_tokens_grad,
+                permuted_tokens_grad,
+                None,
+                dispatched_probs_grad,
+                None,
+            )

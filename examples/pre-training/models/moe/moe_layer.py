@@ -12,37 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import inspect
 import logging
 from collections import namedtuple
-import inspect
+
 import numpy as np
-
 import paddle
-from paddle import framework
-from paddle import nn
-from paddle.distributed.communication import stream
-import paddle.nn.functional as F
-
-from paddle.autograd import PyLayer
-from paddle.distributed.fleet.utils import recompute
-from paddle.distributed import fleet
-
 import paddle.distributed as dist
-
-
-from models.utils import (
-    manual_backward,
-)
-
+import paddle.nn.functional as F
 from models.comm_utils import profile
-
-
 from models.moe.token_dispatcher.fp8_utils import (
+    ExpertsGroupGemmContiguousNode,
     ExpertsGroupGemmNode,
     ExpertsGroupGemmWLCHNode,
 )
+from models.moe.token_dispatcher.moe_utils import UnZipNode, ZipNode
 from models.sequence_parallel_utils import ScatterOp
+from models.utils import manual_backward
+from paddle import framework, nn
+from paddle.autograd import PyLayer
+from paddle.distributed import fleet
+from paddle.distributed.communication import stream
+from paddle.distributed.fleet.utils import recompute
 from paddle.incubate.nn.functional import (
     moe_combine,
     moe_gate_dispatch,
@@ -1214,3 +1205,136 @@ class FP8FusedWLCHFunc(paddle.autograd.PyLayer):
         else:
             dx, probs_grad = ctx.node.backward(output_grad)
             return AlltoAll.apply(dx, ctx.group), probs_grad
+
+
+class MlpNode:
+    def __init__(
+        self, custom_map, max_topk, recompute_fwd_gate_up=False, dequant_input=False
+    ):
+        self.token_dispatcher = custom_map.dispatcher
+        self.experts = custom_map.experts
+        self.experts_group_gemm_node = ExpertsGroupGemmContiguousNode(
+            custom_map,
+            recompute_fwd_gate_up=recompute_fwd_gate_up,
+            dequant_input=dequant_input,
+        )
+        self.unzip_node = UnZipNode(self.token_dispatcher)
+        self.zip_node = ZipNode(self.token_dispatcher)
+        self.dispatched_indices = None
+        self.dispatched_probs = None
+        self.tokens_per_expert = (
+            self.token_dispatcher._comm_manager.tokens_per_expert_list
+        )
+        self.router_topk = max_topk
+
+    def reset_status(self):
+        self.dispatched_indices = None
+        self.dispatched_probs = None
+        self.tokens_per_expert = None
+        self.router_topk = None
+        self.experts_group_gemm_node.reset_status()
+        self.experts_group_gemm_node = None
+
+    def release_mem(self):
+        self.experts_group_gemm_node.reset_status()
+        self.experts_group_gemm_node = None
+
+    @paddle.no_grad()
+    def forward(self, hs_2d_dispatched, dispatched_indices, dispatched_probs):
+        num_experts = len(self.tokens_per_expert)
+
+        self.dispatched_indices = dispatched_indices.to(paddle.int32)
+        (unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs) = (
+            self.unzip_node.forward(
+                hs_2d_dispatched,
+                self.dispatched_indices,
+                dispatched_probs,
+                topk=self.router_topk,
+                num_experts=num_experts,
+                tokens_per_expert=self.tokens_per_expert,
+            )
+        )
+        hs_2d_dispatched._record_stream()
+        dispatched_indices._record_stream()
+        dispatched_probs._record_stream()
+
+        padding_token_per_experts = [
+            (x + 127) // 128 * 128 for x in self.tokens_per_expert
+        ]
+        expert_out = self.experts_group_gemm_node.forward(
+            unzipped_tokens,
+            unzipped_probs,
+            padding_token_per_experts,
+            self.tokens_per_expert,
+        )
+
+        expert_out_tmp = expert_out.reshape([-1, expert_out.shape[-1]])
+
+        expert_out_zipped = self.zip_node.forward(
+            expert_out_tmp,
+            zipped_expertwise_rowmap,
+            self.dispatched_indices,
+            unzipped_probs,
+            total_zipped_tokens=hs_2d_dispatched.shape[0],
+            num_experts=num_experts,
+        )
+
+        self.dispatched_probs = dispatched_probs
+        expert_out_zipped.stop_gradient = False
+
+        return expert_out_zipped
+
+    @paddle.no_grad()
+    def backward(self, hidden_states_out_grad):
+        unzipped_grad = self.zip_node.backward(
+            hidden_states_out_grad,
+            self.dispatched_indices,
+            self.dispatched_probs,
+            top_k=self.router_topk,
+            num_experts=len(self.tokens_per_expert),
+            tokens_per_expert=self.tokens_per_expert,
+        )
+        hidden_states_out_grad._record_stream()
+
+        expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
+
+        hs_fp8_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
+            expert_out,
+            hidden_states_out_grad,
+            probs_grad,
+            self.dispatched_indices,
+            num_experts=len(self.tokens_per_expert),
+        )
+        self.reset_status()
+        return hs_fp8_dispatched_grad, dispatched_probs_grad
+
+
+class Fp8FusedMoeFunc(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(
+        ctx,
+        hidden_states,
+        dispatched_probs,
+        dispatched_indices,
+        custom_map,
+        max_topk,
+        recompute_fwd_gate_up=False,
+        dequant_input=False,
+        is_first_fwd=False,
+    ):
+        ctx.node = MlpNode(
+            custom_map,
+            max_topk,
+            recompute_fwd_gate_up=recompute_fwd_gate_up,
+            dequant_input=dequant_input,
+        )
+        out = ctx.node.forward(hidden_states, dispatched_indices, dispatched_probs)
+
+        if is_first_fwd:
+            ctx.node.release_mem()
+        return out
+
+    @staticmethod
+    def backward(ctx, output_grad):
+        hidden_states_grad, dispatched_probs_grad = ctx.node.backward(output_grad)
+        return hidden_states_grad, dispatched_probs_grad, None

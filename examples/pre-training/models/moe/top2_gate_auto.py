@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-top2gate
-"""
-
 from models.moe.top2_gate import TopKGateFused
 from models.moe.moe_utils import get_mesh, get_flatten_mesh
 
@@ -25,7 +21,6 @@ import logging
 from paddle import Tensor
 import paddle.distributed as dist
 
-# import paddle.nn.functional as F
 
 logger = logging.getLogger(__name__)
 

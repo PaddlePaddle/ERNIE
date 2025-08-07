@@ -24,10 +24,8 @@ from contextlib import contextmanager
 
 import paddle
 from paddle import nn
-from paddle.distributed.communication import stream
 import paddle.nn.functional as F
 
-from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 from paddle.distributed import fleet
 
@@ -151,40 +149,6 @@ def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
         if output.dtype != orig_dtype:
             output = output.cast(orig_dtype)
     return output
-
-
-class AlltoAll(PyLayer):
-    """
-    AlltoAll w/ backward
-    """
-
-    @staticmethod
-    def forward(ctx, x, group):
-        """
-        All-to-all communication in the group.
-        """
-        ctx.group = group
-        if dist.get_world_size(group) <= 1:
-            return x
-        output = paddle.empty_like(x)
-        output.stop_gradient = False
-        with profile("moe-all2all"):
-            stream.alltoall_single(output, x, None, None, group, True, True)
-        return output
-
-    @staticmethod
-    def backward(ctx, *dx):
-
-        return AlltoAll.apply(*dx, group=ctx.group)
-
-
-def detach_and_requires_grad_(*args):
-    """detach_and_requires_grad_"""
-    ret = [a.detach() if a is not None else None for a in args]
-    for r, a in zip(ret, args):
-        if a is not None:
-            r.stop_gradient = a.stop_gradient
-    return ret
 
 
 class MOELayerAuto(MOELayer):
