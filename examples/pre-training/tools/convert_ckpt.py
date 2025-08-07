@@ -17,7 +17,6 @@ convert model param.
 """
 
 import argparse
-import sys
 import os
 import json
 import shutil
@@ -71,8 +70,17 @@ class Checkpoint:
         parallel_config = self.meta["parallel_config"]
         self.meta_path = meta_path
         self.mp_degree = parallel_config["mp_degree"]
+        assert self.mp_degree == 1, "currently not support mp"
         self.pp_degree = parallel_config["pp_degree"]
         self.sharding_degree = parallel_config["sharding_degree"]
+        self.ep_degree = parallel_config["ep_degree"]
+        self.moe_sharding_degree = parallel_config["moe_sharding_degree"]
+        assert (
+            self.moe_sharding_degree == 1
+        ), "currently not support moe_sharding_degree"
+        assert (
+            self.ep_degree == self.sharding_degree
+        ), "ep degree must same with sharding degree"
         print(
             "src ckpt info: tp-degree: {}, pp-degree: {}, sharding-degree: {}".format(
                 self.mp_degree, self.pp_degree, self.sharding_degree
@@ -147,50 +155,66 @@ class Checkpoint:
         for layer_name, value in structure_name_mapping.items():
             if tensor_name == value:
                 layer_names.append(layer_name)
-        if len(layer_names) > 1:
-            print("find {} layer_names for {}".format(len(layer_names), tensor_name))
-            sys.exit(1)
+        matched_layer_name_and_tensor_pairs = []
         if len(layer_names) == 0:
             print("{} not found in structure_name_mapping".format(tensor_name))
             return None, None
-        matched_layer_name = self.map_to_org_model(layer_names[0])
-        if "mlp.experts" in matched_layer_name:
-            match = re.search(r"mlp\.experts\.(\d+)", matched_layer_name)
-            assert match is not None
-            expert_id = int(shard_num) * self.sharding_degree + int(match.group(1))
-            matched_layer_name = re.sub(
-                r"(mlp\.experts\.)\d+",
-                lambda m: m.group(1) + str(expert_id),
-                matched_layer_name,
-            )
-            print("adapt expert({} -> {})".format(int(match.group(1)), expert_id))
+        for i in range(len(layer_names)):
+            matched_layer_name = self.map_to_org_model(layer_names[i])
+            if "mlp.experts" in matched_layer_name:
+                match = re.search(r"mlp\.experts\.(\d+)", matched_layer_name)
+                assert match is not None
+                expert_id = int(shard_num) * self.sharding_degree + int(match.group(1))
+                matched_layer_name = re.sub(
+                    r"(mlp\.experts\.)\d+",
+                    lambda m: m.group(1) + str(expert_id),
+                    matched_layer_name,
+                )
+                print("adapt expert({} -> {})".format(int(match.group(1)), expert_id))
 
-        if matched_layer_name in self.safetensors_index["weight_map"]:
-            file_name = self.safetensors_index["weight_map"][matched_layer_name]
-            safetensor_file = os.path.join(self.args.org, file_name)
-            if not os.path.exists(safetensor_file):
-                print("{} not exists".format(safetensor_file))
-                return None, None
-            ckpt = load_file(safetensor_file)
-            if matched_layer_name in ckpt.keys():
-                return matched_layer_name, paddle.to_tensor(ckpt[matched_layer_name])
+            if matched_layer_name in self.safetensors_index["weight_map"]:
+                file_name = self.safetensors_index["weight_map"][matched_layer_name]
+                safetensor_file = os.path.join(self.args.org, file_name)
+                if not os.path.exists(safetensor_file):
+                    print("{} not exists".format(safetensor_file))
+                ckpt = load_file(safetensor_file)
+                if matched_layer_name in ckpt.keys():
+                    print("{} found in safetensors".format(matched_layer_name))
+                    matched_layer_name_and_tensor_pairs.append(
+                        [matched_layer_name, paddle.to_tensor(ckpt[matched_layer_name])]
+                    )
+                else:
+                    print("{} not found in safetensors".format(matched_layer_name))
             else:
-                print("{} not found in safetensors".format(matched_layer_name))
-                return None, None
+                print("{} not found in safetensors index".format(matched_layer_name))
+        assert (
+            len(matched_layer_name_and_tensor_pairs) == 1
+        ), f"find multi values for tensor {tensor_name}"
+        if len(matched_layer_name_and_tensor_pairs) == 1:
+            return matched_layer_name_and_tensor_pairs[0]
         else:
-            print("{} not found in safetensors index".format(matched_layer_name))
             return None, None
 
     def process_one_pdopt(self, pdopt_path):
-        match = re.search(r"pp(\d+)_shard(\d+)", pdopt_path)
-        assert match is not None
-        pp_num = match.group(1)
-        shard_num = match.group(2)
-        print(f"pp: {pp_num}, shard: {shard_num}")
-        sharding_metas_key = "tp00_pp{}".format(pp_num)
-        structure_name_mapping = self.meta["sharding_metas"][sharding_metas_key][
-            "structure_name_mapping"
-        ]
+        if self.pp_degree > 1:
+            match = re.search(r"pp(\d+)_shard(\d+)", pdopt_path)
+            assert match is not None
+            pp_num = match.group(1)
+            shard_num = match.group(2)
+            print(f"pp: {pp_num}, shard: {shard_num}")
+            sharding_metas_key = "tp00_pp{}".format(pp_num)
+            structure_name_mapping = self.meta["sharding_metas"][sharding_metas_key][
+                "structure_name_mapping"
+            ]
+        else:
+            match = re.search(r"shard(\d+)", pdopt_path)
+            assert match is not None
+            shard_num = match.group(1)
+            print(f"shard: {shard_num}")
+            sharding_metas_key = "tp00_pp00"
+            structure_name_mapping = self.meta["sharding_metas"][sharding_metas_key][
+                "structure_name_mapping"
+            ]
 
         pdopt = paddle.load(pdopt_path)
         for tensor_name, tensor_data in pdopt["master_weights"].items():
@@ -217,7 +241,7 @@ class Checkpoint:
             )
             pdopt["master_weights"][tensor_name].set_value(weight_t)
             print(
-                "successfully convert {}: {}".format(
+                "successfully convert {} with shape of {}".format(
                     matched_layer_name, tensor_data.shape
                 )
             )
