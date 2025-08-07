@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from dataclasses import dataclass, field
-from typing import Dict
 
 
 @dataclass
@@ -62,28 +61,23 @@ class ServerArguments:
         },
     )
     enable_mm: bool = field(
-        default=False,
-        metadata={
-            "help": "Set to true when using VL model, else false."
-        }
+        default=False, metadata={"help": "Set to true when using VL model, else false."}
     )
     limit_mm_per_prompt: str = field(
         default="{'image': 1, 'video': 1}",
         metadata={
             "help": "Limit the quantity of multimodal data per prompt (e.g., {'image': 10, 'video': 3}), with a default value of 1 for all types."
-        }
+        },
     )
     reasoning_parser: str = field(
-        default='ernie-45-vl',
+        default="ernie-45-vl",
         metadata={
             "help": "Specify the inference parser to use for extracting reasoning content from model outputs."
-        }
+        },
     )
-    max_num_batched_tokens:	int = field(
+    max_num_batched_tokens: int = field(
         default=384,
-        metadata={
-            "help": "Maximum token count per batch during the prefill phase."
-        }
+        metadata={"help": "Maximum token count per batch during the prefill phase."},
     )
 
     # cache

@@ -32,17 +32,23 @@ def run_chat(args: Optional[dict[str, Any]] = None) -> None:
     model_args, generating_args, finetuning_args, server_args = get_server_args(args)
 
     messages = []
-    print("Welcome to the CLI application, use `clear` to remove the history, use `exit` to exit the application.")
+    print(
+        "Welcome to the CLI application, use `clear` to remove the history, use `exit` to exit the application."
+    )
 
     ip = "0.0.0.0"
     service_http_port = str(server_args.port)
-    client = openai.Client(base_url=f"http://{ip}:{service_http_port}/v1", api_key="EMPTY_API_KEY")
+    client = openai.Client(
+        base_url=f"http://{ip}:{service_http_port}/v1", api_key="EMPTY_API_KEY"
+    )
 
     while True:
         try:
             query = input("\nUser: ")
         except UnicodeDecodeError:
-            print("Detected decoding error at the inputs, please set the terminal encoding to utf-8.")
+            print(
+                "Detected decoding error at the inputs, please set the terminal encoding to utf-8."
+            )
             continue
         except Exception:
             raise
@@ -59,8 +65,10 @@ def run_chat(args: Optional[dict[str, Any]] = None) -> None:
             try:
                 query = eval(query)
             except Exception:
-                print('image_url or video_url found in your query, please please refer to the following format for input. '
-                '[{"type": "image_url", "image_url": {"url": "https://paddlenlp.bj.bcebos.com/datasets/paddlemix/demo_images/example2.jpg"}},{"type": "text", "text": "What is this?"},]')
+                print(
+                    "image_url or video_url found in your query, please please refer to the following format for input. "
+                    '[{"type": "image_url", "image_url": {"url": "https://paddlenlp.bj.bcebos.com/datasets/paddlemix/demo_images/example2.jpg"}},{"type": "text", "text": "What is this?"},]'
+                )
 
         messages.append({"role": "user", "content": query})
         print("Assistant: ", end="", flush=True)
@@ -85,22 +93,22 @@ def run_chat(args: Optional[dict[str, Any]] = None) -> None:
             print_answer = False
             if generating_args.stream:
                 for chunk in response:
-                    if chunk.choices[0].delta.reasoning_content != '':
+                    if chunk.choices[0].delta.reasoning_content != "":
                         if not print_thinking:
-                            print('thinking process:')
+                            print("thinking process:")
                             print_thinking = True
-                        print(chunk.choices[0].delta.reasoning_content, end='')
+                        print(chunk.choices[0].delta.reasoning_content, end="")
                         assistant_response += chunk.choices[0].delta.reasoning_content
-                    if chunk.choices[0].delta.content != '':
+                    if chunk.choices[0].delta.content != "":
                         if not print_answer:
-                            print('answer:')
+                            print("answer:")
                             print_answer = True
-                        print(chunk.choices[0].delta.content, end='')
+                        print(chunk.choices[0].delta.content, end="")
                         assistant_response += chunk.choices[0].delta.content
             else:
-                print('thinking process:')
+                print("thinking process:")
                 print(response.choices[0].message.reasoning_content)
-                print('answer:')
+                print("answer:")
                 print(response.choices[0].message.content)
                 assistant_response += response.choices[0].message.reasoning_content
                 assistant_response += response.choices[0].message.content
@@ -108,7 +116,7 @@ def run_chat(args: Optional[dict[str, Any]] = None) -> None:
             if generating_args.stream:
                 for chunk in response:
                     if chunk.choices[0].delta is not None:
-                        print(chunk.choices[0].delta.content, end='')
+                        print(chunk.choices[0].delta.content, end="")
                         assistant_response += chunk.choices[0].delta.content
             else:
                 print(response.choices[0].message.content)
