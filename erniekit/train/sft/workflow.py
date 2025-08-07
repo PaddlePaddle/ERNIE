@@ -204,13 +204,8 @@ def run_sft(
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
-
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
 
     model_class = Ernie4_5_MoeForCausalLM
     if finetuning_args.pipeline_parallel_degree > 1:
@@ -277,8 +272,7 @@ def run_sft(
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
         convert_from_torch=False,
     )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
@@ -344,8 +338,7 @@ def run_sft(
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
+            download_hub=model_args.download_hub,
             convert_from_torch=False,
         )
     else:
@@ -360,8 +353,7 @@ def run_sft(
     logger.info(f"{runtime_timer.log()}")
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
         convert_from_torch=False,
     )
 

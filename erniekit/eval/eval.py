@@ -219,20 +219,14 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
-
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
 
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
         convert_from_torch=False,
     )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
@@ -288,16 +282,14 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
+            download_hub=model_args.download_hub,
             convert_from_torch=False,
         )
     else:
         model = model_class.from_config(
             model_config,
             dtype=dtype,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
+            download_hub=model_args.download_hub,
             convert_from_torch=False,
         )
 
@@ -320,8 +312,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
         convert_from_torch=False,
     )
 

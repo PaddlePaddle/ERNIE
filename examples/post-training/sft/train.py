@@ -241,17 +241,11 @@ class ModelArgument:
             "ParallelCrossEntropy to calculate cross-entropy loss for parallel model."
         },
     )
-    from_hf_hub: bool = field(
-        default=False,
-        metadata={"help": "Whether to download model from huggingface hub"},
-    )
-    from_aistudio: bool = field(
-        default=False,
-        metadata={"help": "Whether to download model from aistudio"},
-    )
-    from_modelscope: bool = field(
-        default=False,
-        metadata={"help": "Whether to download model from modelscope"},
+    download_hub: str = field(
+        default="aistudio",
+        metadata={
+            "help": "The source for model downloading, options include `huggingface`, `aistudio`, `modelscope`, default `aistudio`."
+        },
     )
     # LoRA
     lora: bool = field(
@@ -587,13 +581,8 @@ def main():
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
-
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
 
     model_class = Ernie4_5_MoeForCausalLM
     if training_args.pipeline_parallel_degree > 1:
@@ -660,8 +649,7 @@ def main():
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
         convert_from_torch=False,
     )
     model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
@@ -727,8 +715,7 @@ def main():
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
+            download_hub=model_args.download_hub,
             convert_from_torch=False,
         )
     else:
@@ -744,8 +731,7 @@ def main():
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
         convert_from_torch=False,
     )
 

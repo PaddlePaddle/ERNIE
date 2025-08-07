@@ -201,13 +201,8 @@ def run_dpo(
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
-
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
 
     # fuse_softmax_mask only support for rocm.
     if not paddle.is_compiled_with_rocm():
@@ -287,8 +282,7 @@ def run_dpo(
         num_acc_steps=finetuning_args.gradient_accumulation_steps,
         add_tail_layers=model_args.add_tail_layers,
         num_nextn_predict_layers=0,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
     )
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": model_args.moe_use_aux_free})
@@ -318,8 +312,7 @@ def run_dpo(
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=config,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
+            download_hub=model_args.download_hub,
             convert_from_torch=False,
         )
     else:
@@ -357,8 +350,7 @@ def run_dpo(
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
         convert_from_torch=False,
     )
     logger.info("Loading model & tokenizer successfully !")

@@ -215,19 +215,12 @@ if __name__ == "__main__":
         raise ValueError(f"num_of_gpus must be positive, but got num_of_gpus={training_args.num_of_gpus}")
 
     model_args.model_name_or_path = check_download_repo(model_args.model_name_or_path,
-                                                        from_hf_hub=model_args.from_hf_hub,
-                                                        from_aistudio=model_args.from_aistudio,
-                                                        from_modelscope=model_args.from_modelscope)
-
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
+                                                        download_hub=model_args.download_hub)
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(model_args.model_name_or_path,
-                                                from_hf_hub=model_args.from_hf_hub,
-                                                from_aistudio=model_args.from_aistudio,
+                                                download_hub=model_args.download_hub,
                                                 convert_from_torch=False)
     config = Ernie4_5_MoeConfig.from_pretrained(model_args.model_name_or_path,
-                                                from_hf_hub=model_args.from_hf_hub,
-                                                from_aistudio=model_args.from_aistudio,
+                                                download_hub=model_args.download_hub,
                                                 convert_from_torch=False)
     dpo_estimate_training(tokenizer, data_args, training_args, config)
