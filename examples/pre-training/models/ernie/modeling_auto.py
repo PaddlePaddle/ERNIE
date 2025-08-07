@@ -16,7 +16,6 @@
 
 from models.moe.top2_gate_auto import TopKGateFusedAuto
 from models.moe.top2_gate import Top2Gate
-from models.refined_recompute.flash_attn import RefinedRcomputeFlashAttention
 from models.comm_utils import subbatch
 
 import math
@@ -1020,10 +1019,6 @@ class ErnieAttentionAuto(nn.Layer):
             )
         self.config = config
 
-        self._rr_flash_attn = None
-        if config.use_recompute and config.skip_recompute_ops.get("flash_attn", False):
-            self._rr_flash_attn = RefinedRcomputeFlashAttention()
-
         if (
             self.config.tensor_parallel_degree > 1
             or self.config.pipeline_parallel_degree > 1
@@ -1226,7 +1221,6 @@ class ErnieAttentionAuto(nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             config=self.config,
-            rr_flash_attn=(self._rr_flash_attn if self.training else None),
             inbatch_pack_offset=inbatch_pack_offset,
             training=self.training,
         )
