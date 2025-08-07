@@ -319,7 +319,11 @@ def moe_ep2mp(
 def moe_statedict_cherry_pick(
     state_dict: Dict[str, paddle.Tensor], config: ErnieMoEConfig
 ):
-    moe_num_experts = config.moe_num_experts
+    moe_num_experts = (
+        sum(config.moe_num_experts)
+        if isinstance(config.moe_num_experts, (list, tuple))
+        else config.moe_num_experts
+    )
     if moe_num_experts <= 1:
         return state_dict
     moe_world_size = config.moe_world_size
@@ -2406,6 +2410,8 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
         output_hidden_states=None,
         return_dict=False,
         ignored_index=0,
+        data_id=None,
+        src_id=None,
         inbatch_pack_offset=None,
     ):
         output_attentions = (

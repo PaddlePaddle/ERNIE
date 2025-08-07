@@ -17,9 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def reset_per_device_batch_size(
-    global_batch_size, per_device_train_batch_size, dataset_world_size
-):
+def reset_per_device_batch_size(global_batch_size, per_device_train_batch_size, dataset_world_size):
     assert (
         global_batch_size % dataset_world_size == 0
     ), f"global_bsz={global_batch_size} not evenly divided by world_size={dataset_world_size}"

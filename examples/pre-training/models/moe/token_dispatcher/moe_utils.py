@@ -15,188 +15,23 @@
 # limitations under the License.
 
 import warnings
-import inspect
+
 import numpy as np
 import paddle
 from paddle import framework
 
-try:
-    from paddleformers.trainer.utils.offload_optimizer import reload
-except ImportError:
-    reload = None
 
-try:
-    import TokenDispatcherUtils as TDU
-except ImportError:
-    TDU = None
+def inplace_offload(x):
+    """Offload tensor to CPU in-place to save GPU memory.
 
+    Args:
+        x (paddle.Tensor): The tensor to be offloaded to CPU.
 
-try:
-    import FusedQuantOps as FQO
-except ImportError:
-    FQO = None
-
-
-from .fp8_utils import FP8_ALIGN
-
-
-if not hasattr(paddle.Tensor, "_clear_to_zero_allocation"):
-
-    def _clear_to_zero_allocation(self):
-        """
-        _clear_to_zero_allocation
-        """
-        old_shape = self.shape
-        dst = paddle.empty([0], dtype=self.dtype)
-        dst_t = dst.value().get_tensor()
-        src_t = self.value().get_tensor()
-        src_t._share_data_with(dst_t)
-        src_t._set_dims(old_shape)
-
-    setattr(paddle.Tensor, "_clear_to_zero_allocation", _clear_to_zero_allocation)
-
-
-if not hasattr(paddle.Tensor, "_holder_size"):
-
-    def _holder_size(self):
-        """
-        _holder_size
-        """
-        if self._is_initialized():
-            return int(np.prod(self.shape)) * paddle.core.size_of_dtype(self.dtype)
-        else:
-            return 0
-
-    setattr(paddle.Tensor, "_holder_size", _holder_size)
-
-
-def has_argument(method, name):
+    Note:
+        This operation modifies the tensor in-place by sharing data with a CPU copy.
     """
-    has_argument
-    """
-    return name in inspect.getfullargspec(method).args
-
-
-if TDU is not None:
-    if not has_argument(TDU.tokens_unzip_stable, "fill_output"):
-        origin_tokens_unzip_stable = TDU.tokens_unzip_stable
-
-        def new_tokens_unzip_stable(
-            x,
-            x_scale,
-            expert_routemap_topk,
-            expert_prob_topk,
-            topk,
-            num_experts,
-            tokens_per_expert,
-            padding_multiplex,
-            fill_output=True,
-        ):
-            """
-            new_tokens_unzip_stable
-            """
-            assert fill_output, "fill_output should be True"
-            return origin_tokens_unzip_stable(
-                x,
-                x_scale,
-                expert_routemap_topk,
-                expert_prob_topk,
-                topk,
-                num_experts,
-                tokens_per_expert,
-                padding_multiplex,
-            )
-
-        setattr(TDU, "tokens_unzip_stable", new_tokens_unzip_stable)
-
-
-if FQO is not None:
-    if hasattr(FQO, "fused_swiglu_probs_bwd") and (
-        not has_argument(FQO.fused_swiglu_probs_bwd, "inplace")
-    ):
-        origin_fused_swiglu_probs_bwd = FQO.fused_swiglu_probs_bwd
-
-        def new_fused_swiglu_probs_bwd(o1, do2_s, unzipped_probs, inplace=False):
-            """
-            new_fused_swiglu_probs_bwd
-            """
-            return origin_fused_swiglu_probs_bwd(o1, do2_s, unzipped_probs)
-
-        setattr(FQO, "fused_swiglu_probs_bwd", new_fused_swiglu_probs_bwd)
-
-
-def tokens_zip_unique_add_with_subbatch(
-    zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows=None
-):
-    """
-    tokens_zip_unique_add_with_subbatch
-    """
-    if subbatch_rows is None or subbatch_rows <= 0 or zipped_rows <= 0:
-        return TDU.tokens_zip_unique_add(zipped, unzipped, index_unzipped, zipped_rows)
-    else:
-        if isinstance(zipped, paddle.Tensor):
-            num_split = (zipped_rows + subbatch_rows - 1) // subbatch_rows
-            remainder = zipped_rows % subbatch_rows
-            if remainder == 0:
-                rows = [subbatch_rows] * num_split
-            else:
-                rows = [subbatch_rows] * (num_split - 1) + [remainder]
-
-            if zipped.shape[0] == 0:
-                dtype = zipped.dtype
-                hidden_size = zipped.shape[1]
-                zipped = [paddle.zeros([r, hidden_size], dtype=dtype) for r in rows]
-            else:
-                zipped = paddle.split(zipped, rows, axis=0)
-        return TDU.tokens_zip_unique_add_subbatch(
-            zipped, unzipped, index_unzipped, zipped_rows, subbatch_rows
-        )
-
-
-def merge_subbatch_cast(x, dtype):
-    """
-    merge_subbatch_cast
-    """
-    if isinstance(x, (list, tuple)):
-        if len(x) == 1:
-            x = x[0]
-            return x.cast(dtype) if x.dtype != dtype else x
-        else:
-            return TDU.merge_subbatch_cast(x, dtype)
-    else:
-        return x.cast(dtype) if x.dtype != dtype else x
-
-
-def get_training_step():
-    """
-    get_training_step
-    """
-    try:
-        from ernie4.src.utils.misc import global_training_logs as gtl
-    except ImportError:
-        gtl = None
-
-    if not isinstance(gtl, dict) and gtl.trainer is not None:
-        return gtl.trainer.state.global_step + 1
-    else:
-        return None
-
-
-def inplace_reload(x):
-    """
-    inplace_reload
-    """
-    reload(x)
-    return x
-
-
-def inplace_offload(x, use_pinned=False):
-    """
-    inplace offload
-    """
-    place = paddle.CUDAPinnedPlace() if use_pinned else paddle.CPUPlace()
-    if not x.place._equals(place):
-        y = x.pin_memory() if use_pinned else x.cpu()
+    if not x.place._equals(paddle.CPUPlace()):
+        y = x.cpu()
         if y is not x:
             x_t = x.value().get_tensor()
             y_t = y.value().get_tensor()
@@ -220,9 +55,7 @@ def inplace_offload_if_needed(x, threshold=2 * 1024 * 1024 * 1024):
     memory_size = np.prod(x.shape) * paddle.core.size_of_dtype(x.dtype)
     if memory_size >= threshold:
         inplace_offload(x)
-        warnings.warn(
-            f"Offload tensor with shape: {x.shape}, dtype: {x.dtype}, memory size {memory_size}"
-        )
+        warnings.warn(f"Offload tensor with shape: {x.shape}, dtype: {x.dtype}, memory size {memory_size}")
 
 
 def topk_to_permuted_indices_single(x, num_tokens, expert_id, topk):
@@ -240,9 +73,7 @@ def topk_to_permuted_indices_single(x, num_tokens, expert_id, topk):
             - prob_permuted_indices: Indices of probabilities for the expert assignments
     """
     x = paddle.flatten(x)
-    prob_permuted_indices = paddle.tensor.search._restrict_nonzero(
-        x == expert_id, num_tokens
-    ).flatten()
+    prob_permuted_indices = paddle.tensor.search._restrict_nonzero(x == expert_id, num_tokens).flatten()
     token_permuted_indices = prob_permuted_indices // topk
     return token_permuted_indices, prob_permuted_indices
 
@@ -325,9 +156,7 @@ def unpermute(
         permuted_tokens = permuted_tokens * permuted_probs.unsqueeze(-1)
 
     output_tokens = paddle.zeros(restore_shape, dtype=permuted_tokens.dtype)
-    output_tokens.scatter_(
-        index=token_permuted_indices, updates=permuted_tokens, overwrite=False
-    )
+    output_tokens.scatter_(index=token_permuted_indices, updates=permuted_tokens, overwrite=False)
     return output_tokens
 
 
@@ -363,24 +192,6 @@ class UnZipNode:
         self.unzipped_probs = None
         self.zipped_expertwise_rowmap = None
 
-    def cached_tensors(self):
-        """
-        cached_tensors
-        """
-        return [self.unzipped_probs, self.zipped_expertwise_rowmap]
-
-    def set_cached_tensors(self, tensors):
-        """
-        set_cached_tensors
-        """
-        self.unzipped_probs, self.zipped_expertwise_rowmap = tensors
-
-    def clear_cached_tensors(self):
-        """
-        clear_cached_tensors
-        """
-        self.set_cached_tensors([None] * len(self.cached_tensors()))
-
     @paddle.no_grad()
     def forward(
         self,
@@ -390,7 +201,6 @@ class UnZipNode:
         topk,
         num_experts,
         tokens_per_expert,
-        fill_output=True,
     ):
         """Forward pass - distribute tokens to experts.
 
@@ -408,44 +218,31 @@ class UnZipNode:
                 - zipped_expertwise_rowmap: Mapping between original and expanded tokens
                 - unzipped_probs: Expanded routing probabilities
         """
-        if isinstance(hs_2d_dispatched, tuple):
-            assert (
-                len(hs_2d_dispatched) == 2
-            ), f"hs_2d_dispatched should has at most 2 tensors, but bot {len(hs_2d_dispatched)}"
-            hidden_states, scale = hs_2d_dispatched
-        else:
-            hidden_states, scale = hs_2d_dispatched, None
-
-        (
-            unzipped_tokens,
-            zipped_expertwise_rowmap,
-            unzipped_probs,
-            unzipped_scale,
-        ) = TDU.tokens_unzip_stable(
-            hidden_states,
-            scale,
-            dispatched_indices,
-            dispatched_probs,
-            topk=topk,
-            num_experts=num_experts,
-            tokens_per_expert=tokens_per_expert,
-            padding_multiplex=FP8_ALIGN,
-            fill_output=fill_output,
-        )
-
+        with paddle.amp.auto_cast(False):
+            (
+                unzipped_tokens,
+                zipped_expertwise_rowmap,
+                unzipped_probs,
+                _,
+            ) = paddle.nn.functional.moe_permute(
+                hs_2d_dispatched,
+                None,
+                dispatched_indices,
+                dispatched_probs,
+                num_experts=num_experts,
+                tokens_per_expert=tokens_per_expert,
+                padding_alignment=128,
+            )
         self.unzipped_probs = unzipped_probs
         self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
         return (
             unzipped_tokens,
             zipped_expertwise_rowmap,
             unzipped_probs,
-            unzipped_scale,
         )
 
     @paddle.no_grad()
-    def backward(
-        self, dx, hidden_states_out_grad, probs_grad, dispatched_indices, num_experts
-    ):
+    def backward(self, dx, hidden_states_out_grad, probs_grad, dispatched_indices, num_experts):
         """Backward pass - collect gradients from experts.
 
         Args:
@@ -461,15 +258,13 @@ class UnZipNode:
                 - probs_grad_zipped: Compressed probability gradients
         """
         with paddle.amp.auto_cast(False):
-            weighted_zipped_tokens, probs_grad_zipped = (
-                paddle.nn.functional.moe_unpermute(
-                    dx,
-                    self.zipped_expertwise_rowmap,
-                    dispatched_indices,
-                    probs_grad,
-                    total_zipped_tokens=hidden_states_out_grad.shape[0],
-                    num_experts=num_experts,
-                )
+            weighted_zipped_tokens, probs_grad_zipped = paddle.nn.functional.moe_unpermute(
+                dx,
+                self.zipped_expertwise_rowmap,
+                dispatched_indices,
+                probs_grad,
+                total_zipped_tokens=hidden_states_out_grad.shape[0],
+                num_experts=num_experts,
             )
         self.reset_status()
         return weighted_zipped_tokens, probs_grad_zipped
@@ -497,24 +292,6 @@ class ZipNode:
         """
         self.token_dispatcher = token_dispatcher
         self.name = name
-
-    def cached_tensors(self):
-        """
-        cached_tensors
-        """
-        return []
-
-    def set_cached_tensors(self, tensors):
-        """
-        set_cached_tensors
-        """
-        assert len(tensors) == 0
-
-    def clear_cached_tensors(self):
-        """
-        clear_cached_tensors
-        """
-        pass
 
     @paddle.no_grad()
     def forward(
