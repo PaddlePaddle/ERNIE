@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import numpy as np
 import logging
 
+import numpy as np
 import paddle
 from models.comm_utils import (
     all_gather,
@@ -23,15 +22,15 @@ from models.comm_utils import (
     scatter,
 )
 from paddle import distributed as dist
-from paddle.nn import functional as F
 from paddle.autograd import PyLayer
-from paddle.nn.layer.layers import Layer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients_with_group,
 )
 from paddle.incubate.tensor.manipulation import create_async_load
+from paddle.nn import functional as F
+from paddle.nn.layer.layers import Layer
 
 try:
     from paddle.nn.functional import all_gather_gemm, flux, gemm_reduce_scatter
@@ -192,9 +191,7 @@ class GemmReduceScatterOp(PyLayer):
             input_grad = None
             grad_parallel = None
         else:
-            input_grad, grad_parallel = all_gather_gemm(
-                grad, weight, group, deepcopy_input_parallel=False
-            )
+            input_grad, grad_parallel = all_gather_gemm(grad, weight, group, deepcopy_input_parallel=False)
 
         if weight.stop_gradient:
             weight_grad = None
@@ -208,9 +205,7 @@ class GemmReduceScatterOp(PyLayer):
 class AllGatherGemmOp(PyLayer):
     @staticmethod
     def forward(ctx, input, weight, group):
-        output, input_parallel = all_gather_gemm(
-            input, weight, group, deepcopy_input_parallel=True
-        )
+        output, input_parallel = all_gather_gemm(input, weight, group, deepcopy_input_parallel=True)
         ctx.save_for_backward(input_parallel, weight)
         ctx.group = group
         ctx.input_stop_gradient = input.stop_gradient
@@ -298,12 +293,8 @@ def create_non_fused_allreduce_gradient_hook(param, model, verbose=False):
     return __impl__
 
 
-def register_sequence_parallel_allreduce_hooks(
-    model, fuse_sequence_parallel_allreduce=False
-):
-    logger.warning(
-        "DO NOT use sphook unless your PyLayer does not trigger param backward hook"
-    )
+def register_sequence_parallel_allreduce_hooks(model, fuse_sequence_parallel_allreduce=False):
+    logger.warning("DO NOT use sphook unless your PyLayer does not trigger param backward hook")
     mp_group = get_hcg().get_model_parallel_group()
     if mp_group.nranks <= 1:
         return
@@ -331,18 +322,14 @@ def is_fused_matmul_bias_supported():
         try:
             from paddle.base import core
         except ModuleNotFoundError:
-            logger.warning(
-                "Unable to import paddle.base, are you using paddle latest build?"
-            )
+            logger.warning("Unable to import paddle.base, are you using paddle latest build?")
             import_module_error = True
 
         if import_module_error:
             try:
                 from paddle.fluid import core
             except ModuleNotFoundError:
-                logger.warning(
-                    "Unable to import paddle.fluid, are you using paddle latest build?"
-                )
+                logger.warning("Unable to import paddle.fluid, are you using paddle latest build?")
                 return False
         return hasattr(core.eager.ops.legacy, "fused_gemm_epilogue")
     else:
@@ -367,14 +354,8 @@ class ColumnSequenceParallelLinear(Layer):
         super(ColumnSequenceParallelLinear, self).__init__()
 
         hcg = get_hcg()
-        self.model_parallel_group = (
-            hcg.get_model_parallel_group() if mp_group is None else mp_group
-        )
-        self.world_size = (
-            hcg.get_model_parallel_group().nranks
-            if mp_group is None
-            else mp_group.nranks
-        )
+        self.model_parallel_group = hcg.get_model_parallel_group() if mp_group is None else mp_group
+        self.world_size = hcg.get_model_parallel_group().nranks if mp_group is None else mp_group.nranks
         self._name = name
         self.is_mp = self.world_size > 1
         self.use_comm = use_comm
@@ -453,9 +434,7 @@ class ColumnSequenceParallelLinear(Layer):
             self.use_tpsp_comm_overlap
             and self.is_mp
             and (use_comm and self.use_comm)
-            and flux.all_gather_gemm_can_implement(
-                x, self.weight, self.model_parallel_group
-            )
+            and flux.all_gather_gemm_can_implement(x, self.weight, self.model_parallel_group)
         ):
             output = AllGatherGemmOp.apply(x, self.weight, self.model_parallel_group)
             if self.bias is not None:
@@ -520,17 +499,9 @@ class RowSequenceParallelLinear(Layer):
             assert flux is not None
 
         hcg = get_hcg()
-        self.model_parallel_group = (
-            hcg.get_model_parallel_group() if mp_group is None else mp_group
-        )
-        self.world_size = (
-            hcg.get_model_parallel_group().nranks
-            if mp_group is None
-            else mp_group.nranks
-        )
-        self.rank = (
-            hcg.get_model_parallel_group().rank if mp_group is None else mp_group.rank
-        )
+        self.model_parallel_group = hcg.get_model_parallel_group() if mp_group is None else mp_group
+        self.world_size = hcg.get_model_parallel_group().nranks if mp_group is None else mp_group.nranks
+        self.rank = hcg.get_model_parallel_group().rank if mp_group is None else mp_group.rank
 
         self.is_mp = self.world_size > 1
         assert in_features % self.world_size == 0, (
@@ -598,13 +569,9 @@ class RowSequenceParallelLinear(Layer):
             if (
                 self.use_tpsp_comm_overlap
                 and self.use_comm
-                and flux.gemm_reduce_scatter_can_implement(
-                    x, self.weight, self.model_parallel_group
-                )
+                and flux.gemm_reduce_scatter_can_implement(x, self.weight, self.model_parallel_group)
             ):
-                output_ = GemmReduceScatterOp.apply(
-                    x, self.weight, self.model_parallel_group
-                )
+                output_ = GemmReduceScatterOp.apply(x, self.weight, self.model_parallel_group)
                 if bias is not None:
                     output_ = output_ + bias
             else:

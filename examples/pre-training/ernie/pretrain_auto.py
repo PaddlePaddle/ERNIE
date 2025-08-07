@@ -153,7 +153,6 @@ def main():
     np.random.seed(args.seed)
     random.seed(args.seed)
     paddle.seed(args.seed)
-    # set_seed(args.seed)
 
     prop = paddle.device.cuda.get_device_properties()
     if prop.total_memory < args.pre_alloc_memory * 1024 * 1024 * 1024:
@@ -277,7 +276,7 @@ def main():
         f"eos:{tokenizer.eos_token_id} pad:{tokenizer.pad_token_id} "
     )
 
-    cfg = update_model_config_from_args(cfg, model_config)  # 根据yaml更新modle_config
+    cfg = update_model_config_from_args(cfg, model_config) 
 
     if args.model_type == "ernie":
         model_class = ErnieForCausalLMAuto

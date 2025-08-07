@@ -834,11 +834,9 @@ class AutoPretrainingTrainer(AutoTrainer):
                         base_state_dict["master_weights"] = master_weight
                 state_dict = base_state_dict
                 del base_state_dict
-                # return base_state_dict
         return state_dict
 
     def _save_moe_weights(self, output_dir):
-        """重写save_mow_weights 方法 进行参数分离存储"""
         optimizer_name = _add_variant(
             PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix
         )
@@ -901,18 +899,14 @@ class AutoPretrainingTrainer(AutoTrainer):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
 
         start_time = time.time()
-        # Temporarily disable metric computation, we will do it in the loop here.
         compute_metrics = self.compute_metrics
         eval_loop = self.evaluation_loop
 
         output = eval_loop(
             eval_dataloader,
             description="Evaluation",
-            # No point gathering the predictions if there are no metrics, otherwise we defer to
-            # self.args.prediction_loss_only
             prediction_loss_only=True if compute_metrics is None else None,
             ignore_keys=ignore_keys,
-            # Only evaluate max_eval_iters
             max_eval_iters=self.args.eval_iters,
         )
 
