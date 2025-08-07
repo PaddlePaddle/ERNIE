@@ -26,10 +26,19 @@ from ernie.dataset.hf import errors, parse_config
 class BaseDatasetParser(IterableDataset):
     """Base class for file parser."""
 
-    def __init__(self, file_path, formatting, doc_formatting, columns, process_fn=None, shuffle_file=False):
+    def __init__(
+        self,
+        file_path,
+        formatting,
+        doc_formatting,
+        columns,
+        process_fn=None,
+        shuffle_file=False,
+    ):
         super().__init__()
         self.file_path = file_path
         self.file_name = os.path.basename(file_path)
+        self.train_type = ""
         self.formatting = formatting
         self.doc_formatting = doc_formatting
         self.columns = columns
@@ -44,37 +53,61 @@ class BaseDatasetParser(IterableDataset):
         self.shuffle_file = shuffle_file
 
         self.output_file_name = self.file_name + ".ernie.json"
-        self.output_file_path = os.path.join(parse_config.DATASET_OUTPUT_ROOT, self.output_file_name)
+        self.output_file_path = os.path.join(
+            parse_config.DATASET_OUTPUT_ROOT, self.output_file_name
+        )
         self.output_json_indent = parse_config.DEFAULT_OUTPUT_JSON_INDENT
 
-    def _alpaca_to_erine(self, item):
-        """Transform alpaca formatted data to ernie formatting"""
+    def update_columns(self, columns):
+        """Update columns for parser."""
+        self.columns = columns
+        self.r_columns = {}
+        for k, v in self.columns.items():
+            self.r_columns[v] = k
+
+    def _alpaca_sft_to_erine(self, item):
+        """Transform alpaca formatted sft data to ernie formatting"""
         src = [
             item.get("prompt", "") + item.get("query", ""),
         ]
         tgt = [
             item.get("response", ""),
         ]
-        history = []
-        system = item.get("system", "")
-        is_system = False
-        if system is None or str(system) == "":
-            history = list(zip(src[:-1], tgt[:-1]))
-            system = ""
-        else:
-            history = list(zip(src[:-1], tgt[:-1]))
-            src = [system, *src]
-            tgt = (["", *tgt],)
-            is_system = True
         output = {
-            # "alpaca": item,
             "src": src,
             "tgt": tgt,
-            "history": history,
-            "system": system,
-            "is_system": is_system,
         }
+        system = item.get("system", None)
+        if isinstance(system, str):
+            output["system"] = system
         return output
+
+    def _alpaca_dpo_to_erine(self, item):
+        """Transform alpaca formatted dpo data to ernie formatting"""
+        src = [
+            item.get("prompt", "") + item.get("query", ""),
+        ]
+        chosen = item.get("chosen", "")
+        rejected = item.get("rejected", "")
+        response = [chosen, rejected]
+        output = {
+            "src": src,
+            "tgt": [],
+            "response": response,
+            "sort": [1, 0],
+        }
+        system = item.get("system", None)
+        if isinstance(system, str):
+            output["system"] = system
+        return output
+
+    def _alpaca_to_erine(self, item):
+        """
+        "If train_type is defined as either 'sft' or 'dpo', parse accordingly based on train_type.
+        """
+        if self.train_type == "dpo":
+            return self._alpaca_dpo_to_erine(item)
+        return self._alpaca_sft_to_erine(item)
 
     def __iter__(self):
         """Iterator function for dataset."""
@@ -87,7 +120,9 @@ class BaseDatasetParser(IterableDataset):
                 try:
                     ex = self.process_fn(ex, self.file_name)
                 except Exception as e:
-                    print(f"Skip parsing error data in {self.file_name}. Error message: {e}")
+                    print(
+                        f"Skip parsing error data in {self.file_name}. Error message: {e}"
+                    )
                     continue
             # ignore invalid example
             if ex is None:
@@ -99,10 +134,12 @@ class BaseDatasetParser(IterableDataset):
         Scan files under dataset folder and return the first one filename.
         """
         files = glob.glob(os.path.join(self.download_path, "*"))
-        filenames_under_workspace = sorted([filepath.split(os.sep)[-1] for filepath in files])
+        filenames_under_workspace = sorted(
+            [filepath.split(os.sep)[-1] for filepath in files]
+        )
         filenames = []
         for filename in filenames_under_workspace:
-            if filename.lower() == 'readme.md':
+            if filename.lower() == "readme.md":
                 continue
             filenames.append(filename)
         if len(filenames) == 0:
@@ -118,13 +155,18 @@ class BaseDatasetParser(IterableDataset):
     def check_and_fill_row_alpaca(self, row):
         """
         For alpaca formatting, check and fill default value for the essential field like:
-            prompt/instruction, query/input, response/output.
+            'SFT': prompt/instruction or query/input, response/output.
+            'DPO': prompt/instruction or query/input, chosen, rejected
         """
         has_data = False
         for key in row:
             if row[key] is not None and len(row[key]) > 0:
                 has_data = True
-        for key in parse_config.DEFAULT_COLUMN_VALUE_MAPPING:
+
+        value_mapping = parse_config.DEFAULT_COLUMN_VALUE_MAPPING
+        if self.train_type == "dpo":
+            value_mapping = parse_config.DEFAULT_ALPACA_DPO_COLUMNS_VALUE_MAPPING
+        for key in value_mapping:
             if key not in row:
                 row[key] = ""
         return has_data
@@ -151,10 +193,37 @@ class BaseDatasetParser(IterableDataset):
     def add_dict_row(self, dict_row):
         """
         Mapping the raw dict into the columns.
+        For alpaca formatting, if train_type is not defined, then:
+            1. Check if the required fields 'chosen' and 'rejected' exist.
+            2. If these fields are present, treat it as DPO data; otherwise, treat it as SFT data."
+        All items will be treated the same train_type as the first item.
         """
+        if self.formatting == "alpaca" and self.train_type == "":
+            if (
+                dict_row.get("chosen", None) is not None
+                and dict_row.get("rejected", None) is not None
+            ):
+                self.train_type = "dpo"
+                self.update_columns(parse_config.DEFAULT_ALPACA_DPO_COLUMNS_MAPPING)
+            else:
+                self.train_type = "sft"
+                self.update_columns(parse_config.DEFAULT_ALPACA_COLUMNS_MAPPING)
+
+        default_values_mapping = parse_config.DEFAULT_COLUMN_VALUE_MAPPING
+        if self.formatting == "alpaca" and self.train_type == "dpo":
+            default_values_mapping = (
+                parse_config.DEFAULT_ALPACA_DPO_COLUMNS_VALUE_MAPPING
+            )
+
         row = {}
         for input_key, output_key in self.r_columns.items():
-            row[output_key] = dict_row.get(input_key, parse_config.DEFAULT_COLUMN_VALUE_MAPPING.get(output_key, None))
+            value = dict_row.get(input_key, None)
+            if value is not None:
+                row[output_key] = value
+                continue
+            default_value = default_values_mapping.get(output_key, None)
+            if default_value is not None:
+                row[output_key] = default_value
         return row
 
     def add_str_row(self, str_row):
@@ -167,9 +236,11 @@ class BaseDatasetParser(IterableDataset):
         try:
             input = json.loads(str_row)
             return self.add_dict_row(input)
-        except json.decoder.JSONDecodeError as ee:
+        except json.decoder.JSONDecodeError:
             msg = f"Unformatted json-line: {str_row}, stop"
             raise errors.DataSetParseError(msg)
+        except Exception as e:
+            print("line error:%s" % str(e))
 
     def parse_json_file(self):
         """
@@ -189,15 +260,17 @@ class BaseDatasetParser(IterableDataset):
                     for item in json_data:
                         self.append_data(self.add_dict_row(item))
                 elif isinstance(json_data, dict):
-                    self.data.append(self.add_dict_row(json_data))
+                    self.append_data(self.add_dict_row(json_data))
                 else:
                     return False
-        except OSError as oe:
+        except OSError:
             msg = f"Cannot open dataset file: {self.file_path}"
             raise errors.DataSetFileCannotOpenError(msg)
-        except json.decoder.JSONDecodeError as ee:
+        except json.decoder.JSONDecodeError:
             msg = f"Unformatted json file: {self.file_path}, stop"
             raise errors.DataSetParseError(msg)
+        except Exception as e:
+            print("Fail to load file:%s" % str(e))
         return True
 
     def parse_json_lines_file(self):
@@ -216,7 +289,7 @@ class BaseDatasetParser(IterableDataset):
             with open(self.file_path) as fp:
                 for line in fp:
                     self.append_data(self.add_str_row(line))
-        except OSError as oe:
+        except OSError:
             msg = f"Cannot open dataset file: {self.file_path}"
             raise errors.DataSetFileCannotOpenError(msg)
         except json.decoder.JSONDecodeError as ee:
@@ -235,7 +308,9 @@ class BaseDatasetParser(IterableDataset):
             os.makedirs(parse_config.DATASET_OUTPUT_ROOT)
         with open(self.output_file_path, "w") as ofp:
             ofp.write(json.dumps(self.data, ensure_ascii=False, indent=2))
-        print(f"[DEBUG]Output parsed result as ernie-formatted json at {self.output_file_path}")
+        print(
+            f"[DEBUG]Output parsed result as ernie-formatted json at {self.output_file_path}"
+        )
 
     def parse(self):
         """
@@ -246,12 +321,14 @@ class BaseDatasetParser(IterableDataset):
         elif self.doc_formatting == "jsonl":
             self.parse_json_lines_file()
         elif self.doc_formatting == "auto":
-            for func in [self.parse_json_file, self.parse_json_lines_file]:
+            funcs = {"json": self.parse_json_file, "jsonl": self.parse_json_lines_file}
+            for func_name in funcs:
                 if self.doc_formatting != "auto":
                     break
                 try:
-                    if self.parse_json_file():
-                        self.doc_formatting = "json"
+                    func = funcs[func_name]
+                    if func():
+                        self.doc_formatting = func_name
                 except Exception:
                     continue
         print(
@@ -291,19 +368,41 @@ class HFBaseParser(BaseDatasetParser):
         self.file_path = os.path.join(self.download_path, self.file_name)
 
         self.formatting = config_map.get("formatting", "alpaca")
-        self.doc_formatting = config_map.get("doc_formatting", parse_config.DEFAULT_DOC_FORMATTING)
-        self.columns = config_map.get("columns", parse_config.DEFAULT_ALPACA_COLUMNS_MAPPING)
-        super().__init__(self.file_path, self.formatting, self.doc_formatting, self.columns, process_fn, shuffle_file)
+        self.doc_formatting = config_map.get(
+            "doc_formatting", parse_config.DEFAULT_DOC_FORMATTING
+        )
+        self.columns = config_map.get(
+            "columns", parse_config.DEFAULT_ALPACA_COLUMNS_MAPPING
+        )
+        train_type = config_map.get("train_type", "")
+        if train_type == "dpo":
+            self.columns = config_map.get(
+                "columns", parse_config.DEFAULT_ALPACA_DPO_COLUMNS_MAPPING
+            )
+        super().__init__(
+            self.file_path,
+            self.formatting,
+            self.doc_formatting,
+            self.columns,
+            process_fn,
+            shuffle_file,
+        )
+        self.train_type = train_type
+        self.update_columns(self.columns)
 
         self.output_file_name = repo_id.replace("/", ".") + ".json"
-        self.output_file_path = os.path.join(parse_config.DATASET_OUTPUT_ROOT, self.output_file_name)
+        self.output_file_path = os.path.join(
+            parse_config.DATASET_OUTPUT_ROOT, self.output_file_name
+        )
         self.output_json_indent = parse_config.DEFAULT_OUTPUT_JSON_INDENT
 
     def _base_download(self):
         """
         Download dataset from hugging-face.
         """
-        snapshot_download(repo_id=self.repo_id, repo_type="dataset", local_dir=self.download_path)
+        snapshot_download(
+            repo_id=self.repo_id, repo_type="dataset", local_dir=self.download_path
+        )
 
     def download(self):
         """
@@ -359,7 +458,7 @@ class HFScanParser(HFBaseParser):
         """
         try:
             self.parse_json_file()
-        except errors.DataSetParseError as e:
+        except errors.DataSetParseError:
             self.parse_json_lines_file()
         except errors.DataSetFileCannotOpenError as e:
             raise e
@@ -374,7 +473,9 @@ class HFScanParser(HFBaseParser):
         """
         self.download()
         self.file_name = self.scan_dataset_file()
-        print(f'Find {self.file_name} under {self.download_path} when scanning "*.json".')
+        print(
+            f'Find {self.file_name} under {self.download_path} when scanning "*.json".'
+        )
         self.file_path = os.path.join(self.download_path, self.file_name)
         self.check_dataset_filename()
         self.parse()
@@ -415,7 +516,11 @@ def create_hf_dataset(repo_id, process_fn=None, shuffle_file=True):
 
 
 def create_dataset_from_file(
-    file_path, formatting="alpaca", doc_formatting="json", process_fn=None, shuffle_file=True
+    file_path,
+    formatting="alpaca",
+    doc_formatting="json",
+    process_fn=None,
+    shuffle_file=True,
 ):
     """
     Create dataset from file function.
@@ -434,7 +539,9 @@ def create_dataset_from_file(
             f"{formatting} is not supported."
             f"Please use one of [{', '.join(list(parse_config.DEFAULT_DATASET_COLUMNS_MAPPING.keys()))}]"
         )
-        raise errors.DataSetFormattingNotSupportedError(f"{formatting}")
+        raise errors.DataSetFormattingNotSupportedError(f"{msg}")
     columns = parse_config.DEFAULT_DATASET_COLUMNS_MAPPING[formatting]
-    parser = BaseDatasetParser(file_path, formatting, doc_formatting, columns, process_fn, shuffle_file)
+    parser = BaseDatasetParser(
+        file_path, formatting, doc_formatting, columns, process_fn, shuffle_file
+    )
     return parser
