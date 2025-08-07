@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Paddle Ernie model"""
 
 from models.utils import get_global_training_logs
 from models.comm_utils import profile
@@ -172,15 +171,12 @@ except (ImportError, ModuleNotFoundError):
 
 logger = logging.getLogger(__name__)
 
-# HACK: paddle.fluid.libpaddle.ProcessGroupNCCL 不支持 deepcopy protocol, 此举实属无奈。
 paddle.distributed.communication.group.Group.__deepcopy__ = lambda self, _: self
-# HACK: paddle.fluid.libpaddle.ProcessGroupNCCL 不支持 json 序列化 protocol, 此举实属无奈。
 paddle.distributed.communication.group.Group.to_json = lambda self: repr(self)
 
 
 @dataclass
 class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
-    """doc"""
 
     router_loss: Optional[paddle.Tensor] = None
     gate_logits: Optional[Tuple[paddle.Tensor]] = None
@@ -189,7 +185,6 @@ class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
 
 @dataclass
 class CausalLMOutputWithCrossAttentions(_CausalLMOutput):
-    """doc"""
 
     router_loss: Optional[paddle.Tensor] = None
 
@@ -212,9 +207,7 @@ except ImportError:
     fused = None
 
 
-global_training_logs = (
-    get_global_training_logs()
-)  # 没有erniebot的环境下无法打印 debug 量
+global_training_logs = get_global_training_logs()
 
 ERNIE_PRETRAINED_MODEL_ARCHIVE_LIST = []
 
@@ -241,28 +234,8 @@ def get_gate(
     expert: Tuple[Tuple[int, nn.Layer]],
     layer_idx: int,
 ) -> Tuple[nn.Layer, nn.LayerList]:
-    """get moe gate
 
-    Args:
-        config (ErnieMoEConfig): _description_
-        expert (Tuple[Tuple[int, nn.Layer]]): tuple of (num_experts, expert prototype), each represents lm, mm, etc...
-        layer_idx (int): _description_
-
-    Returns:
-        Tuple[nn.Layer, nn.LayerList]: _description_
-    """
-    f"""
-    自动构建gate, 目前支持 {gate_class.keys()}
-    """
-    # if config.moe_group != "dummy":
-    #     moe_world_size = min(1, dist.get_world_size(config.moe_group))
-    # else:
-    #     moe_world_size = 1
-    moe_num_experts = (
-        sum(config.moe_num_experts)
-        if config.multimodel_experts
-        else config.moe_num_experts
-    )
+    moe_num_experts = config.moe_num_experts
     assert (
         moe_num_experts >= config.moe_world_size
     ), f"expert moe_num_experts={moe_num_experts} >= moe_world_size={config.moe_world_size}"
@@ -289,7 +262,7 @@ def get_gate(
                 experts_to_append = fc
             for ex in experts_to_append:
                 for p in ex.parameters():
-                    p.expert_type = f"expert_type_{expert_id}"  # 不同的 `expert_type` 可以有不同的 intermediate-size
+                    p.expert_type = f"expert_type_{expert_id}"
             experts.extend(experts_to_append)
         assert (
             len(experts) == moe_num_experts_per_device
@@ -312,15 +285,7 @@ def get_gate(
             config, layer_idx=layer_idx, group=config.moe_group
         )
 
-    if config.multimodel_experts and config.moe_use_hard_gate and moe_num_experts > 2:
-        lm_experts = experts[: config.moe_num_experts[0] // config.moe_world_size]
-        lm_cfg = deepcopy(config)
-        lm_cfg.moe_num_experts = config.moe_num_experts[0]
-        lm_gate = gate_class[config.moe_gate.lower()](
-            lm_cfg, layer_idx=layer_idx, group=config.moe_group, gate_weight=gate.weight
-        )
-    else:
-        lm_gate, lm_experts = gate, experts
+    lm_gate, lm_experts = gate, experts
     logger.info(f"LM-experts-{lm_experts} -- experts-{experts}")
     return gate, experts, lm_gate, lm_experts
 
@@ -432,7 +397,6 @@ def moe_ep2mp(
         if "mlp.experts" in k
     ]
     if expert_ids and max(expert_ids) == num_experts - 1:
-        # 参数本身为dummy moe 参数。
         return state_dict
 
     logger.info("auto ep2mp")
@@ -482,18 +446,11 @@ def moe_ep2mp(
 def moe_statedict_local_id_to_global(
     state_dict: Dict[str, paddle.Tensor], config: ErnieMoEConfig
 ):
-    """
-    将本地模型中的参数转换为全局模型的参数
-    """
     if not config.moe_state_dict_use_global_expert_id:
         return state_dict
     if config.moe_world_size <= 1:
         return state_dict
-    moe_num_experts = (
-        sum(config.moe_num_experts)
-        if isinstance(config.moe_num_experts, (list, tuple))
-        else config.moe_num_experts
-    )
+    moe_num_experts = config.moe_num_experts
     if moe_num_experts <= 1:
         return state_dict
     moe_world_size = config.moe_world_size
@@ -535,9 +492,7 @@ def moe_statedict_local_id_to_global(
 def moe_statedict_cherry_pick(
     state_dict: Dict[str, paddle.Tensor], config: ErnieMoEConfig
 ):
-    """
-    从state_dict中挑选出需要的参数
-    """
+
     if not config.moe_state_dict_use_global_expert_id:
         return state_dict
     moe_num_experts = (
@@ -596,11 +551,6 @@ def moe_statedict_upcycle(
     split_actions,
     layer_idxs=None,
 ):
-    """
-    state-dict Upcycle 考虑：
-        1. 细粒度 MoE (shared experts)
-        2. Attention MoE
-    """
     if not isinstance(config.moe_intermediate_size, int):
         logger.warning("moe upcycle only supports single modality expand !")
         return state_dict
@@ -853,9 +803,6 @@ class ErnieMoeMLP(ErnieMLP):
     """
 
     def __init__(self, config, is_shared_expert=False):
-        """
-        MOE experts，在 MP-moe 下，后才用FusedLinear 实现，其他情况下采用Col/Row Linear.
-        """
         if getattr(config, "disable_ffn_model_parallel", False):
             # assert config.moe_group == "mp", f"when using mp_moe, expect moe-group == mp, but get {config.moe_group}"
             config = deepcopy(config)
@@ -869,13 +816,6 @@ class ErnieMoeMLP(ErnieMLP):
         self.shared_expert_mem_efficient = self.config.fp8_mem_configs["shared_expert"]
 
     def forward(self, x, use_comm=True):
-        """
-        Args:
-            x: Tensor [B,S,dim] or [S,dim]
-            use_comm: Skip column-linear allgather if set to false
-        Returns:
-            same shape as `x`
-        """
         if (
             self.config.use_fp8
             and self.config.fp8_configs["layers"]["mlp_tp_fc1_linear"]
@@ -1133,7 +1073,7 @@ class ErnieMoeMLPFused(nn.Layer):
     """Fused Implement of ErnieMoeMLP"""
 
     def __init__(self, config):
-        """doc"""
+
         assert (
             hasattr(config, "disable_ffn_model_parallel")
             or config.tensor_parallel_degree == 1
@@ -1182,23 +1122,7 @@ class FusedLinearAddNormFunc(paddle.autograd.PyLayer):
 
     @staticmethod
     def forward(ctx, x, residual, linear_weight, rms_norm_weight, eps):
-        """
-        计算前向传播的结果。
 
-        Args:
-            ctx (paddle.autograd.grad_context.GradContext): 自动微分上下文，用于保存前向传播中的中间变量。
-            x (paddle.Tensor): 输入的tensor，形状为[batch_size, seq_len, hidden_size]。
-            residual (paddle.Tensor): 残差连接，形状为[batch_size, seq_len, hidden_size]。
-            linear_weight (paddle.Tensor): 线性变换的权重，形状为[hidden_size, hidden_size]。
-            rms_norm_weight (paddle.Tensor): RMSNorm的权重，形状为[hidden_size]。
-            eps (float): 防止除零的小正数。
-
-        Returns:
-            tuple: 包含两个paddle.Tensor的元组，分别为归一化后的输出和加法操作后的输出。
-                - norm_out (paddle.Tensor): 归一化后的输出，形状为[batch_size, seq_len, hidden_size]。
-                - add_out (paddle.Tensor): 加法操作后的输出，形状为[batch_size, seq_len, hidden_size]。
-
-        """
         linear_out = paddle.matmul(x, linear_weight)
         add_out = linear_out + residual
         norm_out, invar = fused.fused_rms_norm(add_out, rms_norm_weight, eps)
@@ -1209,18 +1133,7 @@ class FusedLinearAddNormFunc(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, d_rms_norm_out, d_residual_out):
-        """
-        对给定的输入进行反向传播计算梯度。
 
-        Args:
-            ctx (paddle.autograd.grad_context.GradContext): 上下文对象，保存了前向传播中的状态信息。
-            d_rms_norm_out (paddle.Tensor): RMS 归一化输出的梯度。
-            d_residual_out (paddle.Tensor): 残差输出的梯度。
-
-        Returns:
-            tuple: 包含四个梯度值，分别为输入 x 的梯度、残差 residual 的梯度、线性权重 linear_weight 的梯度、RMS 归一化权重 rms_norm_weight 的梯度。
-
-        """
         x, residual, linear_weight, rms_norm_weight, eps = ctx.saved_tensor()
 
         linear_out = paddle.matmul(x, linear_weight)
@@ -1265,15 +1178,6 @@ class FusedLinearAddNorm(paddle.nn.Layer):
         self.eps = eps
 
     def forward(self, x, residual):
-        """
-        Args:
-            x (Tensor): 输入张量。
-            residual (Tensor): 残差张量。
-
-        Returns:
-            Tensor: 经过 FusedLinearAddNormFunc 操作后的输出张量。
-
-        """
         return FusedLinearAddNormFunc.apply(
             x, residual, self.linear_weight, self.rms_norm_weight, self.eps
         )
@@ -1286,20 +1190,6 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
 
     @staticmethod
     def forward(ctx, x, rms_norm_weight, linear_weight, eps):
-        """
-        前向传播函数，用于计算模型输出。
-
-        Args:
-            ctx (Context): 上下文对象，用于保存计算过程中的中间结果，以便在反向传播时使用。
-            x (Tensor): 输入数据，形状为 (batch_size, seq_len, embed_dim)。
-            rms_norm_weight (Tensor): RMSNorm层的权重，形状为 (embed_dim,)。
-            linear_weight (Tensor): 线性层的权重，形状为 (embed_dim, output_dim)。
-            eps (float): RMSNorm层中用于防止除零错误的小正数。
-
-        Returns:
-            Tensor: 输出数据，形状为 (batch_size, seq_len, output_dim)。
-
-        """
 
         hidden_states, invar = fused.fused_rms_norm(x, rms_norm_weight, eps)
         q = paddle.matmul(hidden_states, linear_weight)
@@ -1309,17 +1199,7 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, d_qkv):
-        """
-        反向传播函数，用于计算反向梯度。
 
-        Args:
-            ctx (Context): 存储了前向传播过程中的一些变量和梯度。
-            d_qkv (Tensor): 对应于qkv向量的梯度。
-
-        Returns:
-            Tuple[Tensor, Tensor, Tensor]: 包含三个张量，分别对应于输入x的梯度、rms_norm_weight的梯度以及linear_weight的梯度。
-
-        """
         x, rms_norm_weight, linear_weight, eps = ctx.saved_tensor()
         hidden_states, invar = fused.fused_rms_norm(x, rms_norm_weight, eps)
         h_grad, d_linear_weight = paddle._C_ops.matmul_grad(
@@ -1360,42 +1240,24 @@ class FusedRMSLinear(paddle.nn.Layer):
         self.eps = eps
 
     def forward(self, x):
-        """
-        计算给定输入 x 的前向传播结果。
-
-        Args:
-            x (Tensor): 输入张量
-
-        Returns:
-            Tensor: 返回经过 FusedRMSLinearFunc 操作后的输出张量，类型与输入 x 相同。
-
-        """
         return FusedRMSLinearFunc.apply(
             x, self.rms_norm_weight, self.linear_weight, self.eps
         )
 
 
 class ErnieMoEAttention(ErnieAttention):
-    """
-    moe attention 模块，支持 qkv attention。 rope 等逻辑复用 `ErnieAttention`
-    """
 
     def __init__(self, config, layer_idx):
-        # assert not config.moe_attn or config.fuse_attn_ffn, "`moe-attn` requires `fuse-attn-ffn`"
         if (
             config.moe_num_experts
             and config.moe_num_attn_experts
             and (layer_idx + 1) % config.moe_layer_interval == 0
         ):
-            assert (
-                not config.sequence_parallel
-            ), "# moe-attn 下不能开启sequence-parallel，因为不知道其他 mp 的 token 是什么模态的。"
+            assert not config.sequence_parallel, "sequence_parallel need be true."
 
             assert not hasattr(
                 config, "disable_ffn_model_parallel"
-            ), '`moe_group == "mp"` 情况下还不支持 moe-attn'
-            # config = deepcopy(config)
-            # config.tensor_parallel_degree = 1
+            ), '`moe_group == "mp"` is not support moe-attn'
             self.use_moe_attn = True
         else:
             self.use_moe_attn = False
@@ -1508,9 +1370,6 @@ class ErnieMoEAttention(ErnieAttention):
                 token_type_ids = token_type_ids.reshape([-1])
                 token_type_ids = ScatterOp.apply(token_type_ids)
                 token_type_ids.stop_gradient = True
-            # 在SP下输入 hidden.shape = [bsz*seq/mp_size, dim]
-            # logger.info(f'into attn shape={hidden_states.shape}')
-            # bsz = hidden_states.shape[0] * self.config.tensor_parallel_degree // self.config.seqlen
             q_len = self.config.seqlen
         else:
             q_len = hidden_states.shape[-2]
@@ -1687,8 +1546,6 @@ class FakeMoERouterLoss(PyLayer):
         else:
             router_loss_grad_value = 1.0 / ctx.num_acc_steps
 
-        # 精度对齐模式下需要设置router_loss回传的梯度为0
-        # 当前自动并行和动手需要在不带router_loss场景下才能做到精度对齐，否则会导致自动并行与动手精度无法对齐
         if in_auto_parallel_align_mode():
             router_loss_grad_value = 0.0
 
@@ -1799,46 +1656,6 @@ class ErnieDecoderLayer(nn.Layer):
                     group_experts=config.moe_group_experts,
                     moe_statics=moe_statics,
                 )
-                if config.multimodel_experts and config.moe_use_hard_gate:
-                    if "text" in str(config.moe_multimodal_dispatch_use_allgather):
-                        logger.info(
-                            f"text expert using moe-allgather-layer: {type(self.mlp)}"
-                        )
-                        _mlp_text = MOEAllGatherLayerV2(
-                            lm_gate,
-                            lm_experts,
-                            layer_idx=layer_idx,
-                            use_expert_out_alltoall=True,
-                            use_padding=False,
-                            shared_experts=shared_experts,
-                            group=config.moe_group,
-                            recompute=config.use_recompute_moe,
-                            enable_logging=config.moe_logging,
-                            k=config.moe_k,
-                            enable_bpr=config.moe_use_bpr,
-                            enable_reverse_token_drop=config.moe_reverse_token_drop,
-                            all_to_all_dropout=config.moe_all_to_all_dropout,
-                            group_experts=config.moe_group_experts,
-                            moe_statics=moe_statics,
-                        )
-                    else:
-                        _mlp_text = MOELayer(
-                            lm_gate,
-                            lm_experts,
-                            layer_idx=layer_idx,
-                            shared_experts=shared_experts,
-                            group=config.moe_group,
-                            recompute=config.use_recompute_moe,
-                            enable_logging=config.moe_logging,
-                            k=config.moe_k,
-                            enable_bpr=config.moe_use_bpr,
-                            all_to_all_dropout=config.moe_all_to_all_dropout,
-                            group_experts=config.moe_group_experts,
-                            moe_statics=moe_statics,
-                        )
-                    self.mlp_text = (
-                        lambda: _mlp_text
-                    )  # 这个lambd防止 text部分参数被扫进state-dict
                 if dense_experts is not None and config.moe_use_hard_gate:
                     _mlp_dense_experts = MOEAllGatherLayerV2(
                         lm_gate,
@@ -1858,12 +1675,8 @@ class ErnieDecoderLayer(nn.Layer):
                         group_experts=config.moe_group_experts,
                         dense_token_type=config.moe_dense_experts_token_type_id,
                     )
-                    self.mlp_dense_experts = (
-                        lambda: _mlp_dense_experts
-                    )  # 这个lambd防止 audio部分参数被扫进state-dict
-            if (
-                config.sequence_parallel
-            ):  # `mp-moe` 下 gate 在 attn 中生效，处于同步区。
+                    self.mlp_dense_experts = lambda: _mlp_dense_experts
+            if config.sequence_parallel:
                 for p in gate.parameters():
                     mark_as_sequence_parallel_parameter(p)
         else:
@@ -1899,8 +1712,6 @@ class ErnieDecoderLayer(nn.Layer):
         self.residual_add2 = FusedDropoutImpl(
             config.hidden_dropout_prob, mode="upscale_in_train"
         )
-        # self.residual_add1 = FusedDropoutAdd(config.hidden_dropout_prob, mode="upscale_in_train")
-        # self.residual_add2 = FusedDropoutAdd(config.hidden_dropout_prob, mode="upscale_in_train")
 
         if config.sequence_parallel:
             if self.use_linear_residual_norm_recompute is True:
@@ -1911,9 +1722,7 @@ class ErnieDecoderLayer(nn.Layer):
                 mark_as_sequence_parallel_parameter(
                     self.post_attention_layernorm.weight
                 )
-            # mp-moe下 bias, expert 内没有Column/RowLinear. 不用挂钩子.
             if not hasattr(config, "disable_ffn_model_parallel"):
-                # mlp 相关bias的sequence_parallel hook 由RowLinear内部挂。
                 if self.use_rms_qkv_recompute is True:
                     mark_as_sequence_parallel_parameter(
                         self.self_attn.fused_rms_norm_linear.rms_norm_weight
@@ -2122,7 +1931,6 @@ class ErnieDecoderLayer(nn.Layer):
                 )
         else:
             is_multimodel_token_task = None
-            is_multimodel_token_cpu = None
             has_dense_experts_token_task = None
             has_dense_experts_token_cpu = None
 
@@ -2174,17 +1982,7 @@ class ErnieDecoderLayer(nn.Layer):
             if has_dense_experts_token_task is not None:
                 hack_offload_wait(has_dense_experts_token_task)
             with profile("moe-mlp"):
-                if (
-                    self.config.multimodel_experts
-                    and self.config.moe_use_hard_gate
-                    and token_type_ids is not None
-                    and not is_multimodel_token_cpu
-                ):
-                    # from models.comm_utils import md5
-                    hidden_states, _, router_loss, gate_logits = self.mlp_text()(
-                        hidden_states, None
-                    )
-                elif has_dense_experts_token_cpu:
+                if has_dense_experts_token_cpu:
                     (
                         hidden_states,
                         _,
@@ -2213,13 +2011,10 @@ class ErnieDecoderLayer(nn.Layer):
             outputs += (present_key_value,)
 
         if self.use_moe:
-            # 只有 `use_moe` 时为非空
             if router_loss_attn:
                 router_loss_attn = router_loss_attn[0]
                 if self.config.moe_logging:
-                    global_training_logs = (
-                        get_global_training_logs()
-                    )  # 没有erniebot的环境下无法打印 debug 量
+                    global_training_logs = get_global_training_logs()
                     global_training_logs.update(
                         **{
                             f"router_loss_attn_{self.layer_idx}": router_loss_attn,
@@ -2228,7 +2023,6 @@ class ErnieDecoderLayer(nn.Layer):
                     )
                 router_loss = router_loss + router_loss_attn
 
-            # use-moe 时无论这一层有没有 moe layer，都会额外增加一个返回值
             if isinstance(
                 self.mlp,
                 (
@@ -2287,16 +2081,7 @@ class ErniePretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_name_mappings(cls, config: ErnieMoEConfig) -> StateDictNameMapping:
-        """
-        返回用于映射ERNIE-M-O模型中状态字典名称的映射列表。
 
-        Args:
-            config (ErnieMoEConfig): 包含ERNIE-M-O模型配置信息的对象。
-
-        Returns:
-            List[StateDictNameMapping]: 包含用于映射ERNIE-M-O模型中的状态字典名称的映射对象的列表。
-
-        """
         mappings: StateDictNameMapping = []
         model_mappings = [
             ["embed_tokens.weight"],
@@ -2371,17 +2156,6 @@ class ErniePretrainedModel(PretrainedModel):
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
-        """
-        获取张量并行映射关系，返回一个字典。
-
-        Args:
-            config (TensorParallelConfig): TensorParallel配置对象，包含一些参数信息。
-            is_split (bool): 是否为分割操作。默认为True。
-
-        Returns:
-            Dict[str, Callable[[Any], Any]]: 包含张量并行映射关系的字典，key为需要映射的张量名，value为相应的映射函数。
-
-        """
 
         from paddleformers.transformers.conversion_utils import split_or_merge_func
         from models.ernie.modeling import gqa_qkv_split_func, gqa_qkv_merge_func
@@ -2417,9 +2191,6 @@ class ErniePretrainedModel(PretrainedModel):
             qkv_fn = partial(fn, is_column=True)
 
         def get_tensor_parallel_split_mappings(num_layers):
-            """
-            目前仅支持对 dense 参数做自动 mp 切分。
-            """
 
             # input is pySlice if load safetensors, cast to tensor here
             def cast_to_tensor_if_needed(x):
@@ -2505,11 +2276,7 @@ class ErniePretrainedModel(PretrainedModel):
                         else:
                             final_actions[newkey] = action
                         if "mlp" in key and (i + 1) % config.moe_layer_interval == 0:
-                            moe_num_experts = (
-                                sum(config.moe_num_experts)
-                                if config.multimodel_experts
-                                else config.moe_num_experts
-                            )
+                            moe_num_experts = config.moe_num_experts
                             if moe_num_experts > 0:
                                 for expert_id in range(moe_num_experts):
                                     _key = key.replace(
@@ -2588,19 +2355,12 @@ class ErniePretrainedModel(PretrainedModel):
                 paddle.incubate.nn.FusedLinear,
             ),
         ):
-            # In the dygraph mode, use the `set_value` to reset the parameter directly,
-            # and reset the `state_dict` to update parameter in static mode.
-            # logger.info(f'initializing pp:{type(layer)}')
-            if not hasattr(
-                layer, "weight"
-            ):  # no weight to initialie : moe-round-robin-gate
+            if not hasattr(layer, "weight"):
                 return
 
             is_moe = getattr(layer.weight, "no_sync", False)
-            # 'model_parallel_rng' 在 DP 间一样(框架设置)，local-seed 是处处不一样
             with rng_tracker("local_seed" if is_moe else "model_parallel_rng"):
-                dtype = paddle.get_default_dtype()  # layer.weight.dtype  #
-                # dtype = str(dtype).replace("paddle.", "")
+                dtype = paddle.get_default_dtype()
                 paddle.set_default_dtype("float32")
                 if isinstance(layer, TEFP8Linear):
                     layer.weight.set_value(
@@ -2661,17 +2421,15 @@ class ErniePretrainedModel(PretrainedModel):
             inv_freq = 1.0 / (
                 layer.base ** (np.arange(0, head_dim, 2).astype("float32") / head_dim)
             )
-            # self.register_buffer("inv_freq", inv_freq.cast(dtype))
 
-            # higher acc using float32
             t = np.arange(layer.max_position_embeddings, dtype="float32")
             freqs = np.einsum("i,j->ij", t, inv_freq)
             # Different from paper, but it uses a different permutation in order to obtain the same calculation
             emb = np.concatenate([freqs, freqs], axis=-1)
             # [bs, seqlen, nhead, head_dim]
-            cos_cached = np.cos(emb)[:, :]  # .astype(dtype)
-            sin_cached = np.sin(emb)[:, :]  # .astype(dtype)
-            layer.cos_cached.set_value(cos_cached)  # model后续会被cast成half/bfloat16
+            cos_cached = np.cos(emb)[:, :]
+            sin_cached = np.sin(emb)[:, :]
+            layer.cos_cached.set_value(cos_cached)
             layer.sin_cached.set_value(sin_cached)
 
 
@@ -2684,15 +2442,7 @@ class ErnieModel(ErniePretrainedModel):
     """
 
     def __init__(self, config: ErnieMoEConfig):
-        """
-        初始化类并设置参数
 
-        Args:
-            config (ErnieMoEConfig): 模型的配置类，包含模型超参数
-
-        Returns:
-            None
-        """
         if config.moe_group in {"mp", "model", "tp", "mpdp"}:
             # assert config.sequence_parallel
             logger.info(
@@ -2774,44 +2524,18 @@ class ErnieModel(ErniePretrainedModel):
                         mark_as_sequence_parallel_parameter(mtp_linear.bias)
 
     def get_input_embeddings(self):
-        """
-        获取输入嵌入
 
-        Returns:
-            nn.Embedding: 嵌入层对象，包含输入序列的嵌入表示
-
-        """
         return self.embed_tokens
 
     def set_input_embeddings(self, value):
-        """设置模型输入嵌入矩阵。
 
-        Args:
-            value (`torch.nn.Embedding`): 包含模型输入嵌入的 Embedding 对象。
-
-        Returns:
-            None。
-
-        """
         self.embed_tokens = value
 
     @classmethod
     def _prepare_decoder_attention_mask(
         cls, attention_mask, input_shape, past_key_values_length, dtype
     ):
-        """
-        根据输入的mask，将其转化为需要的类型。
 
-        Args:
-            attention_mask (Tensor[Bool]): 需要转换的attention mask。
-            input_shape (Tuple[int]): 当前输入张量形状。
-            past_key_values_length (int): 上一个时间步的密钥值长度。
-            dtype (DType): 需要进行转换的目标数据类型。
-
-        Returns:
-            Tensor[Float]: 转换后的attention mask。
-
-        """
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
         combined_attention_mask = None
@@ -3075,19 +2799,17 @@ class ErnieModel(ErniePretrainedModel):
                     layer_outputs, gate_logits = layer_outputs[:-1], layer_outputs[-1]
                     all_gate_logits = all_gate_logits + (gate_logits,)
 
-        # Multi Token Prediction
         if self.config.multi_token_pred_depth > 0:
             mtp_outputs.append(hidden_states)
 
             for depth in range(self.config.multi_token_pred_depth):
-                # sp并行，先获取完整的上一层输出
+
                 if self.config.sequence_parallel or self.config.submatrix_parallel:
                     hidden_states = GatherOp.apply(hidden_states)
                     hidden_states = hidden_states.reshape(
                         [-1, seq_length, hidden_states.shape[-1]]
                     )
 
-                # 构建输入向量
                 inputs_embeds_cur_depth = paddle.concat(
                     [
                         inputs_embeds_ori[:, (depth + 1) :, :],
@@ -3095,9 +2817,7 @@ class ErnieModel(ErniePretrainedModel):
                     ],
                     axis=1,
                 )
-                # inputs_embeds_cur_depth += hidden_states # sum
 
-                # Norm&Concat
                 inputs_embeds_cur_depth_norm = self.mtp_emb_norm[depth](
                     inputs_embeds_cur_depth
                 )
@@ -3115,7 +2835,6 @@ class ErnieModel(ErniePretrainedModel):
                     )
                     inputs_embeds_cur_depth = ScatterOp.apply(inputs_embeds_cur_depth)
 
-                # 通过该层的decoder_layer进行预测
                 decoder_layer = self.mtp_block[depth]
                 past_key_value = None
                 layer_outputs = decoder_layer(
@@ -3192,16 +2911,7 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
     """
 
     def __init__(self, config, return_tuple=True):
-        """
-        用于ERNIE预训练任务的损失函数基类。
 
-        Args:
-            config (PretrainingConfig): ERNIE模型的配置对象。
-            return_tuple (bool，可选): 如果为True，则返回损失函数的值为一个元组（loss），否则返回标量值。默认值为True。
-
-        Returns:
-            None
-        """
         super(ErniePretrainingCriterion, self).__init__(
             config, return_tuple=return_tuple
         )
@@ -3238,9 +2948,7 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             prediction_scores,
             masked_lm_labels,
         )
-        global_training_logs = (
-            get_global_training_logs()
-        )  # 没有erniebot的环境下无法打印 debug 量
+        global_training_logs = get_global_training_logs()
 
         if self.config.multi_token_pred_depth > 0:
             global_training_logs.update(mtp_depth_0_loss=res[0].clone().detach())
@@ -3309,30 +3017,7 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
     def __init__(self, config):
-        """
-        初始化类，初始化ERNIE模型。
 
-        Args:
-            config (`obj:`dict`): 包含ERNIE模型配置信息的字典对象，包含以下参数：
-
-                - ``use_ms_token`` (`bool`): 是否使用Microsoft Tokenizer进行预处理。默认值为False。
-                - ``model_name_or_path`` (`str`): 指定用于预训练BERT或RoBERTa模型的文件路径或者名称。默认值为"bert-base-uncased"。
-                - ``max_seq_length`` (`int`): BERT输入序列长度上限。默认值为512。
-                - ``vocab_file`` (`str`): 指定词汇表文件路径。默认值为None。
-                - ``num_labels`` (`int`): 标签数量。默认值为2。
-                - ``hidden_dropout_prob`` (`float`): 隐含层Dropout概率。默认值为0.1。
-                - ``attention_probs_dropout_prob`` (`float`): Attention Probability Dropout概率。默认值为0.1。
-                - ``intermediate_size`` (`int`): 中间层大小。默认值为4096。
-                - ``layer_num`` (`int`): Transformer块数。默认值为12。
-                - ``use_rmsnorm`` (`bool`): 是否使用RMSNorm。默认值为True。
-                - ``fuse_rms_norm`` (`bool`): 是否融合使用RMSNorm和LayerNorm两种方式。默认值为False。
-                - ``fuse_ln`` (`bool`): 是否融合使用LayerNorm和GroupNorm两种方式。默认值为False。
-                - ``initializer_range`` (`float`): 默认为0.02。
-                - ``use_bfloat16`` (`bool`): 是否使用BFloat16精度计算。默认值为False。
-
-        Returns:
-            None
-        """
         super().__init__(config)
 
         if config.sequence_parallel:
@@ -3369,19 +3054,7 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
 
     # Initialize weights and apply final processing
     def _post_init(self, original_init, *args, **kwargs):
-        """
-        初始化方法，用于在模型初始化之后执行一些操作。
 
-        Args:
-            self (LARKERForSequenceClassification): 当前的LARKERForSequenceClassification对象。
-            original_init (callable): 原始的初始化方法。
-            args (tuple): 参数列表。
-            kwargs (dict): 参数字典。
-
-        Returns:
-            None: 不返回任何值。
-
-        """
         super()._post_init(self, original_init, *args, **kwargs)
         factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
         logger.info(f"using post init div: factor:{factor}")
@@ -3438,14 +3111,10 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
             _type_: _description_
         """
         state_dict = super().state_dict(*args, **kwargs)
-        # moe state dict 转换成全局id.
         return moe_statedict_local_id_to_global(state_dict, self.config)
 
     def set_state_dict(self, state_dict, *args, **kwargs):
-        """
-        自动加载 dense 网络的 state-dict
-        """
-        # 自动扩展dense ckpt
+
         state_dict = moe_statedict_upcycle(
             state_dict,
             self.config,
@@ -3454,7 +3123,6 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
             self._get_tensor_parallel_mappings(self.config, is_split=True),
         )
         state_dict = moe_statedict_cherry_pick(state_dict, self.config)
-        # 自动扩展ep2mp
         state_dict = moe_ep2mp(
             state_dict,
             self.config,
@@ -3471,94 +3139,32 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
         return ret
 
     def get_input_embeddings(self):
-        """
-        获取输入嵌入对象。
 
-        Args:
-            无。
-
-        Returns:
-            torch.nn.Module: 嵌入对象。
-
-        """
         return self.ernie.embed_tokens
 
     def set_input_embeddings(self, value):
-        """设置输入嵌入。
 
-        Args:
-            value (torch.nn.Embedding): 输入嵌入对象。
-
-        Returns:
-            None.
-
-        """
         self.ernie.embed_tokens = value
 
     def get_output_embeddings(self):
-        """
-        获取输出嵌入
 
-        Args:
-            无参数
-
-        Returns:
-            nn.Module: 返回模型的 LM head 的输出嵌入层
-        """
         return self.lm_head
 
     def set_output_embeddings(self, new_embeddings):
-        """设置输出嵌入（LM head）
 
-        Args:
-            new_embeddings (torch.nn.Embedding): 新的输出嵌入。
-
-        Returns:
-            None
-
-        """
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        """
-        设置解码器
 
-        Args:
-            decoder (BertDecoder): 用于解码输入句子的 BertDecoder 对象
-
-        Returns:
-            None
-
-        """
         self.ernie = decoder
 
     def get_decoder(self):
-        """
-        获取解码器
 
-        Args:
-            无
-
-        Returns:
-            Optional[nn.Module]: 返回解码器，如果未指定则返回None
-
-        """
         return self.ernie
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-        """
-        根据给定的输入ID、填充Token ID和句末标记ID，生成对应需要的注意力掩码。
 
-        Args:
-            input_ids (`paddle.Tensor`): 输入ID，形状为[batch_size * seq_length]。
-            pad_token_id (`paddle.Tensor`, optional): 填充Token ID，默认值为None。
-            eos_token_id (`paddle.Tensor`, optional): 句末标记ID，默认值为None。
-
-        Returns:
-            `paddle.Tensor`: 生成的注意力掩码，形状为[batch_size * seq_length, seq_length]。
-
-        """
         is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
             input_ids == pad_token_id
         ).numpy().item()
@@ -3644,17 +3250,7 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
     def update_model_kwargs_for_generation(
         self, outputs, model_kwargs, is_encoder_decoder=False
     ):
-        """
-        更新模型参数以进行生成。
 
-        Args:
-            outputs (Any): 模型输出，可能是一个tuple或一个类实例。
-            model_kwargs (Dict): 模型参数字典。
-            is_encoder_decoder (bool, optional): 是否为编码器解码器模式，默认值为False。
-
-        Returns:
-            Dict: 更新后的模型参数字典。
-        """
         # update cache
         if (
             isinstance(outputs, tuple)
@@ -3783,7 +3379,6 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
                 attentions=outputs.attentions,
                 router_loss=outputs.router_loss if self.config.use_moe else None,
             )
-        # Pretrain & Eval 必须有labels
         if self.config.use_moe:
             router_loss = outputs.router_loss
         else:

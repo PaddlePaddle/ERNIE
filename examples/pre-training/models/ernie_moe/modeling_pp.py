@@ -155,15 +155,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_hcg():
-    """
-    获取混合通信组
 
-    Args:
-        无参数
-
-    Returns:
-        int: 混合通信组的ID
-    """
     return fleet.get_hybrid_communicate_group()
 
 
@@ -171,9 +163,6 @@ class ErnieEmbeddingPipe(nn.Layer):
     """Extends ErnieEmbeddingPipe to forward attention_mask through the pipeline."""
 
     def __init__(self, config):
-        """
-        Embedding Pipe 模型。
-        """
         self.sequence_parallel = config.sequence_parallel
         self.use_mem_eff_attn = config.use_mem_eff_attn
         self.config = config
@@ -300,9 +289,6 @@ class MTPEmbeddingPipe(ErnieEmbeddingPipe):
     """Extends ErnieEmbeddingPipe to forward attention_mask through the pipeline."""
 
     def __init__(self, config):
-        """
-        Embedding Pipe 模型。
-        """
         super(MTPEmbeddingPipe, self).__init__(config)
 
     @property
@@ -340,16 +326,7 @@ class EmptyLayer(nn.Layer):
     """ "EmptyLayer"""
 
     def __init__(self):
-        """
-        重写父类的初始化方法
 
-        Args:
-            None
-
-        Returns:
-            None
-
-        """
         super().__init__()
 
     def forward(self, x):
@@ -371,18 +348,6 @@ class ErnieDecoderLayerPipe(ErnieDecoderLayer):
     """
 
     def __init__(self, config, layer_idx, use_full_recompute=False):
-        """
-        初始化 AttnWrapper 类的一个实例。
-
-        Args:
-        - config (ConfigProto): 配置文件对象，包含模型的配置信息。
-        - layer_idx (int): 当前层索引号。
-        - use_full_recompute (bool, optional): 是否使用全新的计算方式进行权重更新，默认为 False。
-
-        Returns:
-        - None: 该方法没有返回值。
-
-        """
         super().__init__(config, layer_idx)
         self.layer_idx = layer_idx
         self.use_full_recompute = use_full_recompute
@@ -496,7 +461,6 @@ class ErnieDecoderLayerPipe(ErnieDecoderLayer):
         if len(ret) == 1:
             (ret,) = ret
         if self.config.multi_token_pred_depth > 0:
-            # must tuple if `multi_token_pred_depth > 0`
             if self.config.enable_mtp_magic_send:
                 ret = (ret,)
             else:
@@ -512,12 +476,7 @@ class RMSNormPipe(RMSNorm):
     """
 
     def __init__(self, config):
-        """初始化MoE模块。
 
-        Args:
-            config (MoeConfig): MoE配置对象，包含MoE相关参数。
-
-        """
         super().__init__(config)
         self.use_moe = config.use_moe
         mark_as_sequence_parallel_parameter(self.weight)
@@ -570,15 +529,7 @@ class LayerNormPipe(LayerNorm):
     """
 
     def __init__(self, config):
-        """初始化模块。
 
-        Args:
-            config (Config): 模块配置参数。
-
-        Returns:
-            None。
-
-        """
         super().__init__(config)
         self.use_moe = config.moe_num_experts > 0
         mark_as_sequence_parallel_parameter(self.weight)
@@ -624,9 +575,6 @@ class LayerNormPipe(LayerNorm):
 
 
 class ErnieMoELMHeadPipe(ErnieMoELMHead):
-    """
-    doc
-    """
 
     @property
     def embedding_weight(self):
@@ -634,20 +582,6 @@ class ErnieMoELMHeadPipe(ErnieMoELMHead):
         return getattr(self, "weight")
 
     def forward(self, args):
-        """
-        计算模型的前向传播过程，并返回输出 logits 和路由损失之和。
-
-        Args:
-            args (Union[Tuple, torch.Tensor]): 输入参数。
-
-                - Tuple: 包含两个元素的元组，第一个元素为隐藏状态张量，第二个元素为路由损失张量（可选）。
-                - torch.Tensor: 隐藏状态张量。
-
-                如果传入的是元组，则会将其视为包含了隐藏状态张量和路由损失张量的元组；否则，只会将隐藏状态张量视为输入参数进行前向传播操作。
-
-        Returns:
-            Union[torch.Tensor, Tuple]: 输出 logits。如果输入参数是元组，则会同时返回 logits 张量和路由损失张量；否则，只会返回 logits 张量。
-        """
         if self.config.multi_token_pred_depth > 0:
             logits = list()
             for _hidden_states in args:
@@ -666,15 +600,7 @@ class MTPLayer(nn.Layer):
     """
 
     def __init__(self, config):
-        """初始化模块。
 
-        Args:
-            config (Config): 模块配置参数。
-
-        Returns:
-            None。
-
-        """
         super().__init__()
         config = copy.deepcopy(config)
         self.config = config
@@ -814,11 +740,6 @@ class ErniePretrainingCriterionPipe(ErniePretrainingCriterion):
     """
 
     def __init__(self, config):
-        """初始化模型。
-
-        Args:
-            config (dict): 模型配置参数。
-        """
         super().__init__(config)
 
     def forward(self, logits, labels):
@@ -863,64 +784,24 @@ class PipelinePretrainedModel(PretrainedModel):
         self._pp_to_single_mapping = None
 
     def add_sequential_layer(self, layer_desc, name_prefix=""):
-        """
-        将顺序层添加到网络中
 
-        Args:
-            layer_desc (dict): 包含层描述的字典，格式参考 `model_helper.py` 中的说明。
-            name_prefix (str, optional): 层名称前缀，默认为空字符串。
-
-        Returns:
-            None
-
-        """
         self._sequential_layers.append(
             {"layer": layer_desc, "name_prefix": name_prefix}
         )
 
     def get_sequential_layers(self):
-        """
-        获取Sequential网络中的所有层。
 
-        Returns:
-            List[paddle.nn.Layer]: 包含所有层的列表。
-
-        """
         return [x["layer"] for x in self._sequential_layers]
 
     def get_sequential_name_prefixs(self):
-        """
-        获取并行层的名称前缀。
 
-        Args:
-            无。
-
-        Returns:
-            Dict[str, str]: 包含并行层索引和名称前缀的字典。
-
-        """
         return {
             str(index): x["name_prefix"]
             for index, x in enumerate(self._sequential_layers)
         }
 
     def get_shardlayer_prefix(self, name_splited):
-        """_summary_
-            This function retrieves the prefix of a shared layer. The process involves:
-            1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
-            2. For instance, given name_splited = ['shared_layers', 'shared_weight01', 'weight'],
-                the 'shared_layer_key' would be name_splited[1], which is 'shared_weight01'.
-            3. By traversing through all layers, the function checks if the specified
-                shared_layer is present in the current stage. If found, it returns the corresponding prefix.
 
-            Note: For retrieving all SharedLayer instances in Paddle, you can refer to the following Paddle code.
-            https://github.com/PaddlePaddle/Paddle/blob/2cf724d055679a1a0e48766dfb1708b920273078/python/paddle/distributed/fleet/meta_parallel/parallel_layers/pp_layers.py#L460-L513
-        Args:
-            name_splited (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
         shared_layer_names = {
             s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)
         }
@@ -942,16 +823,7 @@ class PipelinePretrainedModel(PretrainedModel):
         )
 
     def _set_pipeline_name_mapping(self, mappings=None):
-        """
-        设置 pipeline 的名称映射。
 
-        Args:
-            mappings (dict, optional): 存储名称与其对应的映射关系的字典。默认值为 None，表示不进行任何映射操作。
-
-        Returns:
-            dict: 返回已更新或原本已有的映射关系。
-
-        """
         if mappings is not None:
             self._pipeline_name_mapping = mappings
         else:
@@ -1037,17 +909,7 @@ class PipelinePretrainedModel(PretrainedModel):
         return missing_shared_keys
 
     def state_dict(self, *args, **kwargs):
-        """
-        返回带有Pipeline Stage映射的字典。
 
-        Args:
-            *args (tuple): 可变参数列表，用于传递给父类方法。
-            **kwargs (dict): 可选关键字参数，用于传递给父类方法。
-
-        Returns:
-            dict: 包含Pipeline Stage映射的字典。
-
-        """
         state_dict = super().state_dict(*args, **kwargs)
 
         if self._pipeline_name_mapping is None:
@@ -1176,23 +1038,14 @@ class PipelinePretrainedModel(PretrainedModel):
             # Different from paper, but it uses a different permutation in order to obtain the same calculation
             emb = np.concatenate([freqs, freqs], axis=-1)
             # [bs, seqlen, nhead, head_dim]
-            cos_cached = np.cos(emb)[:, :]  # .astype(dtype)
-            sin_cached = np.sin(emb)[:, :]  # .astype(dtype)
+            cos_cached = np.cos(emb)[:, :]
+            sin_cached = np.sin(emb)[:, :]
 
-            layer.cos_cached.set_value(cos_cached)  # model后续会被cast成half/bfloat16
+            layer.cos_cached.set_value(cos_cached)
             layer.sin_cached.set_value(sin_cached)
 
 
 def get_pp_vp_split_layers(config):
-    """获取分层的PP和VP分割层。
-
-    Args:
-        config (:obj:`Config`): 配置对象，包含模型相关参数。
-
-    Returns:
-        :obj:`set`: 返回一个无序集合，表示在每一层是否执行重计算操作。
-
-    """
     hcg = get_hcg()
     pp_size = max(hcg.get_pipe_parallel_world_size(), 1)
     vp_size = max(config.virtual_pp_degree, 1)
@@ -1233,14 +1086,11 @@ def get_pp_vp_split_layers(config):
 
 
 class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
-    """支持Pipeline Parallel的ERNIE4 组网模型"""
 
     config_class = ErnieMoEConfig
 
     _get_tensor_parallel_mappings = ErniePretrainedModel._get_tensor_parallel_mappings
-    # NO base_model_prefix !!!!
 
-    # for elastic
     ErnieEmbeddingPipeClass = ErnieEmbeddingPipe
     ErnieDecoderLayerPipeClass = ErnieDecoderLayerPipe
     MTPEmbeddingPipeClass = MTPEmbeddingPipe
@@ -1251,21 +1101,7 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     @classmethod
     def _prepare_pipeline_inputs_func(cls, data):
-        """
-        从数据字典中提取输入和标签。
 
-        Args:
-            data (dict): 数据字典，包含以下键值对：
-                - input_ids（paddle.Tensor）：输入的token id。
-                - attention_mask（paddle.Tensor）：输入的掩码。
-                - position_ids（paddle.Tensor）：输入的位置id。
-                - labels（paddle.Tensor）：预测的标签。
-                - inbatch_pack_offset（paddle.Tensor）：在batch中的偏移量。
-
-        Returns:
-            Tuple[List[paddle.Tensor]]: 返回输入和标签列表。
-
-        """
         inputs = tuple(
             [
                 [d[k] for d in data]
@@ -1288,18 +1124,6 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self,
         config,
     ):
-        """
-        初始化函数，用于创建模型并初始化模型参数。
-
-        Args:
-            config (dict): 模型的配置信息，包含一些模型相关的参数。
-
-        Returns:
-            None
-
-        """
-        # initialize-trick for big model,
-        # see https://github.com/bigscience-workshop/bigscience/blob/master/train/tr11-176B-ml/README.md#std-init
         new_initializer_range = math.sqrt(0.3333 / config.hidden_size)
         logger.info(
             f"change initializer-range from {config.initializer_range} to {new_initializer_range}"
@@ -1341,10 +1165,8 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
-        # DON'T call PipelinePretrainedModel `__ini__` due to mro issue
         PipelinePretrainedModel.init(self, config=config)
 
-        # TODO: 根据recompute_num_layers生成no_recompute_layers
         if config.pp_no_recompute_layer is not None:
             no_recompute_layers = config.pp_no_recompute_layer
         else:
@@ -1488,7 +1310,6 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 LayerDesc(self.ErnieMoELMHeadPipeClass, config=config), "lm_head"
             )
 
-        # NOTE(shenliang03): recompute_interval is nouse for pipeline parallel
         recompute_interval = 0
 
         seg_method = "layer:ErnieDecoderLayer|EmptyLayer|MTPLayer"
@@ -1514,7 +1335,7 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         )
 
     def forward(self, *args, **kwargs):
-        """doc"""
+
         with fp8_autocast(self.config.use_fp8, self.config.fp8_configs["recipe"]):
             return super().forward(*args, **kwargs)
 
@@ -1524,16 +1345,6 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     # HACK op names, break everything
     def rename_model_params(self, func):
-        """
-        将模型参数重命名。
-
-        Args:
-            func: 一个函数，接受三个参数：配置对象、运行功能和模型参数名称。
-
-        Returns:
-            None。
-
-        """
         # 用于构造和静态图一样的statedict
         if self.config.virtual_pp_degree == 1:
             _layers = iter(self.run_function)
@@ -1543,19 +1354,7 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     # Initialize weights and apply final processing
     def _post_init(self, original_init, *args, **kwargs):
-        """
-        在子类中实现 `_post_init` 方法，该方法将在初始化子类的过程中被调用。
 
-        Args:
-            original_init (callable): 基类中定义的 `_post_init` 方法。
-
-            *args: 可变参数列表。
-
-            **kwargs: 关键字参数字典。
-
-        Returns:
-            None
-        """
         super()._post_init(self, original_init, *args, **kwargs)
         with paddle.no_grad():
             for i, layer in self._sub_layers.items():
@@ -1686,18 +1485,6 @@ class ErnieMoEForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         return moe_statedict_local_id_to_global(state_dict, self.config)
 
     def set_state_dict(self, state_dict, *args, **kwargs):
-        """
-        设置模型参数状态字典。
-
-        Args:
-            state_dict (:obj:`Dict`): 需要设置的参数状态字典。
-            args (tuple): 可变长度可选参数。
-            kwargs (dict): 可选关键字参数。
-
-        Returns:
-            :obj:`torch.nn.Module`: 返回当前实例的对象。
-
-        """
         if self._pipeline_name_mapping is None:
             self._set_pipeline_name_mapping()
         # assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"

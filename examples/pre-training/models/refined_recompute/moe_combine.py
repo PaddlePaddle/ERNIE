@@ -56,37 +56,14 @@ class MoECombineFunctor(PyLayer):
 
     @staticmethod
     def forward(ctx, x, combine_weights, scatter_index, hold_tensors):
-        """
-        直接获取第一次前向计算的结果作为输出，不再做重计算
 
-        Args:
-            ctx : 上下文对象，用于保存反向所需的数据。
-            x (paddle.Tensor): 输入张量, combine 算子的输入。
-            combine_weights (paddle.Tensor): 组合权重张量, combine 算子的输入参数。
-            scatter_index (paddle.Tensor): 索引张量, combine 算子的输入参数。
-            hold_tensors (dict): 包含第一次前向计算结果的字典。
-
-        Returns:
-            paddle.Tensor: 输出张量。
-
-        """
         combined_out = hold_tensors["combined_out"].detach()
         ctx.save_for_backward(x, combine_weights, scatter_index, combined_out)
         return combined_out
 
     @staticmethod
     def backward(ctx, grad_y, *_):
-        """
-        反向计算，调用moe_combine_bwd函数计算梯度，并返回梯度, 并释放第一次前向计算的结果。
 
-        Args:
-            ctx : 上下文对象，用于保存反向所需的数据。
-            grad_y (paddle.Tensor): 输出梯度张量。
-            *_ : 其他梯度，不使用。
-
-        Returns:
-            tuple: 返回两个梯度张量，分别是输入x和组合权重的梯度。
-        """
         x, combine_weights, scatter_index, combined_out = ctx.saved_tensor()
 
         grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(

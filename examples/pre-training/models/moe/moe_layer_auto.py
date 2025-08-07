@@ -46,7 +46,7 @@ from models.moe.moe_layer import MOELayer
 try:
     from src.utils.misc import global_training_logs
 except ModuleNotFoundError:
-    global_training_logs = {}  # 没有erniebot的环境下无法打印 debug 量
+    global_training_logs = {}
 
 try:
     from paddle.distributed import in_auto_parallel_align_mode
@@ -101,7 +101,7 @@ GateOutput = namedtuple(
 
 @contextmanager
 def profile(name):
-    """doc"""
+
     if get_timers() is not None:
         get_timers()(name).start()
     yield
@@ -221,23 +221,8 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
-    """
-    根据 gate 结果重排 `x`,  按照 capacity 截断、padding
 
-    Args:
-        x (Tensor)[Seq, Dim]: 输入张量。
-        dispatch_mask Tensor[Seq, 2]: 分发掩码列表。
-        scatter_index Tensor[Seq, 2]: 分布索引列表。
-        num_experts (int): 专家数量。
-        capacity (int): 容量大小。
-
-    Returns:
-        Tensor [Expert*Capacity, Dim]: 分派后的输出张量。
-
-    """
     output = None
-    # init_output = paddle.zeros([num_experts * capacity, x.shape[-1]], dtype='float32')
-    # output = init_output + 0. * x.sum()
     orig_dtype = x.dtype
     scatter_index = scatter_index.unbind(1)
     dispatch_mask = dispatch_mask.unbind(1)
@@ -266,17 +251,7 @@ def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
 
 
 def combining(x, combine_weights, scatter_index):
-    """
-    对输入的矩阵进行组合和聚合操作
 
-    Args:
-        x: Tensor[num_experts * capacity, dim] 待处理的输入矩阵，最后一维表示特征数量。
-        combine_weights: Tensor[seq, 2] 包含每个特征的组合权重列表。
-        scatter_index:   Tensor[seq, 2]: 表示要被聚合的索引元组，第一个元素为行索引，第二个元素为列索引。
-
-    Returns:
-        Tensor: 经过组合和聚合后的输出矩阵，形状为[n, dim * num_features]，其中n是输入矩阵中的样本数目。
-    """
     dim = x.shape[-1]
     scatter_index = scatter_index.reshape([-1])
     num_k = combine_weights.shape[-1]
@@ -452,29 +427,6 @@ def bpr_postprocess(output, buffer):
 
 
 class MOELayerAuto(MOELayer):
-    """MOELayerAuto module which implements MixtureOfExperts as described in Gshard_.
-    ::
-
-        gate = Top2Gate(model_dim, num_experts)
-
-        moe = MOELayerAuto(gate, expert)
-        output = moe(input)
-        l_aux = moe.l_aux
-
-    .. Gshard_: https://arxiv.org/pdf/2006.16668.pdf
-
-    Args:
-        gate (paddle.nn.Layer):
-            gate network
-        expert (paddle.nn.LayerList):
-            expert network, LayerList 长度是 per_device 上的 expert 数。
-        group (paddle.ProgressGroup)
-        recompute: 启用MOE内recomupte
-    Returns:
-        output
-        combine_weight
-        router-loss
-    """
 
     def __init__(
         self,
@@ -492,17 +444,7 @@ class MOELayerAuto(MOELayer):
         config=None,
         ipp=0,
     ):
-        """
-        初始化MoE层。
 
-        Args:
-            gate (nn.Layer): 智能门控层，用于选择需要使用的专家。
-            experts (List[nn.Layer]): 需要使用的专家列表。
-            layer_idx (int): 当前MoE层的索引。
-            group (Group): 分布式通信组。默认值为None。
-            recompute (bool): 是否在每个训练迭代中重新计算MoE输出。默认值为False。
-
-        """
         nn.Layer.__init__(self)
         self.config = config
         self.gate = gate
@@ -662,7 +604,6 @@ class MOELayerAuto(MOELayer):
         """
         with profile("moe-gate"):
             args = ()
-            # 目前只有 `SinkHornGate` aka Top1 gate 支持输入 token type ids
             if token_type_ids is not None:
                 token_type_ids = token_type_ids.reshape([-1])
                 args = (token_type_ids,)
@@ -769,22 +710,16 @@ class MOELayerAuto(MOELayer):
                     [dist.Shard(0)],
                 )
             else:
-                expert_output = expert_output.reshape(
-                    [-1, expert_output.shape[-1]]
-                )  # [e*c,m]
+                expert_output = expert_output.reshape([-1, expert_output.shape[-1]])
 
             if not self.config.moe_use_all2all:
                 if self.config.moe_group == "mp":
-                    # 纯 mp下，dispatch 的 index 用全复制的数据计算，combine 需要和 dispatch 一致，
-                    # 否则会越界，在解决输入数据问题后去掉这个 reshard
-                    # TODO(zhangyichen): 统一 moe_group 是 mp 和其他情况下的代码
                     expert_output = dist.reshard(
                         expert_output,
                         get_mesh(self.ipp),
                         [dist.Replicate(), dist.Replicate()],
                     )
                 else:
-                    # 纯dp
                     expert_output = dist.reshard(
                         expert_output, get_mesh(), [dist.Shard(0), dist.Replicate()]
                     )

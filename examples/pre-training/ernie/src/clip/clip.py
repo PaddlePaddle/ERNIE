@@ -27,9 +27,6 @@ from src.utils import logger
 
 
 class ClipGradByAdaptiveNorm(ClipGradBase):
-    """
-    自适应梯度裁剪策略
-    """
 
     def __init__(
         self,
@@ -82,9 +79,7 @@ class ClipGradByAdaptiveNorm(ClipGradBase):
         )
 
     def clip_by_norm(self, param, grad, norm_value, global_norm):
-        """
-        裁剪核心函数
-        """
+
         state = self.state[param.name]
 
         if "norm_value" not in state:
@@ -297,9 +292,7 @@ class ClipGradByAdaptiveNorm(ClipGradBase):
 
     @framework.dygraph_only
     def state_dict(self):
-        """
-        获取 state dict
-        """
+
         state_dict = {k: v for k, v in self.state.items()}
         for key in self.keys:
             state_dict[key] = self.__dict__[key]
@@ -307,9 +300,7 @@ class ClipGradByAdaptiveNorm(ClipGradBase):
 
     @framework.dygraph_only
     def set_state_dict(self, state_dict):
-        """
-        设置 state dict
-        """
+
         if len(state_dict) == 0 or state_dict is None:
             logger.info("state_dict is empty, please check if it is right.")
 

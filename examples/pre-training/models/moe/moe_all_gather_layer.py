@@ -11,20 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""
-@author: kebo
-@contact: kebo01@baidu.com
-
-@version: 1.0
-@file: moe_layer_all_gather.py
-@time: 2024/09/21 15:11:10
-@Copyright (c) 2024 Baidu.com, Inc. All Rights Reserved
-
-这一行开始写关于本文件的说明与解释
-
-
-"""
 from typing import Tuple, List, Dict, Optional, Callable
 import logging
 import contextlib
@@ -47,32 +33,25 @@ from models.moe.round_robin_gate import RoundRobinGateFused
 from models.moe.top2_gate import TopKGateFused
 from models.comm_utils import reduce_scatter, all_gather
 from models.sequence_parallel_utils import (
-    GatherOp,  # 进入同步区，从此以后 tp 间必须执行一样的操作
-    AllGatherOp,  # 进入异步区，tp间的操作可以不一样
+    GatherOp,
+    AllGatherOp,
     ReduceScatterOp,
     ScatterOp,
     get_async_loader,
     hack_offload_wait,
 )
-from models.utils import global_training_logs_enabled, manual_backward
+from models.utils import manual_backward
 from paddle.incubate.tensor.manipulation import async_offload
 
-from .moe_layer import MOELayer, fuse_logging
+from .moe_layer import MOELayer
 from paddleformers.utils.tools import get_env_device
 from models.utils import get_global_training_logs
 
-global_training_logs = (
-    get_global_training_logs()
-)  # 没有erniebot的环境下无法打印 debug 量
+global_training_logs = get_global_training_logs()
 try:
     import moe_router_loss_ops
 except ImportError:
     moe_router_loss_ops = None
-
-try:
-    from paddle import scatter_add_
-except ImportError:
-    scatter_add_ = None
 
 
 def profile(_):
@@ -127,7 +106,7 @@ else:
 @paddle.no_grad()
 def all_to_all_unpadding(input, output, input_sizes, output_sizes, group=None):
     """helper function for unbalaced alltoall, Feat. Liyurui"""
-    # `alltoall_single` 支持发送 0 tensor 之后，可以直接调用。
+
     if group.nranks <= 1:
         # output.copy_(input, True)
         output[:] = input[:]
@@ -255,13 +234,6 @@ class AllGatherAsync(PyLayer):
 
 
 class ReshardCombineWeight(PyLayer):
-    """
-    Combine weight(shape==[Seq,k]) 有 2 种切片方式：
-        * expert 切片：指向非本机 expert 的值为 0
-        * seq 切片：在 `Seq`维度切片
-    从`expert 切片` 到`seq` 切片的操作是 reduce -> scatter
-    反操作是 all_gather -> mask_select
-    """
 
     @staticmethod
     def forward(ctx, input, group=None):
@@ -281,9 +253,6 @@ class ReshardCombineWeight(PyLayer):
 
 
 class AlltoAllSmart(paddle.autograd.PyLayer):
-    """
-    支持不均匀（包括 不发）send/recv 的 Alltoall.
-    """
 
     @staticmethod
     def forward(
@@ -685,7 +654,6 @@ class MOEAllGatherLayer(MOELayer):
                 gate_prob,
                 offload_helper,
             ) = self.fused_gate_and_dispatch(input, token_type_ids)
-        # allgather 算完dispatch后 进行Scatter 留下本机experts需要计算的tokens.
         dispatched_input = ScatterOp.apply(
             dispatched_input, group=self.config.moe_group
         )
@@ -749,7 +717,6 @@ class MOEAllGatherLayer(MOELayer):
         """
         seqlen, d_model = input.shape
         args = ()
-        # 目前只有 `SinkHornGate` aka Top1 gate 支持输入 token type ids
 
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape([-1])
@@ -1040,18 +1007,18 @@ class MOEAllGatherLayerV2(MOEAllGatherLayer):
                     [input, token_type_ids.unsqueeze(-1).astype(input.dtype)], axis=-1
                 )
             output = self.forward_experts(input)
-            output += self.gate.weight.sum() * 0.0  # hack for grad
+            output += self.gate.weight.sum() * 0.0
             output = output.reshape(orig_shape or orig_shape_2)  # [e*1,c,m]
             return output, None, 0
         with profile("fused_gate_and_dispatch"):
             (
                 dispatched_input,
                 global_hidden_states,
-                local_combine_weights,  # dispatched-expert间聚合后重新在 seq 维度切片
-                expert_num_global_no_token_drop,  # 不考虑截断！
+                local_combine_weights,
+                expert_num_global_no_token_drop,
                 expert_num_global,
                 expert_num_global_list,
-                local_scatter_index,  # dispatched-expert间聚合后重新在 seq 维度切片
+                local_scatter_index,
                 scatter_index_rev,
                 router_loss,
                 (gate_logits, gate_prob),
@@ -1109,7 +1076,7 @@ class MOEAllGatherLayerV2(MOEAllGatherLayer):
                                 ]
                             )
                             for i in range(self.config.moe_world_size)
-                        ],  # output-size
+                        ],
                         [len(recv_rank_local)]
                         * self.config.moe_world_size,  # input-size
                         group=self.config.moe_group,
@@ -1119,9 +1086,8 @@ class MOEAllGatherLayerV2(MOEAllGatherLayer):
                 else:
                     recv_rank_task = None
                     recv_rank = recv_rank_local.tile(self.config.moe_world_size)
-                # 尝试过用 self.id_buffer + slice,显然会更慢, 干脆直接在 np 上造完整个 id，后续写一手 C
                 if moe_utils is None:
-                    send_rank_cpu = np.concatenate(  # TOO SLOW!!! break every thing
+                    send_rank_cpu = np.concatenate(
                         [
                             np.full([j], i // self.num_local_experts, dtype="int32")
                             for i, j in enumerate(expert_num_global_list)
@@ -1173,24 +1139,6 @@ class MOEAllGatherLayerV2(MOEAllGatherLayer):
                     dispatch_token_type_ids,
                 )
             else:
-                if self.enable_logging and global_training_logs_enabled():
-                    capacity = self.gate.get_capacity(
-                        input.shape[0] * self.config.moe_world_size
-                    )
-                    _log = {}
-                    valid_usage = [e for e in expert_num_global_list if e > 0]
-                    if valid_usage:
-                        max_usage = max(valid_usage)
-                        min_usage = min(valid_usage)
-                        _log[f"expert_min_usage_layer_{self.layer_idx}"] = (
-                            min_usage / capacity
-                        )
-                        _log[f"expert_max_usage_layer_{self.layer_idx}"] = (
-                            max_usage / capacity
-                        )
-
-                    global_training_logs = get_global_training_logs()
-                    global_training_logs.update(**_log)
 
                 recv_rank_task and recv_rank_task.wait()  # wait for recv_rank
 
@@ -1456,7 +1404,6 @@ class MOEAllGatherLayerV2(MOEAllGatherLayer):
         """
         seqlen, d_model = input.shape
         args = ()
-        # 目前只有 `SinkHornGate` aka Top1 gate 支持输入 token type ids
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape([-1])
             args = (token_type_ids,)
@@ -1752,20 +1699,15 @@ class MOEAllGatherLayerV2(MOEAllGatherLayer):
         token_type_ids,
         dispatch_token_type_ids,
     ):
-        """
-        分不同模态 gate prob(mm/lm) 进行 aux_loss 计算。
-        """
         dispatch_mask_3d = dispatch_mask.reshape([self.config.moe_world_size, -1])
         if token_type_ids is not None and self.gate.config.moe_use_hard_gate:
             if not self.gate.weight.stop_gradient:
-                # 文参数训练时才计算。
                 dispatch_tokens_mask = (
                     dispatch_token_type_ids == 0
                     if dispatch_token_type_ids is not None
                     else None
                 )
                 lm_tokens_mask = (token_type_ids == 0).astype(gate_prob.dtype)
-                # hard code
                 lm_experts = (
                     self.gate.num_experts[0]
                     if isinstance(self.gate.num_experts, (tuple, list))
@@ -1828,65 +1770,4 @@ class MOEAllGatherLayerV2(MOEAllGatherLayer):
                 prefix="lm",
             )
 
-        tracer = framework._dygraph_tracer()
-        global_training_logs = get_global_training_logs()
-        if self.enable_logging and global_training_logs_enabled() and tracer._has_grad:
-            if moe_router_loss_ops is not None and get_env_device() != "xpu":
-                (
-                    gate_expert_per_token_type_0,
-                    gate_expert_per_token_type_1,
-                    gate_experts_per_token,
-                    ce,
-                ) = fuse_logging(gate_logits, combine_weights, token_type_ids)
-
-                if token_type_ids is not None:
-                    global_training_logs.update(
-                        experts_per_token_text=gate_expert_per_token_type_0,
-                    )
-                    global_training_logs.update(
-                        experts_per_token_image=gate_expert_per_token_type_1,
-                    )
-
-            else:
-                seqlen = gate_logits.shape[0]
-                num_active = paddle.count_nonzero(combine_weights)
-                gate_experts_per_token = num_active / seqlen
-                if token_type_ids is not None:
-                    token_type_ids = token_type_ids.reshape([-1])
-                    combine_weights_type_0 = combine_weights[token_type_ids == 0]
-                    if combine_weights_type_0.size:
-                        gate_expert_per_token_type_0 = (
-                            paddle.count_nonzero(combine_weights_type_0)
-                            / combine_weights_type_0.shape[0]
-                        )
-                        global_training_logs.update(
-                            experts_per_token_text=gate_expert_per_token_type_0,
-                        )
-
-                    combine_weights_type_1 = combine_weights[token_type_ids == 1]
-                    if combine_weights_type_1.size:
-                        gate_expert_per_token_type_1 = (
-                            paddle.count_nonzero(combine_weights_type_1)
-                            / combine_weights_type_1.shape[0]
-                        )
-                        global_training_logs.update(
-                            experts_per_token_image=gate_expert_per_token_type_1,
-                        )
-
-                ce = (
-                    (-F.softmax(gate_logits, -1) * F.log_softmax(gate_logits, -1))
-                    .sum(-1)
-                    .mean(0)
-                )
-            _log = {
-                f"gate_prob_ce_layer_{self.layer_idx}": ce,
-                f"experts_per_token_layer_{self.layer_idx}": gate_experts_per_token,
-            }
-            global_training_logs.update(
-                **_log,
-                **{
-                    k.replace(f"_layer_{self.layer_idx}", ""): v
-                    for k, v in _log.items()
-                },
-            )
         return router_loss

@@ -465,18 +465,7 @@ def split_group(grouped, split_size):
         yield ret
 
 
-# Tea.chen congmin(葱明) brodcast
 def broadcast_data_obj(data, src_rank, group):
-    """广播任意嵌套嵌套的 `data` 结构，每个 value 必须是 paddle.Tensor
-    Args:
-        data : 任意嵌套嵌套的 `data` 结构，每个 value 必须是 paddle.Tensor
-        src_rank (int): 发送节点的全局 rank
-        this_rank (int): 本机 mp_rank
-        group (ProcessGroup): 通信组
-
-    Returns:
-        data: 广播后的 `data`
-    """
     this_rank = dist.get_rank()
     if this_rank == src_rank:
         template = [
@@ -493,12 +482,9 @@ def broadcast_data_obj(data, src_rank, group):
         template = [None]
     dist.broadcast_object_list(template, src_rank, group)
     template = template[0]
-    # log.info(f'[rank={dist.get_rank()}]: {template}')
 
     temp_flat = flatten(template)
     data_flat = flatten(data)
-    # log.info(f'[rank={dist.get_rank()}] {temp_flat[0]}')
-    # keyfn = lambda i: str(i[1].dtype)
 
     def keyfn(i):
         return str(i[1].dtype)
@@ -544,10 +530,6 @@ def broadcast_data_obj(data, src_rank, group):
 
 
 class DistDataLoaderAuto(DistDataLoader):
-    """
-    DistDataLoaderAuto 继承自 DistDataLoader，重新实现了__next__方法，以适应静半下date_set的数据返回形式。
-    关于静半数据形式，详见wrap_merge_fn_for_auto方法。
-    """
 
     def _init_dataloader_comm_group(self):
         return self._hcg.get_pipe_parallel_group()
@@ -557,8 +539,7 @@ class DistDataLoaderAuto(DistDataLoader):
 
         input_list = []
         if "token_type_ids" in data_dict.keys():
-            print("xxx -------- enter __next__ token_type_ids")
-            # 多模情况
+
             (
                 input_ids,
                 labels,
@@ -580,7 +561,6 @@ class DistDataLoaderAuto(DistDataLoader):
             data_world_size = max(self._hcg.get_data_parallel_rank(), 1) * max(
                 self._hcg.get_sharding_parallel_rank(), 1
             )
-            # TODO(zhangyuqin) images为动态shape, 后面要确定如何传入spec
             if images is None:
                 images = paddle.zeros([1, 64, 64], dtype="uint8")
                 has_images = paddle.full([data_world_size, 1], False, dtype="bool")

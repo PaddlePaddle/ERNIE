@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""全局随机数管理模块。
-
-该模块提供了RandomManager类，用于管理分布式训练中的随机数生成，
-确保不同进程间的随机数同步和一致性。
-"""
 import logging
 import random
 import paddle.distributed.fleet as fleet

@@ -12,19 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-@author: kebo
-@contact: kebo01@baidu.com
 
-@version: 1.0
-@file: task_gate.py
-@time: 2023/10/19 17:57:06
-@Copyright (c) 2023 Baidu.com, Inc. All Rights Reserved
-
-这一行开始写关于本文件的说明与解释
-
-
-"""
 import logging
 
 import paddle
@@ -42,18 +30,7 @@ class TaskGate(Top2Gate):
     """
 
     def __init__(self, config, layer_idx: int, group) -> None:
-        """
-        重载构造函数，用于初始化MoE层。
 
-        Args:
-        - config: 配置信息，包含MoE相关配置参数。
-        - layer_idx: 当前层的索引。
-        - group: 上一层的输出张量组成的列表。
-
-        Returns:
-        - None: 没有返回值。
-
-        """
         super().__init__(config, layer_idx, group)
         cap = config.moe_capacity
         self.cap = cap[0] if isinstance(cap, (tuple, list)) else cap

@@ -319,11 +319,7 @@ def moe_ep2mp(
 def moe_statedict_cherry_pick(
     state_dict: Dict[str, paddle.Tensor], config: ErnieMoEConfig
 ):
-    moe_num_experts = (
-        sum(config.moe_num_experts)
-        if isinstance(config.moe_num_experts, (list, tuple))
-        else config.moe_num_experts
-    )
+    moe_num_experts = config.moe_num_experts
     if moe_num_experts <= 1:
         return state_dict
     moe_world_size = config.moe_world_size

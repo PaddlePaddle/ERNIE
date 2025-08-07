@@ -11,7 +11,5 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-实现弹性策略的工具函数
-"""
+
 from .elastic_utils import *  # noqa

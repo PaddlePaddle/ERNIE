@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
+import copy
 import logging
+import re
+
+import numpy as np
 import paddle
 import paddle.distributed as dist
-import numpy as np
-import copy
 
 logger = logging.getLogger(__name__)
 
 try:
-    from ernie_core.models.sequence_parallel_utils import get_async_loader
+    from models.sequence_parallel_utils import get_async_loader
     from paddle.incubate.tensor.manipulation import async_offload
 except ImportError:
-    logger.warning("cannot import async_loader, upgrate to fleety 10.8+")
     get_async_loader = async_offload = None
 
 __all__ = (
@@ -36,11 +36,7 @@ __all__ = (
 ZERO = paddle.zeros([], dtype="float32")
 
 
-class SmoothedValue(object):
-    """Track a series of values and provide access to smoothed values over a
-    window or the global series average.
-    """
-
+class SmoothedValue:
     def __init__(
         self,
         skip_zero,
@@ -51,11 +47,6 @@ class SmoothedValue(object):
 
     @paddle.no_grad()
     def update(self, value):
-        """update
-
-        Args:
-            value (_type_): _description_
-        """
         if isinstance(value, paddle.Tensor):
             value = value.astype("float32").detach()
             if value.shape == [1]:
@@ -67,32 +58,14 @@ class SmoothedValue(object):
 
     @property
     def global_avg(self):
-        """global avg
-
-        Returns:
-            _type_: _description_
-        """
         return self.total / max(self.count, 1e-6)
 
     def reset(self):
-        """reset"""
         self.total = 0.0
         self.count = 0
 
 
-class TrainingLogs(object):
-    """TrainingLogs
-
-    Args:
-        object (_type_): _description_
-
-    Raises:
-        AttributeError: _description_
-
-    Returns:
-        _type_: _description_
-    """
-
+class TrainingLogs:
     _instance = None
 
     def __new__(cls, *args, **kw):
@@ -109,24 +82,18 @@ class TrainingLogs(object):
         self._skip_zero_keys = []
 
     def set_trainer_interval(self, trainer, logging_interval):
-        """
-        set_trainer_interval
-        """
         self.trainer = trainer
         self.logging_interval = logging_interval
 
     @property
     def global_meters_keys(self):
-        """set global meters keys"""
         return self._global_meters_keys
 
     @global_meters_keys.setter
     def global_meters_keys(self, lst):
-        """set global meters keys"""
         self._global_meters_keys = lst
 
     def enable_skip_zero(self, keys=[]):
-        """skip logging zero tensor"""
         logger.info("global_training_logs: use skip zero")
         self._skip_zero_keys = keys
         for m in self.meters.keys():
@@ -135,14 +102,10 @@ class TrainingLogs(object):
                     m._skip_zero = True
 
     def update(self, **kwargs):
-        """update"""
         for k, v in kwargs.items():
             self[k] = v
 
     def is_enabled(self):
-        """
-        is_enabled
-        """
         return (
             self.trainer is None
             or (self.trainer.state.global_step + 1) % self.logging_interval == 0
@@ -157,35 +120,18 @@ class TrainingLogs(object):
         metric.update(v)
 
     def __getitem__(self, v):
-        """pass"""
         return self.meters[v]
 
     def __getattr__(self, attr):
-        """gate attr
-
-        Args:
-            attr (_type_): _description_
-
-        Raises:
-            AttributeError: _description_
-
-        Returns:
-            _type_: _description_
-        """
         if attr in self.meters:
             return self.meters[attr]
         if attr in self.__dict__:
             return self.__dict__[attr]
         raise AttributeError(
-            "'{}' object has no attribute '{}'".format(type(self).__name__, attr)
+            f"'{type(self).__name__}' object has no attribute '{attr}'"
         )
 
     def dict(self, use_async=False):
-        """序列化
-
-        Returns:
-            _type_: _description_
-        """
         avg_metric = {
             k: v.global_avg
             for k, v in self.meters.items()
@@ -218,7 +164,7 @@ class TrainingLogs(object):
                 and ((not self.meters[k]._skip_zero) or v != 0.0)
             }
             return ret, global_info
-        assert get_async_loader is not None, "async logging requires fleety > 10.8"
+        assert get_async_loader is not None, "async logging requires latest paddle"
         if not avg_metric:
             return lambda: ({}, {})
         keys, values = zip(*avg_metric.items())
@@ -253,17 +199,14 @@ class TrainingLogs(object):
         return _ret
 
     def reset(self):
-        """reset"""
         for k in list(self.meters.keys()):
             self.meters[k].reset()
             self.meters.pop(k)
 
     def take_snapshot(self):
-        """take_snapshot"""
         self.snapshot = copy.deepcopy(self.meters)
 
     def restore_snapshot(self):
-        """restore_snapshot"""
         assert (
             self.snapshot is not None
         ), "you should use take_snapshot before restore_snapshot"

@@ -13,4 +13,3 @@
 # limitations under the License.
 
 from .flash_attn import *  # noqa
-from .linear import *  # noqa

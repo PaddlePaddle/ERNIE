@@ -36,11 +36,6 @@ try:
 except ImportError:
     FQO = None
 
-try:
-    from paddle import scatter_add_
-except ImportError:
-    scatter_add_ = None
-
 
 from .fp8_utils import FP8_ALIGN
 

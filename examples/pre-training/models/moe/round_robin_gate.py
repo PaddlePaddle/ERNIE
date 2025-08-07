@@ -26,60 +26,20 @@ logger = logging.getLogger(__name__)
 
 
 class RoundRobinGate(Top2Gate):
-    """
-    测试用轮流分发gate
-    """
 
     def __init__(self, config, layer_idx: int, group) -> None:
-        """
-        重载构造函数，用于初始化MoE层。
 
-        Args:
-        - config: 配置信息，包含MoE相关配置参数。
-        - layer_idx: 当前层的索引。
-        - group: 上一层的输出张量组成的列表。
-
-        Returns:
-        - None: 没有返回值。
-
-        """
         super().__init__(config, layer_idx, group)
         cap = config.moe_capacity
         self.cap = cap[0] if isinstance(cap, (tuple, list)) else cap
         self.second_dispatch = 1
 
     def _create_gate_parameter(self):
-        """
-        创建门参数函数。
 
-        Args:
-            无参。
-
-        Returns:
-            无返回值。
-
-        Raises:
-            该方法不引发任何异常。
-        """
         pass
 
     def forward(self, input, correction_bias=None):
-        """
-        计算moe的输出。
 
-        Args:
-            input：输入数据，为一个形状为[batch_size, max_seq_len]且值为整数的Tensor。
-
-        Returns:
-            tuple：包含capacity、dispatch_mask、combine_weights、scatter_index和router_loss这五个元素组成的tuple。
-
-            - capacity：经过处理后的moe模型的capacity。
-            - dispatch_mask：经过处理后的moe模型的dispatch mask。
-            - combine_weights：经过处理后的moe模型的combination weights。
-            - scatter_index：经过处理后的moe模型的scatter index。
-            - router_loss：经过处理后的moe模型的router loss。
-
-        """
         seqlen = input.shape[0]
         orig_dtype = input.dtype
 
@@ -112,9 +72,6 @@ class RoundRobinGate(Top2Gate):
 
 
 class RoundRobinGateFused(RoundRobinGate):
-    """
-    doc
-    """
 
     def forward(
         self,

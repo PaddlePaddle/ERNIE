@@ -25,60 +25,16 @@ from paddle import distributed as dist
 from paddle.distributed.communication.batch_isend_irecv import (
     _coalescing_manager as batch_isend_irecv_coalescing_manager,
 )
-from paddle.autograd import PyLayer
+
 from paddleformers.trainer.plugins.timer import get_timers
 
 logger = logging.getLogger(__name__)
 
 
 def md5(tensor):
-    """debug use"""
     numpy_array = tensor.numpy()
     array_bytes = numpy_array.tobytes()
     return hashlib.md5(array_bytes).hexdigest()
-
-
-class ZLossOp(PyLayer):
-    """Z Loss OP."""
-
-    @staticmethod
-    def forward(ctx, logits, max_logits, z_loss_lambda=0, group=None):
-        """Z loss forward."""
-        exp_logits = (logits - max_logits).exp()
-        sum_exp_logits = exp_logits.sum(axis=-1, keepdim=True)
-        if group is not None:
-            dist.all_reduce(sum_exp_logits, op=dist.ReduceOp.SUM, group=group)
-        log_z = sum_exp_logits.log() + max_logits
-        z_loss = z_loss_lambda * log_z.square()
-
-        logits_grad = 2 * z_loss_lambda * log_z * exp_logits / sum_exp_logits
-        ctx.save_for_backward(logits_grad)
-        return z_loss, log_z
-
-    @staticmethod
-    def backward(ctx, grad, _):
-        """Z loss backward."""
-        logits_grad = grad * ctx.saved_tensor()[0]
-        return logits_grad
-
-
-class PrintOp(PyLayer):
-    """debug use"""
-
-    # input shape: [s, b, h], n is mp parallelism
-    # after forward shape: [s/n, b, h]
-    @staticmethod
-    def forward(ctx, x, name):
-        """doc"""
-        ctx.name = name
-        logger.info(f"{ctx.name}: {md5(x)[:5]} {x.abs().mean(-1)}")
-        return x
-
-    @staticmethod
-    def backward(ctx, x):
-        """doc"""
-        logger.info(f"grad@{ctx.name}: {md5(x)[:5]} {x.abs().mean(-1)}")
-        return x
 
 
 def scatter(input, group=None, axis=0):

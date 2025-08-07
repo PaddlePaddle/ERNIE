@@ -21,12 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class ReshardSaveExitCallback(TrainerCallback):
-    """
-    Reshard模型后，直接保存模型，并退出程序
-    """
 
     def __init__(self, trainer):
-        "init func"
         self.trainer = trainer
         self.step = 0
         for name in ["adam", "adamw"]:
@@ -60,15 +56,11 @@ class ReshardSaveExitCallback(TrainerCallback):
         opt_state_dict = self.trainer.optimizer.state_dict()
         if "master_weights" in opt_state_dict:
             new_opt_state_dict["master_weights"] = opt_state_dict["master_weights"]
-            self.trainer.optimizer.set_state_dict(
-                opt_state_dict
-            )  # 只保存master_weights
+            self.trainer.optimizer.set_state_dict(opt_state_dict)
 
-        # 直接保存模型
         self.trainer.state.global_step = int(args.resume_from_checkpoint.split("-")[-1])
         self.trainer._save_checkpoint(self.trainer.model, metrics=None)
 
-        # 退出程序
         logger.info(
             "In ReshardSaveExitCallback, finishing saving reshared model, will exit after 20s..."
         )

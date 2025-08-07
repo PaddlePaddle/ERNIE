@@ -79,9 +79,7 @@ def apply_rotary_pos_emb_vision(
 
 
 def qkv_reshard_head(tensor, group):
-    """
-    将qkv在seq维度拼接后一起做切分维度的转换
-    """
+
     parallelism = group.nranks
     qkv_seqlen, head_num, head_dim = tensor.shape
     tensor = tensor.transpose(perm=[1, 0, 2]).contiguous()

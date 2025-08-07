@@ -1,5 +1,3 @@
-""" refined_recompute for moe_gate_dispatch """
-
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,27 +46,7 @@ class MoEGateDispatchFunctor(PyLayer):
 
     @staticmethod
     def forward(ctx, x, prob, compat_args, k, capacity, use_pad, hold_tensors):
-        """
-        re-compute 中的第二次前向计算，直接获取第一次前向计算的结果作为输出，不再做重计算
 
-        Args:
-            ctx : 上下文对象，用于保存反向所需的数据。
-            x (paddle.Tensor): 输入张量, dispatch 算子的输入。
-            prob (paddle.Tensor): 数据分配到每个专家的概率, dispatch 算子的输入参数。
-            compat_args (paddle.Tensor): 兼容性参数, dispatch 算子的输入参数。
-            k (int): 每个 token 被分配到的专家数量, dispatch 算子的输入参数。
-            capacity (int): 每个专家的最大容量, dispatch 算子的输入参数。
-            use_pad (bool): 是否使用 padding, dispatch 算子的输入参数。
-            hold_tensors (dict): 保存了第一次前向计算结果的字典。
-
-        Returns:
-            tuple: 返回值包含以下元素：
-                1. dispatched_input (paddle.Tensor): 经过分派后的输入张量。
-                2. combine_weights (paddle.Tensor): 组合权重。
-                3. scatter_index (paddle.Tensor): 散列索引。
-                4. expert_offset (paddle.Tensor): 专家偏移量。
-                5. expert_id (paddle.Tensor): 专家 ID。
-        """
         dispatched_input = hold_tensors["dispatched_input"]
         combine_weights = hold_tensors["combine_weights"]
         scatter_index = hold_tensors["scatter_index"]
@@ -96,16 +74,7 @@ class MoEGateDispatchFunctor(PyLayer):
 
     @staticmethod
     def backward(ctx, *grads):
-        """
-        反向计算，调用moe_gate_dispatch_bwd函数计算梯度，并返回梯度, 并释放第一次前向计算的结果。
 
-        Args:
-            ctx : 上下文对象，用于保存反向所需的数据。
-            grads : 输出梯度张量。
-
-        Returns:
-            tuple: 返回两个梯度张量，分别是输入x和分配概率的梯度。
-        """
         (
             x,
             prob,

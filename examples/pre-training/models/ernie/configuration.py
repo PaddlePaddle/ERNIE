@@ -227,16 +227,7 @@ class ErnieConfig(PretrainedConfig):
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.hidden_dropout_prob = hidden_dropout_prob
         self.compression_ratio = compression_ratio
-        """
-        `refined_recompute` 内容为一个dict:[op_name, skip_num], 目前只在PP模式下才生效。在PP中会根据`refined_recompute` 填充`self.skip_recompute_ops`
-            `op_name` 选择范围是："mlp_row_ln", "flash_attn", "attention_row_ln", "attention_column_ln", "mlp_column_ln"
-            `skip_num` 表示
-            选择不进行重计算的次数。
-            0表示 0次不重计算，也就是全部都重计算，显存最少。
-            -1表示全部不重计算，显存最多。
-            还可以填 【0，1，。。。，12】中的任意值，进行调整次数。
-            大于等于12。相当于 -1取值
-        """
+
         self.skip_recompute_ops = dict()
         self.quant_bits = quant_bits
         self.num_key_value_heads = num_key_value_heads
@@ -256,7 +247,6 @@ class ErnieConfig(PretrainedConfig):
         self.loss_subbatch_seqlen = loss_subbatch_seqlen
         self.gate_force_zero_padding_grad = gate_force_zero_padding_grad
 
-        # 默认的 fp8 设置
         default_fp8_configs = {
             "quant_scheme": "DelayedScaling",
             "recipe": {
@@ -291,7 +281,6 @@ class ErnieConfig(PretrainedConfig):
                 else:
                     default_dict[key] = value
 
-        # 更新默认设置
         update_nested_dict(default_fp8_configs, fp8_configs)
         self.fp8_configs = default_fp8_configs
         self.use_fp8 = use_fp8
@@ -448,7 +437,6 @@ class ErnieMoEConfig(ErnieConfig):
         moe_layer_end_index: Union[int, list] = -1,
         moe_aux_loss_lambda=1e-2,
         moe_z_loss_lambda=1e-4,
-        moe_orthogonal_loss_lambda=1e-2,
         moe_use_size_all2all=False,
         sinkhorn_2gate=True,
         sinkhorn_temp=3e-2,
@@ -595,11 +583,6 @@ class ErnieMoEConfig(ErnieConfig):
 
         # Use async All-to-All for backward to overlap with expert GEMM’s weight gradient computation (dW),
         # trading off memory for improved throughput.
-        self.use_async_a2a = use_async_a2a
-        if self.use_async_a2a:
-            assert (
-                self.use_quant_before_a2a
-            ), "use_quant_before_a2a must be True when use_async_a2a is True"
 
         default_fp8_configs = {
             "quant_scheme": "DelayedScaling",
@@ -815,7 +798,6 @@ class ErnieMoEConfig(ErnieConfig):
 
     @property
     def multimodel_experts(self) -> bool:
-        """是否有多种类型的experts."""
         return (
             isinstance(self.moe_num_experts, (tuple, list))
             and len(self.moe_num_experts) > 1

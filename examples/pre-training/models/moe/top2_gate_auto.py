@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class TopKGateFusedAuto(TopKGateFused):
-    """doc"""
 
     def __init__(self, config, layer_idx: int, group, gate_weight=None, ipp=0) -> None:
         super().__init__(config, layer_idx, group, gate_weight)
@@ -53,11 +52,7 @@ class TopKGateFusedAuto(TopKGateFused):
             paddle.Tensor [Seq, Expert, Capacity]: bool, dispatch mask
             Tuple[paddle.Tensor]: `GateOutput`
         """
-        num_experts = (
-            sum(self.num_experts)
-            if self.config.multimodel_experts
-            else self.num_experts
-        )
+        num_experts = self.num_experts
         if self.training:
             cap = self.cap[0]
         elif input.shape[0] < num_experts:  # seqlen < num_expert

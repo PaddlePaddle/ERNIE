@@ -12,23 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-@version: 1.0
-@file: sinkhorn_gate.py
-@time: 2023/07/27 14:10:58
-@Copyright (c) 2023 Baidu.com, Inc. All Rights Reserved
 
-这一行开始写关于本文件的说明与解释
-
-
-"""
 from typing import Tuple
 import logging
 import math
 import paddle
 from paddle import Tensor
 import paddle.nn.functional as F
-from paddle.autograd import PyLayer
 
 try:
     from src.utils.misc import global_training_logs
@@ -40,45 +30,16 @@ from models.moe.top2_gate import Top2Gate, compute_optimal_transport
 try:
     from src.utils.misc import global_training_logs
 except ModuleNotFoundError:
-    global_training_logs = {}  # 没有erniebot的环境下无法打印 debug 量
+    global_training_logs = {}
 
 logger = logging.getLogger(__name__)
-
-
-class PrintOp(PyLayer):
-    """debug use"""
-
-    # input shape: [s, b, h], n is mp parallelism
-    # after forward shape: [s/n, b, h]
-    @staticmethod
-    def forward(ctx, x, name):
-        """doc"""
-        ctx.name = name
-        return x
-
-    @staticmethod
-    def backward(ctx, x):
-        """doc"""
-        logger.info(f"grad@{ctx.name}: gnorm: {x}")
-        return x
 
 
 class SinkHornGate(Top2Gate):
     """SinkHorn Gate"""
 
     def __init__(self, config, layer_idx: int, group) -> None:
-        """
-        初始化基类 `Layer` 的子类 `LinearNorm`.
 
-        Args:
-            config: 深度学习模型的配置对象。
-            layer_idx: 当前层的索引，用于在日志中标示当前层的编号。
-            group: 包含该层所有参数的分组对象。
-
-        Returns:
-            None.
-
-        """
         super().__init__(config, layer_idx, group)
 
         self.tol = 1e-7
@@ -90,20 +51,6 @@ class SinkHornGate(Top2Gate):
         self.gate_detach = config.moe_gate_detach
 
     def forward(self, input, token_type_ids=None, correction_bias=None):
-        """
-        将模型的前向传播过程进行封装，返回路由器损失。
-
-        Args:
-            input (paddle.Tensor): 模型输入，为[T, e]张量，T表示时间步数，e表示单词表大小。
-            token_type_ids (paddle.Tensor):  可以根据 `token-type-ids` 路由。
-
-        Returns:
-            Tuple[Tuple[paddle.Tensor, paddle.Tensor], paddle.Tensor]: 返回包含以下内容的元组：
-
-                - Tuple[paddle.Tensor, paddle.Tensor]: 包含capacity、dispatch_mask、combine_weights和scatter_index。
-                - paddle.Tensor: 路由器损失。
-
-        """
 
         orig_dtype = input.dtype
 
@@ -204,12 +151,6 @@ class SinkHornGate(Top2Gate):
             locations1_s = paddle.sum(locations1 * mask1, axis=1)  # [sk, 1]
             mask1_float = mask1.cast(paddle.float32)
 
-            # soft
-            # gates1_s = (prob * mask1_float).sum(axis=-1)
-            # gates1 = gates1_s.unsqueeze(1) * mask1_float
-
-            # hard (straight-througt)
-            # prob = PrintOp.apply(prob.clone(), 'gate-out')
             if self.config.moe_k > 1:
                 locations1_s = locations1_s.reshape(shape=[-1, self.config.moe_k])
                 mask1_float = mask1_float.reshape(
@@ -290,7 +231,6 @@ class SinkHornGate(Top2Gate):
 
 
 class SinkHornGateFused(SinkHornGate):
-    """doc"""
 
     def forward(
         self,

@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-pretrain自动并行版本
-"""
 import json
 import numpy as np
 
@@ -95,16 +92,6 @@ def update_model_config_from_args(config: ErnieConfig, model_args: dict):
 
 
 def init_parameter(model):
-    """
-    初始化模型的参数。
-    该函数会遍历给定的模型，对每个参数进行初始化操作。
-
-    Args:
-        model (torch.nn.Module): Torch神经网络模型，需要初始化其参数。
-
-    Returns:
-        None, 不返回任何值。
-    """
     for param in model.parameters():
         param.initialize()
 
@@ -128,8 +115,6 @@ def main():
             PipelineParallel,
         )
 
-        # Hack， 原 `PipelineParallel.timer_printer` 方法会在 `forward_backward_pipeline` 方法执行完之后清空timmer状态。
-        # 避免这种行为的发生。
         PipelineParallel.timer_printer = lambda _: None
 
     def formatv(v):

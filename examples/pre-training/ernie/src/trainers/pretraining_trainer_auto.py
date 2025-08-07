@@ -133,16 +133,13 @@ def distributed_optimizer_maybe_hack(
     optimizer,
     use_moe,
 ):
-    """重写了 fleet.distributed_optimizer，在 moe 情况下会 hack Optimizer 的 Wrapper"""
     if use_moe:
         from src.trainers.dygraph_optimizer.hybrid_parallel_optimizer import (
             HybridParallelOptimizer as MoEHybridParallelOptimizer,
         )
 
-        # moe下需要定制 `HybridParallelOptimizer` 函数以下重写了 `fleet.distributed_optimizer`
         fleet_env = fleet.fleet
         fleet_env.user_defined_optimizer = optimizer
-        # TODO：sharding group 内做 moe
         hp_optim = MoEHybridParallelOptimizer(
             optimizer, fleet_env._hcg, fleet_env._user_defined_strategy
         )
@@ -164,9 +161,6 @@ def distributed_optimizer_maybe_hack(
 @dataclass
 @add_start_docstrings(AutoTrainingArguments.__doc__)
 class AutoPreTrainingArguments(AutoTrainingArguments):
-    """
-    预训练相关参数配置
-    """
 
     vocab_path: str = field(
         default=None, metadata={"help": "eb35 streaming data vocab"}
@@ -390,13 +384,17 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         default=100, metadata={"help": "AdaptiveNormClip 开始裁剪的step"}
     )
     adaptive_norm_enable_record_clip_history: Optional[bool] = field(
-        default=False, metadata={"help": "AdaptiveNormClip 是否启用统计历史裁剪的记录"}
+        default=False,
+        metadata={
+            "help": "Whether adaptivenormclip enables the recording of statistical history clipping"
+        },
     )
     adaptive_norm_verbose: Optional[bool] = field(
-        default=False, metadata={"help": "AdaptiveNormClip 是否开启裁剪日志打印"}
+        default=False,
+        metadata={"help": "Whether adaptivenormclip enables crop log printing"},
     )
     use_async_save: Optional[bool] = field(
-        default=False, metadata={"help": "是否开启异步保存功能"}
+        default=False, metadata={"help": "Whether to enable asynchronous save function"}
     )
     pre_alloc_memory: float = field(
         default=0.0,
@@ -406,27 +404,31 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         },
     )
     enable_global_training_logs: bool = field(
-        default=False, metadata={"help": "是否启用global_training_logs"}
+        default=False, metadata={"help": "Whether to enable global_training_logs"}
     )
     use_dummy_dataset: Optional[bool] = field(
-        default=False, metadata={"help": "是否使用DummyDataSet, 仅用于Debug"}
+        default=False, metadata={"help": "Whether to use dummydataset, only for debug"}
     )
     reshard_save_then_exit: Optional[bool] = field(
-        default=False, metadata={"help": "是否在reshard后直接退出程序"}
+        default=False,
+        metadata={"help": "Whether to exit the program directly after reshard"},
     )
     moe_group: Optional[str] = field(
-        default="dp", metadata={"help": "moe 的通信组，目前支持“dp|sharding|mp|dummy”"}
+        default="dp",
+        metadata={
+            "help": "MOE's communication group currently supports 'dp|sharding|mp|dummy'"
+        },
     )
     use_moe: Optional[bool] = field(
         default=False, metadata={"help": "expert parallel 临时替代"}
     )
     moe_use_all2all: Optional[bool] = field(
-        default=False, metadata={"help": "是否使用all2all通信方式"}
+        default=False, metadata={"help": "Whether to use all2all communication mode"}
     )
     log_global_grad_norm: Optional[bool] = field(
         default=False,
         metadata={
-            "help": "打印全局grad-norm, 只有在开启`enable_global_training_logs`时生效"
+            "help": "Print global grade norm, only effective when 'enable_global_training_gogs' is enabled"
         },
     )
 
@@ -531,18 +533,10 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     @property
     def combine_batch(self):
-        """合并batch 用于增大seqlen
-
-        Returns:
-            _type_: _description_
-        """
         return self.max_seq_length // self.base_seq_length
 
     @property
     def reeao_dataset_rank(self):
-        """
-        考虑 pp /sharding/ dp 总和的数据流 rank
-        """
         if not self.pp_need_data_degree:
             return super().dataset_rank
         no_need_data_range = list(
@@ -565,9 +559,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     @property
     def reeao_dataset_world_size(self):
-        """
-        考虑 pp /sharding/ dp 总和的数据流 worldsize
-        """
         if not self.pp_need_data:
             return super().dataset_world_size
         return (
@@ -578,11 +569,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     def __post_init__(self):
         super().__post_init__()
-        # if self.sharding_parallel_degree > 1 and self.data_parallel_degree > 1:
-        #     # MP/PP下， 当前框架不支持同时开启 sharding 和 DP
-        #     assert (
-        #         self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
-        #      ), f"when using mp/pp, `data_parallel_degree` should be 1 but receive {self.data_parallel_degree}"
         if in_auto_parallel_align_mode():
             self.adaptive_norm_clip = False
             self.adaptive_norm_clip_ratio = 0.0
@@ -670,7 +656,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                     f"gradient_accumulation_steps[{self.gradient_accumulation_steps}] should be divisible by "
                     f"pp_need_data_degree[{self.pp_need_data_degree}]"
                 )
-                # pp_need_data_degree下，args的acc 需要//pp数量，欺骗 在prepare_inputs
                 self.gradient_accumulation_steps = (
                     self.gradient_accumulation_steps // self.pp_need_data_degree
                 )
@@ -736,14 +721,11 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
 
 class AutoPretrainingTrainer(AutoTrainer):
-    """
-    自动并行训练器，当前许多功能仍在测试适配中。
-    """
 
     def __init__(self, _shit=None, args=None, model=None, callbacks=[], **kwargs):
         assert _shit is None, "use key-ward argument"
         callbacks = [
-            LoggingCallback(),  # ``LoggingCallback` 需要在`TensorBoardCallback` 前面, timmer会reset
+            LoggingCallback(),
             StopperCallback(),
             TensorBoardCallback(
                 args, model=model, log_tokens_per_step=True, log_flops_per_step=False
@@ -756,7 +738,6 @@ class AutoPretrainingTrainer(AutoTrainer):
             callbacks.append(
                 ClipGradByAdaptiveNormCallback(),
             )
-        # TODO: restore param.name in other ways
         args.use_async_save = (
             args.use_async_save and args.save_sharded_model and args.load_sharded_model
         )
@@ -799,9 +780,6 @@ class AutoPretrainingTrainer(AutoTrainer):
         # self.return_value = paddle.zeros([]) #fake return value
 
     def autocast_smart_context_manager(self):
-        """
-        需要精心处理精度上的黑白名单问题。
-        """
         if self.enable_autocast_context_manager:
             black = [
                 "reduce_sum",
@@ -839,7 +817,6 @@ class AutoPretrainingTrainer(AutoTrainer):
         return ctx_manager
 
     def _load_optimizer_state(self, checkpoint):
-        """重写load_optimizer 方法，兼容moe optimizer merge 功能"""
         # def _load_moe_optimizer_state(checkpoint):
         #     opt_moe_suffix = re.sub(r"moe\d\d", "moe00", self.args.optimizer_name_suffix)
         #     return self._load_optimizer_state_of_one_shard(checkpoint, opt_moe_suffix)
@@ -949,7 +926,6 @@ class AutoPretrainingTrainer(AutoTrainer):
         ):
             self._save(output_dir=output_dir)
         else:
-            # 0 号sharding 保存模型
             if self.args.sharding_parallel_rank == 0:
                 paddle.save(
                     filtered_state_dict,
@@ -967,7 +943,7 @@ class AutoPretrainingTrainer(AutoTrainer):
     def evaluate(
         self, eval_dataset=None, ignore_keys=None, metric_key_prefix: str = "eval"
     ):
-        """doc"""
+
         self.model_wrapped.accumulate_steps = self.args.gradient_accumulation_steps
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
 
@@ -1007,10 +983,10 @@ class AutoPretrainingTrainer(AutoTrainer):
     def prediction_pipeline_step(
         self, model, inputs, prediction_loss_only, ignore_keys
     ):
-        """doc"""
+
         loss, _, labels = super().prediction_pipeline_step(
             model, inputs, prediction_loss_only, ignore_keys
-        )  # ERNIE-PP模型的loss其实是loss-sum。
+        )
         num_tokens = (labels != self.tokenizer.ignored_index).sum().item()
         loss_avg = loss * self.model_wrapped.accumulate_steps / num_tokens
         return loss_avg, loss, labels
@@ -1025,49 +1001,15 @@ class AutoPretrainingTrainer(AutoTrainer):
             drop_last=self.args.dataloader_drop_last,
         )
 
-        # if self.train_dataset is None:
-        #     return None
-
-        # total_batch_size = self.args.per_device_train_batch_size * self.args.dataset_world_size
-
-        # # In llm/llama/run_pretrain.py, it uses paddlenlp.utils.batch_sampler.DistributedBatchSampler,
-        # # which does no shuffle when shuffle is set True.
-        # sampler = paddle.io.BatchSampler(
-        #     dataset=self.train_dataset,
-        #     shuffle=False,
-        #     batch_size=total_batch_size,
-        #     drop_last=self.args.dataloader_drop_last,
-        # )
-        # sampler._acc_steps = self.args.gradient_accumulation_steps
-        # return sampler
-
     def get_train_dataloader(self):
-        """
-        获取训练数据的 DataLoader。
 
-        Args:
-            无。
-
-        Returns:
-            DataLoader: 训练数据的 DataLoader 对象。
-
-        Raises:
-            ValueError: 如果 `self.args.need_data` 为 True 但 `self.train_dataset` 为 None 时，抛出该异常。
-
-        """
         if self.args.need_data and self.train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
-        # NOTE: 纯dp也可以用此dataloader, 无需区分
         _DataLoader = partial(
             DistDataLoaderAuto,
             need_data=self.args.need_data,
             pp_broadcast=not self.args.pp_need_data,
         )
-        # _DataLoader = (
-        #     partial(DistDataLoaderAuto, need_data=self.args.need_data, pp_broadcast=not self.args.pp_need_data)
-        #     if (self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1)
-        #     else DataLoader
-        # )  # fleet初始化之后才能使用`DistDataLoaderAuto`
 
         train_dataset = self.train_dataset
         if self._is_iterable_dataset(train_dataset):
@@ -1119,15 +1061,11 @@ class AutoPretrainingTrainer(AutoTrainer):
             if self.control.should_log:
                 logs = {}
                 tr_loss = self._broadcast_final_loss(tr_loss)
-                # TODO(Ruibiao): 自动并行下tr_loss已经经过一次allreduce，需要有接口支持获取每路dp下的loss
                 tr_loss_single_dp_scalar = tr_loss.item()
-                dist.all_reduce(
-                    tr_loss, dist.ReduceOp.SUM
-                )  # 3级并行时，每个pp下的loss会广播，全局reduce-mean的时候，分子分母都会乘以pp_world_size，结果会被约掉
+                dist.all_reduce(tr_loss, dist.ReduceOp.SUM)
                 tr_loss_scalar = tr_loss.item() / dist.get_world_size()
                 tr_loss.zero_()
 
-                # reset tr_loss to zero
                 logs["loss"] = tr_loss_scalar / (
                     self.state.global_step - self._globalstep_last_logged
                 )
@@ -1325,16 +1263,7 @@ class AutoPretrainingTrainer(AutoTrainer):
                 self._end_save_time = time.time()
 
     def create_scheduler(self, num_training_steps):
-        """
-        根据给定的参数创建一个学习率调度器。
 
-        Args:
-            num_training_steps (int): 训练的总步数。
-
-        Returns:
-            torch.optim.lr_scheduler._LRScheduler: 学习率调度器对象。
-
-        """
         if self.args.warmup_steps > 0:
             warmup = self.args.warmup_steps
         else:
@@ -1507,16 +1436,7 @@ class AutoPretrainingTrainer(AutoTrainer):
         return self.optimizer
 
     def save_model(self, output_dir=None):
-        """
-        保存模型到指定目录，并保存静态名称到动态名称的映射关系。
 
-        Args:
-            output_dir (str, optional): 输出目录的路径。默认为 None，即使用父类指定的目录。
-
-        Returns:
-            None
-
-        """
         super().save_model(output_dir)
         if self.args.should_save:
             with open(
@@ -1525,7 +1445,6 @@ class AutoPretrainingTrainer(AutoTrainer):
                 of.write(json.dumps(self.static_name_to_dyg_name))
 
     def _load_rng_state(self, checkpoint):
-        # 预训练环节并不需要由框架控制 `rng`
         pass
 
     def _get_meshes_for_loader(self):

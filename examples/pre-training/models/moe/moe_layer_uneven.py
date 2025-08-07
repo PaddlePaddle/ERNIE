@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-moe
-"""
 from paddleformers.utils.tools import get_env_device
 
 from typing import Any, Tuple, List
@@ -45,7 +42,7 @@ from models.moe.round_robin_gate import RoundRobinGateFused
 try:
     from src.utils.misc import global_training_logs
 except ModuleNotFoundError:
-    global_training_logs = {}  # 没有erniebot的环境下无法打印 debug 量
+    global_training_logs = {}
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +95,7 @@ except ImportError:
 
 
 def average_grad(x, y, dy, eps=1e-12):
-    """
-    TODO: fuse 这坨 shit
-    y=x/x.sum(-1, keepdim=True) 的反向过程
-    """
+
     s, k = x.shape
     xsum = x.sum(axis=-1, keepdim=True)  # [s,1]
     maskpos = (xsum == 0.0).expand_as(x)
@@ -128,12 +122,7 @@ mask = paddle.to_tensor(
 
 
 def average_grad_bi(x, y, dy, eps=1e-12):
-    """
-    y=x/x.sum(-1, keepdim=True)
-    k=2 下面的反向过程，精度会更准一些:
-        dx1 = (y2 *dy1 - y2*dy2)/(y1+y2)**2
-        dx2 = (y1 *dy2 - y1*dy1)/(y1+y2)**2
-    """
+
     s, k = x.shape
     assert k == 2, k
     xsum = paddle.clip(x.sum(axis=-1, keepdim=True), min=eps)  # [s,1]
@@ -149,12 +138,7 @@ def average_grad_bi(x, y, dy, eps=1e-12):
 
 
 def topk_grad(x, dy, indicies):
-    """
-    TODO: fuse 这坨 shit
-    y=gather(topk(x)) 的反向过程
-    x:  [s,e]
-    dy: [s,k]
-    """
+
     s, e = x.shape
     _, k = dy.shape
     dx = paddle.scatter_nd(
@@ -172,26 +156,10 @@ def topk_grad(x, dy, indicies):
 
 
 class GateDispatch(PyLayer):
-    """doc"""
 
     @staticmethod
     def forward(ctx, x, gate_prob, k, capacity, use_pad, eps=1e-12):
-        """
-        对`gate_prob` 进行 softmax 并根据结果选取 topk 路由expert。 最后根据 expert 号对 `x` 进行重排。
-        Args:
-            x: [s, d] 输入的 activateion
-            gate_prob: [s, e]
-        k: int
-            capacity: int #no use
-        Returns:
-            y: [s*k, d] 将所有 `x` 根据其路由的 `expert-id` 升序的排序，融合到 s 维度。
-                    当截断发生时 s 会比输入 s 小。
-            combine_weights: [s, k], float： 每个 token 第 k 选择的 expert 的权重。
-                    当截断发生时 s 会比输入 s 小。
-            scatter_index: [k, s] ： 每个 token 第 k 次选择对应到 `y` 中的位置。
-            expert_offset: [e]： `y`中每个 expert-id 的分割位置。
-            expert_id: [s] `x` 中激活的 expert 号
-        """
+
         ctx.k = k
         ctx.eps = eps
         ctx.capacity = capacity
@@ -218,12 +186,7 @@ class GateDispatch(PyLayer):
 
     @staticmethod
     def backward(ctx, dy, dw, *_):
-        """
-        TODO: 这坨代码可以 fuse 一手。
-        关于 softmax 对 logits 的导数，参考：
-        https://stats.stackexchange.com/questions/215521/
-        how-to-find-derivative-of-softmax-function-for-the-purpose-of-gradient-descent/328095#328095
-        """
+
         s, k = ctx.combine_weights.shape
         grad = F.embedding(ctx.scatter_index, dy)  # [s, k,d]
         mask = (ctx.combine_weights > 0.0).astype(grad.dtype)  # [s,k]
@@ -240,26 +203,10 @@ class GateDispatch(PyLayer):
 
 
 class HardGateDispatch(PyLayer):
-    """专门为 MM 场景定制的 hard gate 分发"""
 
     @staticmethod
     def forward(ctx, x, expert_id, k, capacity, num_experts, eps=1e-12):
-        """
-        对`gate_logits` 进行 softmax 并根据结果选取 topk 路由expert。 最后根据 expert 号对 `x` 进行重排。
-        Args:
-            x: [s, d] 输入的 activateion
-            gate_logits: [s, e]
-        k: int
-            capacity: int #no use
-        Returns:
-            y: [s*k, d] 将所有 `x` 根据其路由的 `expert-id` 升序的排序，融合到 s 维度。
-                    当截断发生时 s 会比输入 s 小。
-            combine_weights: [s, k], float： 每个 token 第 k 选择的 expert 的权重。
-                    当截断发生时 s 会比输入 s 小。
-            scatter_index: [k, s] ： 每个 token 第 k 次选择对应到 `y` 中的位置。
-            expert_offset: [e]： `y`中每个 expert-id 的分割位置。
-            expert_id: [s] `x` 中激活的 expert 号
-        """
+
         ctx.k = k
         assert k == 1, f"k must be 1 in hard gate, got k={k}"
         ctx.eps = eps
@@ -278,15 +225,9 @@ class HardGateDispatch(PyLayer):
 
     @staticmethod
     def backward(ctx, dy, dw, *_):
-        """
-        TODO: 这坨代码可以 fuse 一手。
-        关于 softmax 对 logits 的导数，参考：
-        https://stats.stackexchange.com/questions/215521/
-        how-to-find-derivative-of-softmax-function-for-the-purpose-of-gradient-descent/328095#328095
-        """
         grad = F.embedding(ctx.scatter_index, dy)  # [s, k,d]
         assert grad.shape[1] == 1, f"k must == 1, got {grad.shape}"
-        dx = grad  # [s,1,k] @ [s,k,d] -> [s,1,d]
+        dx = grad
         return dx, None
 
 
@@ -337,9 +278,7 @@ class GateCombine(PyLayer):
             grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
                 ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
             )
-        # grad_combine_weight_helper is the same shape with grad x [seqlen * K, dim]
-        # reduce the hidden shape
-        # TODO: implement reduce in cuda ops
+
         grad_combine_weight = grad_combine_weight_helper.sum(-1)
         return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
 
@@ -380,9 +319,7 @@ def combining(x, combine_weights, scatter_index, hard_gate=False):
     return ret
 
 
-# Based on https://github.com/pytorch/pytorch/pull/40762
 class _AllToAllSized(PyLayer):
-    """doc"""
 
     @staticmethod
     def forward(
@@ -391,21 +328,8 @@ class _AllToAllSized(PyLayer):
         input_indices: Tensor,
         group: Group,
     ) -> Tensor:  # type: ignore
-        """
-        实现 All-to-All 操作，将 input 和 output 根据给定的 indices 进行分组并交换数据。
 
-        Args:
-            ctx (Any): 运行上下文对象。
-            input (Tensor): 输入的 Tensor 数据。
-            input_indices (Tensor): 每台设备需要聚合的原始 indices。
-            group (Group): 计算拓扑对应的 Group。
-
-        Returns:
-            Tuple[Tensor, Tensor]: 返回一个元组，第一个元素为输出的 Tensor 数据，第二个元素为输出的indices。
-
-        """
         ctx.group = group
-        # return input
         assert input.ndim == 2, input.shape
 
         if get_timers() is not None:
@@ -416,75 +340,19 @@ class _AllToAllSized(PyLayer):
         expert_per_device = len(input_indices) // world_size
         input_indices = input_indices.reshape([-1, expert_per_device])
 
-        # >>>> 第一次 all2all <<<<
         output_indices = paddle.zeros_like(input_indices)
         stream.alltoall_single(
             output_indices, input_indices, None, None, group, True, True
-        )  # .wait()
+        )
 
         input_indices.stop_gradient = True
         output_indices.stop_gradient = True
         ctx.input_indices = input_indices
         ctx.output_indices = output_indices
 
-        # has_empty_input = input_indices.sum(-1)
-        # # logger.info(f'has_empty_input: {has_empty_input}')
-        # stream.all_reduce(has_empty_input, op=dist.ReduceOp.MIN, group=group, sync_op=True, use_calc_stream=True)
-        # # logger.info(f'has_empty_input: {has_empty_input}')
-        # has_empty_input = (has_empty_input.numpy() == 0).any()
-
-        # gathered_input_indices =
-        # paddle.empty([input_indices.shape[0] * world_size, input_indices.shape[-1]], dtype=input_indices.dtype)
-        # stream.all_gather(gathered_input_indices, input_indices, group=group, use_calc_stream=True)
-        # gathered_input_indices =
-        # gathered_input_indices.reshape([world_size, world_size, -1]) #[world, world, #local_experts]
-        # output_indices = gathered_input_indices[rank]
-        # >>>> 第一次 all2all <<<<
-
-        # # 处理空 send 情况
-        # input_sum_per_rank = input_indices.sum(-1).numpy()
-        # output_indices_orig = output_indices
-        # # has_empty_input = (gathered_input_indices.sum(-1).numpy() == 0).any()
-        # # logger.info(f'has_empty_input: {has_empty_input}')
-        # # if (input_sum_per_rank == 0).any():
-        # if has_empty_input:
-        #     # input_indices = input_indices.numpy()
-        #     # logger.warning(f"This rank send empty data, before pad: {input_indices} #input={len(input)}")
-        #     padded = []
-        #     cnt = 0
-        #     for rank, span_len in enumerate(input_sum_per_rank):
-        #         if span_len != 0:
-        #             span = input[cnt : cnt + span_len]
-        #         else:
-        #             input_indices[rank, 0] = 1
-        #             span = paddle.zeros([1, input.shape[-1]], dtype=input.dtype)
-        #         cnt += span_len
-        #         padded.append(span)
-        #     # input_indices = paddle.to_tensor(input_indices).clone()
-        #     # fill_mask = input_indices[:,0] == 0
-        #     input = paddle.concat(padded, 0).clone()
-        #     # logger.warning(f"This rank send empty data, after pad: {input_indices} #input={len(input)}")
-        #     # del padded
-        #     input = input.clone()
-        #     assert input_indices.sum().item() == len(input), (input_indices, input.shape)
-
-        # if has_empty_input:
-        #     # >>>> 额外一次 all2all <<<<
-        #     output_indices = paddle.zeros_like(input_indices)
-        #     stream.alltoall_single(output_indices, input_indices, None, None, group, True, True)  # .wait()
-        #     # logger.info(f'extra a2a:  input:{input_indices} -> output:{output_indices}')
-        #     # >>>> 额外一次 all2all <<<<
-
-        # >>>> 第二次 all2all <<<<
         output = paddle.empty(
             [output_indices.sum().item()] + input.shape[1:], dtype=input.dtype
         )
-
-        # logger.info(
-        #     f"before a2a:rank-{rank}: in:{input_indices} out:{output_indices}"
-        #     f" in-shape:{input.shape} out-shape:{output.shape}"
-        #     f" dtype:{input.dtype} {output.dtype}"
-        # )
 
         stream.alltoall_single(
             output,
@@ -494,96 +362,24 @@ class _AllToAllSized(PyLayer):
             group,
             True,
             True,
-        )  # .wait()
-        # logger.info(f'after a2a:rank-{rank}: out-shape:{output.shape}')
-        # >>>> 第二次 all2all <<<<
-
-        # 处理空 recv 情况
-        # output_sum_per_rank_orig = output_indices_orig.sum(-1).numpy()
-        # output_sum_per_rank = output_indices.sum(-1).numpy()
-
-        # if has_empty_input:
-        #     # logger.warning(f"This rank recv empty data, before unpad: {output_indices_orig}")
-        #     cnt, buf = 0, []
-        #     for i, (span_len_orig, span_len) in enumerate(zip(output_indices_orig, output_indices)):
-        #         if span_len_orig == 0:
-        #             if span_len == 0:  # nonzero local experts
-        #                 pass
-        #             assert span_len == 1, span_len
-        #             cnt += span_len
-        #         else:
-        #             assert span_len == span_len_orig
-        #             buf.append(output[cnt : cnt + span_len])
-        #             cnt += span_len
-        #     if not buf:
-        #         output = paddle.zeros([0, output.shape[-1]], dtype=output.dtype)
-        #     else:
-        #         output = paddle.concat(buf, 0)
-        #     del buf
-        #     # logger.warning(f"This rank recv empty data, after unpad: {output.shape}")
-
-        # dist.alltoall(output, input, group=group)
+        )
         if get_timers() is not None:
             get_timers()("moe-all2all").stop()
         return output, output_indices.reshape([-1]).cast("float32")
 
     @staticmethod
     def backward(ctx: Any, dy: Tensor, _) -> Tuple[Tensor]:
-        """
-        将输入的Tensor分发到多个设备上，并将分发后的结果收集起来。
-
-        Args:
-            ctx (Any): 上下文信息，包含了分发信息和分发结果的缓存信息。
-            grad_output (Tensor): 分布在多个设备上的梯度输出。
-            _: 不使用。
-
-        Returns:
-            Tuple[Tensor]: 分发后的梯度输出，形状为 [ctx.input_indices.sum().item()] + grad_output.shape[1:]。
-            在 ctx.output_indices 中指定的位置上，返回对应设备上的梯度输出。
-
-        """
-        # return grad_output
-        # logger.info('begin a2a bwd')
-        # output = paddle.empty([ctx.input_indices.sum().item()] + grad_output.shape[1:], dtype=grad_output.dtype)
-        # stream.alltoall_single(
-        #     output,
-        #     grad_output,
-        #     ctx.input_indices.sum(-1).tolist(),
-        #     ctx.output_indices.sum(-1).tolist(),
-        #     ctx.group,
-        #     True,
-        #     True,
-        # )  # .wait()
 
         dx, _ = _AllToAllSized.apply(
             dy,
             ctx.output_indices.reshape([-1]),
             ctx.group,
         )
-        # logger.info('done a2a bwd')
 
         return dx, None
 
 
 class MOELayer(nn.Layer):
-    """MOELayer module which implements MixtureOfExperts as described in Gshard_.
-    ::
-
-        gate = Top2Gate(model_dim, num_experts)
-        moe = MOELayer(gate, expert)
-        output = moe(input)
-        l_aux = moe.l_aux
-
-    .. Gshard_: https://arxiv.org/pdf/2006.16668.pdf
-
-    Args:
-        gate (paddle.nn.Layer):
-            gate network
-        expert (paddle.nn.LayerList):
-            expert network, LayerList 长度是 per_device 上的 expert 数。
-        group (paddle.ProgressGroup)
-        recompute: 启用MOE内recomupte
-    """
 
     def __init__(
         self,
@@ -594,19 +390,7 @@ class MOELayer(nn.Layer):
         recompute=False,
         enable_logging=False,
     ) -> None:
-        """
-        初始化方法，用于创建一个多层专家的模块。
 
-        Args:
-        - `gate`: `torch.nn.Module`类型的门控网络。
-        - `experts`: 包含多个专家网络的列表或 `torch.nn.ModuleList`。
-        -  layer_idx (int): 当前MoE层的索引。
-        - `group (Optional)`: 分组对象。默认值为 `None`，表示不使用分组。
-        - `recompute (Optional)`: 是否进行模型重计算。默认值为 `False`，表示不进行重计算。
-
-        Returns:
-        - `None`: 该方法没有返回值。
-        """
         super().__init__()
         self.gate = gate
         if gate is not None:
@@ -662,8 +446,6 @@ class MOELayer(nn.Layer):
             and (not self.training)
             and paddle.all(token_type_ids == 0).numpy()
         ):
-            # 在token type hard gate 情况下, 且所有 token_type 为0，全部走文本expert
-            # 去除掉所有dispatch的开销
             return (
                 self.experts[0](input),
                 None,
@@ -671,7 +453,6 @@ class MOELayer(nn.Layer):
                 None,
             )
 
-        # assert len(input) == 1, "only single input Tensor supported"
         if input.ndim == 3:
             orig_shape = input.shape
             input = input.reshape([-1, input.shape[-1]])
@@ -681,26 +462,11 @@ class MOELayer(nn.Layer):
             len(input.shape) == 2
         ), f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
 
-        # Implement Algorithm 2 from GShard paper.
         seqlen, d_model = input.shape
 
-        # Reshape into S tokens by dropping sequence dimension.
-        # reshaped_input = input.reshape(-1, d_model)
-        # assert reshaped_input.shape[0] % len(self.experts) == 0, \
-        #       f'num tokens must be order of number of local experts, {input[0].shape[0]} vs {len(self.experts)}'
         def fwdfn(dispatched_input, expert_count_out):
-            """
-            运行专家模型并合并结果。
 
-            Args:
-                dispatched_input (paddle.Tensor): [S, dim] 被分发到专家的输入数据
-                expert_count_out (list): 每个阶段需要运行专家数量
-
-            Returns:
-                paddle.Tensor: [S, dim] 由所有专家模型产生的输出
-            """
-            # dispatched_input: [S, dim]
-            expert_outputs = []  # 如果由empty初始化，则训练会出inf
+            expert_outputs = []
             expert_count_out = expert_count_out.astype("int64")
             assert (len(expert_count_out) // self.world_size) == len(self.experts), (
                 expert_count_out,
@@ -708,21 +474,17 @@ class MOELayer(nn.Layer):
             )
             # [worldsize, local_experts]
             expert_offset_r = expert_count_out.cumsum(0).numpy()
-            # logger.info(f'expert_offset_r:{expert_offset_r}')
             expert_offset_l = np.pad(expert_offset_r, (1, 0), constant_values=0)[:-1]
             expert_offset = np.stack([expert_offset_l, expert_offset_r], axis=-1)
-            # logger.info(f'expert_offset before transpose: {expert_offset}')
 
             expert_offset = np.transpose(
                 expert_offset.reshape([self.world_size, len(self.experts), 2]),
                 [1, 0, 2],
             )
-            # logger.info(f'expert_offset: {expert_offset}')
 
             for iexpert, (expert, off_list) in enumerate(
                 zip(self.experts, expert_offset)
             ):
-                # logger.info(f'off_list:{off_list}')
                 ins = []
                 ins_offset, cnt = [], 0
                 for left, right in off_list:
@@ -730,20 +492,14 @@ class MOELayer(nn.Layer):
                     ins_offset.append((cnt, cnt + (right - left)))
                     cnt += right - left
                 if not sum(map(len, ins)):
-                    # logger.warning(f"local-expert:{iexpert} does not process data, we do not call expert")
-                    # ins = paddle.zeros([1, dispatched_input.shape[-1]], dtype=dispatched_input.dtype)
                     expert_outputs.append([None for _ in ins_offset])
                     continue
 
                 ins = paddle.concat(ins, 0)
                 out = expert(ins)
                 out = [out[left:right] for left, right in ins_offset]
-                # logger.info(f'expert:{iexpert} input-shape: {ins.shape} input-dtype:{ins.dtype}')
                 expert_outputs.append(out)
-                # debug_buffer[_mask] = paddle.zeros_like(out)
-            # logger.info(f'output-shape before tranpose: {[ [oo.shape for oo in o]for o in expert_outputs]}')
             expert_outputs = list(zip(*expert_outputs))  # transpose
-            # logger.info(f'output-shape after transpose: {[ [oo.shape for oo in o]for o in expert_outputs]}')
             expert_outputs = [
                 o for outputs in expert_outputs for o in outputs if o is not None
             ]
@@ -754,10 +510,6 @@ class MOELayer(nn.Layer):
             else:
                 expert_outputs = paddle.concat(expert_outputs, 0)
 
-            # logger.info(f'after fwd:{expert_outputs.astype("float32").mean(axis=-1)}')
-            # assert (
-            #     expert_outputs.shape == dispatched_input.shape
-            # ), f"output-shape: {expert_outputs.shape} vs {dispatched_input.shape}"
             return expert_outputs
 
         if get_timers() is not None:
@@ -839,9 +591,6 @@ class MOELayer(nn.Layer):
             paddle.diff(expert_offset_pad).astype(expert_offset.dtype).detach()
         )
 
-        # expert_count = expert_offset_pad - expert_offset_pad.roll(1, axis=0)
-        # expert_count = expert_count[1:]
-        # logger.info(f'before a2a: {dispatched_input.shape} \n  expert_count {expert_count}')
         if self.world_size > 1:
             dispatched_input, expert_count_out = _AllToAllSized.apply(
                 dispatched_input, expert_count, self.group
@@ -849,7 +598,6 @@ class MOELayer(nn.Layer):
         else:
             expert_count_out = expert_count
 
-        # logger.info(f'a2a: expert_count_out:{expert_count_out}')
         expert_output = (
             recompute(fwdfn, dispatched_input, expert_count_out)
             if self.recompute and self.training
@@ -859,11 +607,10 @@ class MOELayer(nn.Layer):
         if self.world_size > 1:
             expert_output, expert_count_rec = _AllToAllSized.apply(
                 expert_output, expert_count_out, self.group
-            )  # [ecm]
+            )
         combined_output = combining(
             expert_output, combine_weights, scatter_index, hard_gate=self.use_hard_gate
         )
-        # logger.info("[A2A]: " + "; ".join([f"id:{i}={j}" for i, j in list(enumerate(expert_count.tolist()))]))
         if orig_shape:
             combined_output = combined_output.reshape(
                 orig_shape[:-1] + [combined_output.shape[-1]]
