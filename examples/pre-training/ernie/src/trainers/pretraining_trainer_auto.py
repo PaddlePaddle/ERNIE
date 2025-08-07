@@ -84,15 +84,12 @@ from src.utils.training_utils import (
 from src.callbacks import (
     TensorBoardCallback,
     LoggingCallback,
-    StopperCallback,
-    ClipGradByAdaptiveNormCallback,
-    ReshardSaveExitCallback,
 )
 from src.datasets.dist_data_loader import (
     DistDataLoaderAuto,
 )
 from src.utils.misc import global_training_logs
-from src.clip import ClipGradByAdaptiveNorm, ClipGradForMOEByGlobalNorm
+from src.clip import ClipGradForMOEByGlobalNorm
 
 try:
     from paddleformers.trainer.trainer import (
@@ -335,13 +332,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
             "这个值与最小配比的积 必须大于1, 改变该值时，需要设置same_data=False"
         },
     )
-    adaptive_norm_clip: Optional[bool] = field(
-        default=False, metadata={"help": "是否启用 AdaptiveNormClip 梯度裁剪策略"}
-    )
-    adaptive_norm_clip_ratio: Optional[float] = field(
-        default=1.03,
-        metadata={"help": "AdaptiveNormClip 裁剪阈值, 大于设定的阈值才会启动裁剪"},
-    )
     adaptive_norm_force_clear_state: Optional[bool] = field(
         default=False, metadata={"help": "AdaptiveNormClip 强制清空 state dict"}
     )
@@ -380,10 +370,7 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
     use_dummy_dataset: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use dummydataset, only for debug"}
     )
-    reshard_save_then_exit: Optional[bool] = field(
-        default=False,
-        metadata={"help": "Whether to exit the program directly after reshard"},
-    )
+
     moe_group: Optional[str] = field(
         default="dp",
         metadata={
@@ -529,8 +516,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
     def __post_init__(self):
         super().__post_init__()
         if in_auto_parallel_align_mode():
-            self.adaptive_norm_clip = False
-            self.adaptive_norm_clip_ratio = 0.0
             self.no_shuffle = 1
             self.no_part_shuffle = 1
 
@@ -681,18 +666,11 @@ class AutoPretrainingTrainer(AutoTrainer):
         assert _shit is None, "use key-ward argument"
         callbacks = [
             LoggingCallback(),
-            StopperCallback(),
             TensorBoardCallback(
                 args, model=model, log_tokens_per_step=True, log_flops_per_step=False
             ),
         ] + callbacks
-        if args.reshard_save_then_exit:
-            callbacks.append(ReshardSaveExitCallback(self))
 
-        if args.adaptive_norm_clip:
-            callbacks.append(
-                ClipGradByAdaptiveNormCallback(),
-            )
         args.use_async_save = (
             args.use_async_save and args.save_sharded_model and args.load_sharded_model
         )
@@ -1261,45 +1239,7 @@ class AutoPretrainingTrainer(AutoTrainer):
                 self.args
             )
 
-            if self.args.adaptive_norm_clip:
-                if "split_param" in self.args.sharding_parallel_config:
-                    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
-                        DygraphShardingOptimizerV2,
-                    )
-
-                    v2_assign_slice_grad = DygraphShardingOptimizerV2._assign_slice_grad
-
-                    def _assign_slice_grad(self):
-                        v2_assign_slice_grad(self)
-                        assert isinstance(
-                            self._grad_clip, ClipGradByAdaptiveNorm
-                        ), "self._grad_clip must be ClipGradByAdaptiveNorm"
-                        if not hasattr(self._grad_clip, "pname_to_paramindex"):
-                            pname_to_paramindex = {}
-                            assert not isinstance(self._parameter_list[0], dict)
-                            for idx, param in enumerate(self._parameter_list):
-                                param = self._slice_params[param.name]
-                                if param._is_initialized():
-                                    pname_to_paramindex[param.name] = idx
-                            self._grad_clip.pname_to_paramindex = pname_to_paramindex
-                            self._grad_clip.num_params = len(self._parameter_list)
-                            self._grad_clip.sharding_stage1_v2 = True
-
-                    DygraphShardingOptimizerV2._assign_slice_grad = _assign_slice_grad
-                    logger.info(
-                        "Hack DygraphShardingOptimizerV2._assign_slice_grad for ClipGradByAdaptiveNorm"
-                    )
-
-                grad_clip = ClipGradByAdaptiveNorm(
-                    clip_ratio=self.args.adaptive_norm_clip_ratio,
-                    start_clip_steps=self.args.adaptive_norm_start_clip_steps,
-                    shard_clip=self.args.adaptive_norm_shard_clip,
-                    enable_record=self.args.adaptive_norm_enable_record,
-                    enable_record_clip_history=self.args.adaptive_norm_enable_record_clip_history,
-                    verbose=self.args.adaptive_norm_verbose,
-                )
-                logger.info("using ClipGradByAdaptiveNorm")
-            elif (
+            if (
                 self.args.use_moe
                 and not self.args.use_hybrid_parallel
                 and not self.args.enable_auto_parallel

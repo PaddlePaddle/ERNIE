@@ -17,14 +17,12 @@
 Returns:
     _type_: _description_
 """
-from typing import Any, Tuple, List, Optional, Callable
+from typing import Tuple, List, Optional
 import logging
 from collections import namedtuple
 from contextlib import contextmanager
-from functools import partial
 
 import paddle
-from paddle import framework
 from paddle import nn
 from paddle.distributed.communication import stream
 import paddle.nn.functional as F
@@ -155,20 +153,6 @@ def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
     return output
 
 
-def combining(x, combine_weights, scatter_index):
-
-    dim = x.shape[-1]
-    scatter_index = scatter_index.reshape([-1])
-    num_k = combine_weights.shape[-1]
-    x = dist.reshard(x, get_mesh(0), [dist.Replicate(), dist.Shard(0)])
-    combine_weights = combine_weights.unsqueeze(1)
-    # num_k = 2
-    x = paddle.gather(x, scatter_index).reshape([-1, num_k, dim])  # [seq,2,dim]
-    return paddle.matmul(combine_weights, x).squeeze(
-        1
-    )  # [seq,1,2] @ [seq,2,dim] -> [seq,1,dim]
-
-
 class AlltoAll(PyLayer):
     """
     AlltoAll w/ backward
@@ -194,68 +178,6 @@ class AlltoAll(PyLayer):
         return AlltoAll.apply(*dx, group=ctx.group)
 
 
-class AlltoAllAsync(PyLayer):
-    """
-    AlltoAll async w/ backward
-    """
-
-    @staticmethod
-    def forward(ctx, x, *fn_args, group=None, fn=None, is_first_fwd=False):
-        """
-        All-to-all communication in the group.
-        Args:
-            x: Tensor
-            args: List[Any], argument(s) to `fn`
-            group: ProcessGroup
-            fn: callable, called while doing alltoall
-            is_first_fwd: if using recompute, don't record bacward when first forward
-        Returns:
-            x: Tensor
-            fn_out: List[Tensor]
-        """
-        assert fn is not None, "use AlltoAll no async"
-        ctx.group = group
-        if dist.get_world_size(group) <= 1:
-            ctx.bwf, fn_out = manual_backward(fn, is_first_fwd, *fn_args)
-            return (x,) + fn_out
-        x_out = paddle.empty_like(x)
-        x_out.stop_gradient = False
-        with profile("moe-all2all"):
-            task = stream.alltoall_single(
-                x_out,
-                x,
-                None,
-                None,
-                group,
-                sync_op=False,
-            )
-        ctx.bwf, fn_out = manual_backward(fn, is_first_fwd, *fn_args)
-        task.wait()
-        return (x_out,) + fn_out
-
-    @staticmethod
-    def backward(ctx, dx_out, *fn_out_grads):
-
-        if dist.get_world_size(ctx.group) <= 1:
-            fn_args_grads = ctx.bwf(*fn_out_grads)
-            return (dx_out,) + fn_args_grads
-
-        dx = paddle.empty_like(dx_out)
-        dx.stop_gradient = False
-        with profile("moe-all2all"):
-            task = stream.alltoall_single(
-                dx,
-                dx_out,
-                None,
-                None,
-                ctx.group,
-                sync_op=False,
-            )
-        fn_args_grads = ctx.bwf(*fn_out_grads)
-        task.wait()
-        return (dx,) + fn_args_grads
-
-
 def detach_and_requires_grad_(*args):
     """detach_and_requires_grad_"""
     ret = [a.detach() if a is not None else None for a in args]
@@ -263,72 +185,6 @@ def detach_and_requires_grad_(*args):
         if a is not None:
             r.stop_gradient = a.stop_gradient
     return ret
-
-
-def manual_backward(f: Callable, is_first_fwd: bool, *args: List[Any]):
-    """
-    Args:
-        f(callable)
-        args(*Any)
-    Returns
-        bw_f(callable): manual backward fn
-        out(List[Tensor]): output of f(*args)
-    """
-    tracer = framework._dygraph_tracer()
-    orig = tracer._has_grad
-    if not is_first_fwd:
-        tracer._has_grad = True  # turn on grad trace so we can manual backward
-
-    detached_args = detach_and_requires_grad_(*args)
-    detached_args_clone = [a.clone() if a is not None else None for a in detached_args]
-    out = f(*detached_args_clone)
-    for a in detached_args:
-        if a is not None:
-            a._clear_dataptr()  # free mem
-    if isinstance(out, list):
-        out = tuple(out)
-    elif not isinstance(out, tuple):
-        out = (out,)
-
-    if is_first_fwd:
-        tracer._has_grad = orig
-        return None, out
-
-    out_cached = [
-        o.clone() for o in out if o is not None and not o.stop_gradient
-    ]  # do not cache stop_gradient output
-    for o in out_cached:
-        o._clear_dataptr()  # free mem
-    tracer._has_grad = orig
-
-    def bwd_f(*grad):
-        nonlocal out_cached, detached_args, f
-        grad = list(grad)
-        grad = [g for g in grad if g is not None]
-        assert len(grad) == len(out_cached), (len(grad), len(out_cached), f)
-        # out, grad = zip(*[(o, g) for o, g in zip(out, grad) if g is not None])
-        paddle.autograd.backward(out_cached, grad)
-        return tuple([t.grad if t is not None else None for t in detached_args])
-
-    return bwd_f, out
-
-
-def bpr_preprocess(input, logits, capacity, buffer):
-    """impletment bpr sorting"""
-    assert input.ndim == 2, input.shape
-    idx = paddle.argsort(logits.max(-1), axis=0, descending=True)
-    input = input[idx]
-    logits = logits[idx]
-    buffer["idx"] = idx
-    return input, logits
-
-
-def bpr_postprocess(output, buffer):
-    """bpr sorting"""
-    idx = buffer.pop("idx")
-    rev_idx = paddle.argsort(idx)
-    output = output[rev_idx]
-    return output
 
 
 class MOELayerAuto(MOELayer):
@@ -343,7 +199,6 @@ class MOELayerAuto(MOELayer):
         recompute=False,
         enable_logging: bool = False,
         k=2,
-        enable_pbr: bool = False,
         all_to_all_dropout=0,
         group_experts=False,
         config=None,
@@ -406,17 +261,7 @@ class MOELayerAuto(MOELayer):
             assert 0, "no supported, checkout earylier code"
             assert self.num_local_experts == 1
 
-        if enable_pbr:
-            logger.info("using BPR")
-            prepost_process_buffer = {}
-            self.input_preprocess = partial(
-                bpr_preprocess, buffer=prepost_process_buffer
-            )
-            self.output_postprocess = partial(
-                bpr_postprocess, buffer=prepost_process_buffer
-            )
-        else:
-            self.input_preprocess = self.output_postprocess = None
+        self.input_preprocess = self.output_postprocess = None
         self.group_experts = group_experts
 
     def _cal_multimodel_experts_prob(
@@ -609,9 +454,12 @@ class MOELayerAuto(MOELayer):
                     expert_output = dist.reshard(
                         expert_output, get_mesh(), [dist.Shard(0), dist.Replicate()]
                     )
-            use_fuse = isinstance(self.gate, (TopKGateFusedAuto))
-            combine_fn = combining_fused_auto if use_fuse else combining
-            combined_output = combine_fn(expert_output, combine_weights, scatter_index)
+            assert isinstance(
+                self.gate, (TopKGateFusedAuto)
+            ), "Only TopKGateFusedAuto is supported here"
+            combined_output = combining_fused_auto(
+                expert_output, combine_weights, scatter_index
+            )
 
             if self.output_postprocess is not None:
                 combined_output = self.output_postprocess(combined_output)

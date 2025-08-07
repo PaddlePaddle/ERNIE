@@ -198,19 +198,6 @@ class MoEStatics(nn.Layer):
             self.expert_usage = p
 
 
-def combining(x, combine_weights, scatter_index):
-
-    dim = x.shape[-1]
-    scatter_index = scatter_index.reshape([-1])
-    num_k = combine_weights.shape[-1]
-    combine_weights = combine_weights.unsqueeze(1)
-    # num_k = 2
-    x = paddle.gather(x, scatter_index).reshape([-1, num_k, dim])  # [seq,2,dim]
-    return paddle.matmul(combine_weights, x).squeeze(
-        1
-    )  # [seq,1,2] @ [seq,2,dim] -> [seq,1,dim]
-
-
 class GateCombine(PyLayer):
     @staticmethod
     def forward(ctx, x, combine_weights, scatter_index):
