@@ -815,8 +815,8 @@ class AlltoAllSmartXPU(paddle.autograd.PyLayer):
 
 
 # Conditionally select the AlltoAllSmart implementation
-if paddle.is_compiled_with_xpu():
-    AlltoAllSmart = AlltoAllSmartXPU
+# if paddle.is_compiled_with_xpu():
+#     AlltoAllSmart = AlltoAllSmartXPU
 
 
 class MOEAllGatherLayerV2(MOELayer):
