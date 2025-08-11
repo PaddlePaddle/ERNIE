@@ -1,5 +1,5 @@
 ### model
-model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B
+model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Paddle
 tensor_parallel_degree: 4
 output_dir: None
 
