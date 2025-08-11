@@ -38,7 +38,7 @@ jobs:
       - name: Install Dependencies
         run: |
           docker exec -t ${container_name} /bin/bash -c '
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
           '
 
       - name: Get Diff
@@ -46,7 +46,6 @@ jobs:
           work_dir: ${{ github.workspace }}
         run: |
           docker exec -t ${container_name} /bin/bash -c '
-          source $work_dir/../../../proxy
           rm -rf ERNIE
           git clone https://github.com/PaddlePaddle/ERNIE.git
           cd ERNIE

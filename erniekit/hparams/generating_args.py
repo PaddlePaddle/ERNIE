@@ -24,7 +24,7 @@ class StreamOptions:
 
     def __init__(self, max_count: int = 100):
         self.count: int = 20
-        self.ranked: str = 'newest'
+        self.ranked: str = "newest"
         self.unreadOnly: bool = False
         self.newerThan: int = None
         self._max_count = max_count
@@ -84,4 +84,7 @@ class GeneratingArguments:
     stream_options: StreamOptions = field(
         default=None,
         metadata={"help": "Relevant options for stream output"},
+    )
+    enable_thinking: bool = field(
+        default=False, metadata={"help": "Whether enable thinking when using VL model."}
     )

@@ -32,17 +32,24 @@ def run_chat(args: Optional[dict[str, Any]] = None) -> None:
     model_args, generating_args, finetuning_args, server_args = get_server_args(args)
 
     messages = []
-    print("Welcome to the CLI application, use `clear` to remove the history, use `exit` to exit the application.")
+    print(
+        "Welcome to the CLI application, use `clear` to remove the history, use `exit` to exit the application."
+    )
+    print("Note: the command-line dialogue for VL-model only supports pure text input.")
 
     ip = "0.0.0.0"
     service_http_port = str(server_args.port)
-    client = openai.Client(base_url=f"http://{ip}:{service_http_port}/v1", api_key="EMPTY_API_KEY")
+    client = openai.Client(
+        base_url=f"http://{ip}:{service_http_port}/v1", api_key="EMPTY_API_KEY"
+    )
 
     while True:
         try:
             query = input("\nUser: ")
         except UnicodeDecodeError:
-            print("Detected decoding error at the inputs, please set the terminal encoding to utf-8.")
+            print(
+                "Detected decoding error at the inputs, please set the terminal encoding to utf-8."
+            )
             continue
         except Exception:
             raise
@@ -68,16 +75,43 @@ def run_chat(args: Optional[dict[str, Any]] = None) -> None:
             presence_penalty=generating_args.presence_penalty,
             stream=generating_args.stream,
             stream_options=generating_args.stream_options,
+            extra_body={"enable_thinking": generating_args.enable_thinking},
         )
 
         assistant_response = ""
-        if generating_args.stream:
-            for chunk in response:
-                if chunk.choices[0].delta is not None:
-                    print(chunk.choices[0].delta.content, end='')
-                    assistant_response += chunk.choices[0].delta.content
+
+        if generating_args.enable_thinking:
+            print_thinking = False
+            print_answer = False
+            if generating_args.stream:
+                for chunk in response:
+                    if chunk.choices[0].delta.reasoning_content != "":
+                        if not print_thinking:
+                            print("thinking process:")
+                            print_thinking = True
+                        print(chunk.choices[0].delta.reasoning_content, end="")
+                        assistant_response += chunk.choices[0].delta.reasoning_content
+                    if chunk.choices[0].delta.content != "":
+                        if not print_answer:
+                            print("answer:")
+                            print_answer = True
+                        print(chunk.choices[0].delta.content, end="")
+                        assistant_response += chunk.choices[0].delta.content
+            else:
+                print("thinking process:")
+                print(response.choices[0].message.reasoning_content)
+                print("answer:")
+                print(response.choices[0].message.content)
+                assistant_response += response.choices[0].message.reasoning_content
+                assistant_response += response.choices[0].message.content
         else:
-            print(response.choices[0].message.content)
-            assistant_response += response.choices[0].message.content
+            if generating_args.stream:
+                for chunk in response:
+                    if chunk.choices[0].delta is not None:
+                        print(chunk.choices[0].delta.content, end="")
+                        assistant_response += chunk.choices[0].delta.content
+            else:
+                print(response.choices[0].message.content)
+                assistant_response += response.choices[0].message.content
         print()
         messages.append({"role": "assistant", "content": assistant_response})
