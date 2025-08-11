@@ -87,6 +87,12 @@ def check_download_repo(
 
         return model_name_or_path
     else:
+        # set default download source
+        if not any([from_hf_hub, from_aistudio, from_modelscope]):
+            logger.warning(
+                "Please specify one of the following sources for model downloading: --from_hf_hub, --from_aistudio, --from_modelscope, default set to --from_aistudio"
+            )
+            from_aistudio = True
         # check remote repo
         model_name = model_name_or_path.split("/")[-1].rstrip("-Paddle")
         if model_name in MODEL_DOWNLOAD_MAP.keys():
