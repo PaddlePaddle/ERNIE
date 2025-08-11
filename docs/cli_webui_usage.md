@@ -85,6 +85,8 @@ erniekit server examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 erniekit chat examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 ```
 
+* Note: the command-line dialogue for VL-model only supports pure text input.
+
 ## 1.2. Model Fine-tuning
 
 ### 1.2.1. SFT & LoRA Fine-tuning
