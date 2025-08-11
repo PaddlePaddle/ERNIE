@@ -15,6 +15,7 @@
 import os
 import subprocess
 import sys
+import shlex
 from copy import deepcopy
 from typing import Any, Optional
 
@@ -56,22 +57,47 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
     )
 
     env = deepcopy(os.environ)
-    command = (
-        "python -m fastdeploy.entrypoints.openai.api_server "
-        f"--model {server_model_path} "
-        f"--tensor-parallel-size {finetuning_args.server_tp_degree} "
-        f"--host {server_args.host} "
-        f"--port {server_args.port} "
-        f"--metrics-port {server_args.metrics_port} "
-        f"--engine-worker-queue-port {server_args.engine_worker_queue_port} "
-        f"--use-warmup {server_args.use_warmup} "
-        f"--max-model-len {server_args.max_model_len} "
-        f"--max-num-seqs {server_args.max_num_seqs} "
-        f"--gpu-memory-utilization {server_args.gpu_memory_utilization} "
-        f"--block-size {server_args.block_size} "
-        f"--kv-cache-ratio {server_args.kv_cache_ratio} "
-        f"--quantization {server_args.quantization} "
-    ).split()
+    if server_args.enable_mm:
+        limit_mm_per_prompt = shlex.quote(server_args.limit_mm_per_prompt)
+        command = (
+            "python -m fastdeploy.entrypoints.openai.api_server "
+            f"--model {server_model_path} "
+            f"--tensor-parallel-size {finetuning_args.server_tp_degree} "
+            f"--host {server_args.host} "
+            f"--port {server_args.port} "
+            f"--metrics-port {server_args.metrics_port} "
+            f"--engine-worker-queue-port {server_args.engine_worker_queue_port} "
+            f"--use-warmup {server_args.use_warmup} "
+            f"--max-model-len {server_args.max_model_len} "
+            f"--max-num-seqs {server_args.max_num_seqs} "
+            f"--gpu-memory-utilization {server_args.gpu_memory_utilization} "
+            f"--block-size {server_args.block_size} "
+            f"--kv-cache-ratio {server_args.kv_cache_ratio} "
+            f"--quantization {server_args.quantization} "
+            f"--enable-mm "
+            f"--limit-mm-per-prompt {limit_mm_per_prompt} "
+            f"--reasoning-parser {server_args.reasoning_parser} "
+            f"--enable-chunked-prefill "
+            f"--max-num-batched-tokens {server_args.max_num_batched_tokens} "
+        )
+        command = shlex.split(command)
+    else:
+        command = (
+            "python -m fastdeploy.entrypoints.openai.api_server "
+            f"--model {server_model_path} "
+            f"--tensor-parallel-size {finetuning_args.server_tp_degree} "
+            f"--host {server_args.host} "
+            f"--port {server_args.port} "
+            f"--metrics-port {server_args.metrics_port} "
+            f"--engine-worker-queue-port {server_args.engine_worker_queue_port} "
+            f"--use-warmup {server_args.use_warmup} "
+            f"--max-model-len {server_args.max_model_len} "
+            f"--max-num-seqs {server_args.max_num_seqs} "
+            f"--gpu-memory-utilization {server_args.gpu_memory_utilization} "
+            f"--block-size {server_args.block_size} "
+            f"--kv-cache-ratio {server_args.kv_cache_ratio} "
+            f"--quantization {server_args.quantization} "
+        ).split()
 
     process = subprocess.Popen(
         command,
