@@ -313,29 +313,6 @@ def calc_lm_head_logits(
     return logits
 
 
-def finfo(dtype: paddle.dtype = None):
-
-    if dtype is None:
-        dtype = paddle.get_default_dtype()
-
-    if dtype == paddle.bfloat16:
-
-        class BFloatFInfo:
-            """
-            Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
-            """
-
-            min = -3.3895313892515355e38
-
-        return BFloatFInfo
-    if dtype == paddle.float32:
-        return np.finfo(np.float32)
-    if dtype == paddle.float16:
-        return np.finfo(np.float16)
-    if dtype == paddle.float64:
-        return np.finfo(np.float64)
-
-
 def masked_fill(x, mask, value):
 
     y = paddle.full(x.shape, value, x.dtype)
@@ -538,7 +515,7 @@ def scaled_dot_product_attention(
             attn_weights = paddle.maximum(
                 attn_weights,
                 paddle.to_tensor(
-                    float(finfo(query_states.dtype).min), dtype=query_states.dtype
+                    float(paddle.finfo(query_states.dtype).min), dtype=query_states.dtype
                 ),
             )
 
@@ -588,7 +565,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     """
     batch_size, target_length = input_ids_shape
 
-    mask = paddle.full((target_length, target_length), float(finfo(dtype).min))
+    mask = paddle.full((target_length, target_length), float(paddle.finfo(dtype).min))
 
     mask_cond = paddle.arange(mask.shape[-1])
     mask = masked_fill(
@@ -623,7 +600,7 @@ def _expand_mask(mask, dtype, tgt_length):
 
     inverted_mask = 1.0 - expanded_mask
     return masked_fill(
-        inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min)
+        inverted_mask, inverted_mask.cast("bool"), float(paddle.finfo(dtype).min)
     )
 
 
@@ -991,20 +968,11 @@ class ErnieAttentionAuto(nn.Layer):
             self.hidden_size if not self.is_gqa else kv_hidden_size,
             bias_attr=config.use_bias,
         )
-
-        if config.sequence_parallel:
-            self.o_proj = ErnieLinear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=config.use_bias,
-                ipp=self.ipp,
-            )
-        else:
-            self.o_proj = LinearFN(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=config.use_bias,
-            )
+        self.o_proj = LinearFN(
+            self.hidden_size,
+            self.hidden_size,
+            bias_attr=config.use_bias,
+        )
         if config.rope_reorder:
             self.rotary_emb = RotaryEmbedding(
                 self.head_dim,
@@ -1933,7 +1901,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             )
         combined_attention_mask = paddle.maximum(
             combined_attention_mask.astype(dtype),
-            paddle.to_tensor(float(finfo(dtype).min), dtype=dtype),
+            paddle.to_tensor(float(paddle.finfo(dtype).min), dtype=dtype),
         )
         return combined_attention_mask
 
