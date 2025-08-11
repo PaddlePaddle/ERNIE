@@ -29,11 +29,17 @@ def read_requirements_file(filepath):
         requirements = fin.read()
     return requirements
 
+
 def read(*names, **kwargs):
-    with io.open(os.path.join(os.path.dirname(__file__), *names), encoding=kwargs.get("encoding", "utf8")) as fp:
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *names),
+        encoding=kwargs.get("encoding", "utf8"),
+    ) as fp:
         return fp.read()
 
+
 REQUIRED_PACKAGES = read_requirements_file("requirements/gpu/requirements.txt")
+
 
 def get_version() -> str:
     """_summary_
