@@ -35,9 +35,7 @@ def run_chat(args: Optional[dict[str, Any]] = None) -> None:
     print(
         "Welcome to the CLI application, use `clear` to remove the history, use `exit` to exit the application."
     )
-    print(
-        "Note: the command-line dialogue for VL-model only supports pure text input."
-    )
+    print("Note: the command-line dialogue for VL-model only supports pure text input.")
 
     ip = "0.0.0.0"
     service_http_port = str(server_args.port)
