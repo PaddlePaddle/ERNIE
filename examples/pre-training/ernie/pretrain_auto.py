@@ -388,117 +388,54 @@ def main():
     max_seq_length = args.max_seq_length
 
     if args.do_train:
-        if args.use_dummy_dataset:
-            from src.datasets.pretrain_task import PretrainDummyDataset
-
-            train_dataset = PretrainDummyDataset(args.base_seq_length)
-            train_dataset = MapDataset(train_dataset)
-            logger.warning("USING DUMMY DATASET !!!")
-
-        elif args.use_streaming_data:
-            from src.datasets.streaming_pretrain_reader.streaming_pretrain_task import (
-                KnoverDataset,
-                create_pyreader,
+        assert (
+            args.max_seq_length // args.base_seq_length >= 1
+            and args.max_seq_length % args.base_seq_length == 0
+        )
+        if args.combine_batch > 1:
+            logger.info(
+                f"max seq length is larger than base_seq_length, use combine batch: {args.combine_batch}"
             )
-
-            logger.info("loading plain text data...")
-            with open(config.model_args.train_task_config) as f:
-                train_task_group = json.load(f)
-
-            dp_worldsize = args.reeao_data_world_size
-            dataset_random_seed = args.seed + args.dataset_rank
-            config_dataset = {
-                "max_seq_len": max_seq_length,
-                "vocab_path": args.tokenizer_name,
-                "is_valid": False,
-                "add_ditto": False,
-                "training_mode": "AR",
-                "task_need_convert": args.task_need_convert,
-                "batch_size": max_seq_length,  # means total token's number
-                "random_seed": dataset_random_seed,
-                "dp_worldsize": dp_worldsize,
-                "voc_size": tokenizer.vocab_size,
-                "task_group": train_task_group,
-                # "ignored_index": args.ignored_index,
-                "acc_steps": args.gradient_accumulation_steps,
-                "worker_index": args.dataset_rank,  # 暂时没用到，可有可无，写日志可以用一把
-                "output_dir": args.output_dir,
-            }
-            # logger.debug(f"Pad ID: {tokenizer.pad_id}")
-            # logger.debug(f"ignored_index: {tokenizer.ignored_index}")
-            train_reader = create_pyreader(config_dataset)
-            # `KnoverDataset` 处理所有的batchinng 和shuffle
-            train_dataset = KnoverDataset(
-                train_reader.data_generator(),
-                args.per_device_train_batch_size,
-                ignored_index=tokenizer.ignored_index,
-                pad_id=tokenizer.pad_id,
-            )
-            DEBUG_PRINT_CNT = 0
-
-            def collate_fn(batch):
-                nonlocal DEBUG_PRINT_CNT
-                batch = default_data_collator(batch, return_tensors="np")
-                if DEBUG_PRINT_CNT < 3:
-                    DEBUG_PRINT_CNT += 1
-                    for k, v in batch.items():
-                        logger.debug(
-                            f"Example={DEBUG_PRINT_CNT} key={k}, len={len(v[0])if isinstance(v, np.ndarray) else 0}, "
-                            f"value={v[0] if isinstance(v, np.ndarray) else v}"
-                        )
-                return batch
-
-        else:
             assert (
-                args.max_seq_length // args.base_seq_length >= 1
-                and args.max_seq_length % args.base_seq_length == 0
-            )
-            if args.combine_batch > 1:
-                logger.info(
-                    f"max seq length is larger than base_seq_length, use combine batch: {args.combine_batch}"
-                )
-                assert (
-                    args.use_train_part_sharding
-                ), "not `use_train_part_sharding` is not supported when using `combine_batch`"
-                assert (
-                    args.num_consecutive // args.combine_batch >= 1
-                    and args.num_consecutive % args.combine_batch == 0
-                ), "num_consecutive must be a multiple of max_seq_length / base_seq_length"
-                assert (
-                    args.data_weights
-                ), "no `data_weights` is not supported when using `combine_batch`"
-            max_seq_length = args.base_seq_length
-            if args.need_data:
-                if args.multimodal:
-                    assert False, "Do not support multimodal!"
-                else:
-                    pretrain_task = PretrainTask(train_file_list, tokenizer)
-                train_dataset = pretrain_task.train_data(
-                    max_seq_length + 1,
-                    stride=max_seq_length,
-                    rng=random.Random(args.seed),
-                    weights=data_weights,
-                    evaluate=False,
-                    seed=args.seed,
-                    num_consecutive=args.num_consecutive,
-                    shuffle=not args.no_part_shuffle,
-                    combine_batch=args.combine_batch,
-                    load_process_num=args.data_load_process_num,
-                )
-                train_dataset.load(
-                    use_shard=args.use_train_part_sharding,
-                    dp_rank=args.reeao_dataset_rank,
-                    dp_size=args.reeao_dataset_world_size,
-                )  # TODO: MP/PP时候需要传入dp-rank
-                train_dataset = MapDataset(train_dataset)
+                args.use_train_part_sharding
+            ), "not `use_train_part_sharding` is not supported when using `combine_batch`"
+            assert (
+                args.num_consecutive // args.combine_batch >= 1
+                and args.num_consecutive % args.combine_batch == 0
+            ), "num_consecutive must be a multiple of max_seq_length / base_seq_length"
+            assert (
+                args.data_weights
+            ), "no `data_weights` is not supported when using `combine_batch`"
+        max_seq_length = args.base_seq_length
+        if args.need_data:
+            if args.multimodal:
+                assert False, "Do not support multimodal!"
             else:
-                logger.info(
-                    f"mp_{args.pipeline_parallel_rank}_pp{args.tensor_parallel_rank} no data needed, \
-                              skip init train_dataset"
-                )
-                train_dataset = None
-    else:
-        train_dataset = None
+                pretrain_task = PretrainTask(train_file_list, tokenizer)
+            train_dataset = pretrain_task.train_data(
+                max_seq_length + 1,
+                stride=max_seq_length,
+                rng=random.Random(args.seed),
+                weights=data_weights,
+                evaluate=False,
+                seed=args.seed,
+                num_consecutive=args.num_consecutive,
+                shuffle=not args.no_part_shuffle,
+                combine_batch=args.combine_batch,
+                load_process_num=args.data_load_process_num,
+            )
+            train_dataset.load(
+                use_shard=args.use_train_part_sharding,
+                dp_rank=args.reeao_dataset_rank,
+                dp_size=args.reeao_dataset_world_size,
+            )  # TODO: MP/PP时候需要传入dp-rank
+            train_dataset = MapDataset(train_dataset)
+        else:
+            logger.info(
+                f"mp_{args.pipeline_parallel_rank}_pp{args.tensor_parallel_rank} no data needed, \
+                            skip init train_dataset"
+            )
+            train_dataset = None
 
     if args.do_eval:
         eval_dataset = PretrainTask(

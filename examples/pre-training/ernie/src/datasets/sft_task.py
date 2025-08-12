@@ -19,7 +19,7 @@ import json
 import numpy as np
 import paddle
 from paddle.io import IterableDataset
-from src.datasets.sft_task_reader.finetuning import KnowledgeBasedSFTReader
+from src.datasets..finetuning import KnowledgeBasedSFTReader
 
 
 def erniebot_reader(data_path):
@@ -27,13 +27,6 @@ def erniebot_reader(data_path):
         for line in fp:
             yield json.loads(line.strip())
 
-
-def create_pyreader(config_dataset):
-    if config_dataset["dataset_name"] == "KnowledgeBasedSFTReader":
-        data_reader = KnowledgeBasedSFTReader(**config_dataset)
-    else:
-        raise ValueError(f"Unknown dataset: {config_dataset['dataset_name']}")
-    return data_reader
 
 
 class KnoverDataset(IterableDataset):
