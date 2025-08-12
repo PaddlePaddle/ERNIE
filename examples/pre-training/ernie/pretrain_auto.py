@@ -83,6 +83,7 @@ from src.callbacks import (
 )
 from models.ernie import (
     ErnieConfig,
+    ErnieForCausalLMAuto,
     ErnieForCausalLMAutoPP,
 )
 from models.ernie import ErnieConfig as InceptionModelConfig
