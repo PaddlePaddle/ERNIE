@@ -159,6 +159,10 @@ class FinetuningArguments(
         default=0.0,
         metadata={"help": "dropout probability for attention layers"},
     )
+    loss_subbatch_seqlen: int = field(
+        default=32768,
+        metadata={"help": "loss subbatch seqlen"},
+    )
 
     # performance
     compute_type: str = field(

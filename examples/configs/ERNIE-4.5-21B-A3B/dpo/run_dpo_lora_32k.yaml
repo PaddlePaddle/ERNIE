@@ -6,18 +6,14 @@ train_dataset_prob: "1.0"
 eval_dataset_path: "./examples/data/dpo-eval.jsonl"
 eval_dataset_prob: "1.0"
 max_seq_len: 32768
-num_samples_each_epoch: 6000000
 
 ### model
 model_name_or_path: baidu/ERNIE-4.5-21B-A3B-Paddle
 moe_group: mp
 fine_tuning: LoRA
 lora_rank: 32
-lora_alpha: 128
-lora_plus_scale: 12
-rslora: True
-fuse_rope: True
 fuse_linear: True
+use_fused_head_and_loss_fn: True
 
 ### finetuning
 # base
@@ -25,16 +21,14 @@ stage: DPO
 seed: 42
 do_train: True
 do_eval: True
-distributed_dataloader: True
 dataloader_num_workers: 4
 batch_size: 1
 num_train_epochs: 1
-max_steps: 800
+max_steps: -1
 max_evaluate_steps: 10000
-eval_steps: 20000
+eval_steps: 100
 evaluation_strategy: epoch
 save_steps: 100
-save_total_limit: 5
 save_strategy: epoch
 logging_steps: 1
 release_grads: True
@@ -47,8 +41,6 @@ disable_tqdm: True
 warmup_steps: 50
 learning_rate: 5.0e-7
 lr_scheduler_type: cosine
-min_lr: 5.0e-7
-layerwise_lr_decay_bound: 1.0
 attention_probs_dropout_prob: 0.1
 dropout_warmup_steps: 100
 
@@ -61,16 +53,14 @@ weight_decay: 0.1
 adam_epsilon: 1.0e-8
 adam_beta1: 0.9
 adam_beta2: 0.95
-offload_optim: True
+optim: adamw_custom
+tensorwise_offload_optimizer: True
 
 # performance
-use_sp_callback: True
-tensor_parallel_degree: 2
+tensor_parallel_degree: 1
 tensor_parallel_config: "sync_param sync_grad sync_moment"
 pipeline_parallel_degree: 1
-sharding_parallel_degree: 1
 sharding: stage1
-sequence_parallel: True
 pipeline_parallel_config: "disable_partial_send_recv enable_clear_every_step_cache enable_delay_scale_loss enable_overlap_p2p_comm best_unbalanced_scheduler"
 recompute: True
 recompute_use_reentrant: True
@@ -92,4 +82,3 @@ amp_custom_black_list:
   - "sin"
   - "cos"
 unified_checkpoint: True
-unified_checkpoint_config: async_save

@@ -250,6 +250,10 @@ class ModelArguments:
     num_nextn_predict_layers: int = field(
         default=0, metadata={"help": "Number of nextn predict layers."}
     )
+    use_recompute_loss_fn: bool = field(
+        default=False,
+        metadata={"help": "Whether to use recompute loss function"},
+    )
 
     def __post_init__(self):
         if self.fine_tuning.lower() == "LoRA".lower():

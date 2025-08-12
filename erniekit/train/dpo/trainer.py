@@ -22,8 +22,11 @@ import paddle
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.communication.group import _get_global_group
-from paddle.distributed.fleet.utils.sequence_parallel_utils import register_sequence_parallel_allreduce_hooks
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    register_sequence_parallel_allreduce_hooks,
+)
 from paddleformers.trainer import Trainer
+from paddleformers.trainer.trainer_utils import OptimizerNames
 from paddleformers.trl import DPOTrainer
 from paddleformers.utils.log import logger
 
@@ -49,7 +52,9 @@ class ErnieMoEDPOTrainer(DPOTrainer):
                     self.add_callback(SPGradSyncCallback(_model._layers))
                 else:
                     register_sequence_parallel_allreduce_hooks(
-                        _model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
+                        _model,
+                        self.args.gradient_accumulation_steps,
+                        self.args.fuse_sequence_parallel_allreduce,
                     )
 
         enable_sequence_parallel(model)
@@ -65,7 +70,9 @@ class ErnieMoEDPOTrainer(DPOTrainer):
         Returns:
             paddle.optimizer.Optimizer: The configured optimizer instance with specified parameters and settings.
         """
-        self.static_name_to_dyg_name = {p.name: n for n, p in self.model.named_parameters()}
+        self.static_name_to_dyg_name = {
+            p.name: n for n, p in self.model.named_parameters()
+        }
 
         if self.optimizer is None:
             if self.optimizer_grouped_parameters is not None:
@@ -74,15 +81,32 @@ class ErnieMoEDPOTrainer(DPOTrainer):
                 optimizer_params = self.model.parameters()
 
             decay_parameters = [
-                p.name for n, p in self.model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])
+                p.name
+                for n, p in self.model.named_parameters()
+                if not any(nd in n for nd in ["bias", "norm"])
             ]
 
             def apply_decay_param_fun(x):
                 return x in decay_parameters
 
-            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
-            if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
+            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(
+                self.args
+            )
+            if (
+                hasattr(optimizer_cls, "_create_master_weight")
+                and self.args.fp16_opt_level == "O2"
+            ):
                 optimizer_kwargs["multi_precision"] = True
+            if self.args.optim == OptimizerNames.ADAMW_CUSTOM:
+                optimizer_kwargs["quantization_config"] = (
+                    self.model.config.quantization_config
+                )
+                optimizer_kwargs["use_lowprecision_moment"] = (
+                    self.args.use_lowprecision_moment
+                )
+                optimizer_kwargs["tensorwise_offload_optimizer"] = (
+                    self.args.tensorwise_offload_optimizer
+                )
 
             def _get_layer_lrs(x, lr_lower_bound, n_layers):
                 """
@@ -150,7 +174,9 @@ class ErnieMoEDPOTrainer(DPOTrainer):
                 grad_clip = nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
 
             self.optimizer = optimizer_cls(
-                learning_rate=(self.lr_scheduler if lr_scheduler is None else lr_scheduler),
+                learning_rate=(
+                    self.lr_scheduler if lr_scheduler is None else lr_scheduler
+                ),
                 apply_decay_param_fun=apply_decay_param_fun,
                 parameters=optimizer_params,
                 weight_decay=self.args.weight_decay,
@@ -160,7 +186,7 @@ class ErnieMoEDPOTrainer(DPOTrainer):
             )
 
             if self.args.use_expert_parallel and self.args.use_hybrid_parallel:
-                logger.debug('using moe-hybrid-clip under hybrid parallel')
+                logger.debug("using moe-hybrid-clip under hybrid parallel")
                 hcg = fleet.get_hybrid_communicate_group()
                 self.optimizer._grad_clip = MoEHybridParallelClipGrad(
                     self.optimizer._grad_clip,
