@@ -2011,7 +2011,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 and token_type_ids is not None
                 and not token_type_ids.any()
             ):
-                # from models.comm_utils import md5
                 hidden_states, _, router_loss, gate_logits = self.mlp_text()(
                     hidden_states, None
                 )

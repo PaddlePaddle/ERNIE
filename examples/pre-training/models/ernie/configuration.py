@@ -1,4 +1,3 @@
-# !/usr/bin/env python3
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
 #
@@ -13,15 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Ernie model configuration"""
-import copy
+
 import json
 import logging
 from typing import Optional, Union
 
 import paddle.distributed.communication.group
 from paddleformers.transformers.configuration_utils import PretrainedConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +49,6 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
     },
 }
 
-# Hypothetical model weights currently
 ERNIE_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "facebookresearch/tiny-random-ernie": "https://bj.bcebos.com/paddleformers/models/community/facebookresearch/tiny-random-ernie/model_state.pdparams",
@@ -220,9 +216,7 @@ class ErnieMoEConfig(PretrainedConfig):
         self.use_rmsnorm = use_rmsnorm
         self.using_dynamic_sequence_length = using_dynamic_sequence_length
         if using_dynamic_sequence_length:
-            assert (
-                micro_batch_size > 0
-            ), "micro_batch_size should be set when using_dynamic_sequence_length"
+            assert micro_batch_size > 0, "micro_batch_size should be set when using_dynamic_sequence_length"
         self.micro_batch_size = micro_batch_size
         self.use_qk_norm = use_qk_norm
 
@@ -264,7 +258,7 @@ class ErnieMoEConfig(PretrainedConfig):
         self.decoderlayer_act_offload_settings = decoderlayer_act_offload_settings
         self.loss_subbatch_seqlen = loss_subbatch_seqlen
         self.use_combine_before_a2a = use_combine_before_a2a
-
+        
         # Fuse activation quantization into the dispatch kernel, using FP8 for All-to-All (A2A) communication.
         # Additionally, overlap the A2A operation with weight gradient computation during backward propagation.
         self.use_quant_before_a2a = use_quant_before_a2a
@@ -294,11 +288,7 @@ class ErnieMoEConfig(PretrainedConfig):
 
         def update_nested_dict(default_dict, update_dict):
             for key, value in update_dict.items():
-                if (
-                    isinstance(value, dict)
-                    and key in default_dict
-                    and isinstance(default_dict[key], dict)
-                ):
+                if isinstance(value, dict) and key in default_dict and isinstance(default_dict[key], dict):
                     update_nested_dict(default_dict[key], value)
                 else:
                     default_dict[key] = value
@@ -361,19 +351,13 @@ class ErnieMoEConfig(PretrainedConfig):
         self.enable_delay_scale_loss = enable_delay_scale_loss
         self.num_acc_steps = num_acc_steps
         self.moe_layer_start_index = moe_layer_start_index
-        self.moe_layer_end_index = (
-            self.num_hidden_layers - 1
-            if moe_layer_end_index == -1
-            else moe_layer_end_index
-        )
+        self.moe_layer_end_index = self.num_hidden_layers - 1 if moe_layer_end_index == -1 else moe_layer_end_index
         self.moe_gate_act = moe_gate_act
         self.moe_norm_gate_logits = moe_norm_gate_logits
         self.moe_use_aux_free = moe_use_aux_free
         self.fuse_gate_detach_matmul = fuse_gate_detach_matmul
         if insert_empty_layer is not None:
-            assert isinstance(
-                insert_empty_layer, list
-            ), "insert_empty_layer should be a list"
+            assert isinstance(insert_empty_layer, list), "insert_empty_layer should be a list"
         else:
             insert_empty_layer = []
 
@@ -392,9 +376,7 @@ class ErnieMoEConfig(PretrainedConfig):
         self.aux_loss_type = aux_loss_type
 
         if pp_no_recompute_layer is not None:
-            assert isinstance(
-                insert_empty_layer, list
-            ), "pp_no_recompute_layer should be a list"
+            assert isinstance(insert_empty_layer, list), "pp_no_recompute_layer should be a list"
 
         self.pp_no_recompute_layer = pp_no_recompute_layer
         self.register_nonsaveable_keys("moe_group")
@@ -423,9 +405,7 @@ class ErnieMoEConfig(PretrainedConfig):
         elif hasattr(super(), "register_unsavable_keys"):
             return super().register_unsavable_keys(keys)
         else:
-            raise AttributeError(
-                "register_nonsaveable_keys not found in PretrainedConfig"
-            )
+            raise AttributeError("register_nonsaveable_keys not found in PretrainedConfig")
 
     @property
     def use_moe(self) -> bool:
@@ -452,6 +432,3 @@ class ErnieMoEConfig(PretrainedConfig):
             )
             + "\n"
         )
-
-
-

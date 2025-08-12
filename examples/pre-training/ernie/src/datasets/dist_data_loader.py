@@ -37,7 +37,6 @@ from paddleformers.utils.batch_sampler import DistributedBatchSampler
 from paddleformers.trainer.plugins.timer import get_timers
 from paddleformers.utils.tools import get_env_device
 
-from models.comm_utils import md5
 from src.utils.misc import global_training_logs
 
 logger = logging.getLogger(__name__)
@@ -378,12 +377,7 @@ class DistDataLoader(paddle.io.DataLoader):
             k for k, v in to_return.items() if v is None and k in optional_keys
         ]
         for k in none_keys:
-            to_return.pop(k)  # none key whill break paddlle mp broadcast
-        # debug_info = map_structure(lambda i: i.shape if i is not None else None, to_return)
-        # log.info(f"data out: {self._need_data} {debug_info}")
-        if G_DEBUG_DATA_MD5 and int(G_DEBUG_DATA_MD5):
-            printable = map_structure(lambda i: md5(i), to_return)
-            logger.info(f"data-md5: {printable}")
+            to_return.pop(k)
         return to_return
 
 
