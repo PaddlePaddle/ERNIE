@@ -11,9 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# !/usr/bin/env python3
-"""
-MoE 模块，包含总控 `MOELayer` 以及各类 `Gate`
-"""
-from .moe_layer import MOELayer
-from .top2_gate import Top2Gate
