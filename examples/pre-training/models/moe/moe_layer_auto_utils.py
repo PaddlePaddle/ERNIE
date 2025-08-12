@@ -57,7 +57,7 @@ from models.comm_utils import profile
 
 from models.moe.moe_utils import MOEAllGatherDispatcher
 
-from models.moe.token_dispatcher.fp8_utils import (
+from models.moe.token_dispatcher.fp8_utils_auto import (
     has_config,
     FP8_ALIGN,
     tilewise_quant,
