@@ -65,9 +65,9 @@ def gather_ckpt(org_path, tgt_path, hostnames, local_host):
         )
         assert (
             rst.stderr == ""
-        ), f"error happend when moving ckpt at {hostname} with stderr {rst.stderr}"
+        ), f"error happened when moving ckpt at {hostname} with stderr {rst.stderr}"
 
-        # non local, should scp from remote
+        # non-local, should scp from remote
         if hostname != local_host:
             # compressing
             print(
