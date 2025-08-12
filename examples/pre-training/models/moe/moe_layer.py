@@ -47,8 +47,6 @@ from models.moe.top2_gate import (
     cast_if_needed,
 )
 from models.sequence_parallel_utils import ScatterOp
-from models.refined_recompute.moe_gate_dispatch import RefinedRcomputeMoEGateDispatch
-from models.refined_recompute.moe_combine import RefinedRcomputeMoECombine
 from models.utils import (
     global_training_logs_enabled,
     manual_backward,
@@ -1077,11 +1075,11 @@ class MOELayer(nn.Layer):
         if self.config.use_recompute and self.config.skip_recompute_ops.get(
             "moe_gate_dispatch", False
         ):
-            self._rr_moe_gate_dispatch = RefinedRcomputeMoEGateDispatch()
+            self._rr_moe_gate_dispatch = None
         if self.config.use_recompute and self.config.skip_recompute_ops.get(
             "moe_combine", False
         ):
-            self._rr_moe_combine = RefinedRcomputeMoECombine()
+            self._rr_moe_combine = None
         if hasattr(fleet.fleet, "_hcg"):
             hcg = fleet.get_hybrid_communicate_group()
             if (

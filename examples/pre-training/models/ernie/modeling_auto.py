@@ -89,7 +89,6 @@ class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
     router_loss: Optional[paddle.Tensor] = None
 
 
-from models.refined_recompute.flash_attn import RefinedRcomputeFlashAttention
 from models.comm_utils import subbatch
 
 from models.moe.top2_gate import Top2Gate
@@ -1390,7 +1389,7 @@ class ErnieAttentionAuto(nn.Layer):
 
         self._rr_flash_attn = None
         if config.use_recompute and config.skip_recompute_ops.get("flash_attn", False):
-            self._rr_flash_attn = RefinedRcomputeFlashAttention()
+            self._rr_flash_attn = None
 
         if (
             self.config.tensor_parallel_degree > 1

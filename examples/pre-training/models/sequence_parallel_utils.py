@@ -29,14 +29,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients_with_group,
 )
 from paddle.incubate.tensor.manipulation import create_async_load
-from models.refined_recompute.linear import (
-    RowLNRefinedRcompute,
-    ColumnLNRefinedRcompute,
-)
-from models.refined_recompute.tpsp_comm_overlap import (
-    RowCommLNRefinedRcompute,
-    ColumnCommLNRefinedRcompute,
-)
+
 from models.comm_utils import (
     scatter,
     all_gather,
@@ -707,9 +700,9 @@ class ColumnSequenceParallelLinear(Layer):
         self.linear = F.linear
 
         if self.use_tpsp_comm_overlap and self.is_mp and self.use_comm:
-            self._rr_column_comm_ln = ColumnCommLNRefinedRcompute() if use_rr else None
+            self._rr_column_comm_ln = None
 
-        self._rr_column_ln = ColumnLNRefinedRcompute() if use_rr else None
+        self._rr_column_ln = None
 
         if fuse_matmul_bias:
             if not is_fused_matmul_bias_supported():
@@ -742,7 +735,7 @@ class ColumnSequenceParallelLinear(Layer):
         ):
             if (
                 self._rr_column_ln is not None and self.training
-            ):  # in eval mode, no using refined recompute
+            ):
                 output = self._rr_column_comm_ln(
                     x=x, weight=self.weight, group=self.model_parallel_group
                 )
@@ -761,7 +754,7 @@ class ColumnSequenceParallelLinear(Layer):
 
             if (
                 self._rr_column_ln is not None and self.training
-            ):  # in eval mode, no using refined recompute
+            ):
                 output = self._rr_column_ln(
                     self.linear, x=input_parallel, weight=self.weight, bias=self.bias
                 )
@@ -824,8 +817,8 @@ class RowSequenceParallelLinear(Layer):
             assert flux is not None
 
         if self.use_tpsp_comm_overlap and self.use_comm:
-            self._rr_rown_comm_ln = RowCommLNRefinedRcompute() if use_rr else None
-        self._rr_rown_ln = RowLNRefinedRcompute() if use_rr else None
+            self._rr_rown_comm_ln = None
+        self._rr_rown_ln = None
 
         hcg = get_hcg()
         self.model_parallel_group = (
@@ -909,7 +902,7 @@ class RowSequenceParallelLinear(Layer):
 
             if (
                 self._rr_rown_ln is not None and self.training
-            ):  # in eval mode, no using refined recompute
+            ):
                 if (
                     self.use_tpsp_comm_overlap
                     and self.use_comm
