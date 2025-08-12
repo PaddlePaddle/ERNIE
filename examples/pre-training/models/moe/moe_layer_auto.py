@@ -42,7 +42,7 @@ from paddleformers.trainer.plugins.timer import get_timers
 
 from models.moe.top2_gate_auto import TopKGateFusedAuto
 from models.moe.moe_utils import get_flatten_mesh, get_mesh, _reshard
-from models.moe.moe_layer import MOELayer
+from models.moe.moe_layer_auto_utils import MOELayer
 
 try:
     from src.utils.misc import global_training_logs
