@@ -21,6 +21,8 @@ Currently, four data sampling strategies are supported: `random`, `concat`, `int
 | `interleave_under` | When small datasets are important but have limited samples | None | The `interleave` strategy involves cross-concatenating multiple datasets according to data proportioning. `interleave_under` indicates undersampling, meaning that sampling stops as soon as one of the datasets is exhausted. |
 | `interleave_over`  | When small datasets are important but have limited samples | None | The `interleave` strategy involves cross-concatenating multiple datasets according to data proportioning. `interleave_over` indicates oversampling, meaning that sampling stops only after all datasets have been exhausted. |
 
+- Note: `num_samples_each_epoch` only works in `random` data sampling strategy.
+
 # ERNIEKit Data Format Specification
 
 ERNIEKit currently supports reading local datasets and downloading specified Hugging Face datasets in two formats: erniekit and alpaca.
