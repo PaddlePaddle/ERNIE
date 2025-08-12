@@ -35,6 +35,7 @@ class BaseMixDataset(IterableDataset):
         seed=42,
         random_shuffle=True,
         num_samples_each_epoch=6000000,
+        reverse=False,
     ):
         """
         Initialize the RandomDataset.
@@ -56,6 +57,7 @@ class BaseMixDataset(IterableDataset):
         self.epoch_np_rng = np.random.RandomState(self.epoch_index)
         self.random_shuffle = random_shuffle
         self.num_samples_each_epoch = num_samples_each_epoch
+        self.reverse = reverse
 
     @abstractmethod
     def __iter__(self):
@@ -116,6 +118,9 @@ class RandomDataset(BaseMixDataset):
 
             if self.random_shuffle:
                 self.epoch_np_rng.shuffle(examples_all)
+
+            if self.reverse:
+                examples_all = examples_all[::-1]
 
             for example in examples_all:
                 yield example

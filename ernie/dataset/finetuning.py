@@ -299,6 +299,7 @@ class SequenceDataset(IterableDataset):
         self.packing = packing
         self.mix_strategy = mix_strategy
         self.num_samples_each_epoch = num_samples_each_epoch
+        self.reverse = True
 
         # For new data concatenation mode
         self.begin_of_query = self.tokenizer.tokenize("User: ")
@@ -353,6 +354,7 @@ class SequenceDataset(IterableDataset):
                     self.random_seed,
                     self.random_shuffle,
                     self.num_samples_each_epoch,
+                    self.reverse,
                 )
 
         self.estimate = False
