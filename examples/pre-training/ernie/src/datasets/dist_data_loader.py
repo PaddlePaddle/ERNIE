@@ -41,11 +41,7 @@ from models.comm_utils import md5
 from src.utils.misc import global_training_logs
 
 logger = logging.getLogger(__name__)
-try:
-    from models.ernie_moe.modeling_pp import input_ids_for_mtp
-except ImportError:
-    logger.error("input_ids_for_mtp not found. Update ErnieCore to use this opt")
-    input_ids_for_mtp = None
+
 
 log = logging.getLogger(__name__)
 
@@ -341,10 +337,7 @@ class DistDataLoader(paddle.io.DataLoader):
                 self._pp_data_group,
             )
 
-        if self.need_magic_trans:
-            if input_ids is not None:
-                global input_ids_for_mtp
-                input_ids_for_mtp.append(input_ids)
+
 
         if VOCAB_SIZE is not None:
             if input_ids is not None:

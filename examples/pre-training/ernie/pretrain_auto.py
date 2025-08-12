@@ -86,7 +86,7 @@ from models.ernie import (
     ErnieForCausalLMAutoPP,
 )
 from models.ernie import ErnieConfig as InceptionModelConfig
-from models.ernie_moe import (
+from models.ernie_moe.configuration import (
     ErnieMoEConfig,
 )
 from src.datasets import PretrainTask
