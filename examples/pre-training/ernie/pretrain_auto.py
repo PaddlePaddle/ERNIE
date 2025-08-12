@@ -1,22 +1,4 @@
-# !/usr/bin/env python3
 
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""
-pretrain自动并行版本
-"""
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -81,12 +63,11 @@ from src.callbacks import (
     GlobalRNGCallback,
 )
 from models.ernie import (
-    ErnieConfig,
     ErnieForCausalLMAuto,
     ErnieForCausalLMAutoPP,
 )
-from models.ernie import ErnieConfig as InceptionModelConfig
 from models.ernie_moe.configuration import (
+    ErnieConfig,
     ErnieMoEConfig,
 )
 from src.datasets import PretrainTask
@@ -95,7 +76,7 @@ from src.trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
 from src.utils import (
     setup_logger_output_file,
 )
-from src.utils.data_utils import  merge_fn, merge_fn_group_batch
+from src.utils.data_utils import  merge_fn_group_batch
 from src.utils.misc import global_training_logs
 
 
@@ -334,15 +315,6 @@ def main():
     vocab = tokenizer.get_vocab()
     image_preprocess = None  # set if `vision_model_name_or_path is not None`
 
-    
-
-    if args.inception_model_name_or_path:
-        inception_config = InceptionModelConfig.from_pretrained(
-            args.inception_model_name_or_path,
-            tensor_parallel_degree=cfg.tensor_parallel_degree,
-            tensor_parallel_rank=cfg.tensor_parallel_rank,
-        )
-        cfg.inception_config = inception_config
     if args.model_type == "ernie":
         model_class = ErnieForCausalLMAuto
     elif args.model_type == "ernie_pp":
@@ -452,19 +424,14 @@ def main():
     else:
         eval_dataset = None
 
-    if args.do_train and args.use_streaming_data:
-        raise NotImplementedError("Streaming data is not supported for now.")
-        data_collator = partial(
-            merge_fn, tokenizer, pad_to_max_seqlen=args.max_seq_length
-        )
-    else:
-        data_collator = partial(
-            merge_fn_group_batch,
-            tokenizer,
-            pad_to_max_seqlen=args.max_seq_length,
-            combine_batch=args.combine_batch,
-            image_dtype="uint8",
-        )
+
+    data_collator = partial(
+        merge_fn_group_batch,
+        tokenizer,
+        pad_to_max_seqlen=args.max_seq_length,
+        combine_batch=args.combine_batch,
+        image_dtype="uint8",
+    )
     callbacks = []
     callbacks = [DataTraceCallbackAuto()] if not args.use_dummy_dataset else []
     callbacks += [GlobalRNGCallback()]

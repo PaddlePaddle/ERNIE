@@ -58,7 +58,7 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
 
 from models.ernie.modeling import FusedDropoutImpl
-from models.sequence_parallel_utils import (
+from models.sequence_parallel_utils_auto import (
     sequence_parallel_sparse_mask_labels,
 )
 from models.moe.moe_layer_auto import (
@@ -91,7 +91,7 @@ class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
 
 from models.comm_utils import subbatch
 
-from models.moe.top2_gate import Top2Gate
+from models.moe.top2_gate_auto_auto import Top2Gate
 from models.moe.top2_gate_auto import TopKGateFusedAuto
 
 

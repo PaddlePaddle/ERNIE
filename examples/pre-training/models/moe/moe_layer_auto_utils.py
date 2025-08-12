@@ -41,11 +41,11 @@ import paddle.distributed as dist
 from paddle import Tensor
 from paddleformers.utils.tools import get_env_device
 
-from models.moe.top2_gate import (
+from models.moe.top2_gate_auto_auto import (
     TopKGateFused,
     cast_if_needed,
 )
-from models.sequence_parallel_utils import ScatterOp
+from models.sequence_parallel_utils_auto import ScatterOp
 from models.utils import (
     global_training_logs_enabled,
     manual_backward,

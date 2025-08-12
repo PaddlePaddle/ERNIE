@@ -22,7 +22,7 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.autograd import PyLayer
 
-from models.sequence_parallel_utils import (
+from models.sequence_parallel_utils_auto import (
     AllGatherOp,
     ReduceScatterOp,
 )

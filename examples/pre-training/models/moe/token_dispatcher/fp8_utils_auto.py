@@ -20,7 +20,7 @@ import numpy
 import paddle
 import paddle.nn.functional as F
 
-from models.fp8_linear import kitchen_quant, kitchen_fp8_gemm
+from models.fp8_linear_auto import kitchen_quant, kitchen_fp8_gemm
 
 try:
     from paddle.incubate.nn.functional import swiglu
