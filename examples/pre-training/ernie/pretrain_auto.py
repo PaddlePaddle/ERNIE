@@ -79,7 +79,6 @@ from src.callbacks import (
     ProgreesiveBatchingCallback,
     DataTraceCallbackAuto,
     GlobalRNGCallback,
-    PPNeedDataCallback,
 )
 from models.ernie import (
     ErnieConfig,
@@ -469,8 +468,7 @@ def main():
     callbacks = []
     callbacks = [DataTraceCallbackAuto()] if not args.use_dummy_dataset else []
     callbacks += [GlobalRNGCallback()]
-    if args.pp_need_data_degree:
-        callbacks += [PPNeedDataCallback()]
+
 
     if args.batch_size_warmup_steps:
         progreesive_batcing_callback = ProgreesiveBatchingCallback(

@@ -96,7 +96,6 @@ from src.callbacks import (
     LoggingCallback,
     StopperCallback,
     ClipGradByAdaptiveNormCallback,
-    ReshardSaveExitCallback,
 )
 from src.datasets import (
     DistDataLoaderAuto,
@@ -1281,8 +1280,7 @@ class AutoPretrainingTrainer(AutoTrainer):
                 args, model=model, log_tokens_per_step=True, log_flops_per_step=False
             ),
         ] + callbacks
-        if args.reshard_save_then_exit:
-            callbacks.append(ReshardSaveExitCallback(self))
+
 
         if args.adaptive_norm_clip:
             callbacks.append(
