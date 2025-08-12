@@ -29,7 +29,7 @@ import paddle.distributed as dist
 logger = logging.getLogger(__name__)
 
 from models.moe.top2_gate import TopKGateFused
-from models.moe.moe_utils import get_mesh, get_flatten_mesh
+from models.moe.moe_utils_auto import get_mesh, get_flatten_mesh
 
 
 class TopKGateFusedAuto(TopKGateFused):

@@ -65,7 +65,7 @@ from models.moe.moe_layer_auto import (
     MOELayerAuto,
 )
 from .configuration import ErnieMoEConfig
-from models.moe.moe_utils import get_mesh
+from models.moe.moe_utils_auto import get_mesh
 
 # Because param_name is generated based on the class name,
 # when changes in distributed strategies result in class modifications,

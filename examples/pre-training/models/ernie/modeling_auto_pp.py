@@ -33,7 +33,7 @@ from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
 from paddle.distributed.fleet.utils import recompute
 
 
-from models.moe.moe_utils import get_mesh
+from models.moe.moe_utils_auto import get_mesh
 
 from .modeling_auto import (
     _parse_moe_group,
