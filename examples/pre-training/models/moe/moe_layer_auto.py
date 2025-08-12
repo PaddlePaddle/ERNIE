@@ -39,8 +39,7 @@ import paddle.distributed as dist
 from paddle import Tensor
 from paddleformers.trainer.plugins.timer import get_timers
 
-from models.moe.sinkhorn_gate import SinkHornGateFused
-from models.moe.round_robin_gate import RoundRobinGateFused
+
 from models.moe.top2_gate_auto import TopKGateFusedAuto
 from models.moe.moe_utils import get_flatten_mesh, get_mesh, _reshard
 from models.moe.moe_layer import MOELayer
@@ -675,7 +674,7 @@ class MOELayerAuto(MOELayer):
                 token_type_ids = token_type_ids.reshape([-1])
                 args = (token_type_ids,)
             use_fuse = isinstance(
-                self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFusedAuto)
+                self.gate, (TopKGateFusedAuto)
             )
             if use_fuse:
                 (gate_logits, capacity, router_loss, local_capacity) = self.gate(
@@ -697,7 +696,7 @@ class MOELayerAuto(MOELayer):
         with profile("moe-dispatch"):
             if use_fuse:
                 # capacity no use
-                k = 1 if isinstance(self.gate, SinkHornGateFused) else self.k
+                k = self.k
                 prob, max_prob = self.fused_gate_logits_process(
                     gate_logits, token_type_ids
                 )
@@ -797,7 +796,7 @@ class MOELayerAuto(MOELayer):
                         expert_output, get_mesh(), [dist.Shard(0), dist.Replicate()]
                     )
             use_fuse = isinstance(
-                self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFusedAuto)
+                self.gate, (TopKGateFusedAuto)
             )
             combine_fn = combining_fused_auto if use_fuse else combining
             combined_output = combine_fn(expert_output, combine_weights, scatter_index)

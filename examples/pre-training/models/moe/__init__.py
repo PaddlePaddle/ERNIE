@@ -16,5 +16,4 @@
 MoE 模块，包含总控 `MOELayer` 以及各类 `Gate`
 """
 from .moe_layer import MOELayer
-from .round_robin_gate import RoundRobinGate
 from .top2_gate import Top2Gate

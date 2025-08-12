@@ -41,10 +41,6 @@ import paddle.distributed as dist
 from paddle import Tensor
 from paddleformers.utils.tools import get_env_device
 
-from models.moe.moe_layer_uneven import combining as combining_fused
-from models.moe.moe_layer_uneven import rr_combining_wrapper
-from models.moe.sinkhorn_gate import SinkHornGateFused
-from models.moe.round_robin_gate import RoundRobinGateFused
 from models.moe.top2_gate import (
     TopKGateFused,
     DeepEPTop2Gate,
@@ -192,6 +188,78 @@ GateOutput = namedtuple(
     ],
 )
 
+
+class GateCombine_ori(PyLayer):
+    """GateCombine_ori"""
+
+    @staticmethod
+    def forward(ctx, x, combine_weights, scatter_index):
+        """
+        Input:
+            x:  [seqlen * k, hidden_size]
+            combine_weights: [seqlen, k]
+            scatter_index: [seqlen, k]
+        Output:
+            y: [seqlen, hidden_size]
+        """
+        ctx.x = x
+        ctx.combine_weights = combine_weights
+        ctx.scatter_index = scatter_index
+        if get_env_device() == "xpu":
+            assert xpu_moe_combine is not None
+            return xpu_moe_combine(x, combine_weights, scatter_index)
+        else:
+            assert moe_combine is not None
+            ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
+            return ret
+
+    @staticmethod
+    def backward(ctx, grad_y, *_):
+        """
+        Input:
+            grad_y:  [seqlen, hidden_size]
+            combine_weights: [seqlen, k]
+            scatter_index: [seqlen, k]
+        Output:
+            grad_x: [seqlen * k, hidden_size]
+            grad_combine_weight: [seqlen, k]
+
+        """
+
+        if get_env_device() == "xpu":
+            assert xpu_moe_combine_bwd is not None
+            grad_x, grad_combine_weight_helper = xpu_moe_combine_bwd(
+                ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
+            )
+        else:
+            assert moe_combine is not None
+            grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
+                ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
+            )
+        # grad_combine_weight_helper is the same shape with grad x [seqlen * K, dim]
+        # reduce the hidden shape
+        # TODO: implement reduce in cuda ops
+        grad_combine_weight = grad_combine_weight_helper.sum(-1)
+        return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
+
+
+
+def combining_fused(x, combine_weights, scatter_index, hard_gate=False):
+    """
+    Args:
+        x: Tensor[seq, dim]
+        combine_weights: [s, k]
+        scatter_index:  ** [k, s] **
+
+    Returns:
+        y: Tensor[s, dim]
+    """
+    if hard_gate:
+        x_gatherd = F.embedding(scatter_index, x)  # [s,k,dim]
+        return x_gatherd.squeeze(-2)
+    ret = GateCombine_ori.apply(x, combine_weights, scatter_index)
+    ret.stop_gradient = False
+    return ret
 
 class Fp8MoeGateDispatchAndQuant(paddle.autograd.PyLayer):
     """Fp8MoeGateDispatchAndQuant"""
@@ -1093,7 +1161,7 @@ class MOELayer(nn.Layer):
         Returns:
             _type_: _description_
         """
-        k = 1 if isinstance(self.gate, SinkHornGateFused) else self.k
+        k = self.k
         moe_num_experts = gate_logits.shape[-1]
         experts_type_ids = self.gate.experts_type_ids
         use_hard_gate = self.config.moe_use_hard_gate
@@ -1161,7 +1229,7 @@ class MOELayer(nn.Layer):
         gate_distpach_and_quant
         """
         assert isinstance(
-            self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFused)
+            self.gate, (TopKGateFused)
         ), "Only fused gate is supported."
         assert not self.config.use_ep_comm_overlap, "ep_comm_overlap is not supported"
         assert (
@@ -1189,7 +1257,7 @@ class MOELayer(nn.Layer):
         if self.input_preprocess is not None:
             input, gate_logits = self.input_preprocess(input, gate_logits, capacity)
 
-        k = 1 if isinstance(self.gate, SinkHornGateFused) else self.k
+        k = self.k
         prob, max_prob = self.fused_gate_logits_process(gate_logits, token_type_ids)
 
         with profile("dispatch_op"):
@@ -1293,7 +1361,7 @@ class MOELayer(nn.Layer):
             args = (token_type_ids,)
 
         use_fuse = isinstance(
-            self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFused)
+            self.gate, (TopKGateFused)
         )
         if use_fuse:
             if self.use_norm_gate_recompute:
@@ -1337,7 +1405,7 @@ class MOELayer(nn.Layer):
             input, gate_logits = self.input_preprocess(input, gate_logits, capacity)
         if use_fuse:
             # capacity no use
-            k = 1 if isinstance(self.gate, SinkHornGateFused) else self.k
+            k = self.k
             prob, max_prob = self.fused_gate_logits_process(gate_logits, token_type_ids)
             if get_env_device() == "xpu":
                 assert xpu_moe_gate_dispatch is not None
@@ -1582,7 +1650,7 @@ class MOELayer(nn.Layer):
         在fused expert 的情况下，计算辅助 loss (Aux-loss, 正交 loss, z-loss) 并 打印 log
         """
         use_fuse = isinstance(
-            self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFused)
+            self.gate, (TopKGateFused)
         )
         if use_fuse:
             assert gate_prob is not None
@@ -1771,15 +1839,10 @@ class MOELayer(nn.Layer):
             [-1, expert_output.shape[-1]]
         )  # [e*1,c,m]
         use_fuse = isinstance(
-            self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFused)
+            self.gate, (TopKGateFused)
         )
         combine_fn = combining_fused if use_fuse else combining
-        if self._rr_moe_combine is not None and use_fuse:
-            combined_output = rr_combining_wrapper(
-                expert_output, combine_weights, scatter_index, self._rr_moe_combine
-            )
-        else:
-            combined_output = combine_fn(expert_output, combine_weights, scatter_index)
+        combined_output = combine_fn(expert_output, combine_weights, scatter_index)
 
         if self.output_postprocess is not None:
             combined_output = self.output_postprocess(combined_output)
@@ -3655,7 +3718,7 @@ class DeepEPDropTokenMOELayer(MOELayer):
             args = (token_type_ids,)
 
         use_fuse = isinstance(
-            self.gate, (RoundRobinGateFused, SinkHornGateFused, TopKGateFused)
+            self.gate, (TopKGateFused)
         )
         assert use_fuse
         (
@@ -3667,7 +3730,7 @@ class DeepEPDropTokenMOELayer(MOELayer):
         if self.input_preprocess is not None:
             input, gate_logits = self.input_preprocess(input, gate_logits, capacity)
         # capacity no use
-        k = 1 if isinstance(self.gate, SinkHornGateFused) else self.k
+        k = self.k
         prob, max_prob = self.fused_gate_logits_process(gate_logits, token_type_ids)
 
         assert moe_ops is not None
@@ -4121,7 +4184,7 @@ class MOELayerWithAllGatherDispatcher(MOELayer):
         moe_allgather_dispatcher_return = MOEAllGatherDispatcher.token_dispatcher(
             input,
             gate_logits,
-            1 if isinstance(self.gate, SinkHornGateFused) else self.k,
+            self.k,
             self.expert_indices,
             self.num_local_experts * self.world_size,
             self.num_local_experts,

@@ -94,10 +94,6 @@ from models.comm_utils import subbatch
 
 from models.moe.top2_gate import Top2Gate
 from models.moe.top2_gate_auto import TopKGateFusedAuto
-from models.moe.round_robin_gate import RoundRobinGate, RoundRobinGateFused
-from models.moe.random_gate import RandomGate
-from models.moe.sinkhorn_gate import SinkHornGate, SinkHornGateFused
-from models.moe.task_gate import TaskGate
 
 
 logger = logging.getLogger(__name__)
@@ -178,14 +174,8 @@ __all__ = [
 
 
 gate_class = dict(
-    round_robin=RoundRobinGate,
-    round_robin_fused=RoundRobinGateFused,
-    random=RandomGate,
     top2=Top2Gate,
     top2_fused=TopKGateFusedAuto,
-    sinkhorn=SinkHornGate,
-    sinkhorn_fused=SinkHornGateFused,
-    task_gate=TaskGate,
 )
 
 
