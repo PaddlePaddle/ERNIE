@@ -16,5 +16,4 @@
 """
 
 from .dist_data_loader import DistDataLoader, DistDataLoaderAuto
-from .pretrain_iterable_dataset import create_pretrain_iterable_dataset
 from .pretrain_task import ExampleSet, ExampleSetSingleDataSource, PretrainTask
