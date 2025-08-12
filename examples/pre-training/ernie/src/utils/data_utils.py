@@ -23,7 +23,6 @@ import numpy as np
 import os
 import datetime
 import paddle
-from models.ernie_mm_moe.modeling import IDTYPES_2_ID
 from .mm_data_utils import MMSpecialTokensConfig
 
 logger = logging.getLogger(__name__)
@@ -322,7 +321,7 @@ def merge_fn_group_batch(
             elif k == "labels" or k == "image_type_ids":
                 pad_value = tokenizer.ignored_index
             elif k == "token_type_ids":
-                pad_value = IDTYPES_2_ID["text"]  # pad is also considered as text
+                pad_value = 0  # pad is also considered as text
             else:
                 pad_value = 0
 

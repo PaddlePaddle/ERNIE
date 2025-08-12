@@ -89,8 +89,6 @@ from models.ernie import ErnieConfig as InceptionModelConfig
 from models.ernie_moe import (
     ErnieMoEConfig,
 )
-from models.ernie_mm_moe import ErniemmMoEConfig, ErniemmMoEForCausalLMAuto
-from models.image_encoder import EVAVisionTransformerConfig
 from src.datasets import PretrainTask
 from src.datasets.pretrain_task import parse_data_weight
 from src.datasets.image_preprocessor import CLIPImageProcessor
@@ -303,20 +301,6 @@ def main():
         ErnieConfig = ErnieMoEConfig
         # ErnieForCausalLMAuto = ErnieMoEForCausalLMAuto
 
-    if args.multimodal:
-        assert (
-            args.vision_model_name_or_path
-        ), "vision_model_name_or_path must be set when use multimodal"
-        ErnieConfig = ErniemmMoEConfig
-        ErnieForCausalLMAuto = ErniemmMoEForCausalLMAuto
-        if args.pipeline_parallel_degree > 1:
-            if not args.pp_need_data_degree:
-                logger.info(
-                    "not specify `pipeline_parallel_degree` when using `ErniemmMoEForCausalLMAuto`,"
-                    "assume all pp need data"
-                )
-                args.pp_need_data_degree = args.pipeline_parallel_degree
-
     if args.moe_group.lower() in {"mp", "tp", "model", "dummy"}:
         logger.info(f"disable moe flag when using moe-group={args.moe_group}")
         args.use_moe = False
@@ -353,28 +337,7 @@ def main():
     vocab = tokenizer.get_vocab()
     image_preprocess = None  # set if `vision_model_name_or_path is not None`
 
-    if args.vision_model_name_or_path:
-        vision_config = EVAVisionTransformerConfig.from_pretrained(
-            args.vision_model_name_or_path,
-            tensor_parallel_degree=cfg.tensor_parallel_degree,
-            tensor_parallel_rank=cfg.tensor_parallel_rank,
-        )
-        cfg.vision_config = vision_config
-        cfg.pixel_hidden_size = cfg.vision_config.hidden_size
-        cfg.im_patch_id = tokenizer.get_vocab()[
-            MMSpecialTokensConfig.get_special_tokens_info()["image_placeholder"]
-        ]
-        cfg.max_text_id = cfg.im_patch_id
-        image_preprocess = CLIPImageProcessor.from_pretrained(
-            args.vision_model_name_or_path
-        )
-
-        image_preprocess.image_mean_tensor = paddle.to_tensor(
-            image_preprocess.image_mean, dtype="float32"
-        ).reshape([1, 3, 1, 1])
-        image_preprocess.image_std_tensor = paddle.to_tensor(
-            image_preprocess.image_std, dtype="float32"
-        ).reshape([1, 3, 1, 1])
+    
 
     if args.inception_model_name_or_path:
         inception_config = InceptionModelConfig.from_pretrained(
