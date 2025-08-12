@@ -92,10 +92,8 @@ from models.ernie_moe.configuration import (
 )
 from src.datasets import PretrainTask
 from src.datasets.pretrain_task import parse_data_weight
-from src.datasets.image_preprocessor import CLIPImageProcessor
 from src.trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
 from src.utils import (
-    load_model,
     setup_logger_output_file,
 )
 from src.utils.data_utils import  merge_fn, merge_fn_group_batch
@@ -371,8 +369,7 @@ def main():
     paddle.set_default_dtype("float32")
 
     logger.info(f"using model={type(model)}, cfg={cfg}")
-    if args.init_ckpt:
-        load_model(model, args.init_ckpt)
+
 
     freeze_config = set(args.freeze_config.split(" "))
     if "freeze_vision" in freeze_config and hasattr(model, "freeze_vision"):

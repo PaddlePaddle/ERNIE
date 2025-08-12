@@ -18,6 +18,5 @@
 
 from .data_utils import *  # noqa
 from .logging import *  # noqa
-from .model_io import *  # noqa
 from .seed_utils import *  # noqa
 from .training_utils import *  # noqa
