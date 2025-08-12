@@ -23,7 +23,6 @@ import numpy as np
 import os
 import datetime
 import paddle
-from .mm_data_utils import MMSpecialTokensConfig
 
 logger = logging.getLogger(__name__)
 
@@ -83,72 +82,6 @@ class bcolors:
     UNDERLINE = "\033[4m"
 
 
-def fancy_print(data, tokenizer):
-    """_summary_
-
-    Args:
-        data (_type_): _description_
-        tokenizer (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    marker1 = "[unused99]"
-    marker2 = "[unused98]"
-    image_token = tokenizer.encode(
-        MMSpecialTokensConfig.image_placeholder, add_special_tokens=False
-    )["input_ids"][0]
-    logger.info(f"IMAGE_TOKEN_ID: {image_token}")
-    for ids, labels in zip(data["input_ids"].tolist(), data["labels"].tolist()):
-        # log.info(labels)
-        ids2 = []
-        assert len(ids) == len(labels)
-        last_j = 0
-        for i, j in zip(ids, labels):
-            j = int(j != tokenizer.ignored_index)
-            if i == image_token:
-                ids2 += tokenizer.encode("<|image|>", return_attention_mask=False)[
-                    "input_ids"
-                ]
-            else:
-                ids2.append(i)
-            if j != last_j:
-                ids2 += tokenizer.encode(
-                    marker1 if (j > last_j) else marker2,
-                    add_special_tokens=False,
-                    return_attention_mask=False,
-                )["input_ids"]
-            last_j = j
-        if j == 1:
-            ids2 += tokenizer.encode(
-                marker2, add_special_tokens=False, return_attention_mask=False
-            )["input_ids"]
-        ret = (
-            tokenizer.decode(ids2)
-            .replace("[unused99]", bcolors.FAIL)
-            .replace("[unused98]", bcolors.ENDC)
-        )
-
-        # 花里胡哨的代码
-        image_tag = "<|image|>"
-        pat = re.compile(f"({re.escape(image_tag)})+")
-        build = []
-        for i in pat.finditer(ret):
-            cnt = i.group(0).count(image_tag)
-            build.append((i.span(), f"<|image@{cnt}|>"))
-
-        pad_tag = ["<pad>", "<mask:0>", "<unk>"]
-        pat = re.compile(f"({'|'.join(pad_tag)})+")
-        for i in pat.finditer(ret):
-            cnt = sum(i.group(0).count(t) for t in pad_tag)
-            build.append((i.span(), f"<pad@{cnt}>"))
-
-        for s, t in build[::-1]:
-            l, r = s
-            ret = ret[:l] + t + ret[r:]
-        return ret
-
-
 def merge_fn(
     tokenizer, batch, pad_to_max_seqlen=None, debug_print=1, shift_label=False
 ):
@@ -192,9 +125,6 @@ def merge_fn(
             print_data_online(
                 f"Example={DEBUG_PRINT_CNT} key={k}, len={len(v[0])if isinstance(v, np.ndarray) and v.ndim > 1 else 0}, value={v[0] if isinstance(v, np.ndarray) else v}"
             )
-        print_data_online(
-            f"Example={DEBUG_PRINT_CNT} text={fancy_print(batch, tokenizer)}"
-        )
 
     if shift_label:
         batch["labels"] = batch["labels"][:, 1:]
@@ -348,9 +278,6 @@ def merge_fn_group_batch(
                 f"len={len(v[0])if isinstance(v, np.ndarray) and v.ndim > 1 else 0}, "
                 f"value={v if isinstance(v, np.ndarray) else v}"
             )
-        print_data_online(
-            f"Example={DEBUG_PRINT_CNT} text={fancy_print(batch, tokenizer)}"
-        )
 
     if shift_label:
         batch["labels"] = batch["labels"][:, 1:]
@@ -457,9 +384,6 @@ def merge_fn_in_batch(
             print_data_online(
                 f"Example={DEBUG_PRINT_CNT} key={k}, len={len(v[0])if isinstance(v, np.ndarray) else 0}, value={v[0] if isinstance(v, np.ndarray) else v}"
             )
-        print_data_online(
-            f"Example={DEBUG_PRINT_CNT} text={fancy_print(batch, tokenizer)}"
-        )
 
     if shift_label:
         batch["labels"] = batch["labels"][:, 1:]

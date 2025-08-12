@@ -104,7 +104,6 @@ from src.datasets import (
     ExampleSetSingleDataSource,
 )
 from src.utils.misc import global_training_logs
-from src.utils.mm_data_utils import DATATYPE_2_ID
 from src.clip import ClipGradByAdaptiveNorm, ClipGradForMOEByGlobalNorm
 from src.trainers.pretraining_trainer import DummySampler
 
@@ -174,6 +173,8 @@ def distributed_optimizer_maybe_hack(
     else:
         return fleet.distributed_optimizer(optimizer)
 
+
+DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
 
 @dataclass
 @add_start_docstrings(AutoTrainingArguments.__doc__)
