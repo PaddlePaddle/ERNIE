@@ -34,7 +34,6 @@ from paddle.distributed.fleet.utils import recompute
 from models.moe.moe_utils import get_mesh
 
 from .modeling_auto import (
-    _parse_moe_group,
     ErnieDecoderLayerAuto,
     ErniePretrainedModelAuto,
     LayerNorm,
@@ -223,14 +222,13 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
             None.
         """
         if hasattr(config, "use_moe") and config.use_moe:
-            if config.moe_group in {"mp", "model", "tp", "mpdp"}:
+            if config.moe_group.lower()  in {"mp", "model", "tp", "mpdp"}:
                 assert config.sequence_parallel
                 logger.info(
                     f"disable FFN tensor model parallel, moe-group={config.moe_group}"
                 )
                 config.disable_ffn_model_parallel = True
 
-            config.moe_group = _parse_moe_group(config.moe_group)
             if config.moe_group in fleet.auto.get_mesh().dim_names:
                 config.moe_world_size = fleet.auto.get_mesh().get_dim_size(
                     config.moe_group
@@ -244,14 +242,13 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
         self.config = config
 
         if hasattr(config, "use_moe") and config.use_moe:
-            if config.moe_group in {"mp", "model", "tp", "mpdp"}:
+            if config.moe_group.lower() in {"mp", "model", "tp", "mpdp"}:
                 assert config.sequence_parallel
                 logger.info(
                     f"disable FFN tensor model parallel, moe-group={config.moe_group}"
                 )
                 config.disable_ffn_model_parallel = True
 
-            config.moe_group = _parse_moe_group(config.moe_group)
             if config.moe_group in fleet.auto.get_mesh().dim_names:
                 config.moe_world_size = fleet.auto.get_mesh().get_dim_size(
                     config.moe_group
