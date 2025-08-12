@@ -13,12 +13,11 @@
 # limitations under the License.
 
 # download model from huggingface
-huggingface-cli download baidu/ERNIE-4.5-300B-A47B-Paddle --local-dir baidu/ERNIE-4.5-300B-A47B-Paddle
+huggingface-cli download baidu/ERNIE-4.5-0.3B-Paddle --local-dir baidu/ERNIE-4.5-0.3B-Paddle
 
 # # download model from aistudio
-# aistudio download --model PaddlePaddle/ERNIE-4.5-300B-A47B-Paddle --local_dir baidu/ERNIE-4.5-300B-A47B-Paddle
+# aistudio download --model PaddlePaddle/ERNIE-4.5-0.3B-Paddle --local_dir baidu/ERNIE-4.5-0.3B-Paddle
 # # download model from modelscope
-# modelscope download --model PaddlePaddle/ERNIE-4.5-300B-A47B-Paddle --local_dir baidu/ERNIE-4.5-300B-A47B-Paddle
+# modelscope download --model PaddlePaddle/ERNIE-4.5-0.3B-Paddle --local_dir baidu/ERNIE-4.5-0.3B-Paddle
 
-NNODES=7 MASTER_ADDR=$1 MASTER_PORT=$2 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
-    erniekit train examples/configs/ERNIE-4.5-300B-A47B/dpo/run_dpo_32k.yaml
+erniekit train examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_lora_128k.yaml

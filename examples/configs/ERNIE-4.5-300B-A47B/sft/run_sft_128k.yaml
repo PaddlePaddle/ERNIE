@@ -1,14 +1,15 @@
 ### data
 train_dataset_type: "erniekit"
 eval_dataset_type: "erniekit"
-train_dataset_path: "./examples/data/sft-train.jsonl"
+train_dataset_path: "./data/sft-train.jsonl"
 train_dataset_prob: "1.0"
 eval_dataset_path: "./examples/data/sft-eval.jsonl"
 eval_dataset_prob: "1.0"
-max_seq_len: 32768
+max_seq_len: 131072
 
 ### model
-model_name_or_path: baidu/ERNIE-4.5-0.3B-Paddle
+model_name_or_path: baidu/ERNIE-4.5-300B-A47B-Paddle
+moe_group: mp
 fine_tuning: Full
 fuse_rope: True
 use_sparse_head_and_loss_fn: True
@@ -19,6 +20,7 @@ stage: SFT
 seed: 23
 do_train: True
 do_eval: True
+distributed_dataloader: False
 dataloader_num_workers: 1
 batch_size: 1
 num_train_epochs: 1
@@ -49,9 +51,11 @@ optim: adamw_custom
 tensorwise_offload_optimizer: True
 
 # performance
-tensor_parallel_degree: 1
-pipeline_parallel_degree: 1
+tensor_parallel_degree: 8
+pipeline_parallel_degree: 9
 sharding: stage1
+use_sp_callback: True
+sequence_parallel: True
 pipeline_parallel_config: enable_delay_scale_loss enable_release_grads disable_partial_send_recv
 recompute: True
 recompute_use_reentrant: True
@@ -74,3 +78,4 @@ amp_custom_black_list:
   - sin
   - cos
 unified_checkpoint: True
+use_lowprecision_moment: True

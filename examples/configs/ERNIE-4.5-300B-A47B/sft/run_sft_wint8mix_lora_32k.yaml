@@ -6,16 +6,12 @@ train_dataset_prob: "1.0"
 eval_dataset_path: "./examples/data/sft-eval.jsonl"
 eval_dataset_prob: "1.0"
 max_seq_len: 32768
-num_samples_each_epoch: 6000000
 
 ### model
 model_name_or_path: baidu/ERNIE-4.5-300B-A47B-Paddle
 moe_group: mp
 fine_tuning: LoRA
 lora_rank: 32
-lora_alpha: -1
-lora_plus_scale: 1.0
-rslora: False
 fuse_rope: True
 use_sparse_head_and_loss_fn: True
 
@@ -29,12 +25,11 @@ distributed_dataloader: False
 dataloader_num_workers: 1
 batch_size: 1
 num_train_epochs: 1
-max_steps: 100
+max_steps: -1
 max_evaluate_steps: 10000
-eval_steps: 10000
+eval_steps: 100
 evaluation_strategy: steps
-save_steps: 10000000
-save_total_limit: 5
+save_steps: 100
 save_strategy: steps
 logging_steps: 1
 release_grads: True
@@ -47,20 +42,19 @@ disable_tqdm: True
 warmup_steps: 20
 learning_rate: 1.0e-5
 lr_scheduler_type: cosine
-min_lr: 1.0e-6
-layerwise_lr_decay_bound: 1.0
 
 # optimizer
 weight_decay: 0.1
 adam_epsilon: 1.0e-8
 adam_beta1: 0.9
 adam_beta2: 0.999
-offload_optim: True
+optim: adamw_custom
+tensorwise_offload_optimizer: True
 
 # performance
-tensor_parallel_degree: 8
+use_sp_callback: True
+tensor_parallel_degree: 4
 pipeline_parallel_degree: 1
-sharding_parallel_degree: 1
 sharding: stage1
 sequence_parallel: True
 pipeline_parallel_config: disable_partial_send_recv enable_clear_every_step_cache
@@ -85,4 +79,3 @@ amp_custom_black_list:
   - sin
   - cos
 unified_checkpoint: True
-unified_checkpoint_config: async_save

@@ -323,6 +323,8 @@ def run_sft(
     model_config.num_acc_steps = finetuning_args.gradient_accumulation_steps
     model_config.multi_token_pred_lambda = finetuning_args.multi_token_pred_lambda
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
+    model_config.use_recompute_loss_fn = model_args.use_recompute_loss_fn
+    model_config.loss_subbatch_seqlen = finetuning_args.loss_subbatch_seqlen
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
     if model_config.moe_num_experts is None or model_config.moe_num_experts == 0:

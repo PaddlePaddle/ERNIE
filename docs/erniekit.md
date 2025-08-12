@@ -90,36 +90,52 @@ ERNIEKit supports training for the following models. Before initiating training 
 
 | Model                          | Post-Training Method | Seq Length | Min Resources       | Recommended Config |
 |--------------------------------|----------------------|------------|---------------------|---------------------|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT         | 8K       | 96x80G A/H GPUs     | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_8k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT         | 32K      | 112x80G A/H GPUs    | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_32k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT         | 8K       | 40x80G A/H GPUs     | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_8k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT         | 32K      | 40x80G A/H GPUs    | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_32k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT         | 128K      | 72x80G A/H GPUs    | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_128k.sh)|
 | ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT(FP8)    |    8K   | 16x80G H GPUs + 2TB CPU RAM     | [run_sft_fp8_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_fp8_8k.sh)|
 | ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT(FP8)    | 32K      | 16x80G H GPUs + 2TB CPU RAM      | [run_sft_fp8_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_fp8_32k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA | 8K       | 16x80G A/H GPUs     |[run_sft_lora_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_lora_8k.sh) |
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA | 32K      | 16x80G A/H GPUs     |[run_sft_lora_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_lora_32k.sh) |
 | ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA(wint4/8) | 8K       | 4x80G A/H GPUs     |[run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_8k.sh) |
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA(wint4/8) | 32K      | 8x80G A/H GPUs     |[run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_32k.sh) |
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO         | 8K       | 112x80G A/H GPUs   | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_8k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO         | 32K      | 112x80G A/H GPUs   | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_32k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA(wint4/8) | 32K      | 4x80G A/H GPUs     |[run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_32k.sh) |
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA(wint4/8) | 128K      | 16x80G A/H GPUs     |[run_sft_wint8mix_lora_128k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_128k.sh) |
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO         | 8K       | 56x80G A/H GPUs   | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_8k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO         | 32K      | 56x80G A/H GPUs   | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_32k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO         | 128K      | 80x80G A/H GPUs   | [run_dpo_128k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_128k.sh)|
 | ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO-LoRA    | 8K       | 16x80G A/H GPUs    | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_lora_8k.sh)|
 | ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO-LoRA    | 32K      | 16x80G A/H GPUs    | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_lora_32k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 8K       | 8x80G A/H GPUs     | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 32K      | 8x80G A/H GPUs     | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_32k.sh)|
-| ERNIE-4.5-21B-A3B-B base/ERNIE-4.5-21B-A3B | SFT         | 128K     | 8x80G A/H GPUs     | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_128k.sh)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO-LoRA(wint4/8) | 8K      | 4x80G A/H GPUs     |[run_dpo_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_wint8mix_lora_8k.sh) |
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO-LoRA(wint4/8) | 32K      | 4x80G A/H GPUs     |[run_dpo_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_wint8mix_lora_32k.sh) |
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO-LoRA(wint4/8) | 128K      | 16x80G A/H GPUs     |[run_dpo_wint8mix_lora_128k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_wint8mix_lora_128k.sh) |
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 8K       | 2x80G A/H GPUs     | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_8k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 32K      | 4x80G A/H GPUs     | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_32k.sh)|
+| ERNIE-4.5-21B-A3B-B base/ERNIE-4.5-21B-A3B | SFT         | 128K     | 4x80G A/H GPUs     | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_128k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 8K       | 1x80G A/H GPUs     | [run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_8k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 32K      | 1x80G A/H GPUs     | [run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_32k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 8K       | 8x80G A/H GPUs     | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 32K      | 8x80G A/H GPUs     | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_32k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 128K     | 8x80G A/H GPUs     | [run_dpo_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_128k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA | 8K      | 1x80G A/H GPUs     | [run_sft_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_lora_8k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA | 32K      | 1x80G A/H GPUs     | [run_sft_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_lora_32k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA | 128K      | 2x80G A/H GPUs     | [run_sft_lora_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_lora_128k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 8K       | 4x80G A/H GPUs     | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_8k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 32K      | 4x80G A/H GPUs     | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_32k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 128K     | 4x80G A/H GPUs     | [run_dpo_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_128k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 8K       | 1x80G A/H GPUs     | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_8k.sh)|
 | ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 32K      | 1x80G A/H GPUs     | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_32k.sh)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 128K      | 2x80G A/H GPUs     | [run_dpo_lora_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_128k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 8K       | 1x80G A/H GPU      | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_8k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 32K      | 1x80G A/H GPU      | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_32k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 128K      | 1x80G A/H GPU      | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_128k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT-LoRA(wint4/8)         | 8K      | 1x80G A/H GPU      | [run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_wint8mix_lora_8k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT-LoRA(wint4/8)         | 32K      | 1x80G A/H GPU      | [run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_wint8mix_lora_32k.sh)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT-LoRA       | 8K      | 1x80G A/H GPU      | [run_sft_lora_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_lora_8k.sh)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT-LoRA       | 32K      | 1x80G A/H GPU      | [run_sft_lora_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_lora_32k.sh)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT-LoRA       | 128K      | 1x80G A/H GPU      | [run_sft_lora_128k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_lora_128k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO         | 8K       | 1x80G A/H GPU      | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_8k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO         | 32K      | 1x80G A/H GPU      | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_32k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO         | 128K      | 1x80G A/H GPU      | [run_dpo_128k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_128k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO-LoRA    | 8K       | 1x80G A/H GPU      | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_lora_8k.sh)|
 | ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO-LoRA    | 32K      | 1x80G A/H GPU      | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_lora_32k.sh)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO-LoRA    | 128K      | 1x80G A/H GPU      | [run_dpo_lora_128k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_lora_128k.sh)|
 
 
 ### 3.2 Data Preparation

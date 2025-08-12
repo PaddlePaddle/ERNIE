@@ -5,11 +5,12 @@ train_dataset_path: "./examples/data/sft-train.jsonl"
 train_dataset_prob: "1.0"
 eval_dataset_path: "./examples/data/sft-eval.jsonl"
 eval_dataset_prob: "1.0"
-max_seq_len: 32768
+max_seq_len: 131072
 
 ### model
 model_name_or_path: baidu/ERNIE-4.5-0.3B-Paddle
-fine_tuning: Full
+fine_tuning: LoRA
+lora_rank: 32
 fuse_rope: True
 use_sparse_head_and_loss_fn: True
 
@@ -37,11 +38,11 @@ disable_tqdm: True
 
 # train
 warmup_steps: 20
-learning_rate: 1.0e-5
+learning_rate: 1.0e-4
 lr_scheduler_type: cosine
 
 # optimizer
-weight_decay: 0.1
+weight_decay: 0.01
 adam_epsilon: 1.0e-8
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -52,7 +53,7 @@ tensorwise_offload_optimizer: True
 tensor_parallel_degree: 1
 pipeline_parallel_degree: 1
 sharding: stage1
-pipeline_parallel_config: enable_delay_scale_loss enable_release_grads disable_partial_send_recv
+pipeline_parallel_config: disable_partial_send_recv enable_clear_every_step_cache
 recompute: True
 recompute_use_reentrant: True
 compute_type: bf16
