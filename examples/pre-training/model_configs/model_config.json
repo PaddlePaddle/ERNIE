@@ -29,7 +29,7 @@
   "fuse_rms_norm": true,
   "use_bias": false,
   "fuse_attn_ffn": true,
-  "fuse_linear": false,
+  "fuse_linear": true,
   "rope_reorder": false,
   "fuse_rope": true,
   "fuse_swiglu": true,
