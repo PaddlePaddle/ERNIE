@@ -97,7 +97,7 @@ from src.utils import (
     load_model,
     setup_logger_output_file,
 )
-from src.utils.data_utils import fancy_print, merge_fn, merge_fn_group_batch
+from src.utils.data_utils import  merge_fn, merge_fn_group_batch
 from src.utils.misc import global_training_logs
 
 
@@ -446,9 +446,6 @@ def main():
                             f"Example={DEBUG_PRINT_CNT} key={k}, len={len(v[0])if isinstance(v, np.ndarray) else 0}, "
                             f"value={v[0] if isinstance(v, np.ndarray) else v}"
                         )
-                    logger.debug(
-                        f"Example={DEBUG_PRINT_CNT} text={fancy_print(batch, tokenizer)}"
-                    )
                 return batch
 
         else:
