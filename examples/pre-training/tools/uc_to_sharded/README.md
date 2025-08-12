@@ -14,4 +14,4 @@ Start Pre-Training and save checkpoints at any step. More information is availab
 
 ## Convert Pretrained Weights
 
-`python convert_ckpt.py --org <path_to_pretrained_weights> --cur <path_to_checkpoint> --dst <path_to_converted_weights>`
+`python convert_uc_to_sharded.py --org <path_to_pretrained_weights> --cur <path_to_checkpoint> --dst <path_to_converted_weights>`
