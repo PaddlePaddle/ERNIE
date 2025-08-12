@@ -29,6 +29,12 @@ class DataArguments:
             )
         },
     )
+    mix_strategy: str = field(
+        default="random",
+        metadata={
+            "help": "Strategy to use in dataset mixing (random/concat/interleave) (undersampling/oversampling)."
+        },
+    )
     train_dataset_type: str = field(
         default="erniekit",
         metadata={
@@ -50,7 +56,9 @@ class DataArguments:
         Multi-source dataset is supported, e.g., 0.8,0.2."
         },
     )
-    eval_dataset_type: str = field(default="erniekit", metadata={"help": "type of eval datasets."})
+    eval_dataset_type: str = field(
+        default="erniekit", metadata={"help": "type of eval datasets."}
+    )
     eval_dataset_path: str = field(
         default="examples/data/sft-eval.jsonl",
         metadata={"help": "path of eval datasets."},
@@ -86,7 +94,9 @@ class DataArguments:
     )
     random_shuffle: bool = field(
         default=True,
-        metadata={"help": "Whether to enable authorize code for privatization. Defaults to False."},
+        metadata={
+            "help": "Whether to enable authorize code for privatization. Defaults to False."
+        },
     )
     num_samples_each_epoch: int = field(
         default=6000000,
@@ -94,6 +104,10 @@ class DataArguments:
     )
 
     # strategy
+    packing: bool = field(
+        default=True,
+        metadata={"help": "Enable sequences packing in training."},
+    )
     greedy_intokens: bool = field(
         default=True,
         metadata={"help": "Whether to use greedy_intokens packing method."},

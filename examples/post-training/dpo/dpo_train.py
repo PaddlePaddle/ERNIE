@@ -394,9 +394,16 @@ def main():
         "buffer_size": data_args.buffer_size,
         "use_attn_mask_start_row_indices": model_args.use_attn_mask_start_row_indices,
         "mask_out_eos_token": data_args.mask_out_eos_token,
+        "packing": data_args.packing,
+        "mix_strategy": data_args.mix_strategy,
     }
 
     if training_args.max_steps == -1:
+        if data_args.mix_strategy == "random":
+            raise ValueError(
+                "When using 'random' mix_strategy, max_steps must be explicitly set (cannot be -1). "
+                "Random mixing requires a fixed number of training steps to properly sample data."
+            )
         if training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
             # NOTE(gongenlei): not to feed train_dataset, or the data will be wrong in next training.
             training_args, _ = dpo_estimate_training(

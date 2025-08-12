@@ -168,6 +168,18 @@ def parse_arguments():
         default="True",
         help="Whether to shuffle data.",
     )
+    parser.add_argument(
+        "--mix_strategy",
+        type=str,
+        default="random",
+        help="Strategy to use in dataset mixing (random/concat/interleave) (undersampling/oversampling).",
+    )
+    parser.add_argument(
+        "--packing",
+        type=bool,
+        default=True,
+        help="Enable sequences packing in training.",
+    )
     return parser.parse_args()
 
 
@@ -216,6 +228,8 @@ def estimate_training(args):
         "num_samples_each_epoch": args.num_samples_each_epoch,
         "random_shuffle": args.random_shuffle,
         "greedy_intokens": args.greedy_intokens,
+        "packing": args.packing,
+        "mix_strategy": args.mix_strategy,
     }
     train_dataset = create_dataset(
         task_group=args.train_dataset_path,

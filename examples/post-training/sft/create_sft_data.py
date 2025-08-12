@@ -90,6 +90,8 @@ def main():
         "num_samples_each_epoch": data_args.num_samples_each_epoch,
         "random_shuffle": data_args.random_shuffle,
         "greedy_intokens": data_args.greedy_intokens,
+        "packing": data_args.packing,
+        "mix_strategy": data_args.mix_strategy,
     }
     dataclass = Sequence
 
@@ -108,6 +110,11 @@ def main():
             **dataset_config,
         )
         if training_args.max_steps == -1:
+            if data_args.mix_strategy == "random":
+                raise ValueError(
+                    "When using 'random' mix_strategy, max_steps must be explicitly set (cannot be -1). "
+                    "Random mixing requires a fixed number of training steps to properly sample data."
+                )
             training_args.estimation_output_file = (
                 "estimate_training.json"
                 if training_args.estimation_output_file is None
@@ -139,7 +146,7 @@ def main():
         train_builder.finalize(train_output_idx_files)
         logger.info(f"{runtime_timer.log()}")
 
-    if training_args.do_eval and data_args.eval_task_config:
+    if training_args.do_eval:
         runtime_timer.start("Create SFT Eval MapDataset")
         os.makedirs(os.path.join(data_args.dataset_output_dir, "eval"), exist_ok=True)
         eval_output_idx_files = os.path.join(

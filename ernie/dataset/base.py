@@ -78,7 +78,9 @@ class FileDataset(IterableDataset):
                 try:
                     ex = json.loads(line)
                 except Exception as e:
-                    logger.warning(f"Skip loading error data at line {lineno} of {self._filename}. Error message: {e}")
+                    logger.warning(
+                        f"Skip loading error data at line {lineno} of {self._filename}. Error message: {e}"
+                    )
                     continue
                 if self._process_fn is not None:
                     try:
@@ -130,7 +132,9 @@ class FileListDataset(IterableDataset):
 
         self._sub_datasets = []
         for fname in self._filenames:
-            self._sub_datasets.append(FileDataset(fname, process_fn=process_fn, shuffle_file=shuffle_file))
+            self._sub_datasets.append(
+                FileDataset(fname, process_fn=process_fn, shuffle_file=shuffle_file)
+            )
 
         self._shuffle_files = shuffle_files
 
@@ -176,7 +180,9 @@ class MultiSourceDataset(IterableDataset):
         """
         tasks = []
         for i in range(len(task_dataset_path)):
-            tasks.append({"prob": task_dataset_prob[i], "filepath": task_dataset_path[i]})
+            tasks.append(
+                {"prob": task_dataset_prob[i], "filepath": task_dataset_path[i]}
+            )
         # filter zero probability task
         tasks = [task for task in tasks if task["prob"] > 0]
         self._task_group = tasks
@@ -186,7 +192,9 @@ class MultiSourceDataset(IterableDataset):
                 task["dataset"] = hf_parser.create_hf_dataset(
                     repo_id=task["filepath"],
                     process_fn=(
-                        partial(process_fn, task_name=task["task_name"]) if "task_name" in task else process_fn
+                        partial(process_fn, task_name=task["task_name"])
+                        if "task_name" in task
+                        else process_fn
                     ),
                     shuffle_file=shuffle_file,
                 )
@@ -196,7 +204,9 @@ class MultiSourceDataset(IterableDataset):
                 task["dataset"] = FileDataset(
                     task["filepath"],
                     process_fn=(
-                        partial(process_fn, task_name=task["task_name"]) if "task_name" in task else process_fn
+                        partial(process_fn, task_name=task["task_name"])
+                        if "task_name" in task
+                        else process_fn
                     ),
                     shuffle_file=shuffle_file,
                 )
@@ -205,7 +215,9 @@ class MultiSourceDataset(IterableDataset):
                     task["train_filelist"],
                     file_format=each_sub_dataset_type,
                     process_fn=(
-                        partial(process_fn, task_name=task["task_name"]) if "task_name" in task else process_fn
+                        partial(process_fn, task_name=task["task_name"])
+                        if "task_name" in task
+                        else process_fn
                     ),
                     shuffle_file=shuffle_file,
                     shuffle_files=shuffle_files,
@@ -216,12 +228,16 @@ class MultiSourceDataset(IterableDataset):
                     formatting="alpaca",
                     doc_formatting="auto",
                     process_fn=(
-                        partial(process_fn, task_name=task["task_name"]) if "task_name" in task else process_fn
+                        partial(process_fn, task_name=task["task_name"])
+                        if "task_name" in task
+                        else process_fn
                     ),
                     shuffle_file=shuffle_file,
                 )
             else:
-                raise NotImplementedError(f"Cannot support {each_sub_dataset_type} now.")
+                raise NotImplementedError(
+                    f"Cannot support {each_sub_dataset_type} now."
+                )
         sum_prob = sum([task["prob"] for task in self._task_group])
         for task in self._task_group:
             task["prob_origin"] = task["prob"]
@@ -247,3 +263,37 @@ class MultiSourceDataset(IterableDataset):
             except StopIteration:
                 task["iterator"] = iter(task["dataset"])
                 yield from task["iterator"]
+
+
+class InfiniteDataset(IterableDataset):
+    """Infinite iterable dataset with shuffle support.
+
+    This dataset supports continuous iteration and optional random shuffling.
+    """
+
+    def __init__(self, dataset, rng=None, random_shuffle=True):
+        """Initialize InfiniteDataset.
+
+        Args:
+            dataset (Iterable): The original dataset to wrap.
+            rng (Random, optional): Random number generator for shuffling.
+            random_shuffle (bool): Whether to enable random shuffling.
+        """
+        self.data = list(iter(dataset))
+        self.indices = list(range(len(self.data)))
+        if rng is None:
+            rng = random.Random()
+        self.rng = rng
+        self.random_shuffle = random_shuffle
+
+    def __iter__(self):
+        """Infinite iterator with optional shuffling.
+
+        Yields:
+            object: The next data sample from the dataset.
+        """
+        while True:
+            if self.random_shuffle:
+                self.rng.shuffle(self.indices)
+            for i in self.indices:
+                yield self.data[i]

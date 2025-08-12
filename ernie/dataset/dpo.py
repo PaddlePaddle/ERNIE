@@ -14,17 +14,18 @@
 
 """DPO dataset."""
 
-import random
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Optional
 
 import numpy as np
-from paddle.io import IterableDataset, get_worker_info
+from paddle.io import IterableDataset
 from paddleformers.utils.log import logger
 from scipy.linalg import block_diag
 
 from ernie.dataset.base import MultiSourceDataset
+
+from .mix_datasets import create_dataset_instance
 
 LOGGER_COUNT = 0
 
@@ -126,6 +127,8 @@ def create_dataset(**dataset_config):
             "use_attn_mask_start_row_indices", True
         ),
         mask_out_eos_token=dataset_config["mask_out_eos_token"],
+        packing=dataset_config["packing"],
+        mix_strategy=dataset_config["mix_strategy"],
     )
     return sequence_dataset
 
@@ -398,39 +401,6 @@ def process_session_example(data, input_file):
     )
 
 
-class InfiniteDataset(IterableDataset):
-    """Load infinite data from original dataset with shuffle.
-
-    Args:
-        dataset (IterableDataset): Source dataset to wrap. Will be fully
-            materialized into a list for repeated access.
-        rng (random.Random, optional): Custom random number generator for
-            controlling shuffle behavior. Defaults to new random.Random().
-    """
-
-    def __init__(self, dataset, rng=None, random_shuffle=True):
-        """Initialize InfiniteDataset.
-
-        Args:
-            dataset (Iterable): The original dataset to wrap.
-            rng (Random, optional): Random number generator for shuffling.
-            random_shuffle (bool): Whether to enable random shuffling.
-        """
-        self.data = list(iter(dataset))
-        self.indices = list(range(len(self.data)))
-        if rng is None:
-            rng = random.Random()
-        self.rng = rng
-        self.random_shuffle = random_shuffle
-
-    def __iter__(self):
-        while True:
-            if self.random_shuffle:
-                self.rng.shuffle(self.indices)
-            for i in self.indices:
-                yield self.data[i]
-
-
 class SequenceDataset(IterableDataset):
     """Stateful dataset for generating token sequences from multi-source examples.
 
@@ -463,6 +433,8 @@ class SequenceDataset(IterableDataset):
         buffer_size: int = 500,
         use_attn_mask_start_row_indices: bool = True,
         mask_out_eos_token: bool = True,
+        packing: bool = False,
+        mix_strategy: str = "random",
     ):
         self.example_dataset = dataset
         self.tokenizer = tokenizer
@@ -481,13 +453,15 @@ class SequenceDataset(IterableDataset):
             )
         self.is_valid = is_valid
         self.random_seed = random_seed
-        self.rng = random.Random(random_seed)
         self.random_shuffle = random_shuffle
         self.greedy_intokens = greedy_intokens
         self.buffer_size = buffer_size
         self.origin_dataset_num = 0
         self.use_attn_mask_start_row_indices = use_attn_mask_start_row_indices
         self.mask_out_eos_token = mask_out_eos_token
+        self.packing = packing
+        self.mix_strategy = mix_strategy
+        self.num_samples_each_epoch = num_samples_each_epoch
 
         # For new data concatenation mode
         self.begin_of_query = self.tokenizer.tokenize("User: ")
@@ -498,24 +472,47 @@ class SequenceDataset(IterableDataset):
             "\n"
         )  # Same effect as sys_end_token
 
-        if not is_valid:
-            for task in self.example_dataset._task_group:
-                task["target_num_each_epoch"] = int(
-                    task["prob"] * num_samples_each_epoch
-                )
-                inner_dataset = InfiniteDataset(
-                    task["dataset"], self.rng, self.random_shuffle
-                )
-                task["iterator"] = iter(inner_dataset)
-                task["num_examples"] = len(inner_dataset.data)
-                logger.info(
-                    f"{task['filepath']}: task prob: {task['prob']}, "
-                    f"ori number of examples: {len(inner_dataset.data)}, "
-                    f"target_num_each_epoch: {task['target_num_each_epoch']}"
-                )
-                self.origin_dataset_num += len(inner_dataset.data)
+        datasets_list = [task["dataset"] for task in self.example_dataset._task_group]
+        datasets_prob = [task["prob"] for task in self.example_dataset._task_group]
 
-        self.epoch_index = 0
+        if is_valid:
+            self.random_shuffle = False
+            self.greedy_intokens = 0
+            self.mix_datasets = create_dataset_instance(
+                "concat",
+                datasets_list,
+                datasets_prob,
+                (
+                    "upsampling"
+                    if self.mix_strategy == "interleave_under"
+                    else "oversampling"
+                ),
+                self.random_seed,
+                self.random_shuffle,
+                self.num_samples_each_epoch,
+            )
+        else:
+            if self.mix_strategy not in [
+                "random",
+                "concat",
+                "interleave_under",
+                "interleave_over",
+            ]:
+                raise ValueError(f"Unsupported mix strategy: {self.mix_strategy}")
+            else:
+                self.mix_datasets = create_dataset_instance(
+                    self.mix_strategy,
+                    datasets_list,
+                    datasets_prob,
+                    (
+                        "upsampling"
+                        if self.mix_strategy == "interleave_under"
+                        else "oversampling"
+                    ),
+                    self.random_seed,
+                    self.random_shuffle,
+                    self.num_samples_each_epoch,
+                )
 
     def __iter_func(self):
         """
@@ -533,63 +530,59 @@ class SequenceDataset(IterableDataset):
         Raises:
             No exceptions raised.
         """
-        # epoch_rng only use in this epoch.
-        epoch_rng = np.random.RandomState(self.epoch_index)
-        worker_info = get_worker_info()
 
         # prepare epoch data
-        examples_all = []
         batch_sequence, cur_len = [], 0
-        for task in self.example_dataset._task_group:
-            if self.is_valid:
-                examples = [ex for ex in task["dataset"]]
-                self.origin_dataset_num += len(examples)
-            else:
-                examples = [
-                    next(task["iterator"]) for _ in range(task["target_num_each_epoch"])
-                ]
-            if self.random_shuffle:
-                epoch_rng.shuffle(examples)
-            if worker_info is not None:
-                examples = examples[worker_info.id :: worker_info.num_workers]
-            examples_all.extend(examples)
-        if self.random_shuffle:
-            epoch_rng.shuffle(examples_all)
-        if not self.greedy_intokens:
-            for example in examples_all:
+        dataset_iterator = iter(self.mix_datasets)
+
+        if not self.packing:
+            for _ in range(len(self.mix_datasets)):
+                example = next(dataset_iterator)
                 sequence = self._postprocess_sequence(example)
                 if sequence is None:
                     continue
 
-                if cur_len + len(sequence.input_ids) <= self.max_seq_len:
-                    batch_sequence.append(sequence)
-                    cur_len += len(sequence.input_ids)
-                else:
-                    yield batch_sequence
-                    batch_sequence, cur_len = [sequence], len(sequence.input_ids)
+                batch_sequence, cur_len = [sequence], len(sequence.input_ids)
+                yield batch_sequence
 
             if len(batch_sequence) > 0:
                 yield batch_sequence
         else:
-            sequence_buffer = []
-            buffer_size = self.buffer_size
-            for example in examples_all:
-                sequence = self._postprocess_sequence(example)
-                if sequence is None:
-                    continue
-                sequence_buffer.append(sequence)
+            if not self.greedy_intokens:
+                for _ in range(len(self.mix_datasets)):
+                    example = next(dataset_iterator)
+                    sequence = self._postprocess_sequence(example)
+                    if sequence is None:
+                        continue
 
-                if len(sequence_buffer) == buffer_size:
+                    if cur_len + len(sequence.input_ids) <= self.max_seq_len:
+                        batch_sequence.append(sequence)
+                        cur_len += len(sequence.input_ids)
+                    else:
+                        yield batch_sequence
+                        batch_sequence, cur_len = [sequence], len(sequence.input_ids)
+
+                if len(batch_sequence) > 0:
+                    yield batch_sequence
+            else:
+                sequence_buffer = []
+                buffer_size = self.buffer_size
+                for _ in range(len(self.mix_datasets)):
+                    example = next(dataset_iterator)
+                    sequence = self._postprocess_sequence(example)
+                    if sequence is None:
+                        continue
+                    sequence_buffer.append(sequence)
+
+                    if len(sequence_buffer) == buffer_size:
+                        sequence_pack = self._generate_greedy_packs(sequence_buffer)
+                        for pack in sequence_pack:
+                            yield pack
+                        sequence_buffer = []
+                if len(sequence_buffer) > 0:
                     sequence_pack = self._generate_greedy_packs(sequence_buffer)
                     for pack in sequence_pack:
                         yield pack
-                    sequence_buffer = []
-            if len(sequence_buffer) > 0:
-                sequence_pack = self._generate_greedy_packs(sequence_buffer)
-                for pack in sequence_pack:
-                    yield pack
-
-        self.epoch_index += 1
 
     def __iter__(self):
         """

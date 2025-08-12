@@ -224,6 +224,16 @@ class DataArgument:
             )
         },
     )
+    mix_strategy: str = field(
+        default="random",
+        metadata={
+            "help": "Strategy to use in dataset mixing (random/concat/interleave) (undersampling/oversampling)."
+        },
+    )
+    packing: bool = field(
+        default=True,
+        metadata={"help": "Enable sequences packing in training."},
+    )
 
 
 @dataclass
@@ -756,6 +766,8 @@ def main():
         "random_seed": training_args.seed,
         "num_replicas": training_args.dataset_world_size,
         "rank": training_args.dataset_rank,
+        "packing": data_args.packing,
+        "mix_strategy": data_args.mix_strategy,
     }
     from ernie.dataset.finetuning import collate_fn
 
@@ -819,6 +831,11 @@ def main():
         )
 
     if training_args.max_steps == -1:
+        if data_args.mix_strategy == "random":
+            raise ValueError(
+                "When using 'random' mix_strategy, max_steps must be explicitly set (cannot be -1). "
+                "Random mixing requires a fixed number of training steps to properly sample data."
+            )
         if training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
             if data_args.dataset_type != "map":
                 training_args.max_steps = estimate_training(

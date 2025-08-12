@@ -13,12 +13,11 @@
 # limitations under the License.
 
 
-import random
 from dataclasses import dataclass
 from typing import List
 
 import numpy as np
-from paddle.io import IterableDataset, get_worker_info
+from paddle.io import IterableDataset
 from paddleformers.utils.log import logger
 
 from ernie.dataset.base import MultiSourceDataset
@@ -26,6 +25,8 @@ from ernie.dataset.data_utils import (
     Example,
     pad_batch_data,
 )
+
+from .mix_datasets import create_dataset_instance
 
 LOGGER_COUNT = 0
 
@@ -91,6 +92,8 @@ def create_dataset(**dataset_config):
         random_seed=dataset_config["random_seed"],
         random_shuffle=dataset_config["random_shuffle"],
         greedy_intokens=dataset_config["greedy_intokens"],
+        packing=dataset_config["packing"],
+        mix_strategy=dataset_config["mix_strategy"],
     )
     return sequence_dataset
 
@@ -248,40 +251,6 @@ def process_example(data, input_file):
     )
 
 
-class InfiniteDataset(IterableDataset):
-    """Infinite iterable dataset with shuffle support.
-
-    This dataset supports continuous iteration and optional random shuffling.
-    """
-
-    def __init__(self, dataset, rng=None, random_shuffle=True):
-        """Initialize InfiniteDataset.
-
-        Args:
-            dataset (Iterable): The original dataset to wrap.
-            rng (Random, optional): Random number generator for shuffling.
-            random_shuffle (bool): Whether to enable random shuffling.
-        """
-        self.data = list(iter(dataset))
-        self.indices = list(range(len(self.data)))
-        if rng is None:
-            rng = random.Random()
-        self.rng = rng
-        self.random_shuffle = random_shuffle
-
-    def __iter__(self):
-        """Infinite iterator with optional shuffling.
-
-        Yields:
-            object: The next data sample from the dataset.
-        """
-        while True:
-            if self.random_shuffle:
-                self.rng.shuffle(self.indices)
-            for i in self.indices:
-                yield self.data[i]
-
-
 class SequenceDataset(IterableDataset):
     """Dataset for creating sequences from multi-source examples.
 
@@ -298,6 +267,8 @@ class SequenceDataset(IterableDataset):
         random_seed: int = 11,
         random_shuffle: bool = True,
         greedy_intokens: bool = False,
+        packing: bool = False,
+        mix_strategy: str = "random",
     ):
         """Initialize SequenceDataset.
 
@@ -323,10 +294,11 @@ class SequenceDataset(IterableDataset):
         self.max_seq_len = max_seq_len
         self.is_valid = is_valid
         self.random_seed = random_seed
-        self.rng = random.Random(random_seed)
         self.random_shuffle = random_shuffle
         self.greedy_intokens = greedy_intokens
-        self.origin_dataset_num = 0
+        self.packing = packing
+        self.mix_strategy = mix_strategy
+        self.num_samples_each_epoch = num_samples_each_epoch
 
         # For new data concatenation mode
         self.begin_of_query = self.tokenizer.tokenize("User: ")
@@ -341,25 +313,48 @@ class SequenceDataset(IterableDataset):
             "\n"
         )  # Same effect as sys_end_token
 
-        if not is_valid:
-            for task in self.example_dataset._task_group:
-                task["target_num_each_epoch"] = int(
-                    task["prob"] * num_samples_each_epoch
-                )
-                inner_dataset = InfiniteDataset(
-                    task["dataset"], self.rng, self.random_shuffle
-                )
-                task["iterator"] = iter(inner_dataset)
-                task["num_examples"] = len(inner_dataset.data)
-                logger.info(
-                    f"{task['filepath']}: task prob: {task['prob']}, "
-                    f"ori number of examples: {len(inner_dataset.data)}, "
-                    f"target_num_each_epoch: {task['target_num_each_epoch']}"
-                )
-                self.origin_dataset_num += len(inner_dataset.data)
-        else:
+        datasets_list = [task["dataset"] for task in self.example_dataset._task_group]
+        datasets_prob = [task["prob"] for task in self.example_dataset._task_group]
+
+        if is_valid:
             self.random_shuffle = False
             self.greedy_intokens = 0
+            self.mix_datasets = create_dataset_instance(
+                "concat",
+                datasets_list,
+                datasets_prob,
+                (
+                    "upsampling"
+                    if self.mix_strategy == "interleave_under"
+                    else "oversampling"
+                ),
+                self.random_seed,
+                self.random_shuffle,
+                self.num_samples_each_epoch,
+            )
+        else:
+            if self.mix_strategy not in [
+                "random",
+                "concat",
+                "interleave_under",
+                "interleave_over",
+            ]:
+                raise ValueError(f"Unsupported mix strategy: {self.mix_strategy}")
+            else:
+                self.mix_datasets = create_dataset_instance(
+                    self.mix_strategy,
+                    datasets_list,
+                    datasets_prob,
+                    (
+                        "upsampling"
+                        if self.mix_strategy == "interleave_under"
+                        else "oversampling"
+                    ),
+                    self.random_seed,
+                    self.random_shuffle,
+                    self.num_samples_each_epoch,
+                )
+
         self.estimate = False
         # The number of valid samples and skipped samples in estimation
         self.unused_samples = 0
@@ -367,18 +362,9 @@ class SequenceDataset(IterableDataset):
         # If used_estimate_samples exceeds max_estimate_samples,stop estimating.
         self.used_estimate_samples = 0
         self.max_estimate_samples = 0
-        if not is_valid:
-            # Set max estimate samples to dataset num examples in default
-            if len(self.example_dataset._task_group) > 1:
-                for task in self.example_dataset._task_group:
-                    self.max_estimate_samples += np.ceil(
-                        task["num_examples"] * task["prob_origin"]
-                    )
-            else:
-                self.max_estimate_samples = self.example_dataset._task_group[0][
-                    "num_examples"
-                ]
-        self.epoch_index = 0
+        # set max estimate samples
+        if not self.is_valid:
+            self.max_estimate_samples = len(self.mix_datasets)
 
     def __iter_func(self):
         """Core iterator function for sequence generation.
@@ -386,61 +372,29 @@ class SequenceDataset(IterableDataset):
         Returns:
             Sequence: A processed sequence containing token IDs and labels.
         """
-        # epoch_rng only use in this epoch.
-        epoch_rng = np.random.RandomState(self.epoch_index)
-        worker_info = get_worker_info()
 
         # prepare epoch data
-        logger.info("prepare SequenceDataset ...")
-        examples_all = []
-        for task in self.example_dataset._task_group:
-            if self.is_valid:
-                examples = [ex for ex in task["dataset"]]
-                self.origin_dataset_num += len(examples)
-            else:
-                examples = [
-                    next(task["iterator"]) for _ in range(task["target_num_each_epoch"])
-                ]
-            if self.random_shuffle:
-                epoch_rng.shuffle(examples)
-            if worker_info is not None:
-                examples = examples[worker_info.id :: worker_info.num_workers]
-            examples_all.extend(examples)
-        if self.random_shuffle:
-            epoch_rng.shuffle(examples_all)
-        logger.info(
-            f"prepare SequenceDataset done: total number of examples is {len(examples_all)}"
-        )
-
         batch_sequence, cur_len = [], 0
+        dataset_iterator = iter(self.mix_datasets)
 
-        if self.is_valid:
-            examples_all = examples_all[::-1]
-
-        if not self.greedy_intokens:
-            # base
-            for example in examples_all[::-1]:
+        if not self.packing:
+            for _ in range(len(self.mix_datasets)):
+                example = next(dataset_iterator)
                 actual_example_num = 1
                 sequence = self._postprocess_sequence(example, actual_example_num)
+                # unused_samples and used_samples are used to calculate skip_samples and actual_train_samples
                 if sequence is None:
                     if self.estimate:
                         self.unused_samples += actual_example_num
                     continue
                 if self.estimate:
                     self.used_samples += actual_example_num
-                if cur_len + len(sequence.token_ids) <= self.max_seq_len:
-                    batch_sequence.append(sequence)
-                    cur_len += len(sequence.token_ids)
-                else:
-                    yield batch_sequence
-                    batch_sequence, cur_len = [sequence], len(sequence.token_ids)
+                batch_sequence, cur_len = [sequence], len(sequence.token_ids)
+                yield batch_sequence
 
                 if self.estimate:
                     self.used_estimate_samples += actual_example_num
                     if self.used_estimate_samples >= self.max_estimate_samples:
-                        # Yield left batch sequence before estimation ends
-                        if len(batch_sequence) > 0:
-                            yield batch_sequence
                         self.used_estimate_samples = 0
                         # Set flag to False and yield empty list to signal the end of estimation
                         self.estimate = False
@@ -448,53 +402,84 @@ class SequenceDataset(IterableDataset):
             if len(batch_sequence) > 0:
                 yield batch_sequence
         else:
-            # Pseudo multiple rounds + group greedy intokens.
-            buffer_size = 500
-            examples = []
-            actual_example_num_list = []
-            i = 0
-            for example in examples_all[::-1]:
-                actual_example_num = 1
-                if i < buffer_size:
-                    examples.append(example)
-                    actual_example_num_list.append(actual_example_num)
-                    i += 1
-                else:
-                    # Running greedy strategy in examples.
+            if not self.greedy_intokens:
+                # base
+                for _ in range(len(self.mix_datasets)):
+                    example = next(dataset_iterator)
+                    actual_example_num = 1
+                    sequence = self._postprocess_sequence(example, actual_example_num)
+                    if sequence is None:
+                        if self.estimate:
+                            self.unused_samples += actual_example_num
+                        continue
+                    if self.estimate:
+                        self.used_samples += actual_example_num
+                    if cur_len + len(sequence.token_ids) <= self.max_seq_len:
+                        batch_sequence.append(sequence)
+                        cur_len += len(sequence.token_ids)
+                    else:
+                        yield batch_sequence
+                        batch_sequence, cur_len = [sequence], len(sequence.token_ids)
+
+                    if self.estimate:
+                        self.used_estimate_samples += actual_example_num
+                        if self.used_estimate_samples >= self.max_estimate_samples:
+                            # Yield left batch sequence before estimation ends
+                            if len(batch_sequence) > 0:
+                                yield batch_sequence
+                            self.used_estimate_samples = 0
+                            # Set flag to False and yield empty list to signal the end of estimation
+                            self.estimate = False
+                            yield []
+                if len(batch_sequence) > 0:
+                    yield batch_sequence
+            else:
+                # Pseudo multiple rounds + group greedy intokens.
+                buffer_size = 500
+                examples = []
+                actual_example_num_list = []
+                i = 0
+                for _ in range(len(self.mix_datasets)):
+                    example = next(dataset_iterator)
+                    actual_example_num = 1
+                    if i < buffer_size:
+                        examples.append(example)
+                        actual_example_num_list.append(actual_example_num)
+                        i += 1
+                    else:
+                        # Running greedy strategy in examples.
+                        generate_packs = self._generate_greedy_packs(
+                            examples, actual_example_num_list
+                        )
+                        for pack in generate_packs:
+                            if len(pack) > 0:
+                                yield pack
+                        examples = [example]
+                        i = 1
+
+                    if self.estimate:
+                        self.used_estimate_samples += actual_example_num
+                        # Stop estimation if the number of samples used in estimation is larger than max_estimate_samples
+                        if self.used_estimate_samples >= self.max_estimate_samples:
+                            # Yield left packs before estimation ends
+                            if len(examples) > 0:
+                                generate_packs = self._generate_greedy_packs(
+                                    examples, actual_example_num_list
+                                )
+                                for pack in generate_packs:
+                                    if len(pack) > 0:
+                                        yield pack
+                            # Set flag to False and yield empty list to signal the end of estimation
+                            self.estimate = False
+                            yield []
+
+                if len(examples) > 0:
                     generate_packs = self._generate_greedy_packs(
                         examples, actual_example_num_list
                     )
                     for pack in generate_packs:
                         if len(pack) > 0:
                             yield pack
-                    examples = [example]
-                    i = 1
-
-                if self.estimate:
-                    self.used_estimate_samples += actual_example_num
-                    # Stop estimation if the number of samples used in estimation is larger than max_estimate_samples
-                    if self.used_estimate_samples >= self.max_estimate_samples:
-                        # Yield left packs before estimation ends
-                        if len(examples) > 0:
-                            generate_packs = self._generate_greedy_packs(
-                                examples, actual_example_num_list
-                            )
-                            for pack in generate_packs:
-                                if len(pack) > 0:
-                                    yield pack
-                        # Set flag to False and yield empty list to signal the end of estimation
-                        self.estimate = False
-                        yield []
-
-            if len(examples) > 0:
-                generate_packs = self._generate_greedy_packs(
-                    examples, actual_example_num_list
-                )
-                for pack in generate_packs:
-                    if len(pack) > 0:
-                        yield pack
-
-        self.epoch_index += 1
 
     def __iter__(self):
         """Iterator interface for the dataset.

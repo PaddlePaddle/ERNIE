@@ -372,6 +372,8 @@ def run_sft(
         "random_seed": finetuning_args.seed,
         "num_replicas": finetuning_args.dataset_world_size,
         "rank": finetuning_args.dataset_rank,
+        "packing": data_args.packing,
+        "mix_strategy": data_args.mix_strategy,
     }
     from ernie.dataset.finetuning import collate_fn
 
@@ -433,6 +435,11 @@ def run_sft(
         )
 
     if finetuning_args.max_steps == -1:
+        if data_args.mix_strategy == "random":
+            raise ValueError(
+                "When using 'random' mix_strategy, max_steps must be explicitly set (cannot be -1). "
+                "Random mixing requires a fixed number of training steps to properly sample data."
+            )
         if finetuning_args.should_load_dataset and paddle.distributed.get_rank() == 0:
             if data_args.dataset_type != "map":
                 finetuning_args.max_steps = estimate_training(

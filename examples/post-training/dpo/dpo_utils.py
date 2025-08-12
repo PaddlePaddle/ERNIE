@@ -159,6 +159,16 @@ class DataArgument:
     mask_out_eos_token: bool = field(
         default=True, metadata={"help": "Mask out eos token"}
     )
+    mix_strategy: str = field(
+        default="random",
+        metadata={
+            "help": "Strategy to use in dataset mixing (random/concat/interleave) (undersampling/oversampling)."
+        },
+    )
+    packing: bool = field(
+        default=True,
+        metadata={"help": "Enable sequences packing in training."},
+    )
 
 
 @dataclass
