@@ -98,7 +98,6 @@ from src.utils import (
     setup_logger_output_file,
 )
 from src.utils.data_utils import fancy_print, merge_fn, merge_fn_group_batch
-from src.utils.mm_data_utils import MMSpecialTokensConfig
 from src.utils.misc import global_training_logs
 
 
@@ -538,8 +537,6 @@ def main():
     callbacks = []
     callbacks = [DataTraceCallbackAuto()] if not args.use_dummy_dataset else []
     callbacks += [GlobalRNGCallback()]
-    # if "freeze_lm" in freeze_config and args.modality_ratio is not None:
-    #     callbacks += [MultiModalInterleaveCallback()]
     if args.pp_need_data_degree:
         callbacks += [PPNeedDataCallback()]
 

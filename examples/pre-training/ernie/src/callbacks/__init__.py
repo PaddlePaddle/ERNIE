@@ -29,7 +29,6 @@ from .moe_logging_callback import GlobalRNGCallback, MoeLoggingCallback
 from .sp_grad_sync_callback import SPGradSyncCallback
 from .fp8_quant_weight_callback import FP8QuantWeightCallback
 from .data_trace_callback import DataTraceCallback, DataTraceCallbackAuto
-from .multimodal_interleave_callback import MultiModalInterleaveCallback
 from .pp_need_data_callback import PPNeedDataCallback
 
 __all__ = [
@@ -48,6 +47,5 @@ __all__ = [
     "ProgreesiveBatchingCallback",
     "DataTraceCallbackAuto",
     "DataTraceCallback",
-    "MultiModalInterleaveCallback",
     "PPNeedDataCallback",
 ]
