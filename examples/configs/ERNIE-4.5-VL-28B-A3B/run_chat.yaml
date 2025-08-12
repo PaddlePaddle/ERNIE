@@ -1,0 +1,20 @@
+### model
+model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Paddle
+tensor_parallel_degree: 4
+output_dir: None
+
+### server
+# ref: https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/zh/optimal_deployment/ERNIE-4.5-300B-A47B-Paddle.md
+max_model_len: 32768
+port: 8188
+quantization: wint4
+max_num_seqs: 32
+enable_mm: true
+limit_mm_per_prompt: '{"image": 100, "video": 100}'
+reasoning_parser: ernie-45-vl
+max_num_batched_tokens: 384
+
+### chat
+max_new_tokens: 8192
+top_p: 0.7
+temperature: 0.95
