@@ -284,7 +284,7 @@ def calc_lm_head_logits(
     tensor_parallel_output=None,
 ):
     """the core function to calc lm head"""
-    if config.sequence_parallel or config.submatrix_parallel:
+    if config.sequence_parallel:
 
         assert (
             not config.use_sparse_head_and_loss_fn
@@ -1231,8 +1231,6 @@ class ErnieMLP(nn.Layer):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
 
-        assert not config.submatrix_parallel, "submatrix parallel is not supported now."
-
         LinearFN = nn.Linear
         self.gate_proj = LinearFN(
             self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
@@ -1522,7 +1520,7 @@ class ErnieAttentionAuto(nn.Layer):
                 inbatch_pack_offset=inbatch_pack_offset,
             )
 
-        if self.config.sequence_parallel or self.config.submatrix_parallel:
+        if self.config.sequence_parallel:
             attn_output = paddle.transpose(attn_output, [1, 0, 2])
 
         attn_output = self.o_proj(attn_output)
@@ -2610,7 +2608,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             # print(f'emb out:{inputs_embeds} \n emb-weight:{self.embed_tokens.weight}')
 
         global_mesh = global_mesh_starts_with_pp()
-        if self.config.sequence_parallel or self.config.submatrix_parallel:
+        if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
             # if token_type_ids is not None:
@@ -2849,7 +2847,7 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
         if self.config.use_sparse_head_and_loss_fn:
             hidden_states, outlinear_weight, outlinear_bias = prediction_scores
 
-            if self.config.sequence_parallel or self.config.submatrix_parallel:
+            if self.config.sequence_parallel:
                 masked_lm_labels, sparse_label_idx = (
                     sequence_parallel_sparse_mask_labels(
                         masked_lm_labels, self.ignored_index
@@ -3169,14 +3167,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                 config.tensor_parallel_degree > 1
             ), f"sequence-parallel needs mp>1, got mp={config.tensor_parallel_degree}"
 
-        if config.submatrix_parallel:
-            assert config.seqlen is not None
-            assert (
-                config.tensor_parallel_degree > 1
-            ), f"submatrix_parallel only works in mp, got mp={self.tensor_parallel_degree}"
-            assert (
-                config.sequence_parallel == 0
-            ), "enable submatrix_parallel must disable sequence-parallel"
 
         # initialize-trick for big model, see
         # https://github.com/bigscience-workshop/bigscience/blob/master/train/tr11-176B-ml/README.md#std-init

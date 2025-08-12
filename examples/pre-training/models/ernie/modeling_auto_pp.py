@@ -464,7 +464,7 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
                 self.embed_tokens.weight.dtype
             )
 
-            if self.config.sequence_parallel or self.config.submatrix_parallel:
+            if self.config.sequence_parallel:
                 # [B, S, H] -> [S, B, H]
                 inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
                 # if token_type_ids is not None:
@@ -665,14 +665,7 @@ class ErnieForCausalLMAutoPP(ErniePretrainedModelAuto):
                 config.tensor_parallel_degree > 1
             ), f"sequence-parallel needs mp>1, got mp={config.tensor_parallel_degree}"
 
-        if config.submatrix_parallel:
-            assert config.seqlen is not None
-            assert (
-                config.tensor_parallel_degree > 1
-            ), f"submatrix_parallel only works in mp, got mp={self.tensor_parallel_degree}"
-            assert (
-                config.sequence_parallel == 0
-            ), "enable submatrix_parallel must disable sequence-parallel"
+
 
         # initialize-trick for big model, see
         # https://github.com/bigscience-workshop/bigscience/blob/master/train/tr11-176B-ml/README.md#std-init
