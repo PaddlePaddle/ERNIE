@@ -123,6 +123,7 @@ def get_parser():
         default=None,
         help="weight_only_int8",
     )
+    parser.add_argument("--download_hub", type=str, default="aistudio")
     parser.add_argument(
         "--input_file", type=str, default="./examples/inference/data/query-demo.jsonl"
     )
@@ -163,13 +164,8 @@ class Predictor:
         """
         args.model_name_or_path = check_download_repo(
             args.model_name_or_path,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
-            from_modelscope=args.from_modelscope,
+            download_hub=args.download_hub,
         )
-
-        if getattr(args, "from_modelscope", False):
-            os.environ["from_modelscope"] = "True"
 
         self.runtime_timer = RuntimeTimer("Predictor")
         self.num_input_tokens = 0
@@ -194,8 +190,7 @@ class Predictor:
         # init model & tokenizer
         self.tokenizer = Ernie4_5_Tokenizer.from_pretrained(
             args.model_name_or_path,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
+            download_hub=args.download_hub,
             convert_from_torch=False,
         )
         self.tokenizer.padding_side = "left"
@@ -219,15 +214,13 @@ class Predictor:
             use_flash_attention=True,
             moe_group="dummy",
             num_nextn_predict_layers=0,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
+            download_hub=args.download_hub,
             convert_from_torch=False,
         )
         self.model = Ernie4_5_MoeForCausalLM.from_pretrained(
             args.model_name_or_path,
             config=self.config,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
+            download_hub=args.download_hub,
             convert_from_torch=False,
         )
         gc.collect()

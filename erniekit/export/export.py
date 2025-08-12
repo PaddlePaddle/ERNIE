@@ -96,18 +96,13 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
 
         model_args.model_name_or_path = check_download_repo(
             model_args.model_name_or_path,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
-            from_modelscope=model_args.from_modelscope,
+            download_hub=model_args.download_hub,
         )
-        if getattr(model_args, "from_modelscope", False):
-            os.environ["from_modelscope"] = "True"
 
         resolve_result = resolve_file_path(
             model_args.model_name_or_path,
             [SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME],
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
+            download_hub=model_args.download_hub,
         )
         if resolve_result is not None:
             resolve_path = os.path.dirname(resolve_result)

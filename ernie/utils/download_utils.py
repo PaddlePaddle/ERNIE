@@ -12,67 +12,78 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import os
 import json
-from paddleformers.utils.log import logger
+from paddleformers.utils.download import (
+    DownloadSource,
+    register_model_group,
+    check_repo,
+)
 
-MODEL_DOWNLOAD_MAP = {
-    "ERNIE-4.5-300B-A47B-Base": {
-        "hf_hub": "baidu/ERNIE-4.5-300B-A47B-Base-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-300B-A47B-Base-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-300B-A47B-Base-Paddle",
-    },
-    "ERNIE-4.5-300B-A47B": {
-        "hf_hub": "baidu/ERNIE-4.5-300B-A47B-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-300B-A47B-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-300B-A47B-Paddle",
-    },
-    "ERNIE-4.5-21B-A3B-Base": {
-        "hf_hub": "baidu/ERNIE-4.5-21B-A3B-Base-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-21B-A3B-Base-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-21B-A3B-Base-Paddle",
-    },
-    "ERNIE-4.5-21B-A3B": {
-        "hf_hub": "baidu/ERNIE-4.5-21B-A3B-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-21B-A3B-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-21B-A3B-Paddle",
-    },
-    "ERNIE-4.5-0.3B-Base": {
-        "hf_hub": "baidu/ERNIE-4.5-0.3B-Base-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-0.3B-Base-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-0.3B-Base-Paddle",
-    },
-    "ERNIE-4.5-0.3B": {
-        "hf_hub": "baidu/ERNIE-4.5-0.3B-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-0.3B-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-0.3B-Paddle",
-    },
-    "ERNIE-4.5-VL-424B-A47B-Base": {
-        "hf_hub": "baidu/ERNIE-4.5-VL-424B-A47B-Base-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-VL-424B-A47B-Base-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-VL-424B-A47B-Base-Paddle",
-    },
-    "ERNIE-4.5-VL-424B": {
-        "hf_hub": "baidu/ERNIE-4.5-VL-424B-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-VL-424B-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-VL-424B-Paddle",
-    },
-    "ERNIE-4.5-VL-28B-A3B-Base": {
-        "hf_hub": "baidu/ERNIE-4.5-VL-28B-A3B-Base-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Base-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Base-Paddle",
-    },
-    "ERNIE-4.5-VL-28B-A3B": {
-        "hf_hub": "baidu/ERNIE-4.5-VL-28B-A3B-Paddle",
-        "aistudio": "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Paddle",
-        "modelscope": "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Paddle",
-    },
-}
+register_model_group(
+    models={
+        "ERNIE-4.5-300B-A47B-Base": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-300B-A47B-Base-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-300B-A47B-Base-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-300B-A47B-Base-Paddle",
+        },
+        "ERNIE-4.5-300B-A47B": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-300B-A47B-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-300B-A47B-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-300B-A47B-Paddle",
+        },
+        "ERNIE-4.5-21B-A3B-Base": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-21B-A3B-Base-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-21B-A3B-Base-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-21B-A3B-Base-Paddle",
+        },
+        "ERNIE-4.5-21B-A3B": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-21B-A3B-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-21B-A3B-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-21B-A3B-Paddle",
+        },
+        "ERNIE-4.5-0.3B-Base": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-0.3B-Base-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-0.3B-Base-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-0.3B-Base-Paddle",
+        },
+        "ERNIE-4.5-0.3B": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-0.3B-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-0.3B-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-0.3B-Paddle",
+        },
+    }
+)
+
+
+register_model_group(
+    models={
+        "ERNIE-4.5-VL-424B-A47B-Base": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-VL-424B-A47B-Base-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-VL-424B-A47B-Base-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-VL-424B-A47B-Base-Paddle",
+        },
+        "ERNIE-4.5-VL-424B": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-VL-424B-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-VL-424B-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-VL-424B-Paddle",
+        },
+        "ERNIE-4.5-VL-28B-A3B-Base": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-VL-28B-A3B-Base-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Base-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Base-Paddle",
+        },
+        "ERNIE-4.5-VL-28B-A3B": {
+            DownloadSource.HUGGINGFACE: "baidu/ERNIE-4.5-VL-28B-A3B-Paddle",
+            DownloadSource.AISTUDIO: "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Paddle",
+            DownloadSource.MODELSCOPE: "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-Paddle",
+        },
+    }
+)
 
 
 def check_download_repo(
-    model_name_or_path, from_hf_hub=False, from_aistudio=False, from_modelscope=False
+    model_name_or_path, download_hub: DownloadSource = DownloadSource.DEFAULT
 ):
     # Detect torch model.
     is_local = os.path.isfile(model_name_or_path) or os.path.isdir(model_name_or_path)
@@ -84,37 +95,8 @@ def check_download_repo(
             raise ValueError(
                 "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
             )
-
-        return model_name_or_path
     else:
         # check remote repo
-        model_name = model_name_or_path.split("/")[-1].rstrip("-Paddle")
-        if model_name in MODEL_DOWNLOAD_MAP.keys():
-            if re.match(
-                r"^(baidu|PaddlePaddle)/ERNIE-4\.5-.+-Paddle$", model_name_or_path
-            ):  # model download from baidu
-                download_repo = MODEL_DOWNLOAD_MAP[model_name]
-                if from_hf_hub:
-                    if model_name_or_path != download_repo["hf_hub"]:
-                        logger.warning(
-                            f"The repo id of baidu's model in the hf_hub should be 'baidu', model_name_or_path has changed to {download_repo['hf_hub']}"
-                        )
-                    return download_repo["hf_hub"]
-                elif from_aistudio:
-                    if model_name_or_path != download_repo["aistudio"]:
-                        logger.warning(
-                            f"The repo id of baidu's model in the aistudio should be 'PaddlePaddle', model_name_or_path has changed to {download_repo['aistudio']}"
-                        )
-                    return download_repo["aistudio"]
-                elif from_modelscope:
-                    if model_name_or_path != download_repo["modelscope"]:
-                        logger.warning(
-                            f"The repo id of baidu's model in the modelscope should be 'PaddlePaddle', model_name_or_path has changed to {download_repo['modelscope']}"
-                        )
-                    return download_repo["modelscope"]
-                else:
-                    raise ValueError(
-                        "please select a model downloading source: --from_hf_hub, --from_aistudio, --from_modelscope"
-                    )
+        model_name_or_path = check_repo(model_name_or_path, download_hub)
 
-        return model_name_or_path
+    return model_name_or_path
