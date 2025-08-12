@@ -18,6 +18,3 @@
 from .dist_data_loader import DistDataLoader, DistDataLoaderAuto
 from .pretrain_iterable_dataset import create_pretrain_iterable_dataset
 from .pretrain_task import ExampleSet, ExampleSetSingleDataSource, PretrainTask
-from .simple_sft_task import ChatSftTask
-
-# from .pretrain_multimodal_task import PretrainMultimodalTask
