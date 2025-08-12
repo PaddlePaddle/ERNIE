@@ -36,9 +36,8 @@ from models.moe.moe_utils import get_mesh
 from .modeling_auto import (
     ErnieDecoderLayerAuto,
     ErniePretrainedModelAuto,
-    LayerNorm,
+    FastLayerNorm,
     RMSNorm,
-    FusedLayerNorm,
     ErniePretrainingCriterion,
     ErnieLMHead,
 )
@@ -287,11 +286,15 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
                     )
         self.layer = ErnieDecoderLayerAuto(config, layer_idx, ipp)
 
-        Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-        if not config.use_rmsnorm and config.fuse_ln:
-            Norm = FusedLayerNorm
+        if config.use_rmsnorm:
+            Norm = RMSNorm(config)
+        elif config.use_fast_ln:
+            Norm = FastLayerNorm(config)
+        else:
+            Norm = nn.LayerNorm(config.hidden_size, epsilon=config.rms_norm_eps)
+    
         if self.layer_idx == self.config.num_hidden_layers - 1:
-            self.norm = Norm(config, -1)
+            self.norm = Norm
             self.lm_head = ErnieLMHead(config)
 
     def recompute_training(
@@ -592,8 +595,8 @@ class ErnieForCausalLMAutoPP(ErniePretrainedModelAuto):
             else:
                 logger.info("Use normal RMSNorm")
         else:
-            if self.config.fuse_ln:
-                logger.info("Use fusedLN")
+            if self.config.use_fast_ln:
+                logger.info("Use FastLN")
             else:
                 logger.info("Use normal LayerNorm")
 
