@@ -39,15 +39,8 @@ from models.comm_utils import (
 )
 from paddleformers.utils.tools import get_env_device
 
-try:
-    from paddle.distributed import in_auto_parallel_align_mode
-except:
 
-    def in_auto_parallel_align_mode():
-        """
-        hack for paddlenlp develop branch.
-        """
-        return False
+from paddle.distributed import in_auto_parallel_align_mode
 
 
 try:
@@ -180,10 +173,6 @@ class _AllToAll(paddle.autograd.PyLayer):
 
 
 class AllGatherVarlenOpV2(PyLayer):
-    """
-    老 `GatherOp`的变长版本, 与`SliceVarlenOp`对应
-    与 `AllGatherVarlenOp` 的实现没什么不一样
-    """
 
     @staticmethod
     def forward(ctx, input, indices, axis=0, group=None):
@@ -200,18 +189,6 @@ class AllGatherVarlenOpV2(PyLayer):
 
 
 class SliceVarlenOp(PyLayer):
-    """
-    各 rank 从**同一个** sequence 上 slice 出变长的部分。
-    在反向时候会汇聚来自各 rank 的梯度，回复到 mp 同步状态。
-
-    是`ScatterOp` 的变长版本。反操作是 `VarlenGatherOp`
-    Args:
-        input: Tensor [S,*]
-        indices: 各 rank 分片长度
-        minimum_size: 如果 slice 为空，返回 `minimum_size` 个假数据。
-    Returns:
-        切分后的 Tensor
-    """
 
     @staticmethod
     def forward(
@@ -237,15 +214,6 @@ class SliceVarlenOp(PyLayer):
 
 
 class ScatterOp(PyLayer):
-    """
-    各 rank 从**同一个** sequence 上 slice 出属于自己的部分（均匀切分 )。
-    在反向时候会汇聚来自各 rank 的梯度，回复到 mp 同步状态。
-    反操作是`GatherOp`
-
-    input: Tensor [S,*]
-
-    注意：跟`distributed.scatter`并没有什么关系
-    """
 
     @staticmethod
     def forward(ctx, input, axis=0, group=None):
@@ -479,7 +447,6 @@ def sequence_parallel_sparse_mask_labels(labels, ignore_label=-100):
     """allgather sparse label and return sparse idx"""
     hcg = fleet.get_hybrid_communicate_group()
     group = hcg.get_model_parallel_group()
-    parallelism = group.nranks
     labels = labels.flatten()
     labels_local = paddle.split(labels, group.nranks)[group.rank]
 
@@ -526,10 +493,7 @@ def create_fused_allreduce_gradient_hook(parameter_list, accumulation_steps):
 
 
 def create_non_fused_allreduce_gradient_hook(param, model, verbose=False):
-    """
-    model: PipelineParallel
-    `accumulate_steps` 可能在训练中改变，从`model` 中获取`accumulate_steps`
-    """
+
     hcg = get_hcg()
     pg = hcg.get_model_parallel_group().process_group
     step = [0]
@@ -733,9 +697,7 @@ class ColumnSequenceParallelLinear(Layer):
                 x, self.weight, self.model_parallel_group
             )
         ):
-            if (
-                self._rr_column_ln is not None and self.training
-            ):
+            if self._rr_column_ln is not None and self.training:
                 output = self._rr_column_comm_ln(
                     x=x, weight=self.weight, group=self.model_parallel_group
                 )
@@ -752,9 +714,7 @@ class ColumnSequenceParallelLinear(Layer):
             else:
                 input_parallel = x
 
-            if (
-                self._rr_column_ln is not None and self.training
-            ):
+            if self._rr_column_ln is not None and self.training:
                 output = self._rr_column_ln(
                     self.linear, x=input_parallel, weight=self.weight, bias=self.bias
                 )
@@ -900,9 +860,7 @@ class RowSequenceParallelLinear(Layer):
             else:
                 bias = None
 
-            if (
-                self._rr_rown_ln is not None and self.training
-            ):
+            if self._rr_rown_ln is not None and self.training:
                 if (
                     self.use_tpsp_comm_overlap
                     and self.use_comm

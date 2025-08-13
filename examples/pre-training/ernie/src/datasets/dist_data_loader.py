@@ -336,8 +336,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 self._pp_data_group,
             )
 
-
-
         if VOCAB_SIZE is not None:
             if input_ids is not None:
                 input_ids %= int(VOCAB_SIZE)
@@ -381,13 +379,11 @@ class DistDataLoader(paddle.io.DataLoader):
         return to_return
 
 
-# TODO(shenliang): we should fused broadcast for better performance in future.
 def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_rank=0):
     """
     Broadcast data from src_rank to all ranks in comm_group.
     """
     # Move to GPU and broadcast.
-    max_dim = _MAX_DATA_DIM
     size_cpu = []
     if comm_rank == 0:
         for data in data_list:
@@ -479,16 +475,7 @@ def split_group(grouped, split_size):
 
 # Tea.chen congmin(葱明) brodcast
 def broadcast_data_obj(data, src_rank, group):
-    """广播任意嵌套嵌套的 `data` 结构，每个 value 必须是 paddle.Tensor
-    Args:
-        data : 任意嵌套嵌套的 `data` 结构，每个 value 必须是 paddle.Tensor
-        src_rank (int): 发送节点的全局 rank
-        this_rank (int): 本机 mp_rank
-        group (ProcessGroup): 通信组
 
-    Returns:
-        data: 广播后的 `data`
-    """
     this_rank = dist.get_rank()
     if this_rank == src_rank:
         template = [
@@ -509,8 +496,6 @@ def broadcast_data_obj(data, src_rank, group):
 
     temp_flat = flatten(template)
     data_flat = flatten(data)
-    # log.info(f'[rank={dist.get_rank()}] {temp_flat[0]}')
-    # keyfn = lambda i: str(i[1].dtype)
 
     def keyfn(i):
         return str(i[1].dtype)
@@ -518,9 +503,7 @@ def broadcast_data_obj(data, src_rank, group):
     ret_flat = [-1 for _ in range(len(temp_flat))]
     for dtype, grouped in groupby(sorted(enumerate(temp_flat), key=keyfn), keyfn):
         grouped = list(grouped)
-        for grouped_chunk in split_group(
-            grouped, 2**18
-        ):  # 对 > 2**31 的 tensor 进行 spilt 会出 paddle 问题。
+        for grouped_chunk in split_group(grouped, 2**18):
             idxs = [g[0] for g in grouped_chunk]
             if not dtype:
                 for id in idxs:
@@ -536,7 +519,6 @@ def broadcast_data_obj(data, src_rank, group):
                 data_buf = paddle.empty(
                     [sum(data_buf_shapes)], dtype=grouped_chunk[0][1].dtype
                 )
-            # log.info(f'[rank={dist.get_rank()}]: broadcast data:{data_buf.shape}')
             dist.broadcast(data_buf, src_rank, group)
             # log.info(f'[rank={dist.get_rank()}]: done broadcast data:{data_buf.shape}')
 
@@ -556,10 +538,6 @@ def broadcast_data_obj(data, src_rank, group):
 
 
 class DistDataLoaderAuto(DistDataLoader):
-    """
-    DistDataLoaderAuto 继承自 DistDataLoader，重新实现了__next__方法，以适应静半下date_set的数据返回形式。
-    关于静半数据形式，详见wrap_merge_fn_for_auto方法。
-    """
 
     def _init_dataloader_comm_group(self):
         return self._hcg.get_pipe_parallel_group()
@@ -569,7 +547,6 @@ class DistDataLoaderAuto(DistDataLoader):
 
         input_list = []
         if "token_type_ids" in data_dict.keys():
-            # 多模情况
             (
                 input_ids,
                 labels,
@@ -595,7 +572,6 @@ class DistDataLoaderAuto(DistDataLoader):
             data_world_size = max(self._hcg.get_data_parallel_rank(), 1) * max(
                 self._hcg.get_sharding_parallel_rank(), 1
             )
-            # TODO(zhangyuqin) images为动态shape, 后面要确定如何传入spec
             if images is None:
                 images = paddle.zeros([1, 64, 64], dtype="uint8")
                 has_images = paddle.full([data_world_size, 1], False, dtype="bool")

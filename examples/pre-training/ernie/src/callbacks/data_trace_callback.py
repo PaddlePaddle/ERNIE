@@ -45,19 +45,7 @@ class DataTraceCallback(TrainerCallback):
         control: TrainerControl,
         **kwargs,
     ):
-        """
-        训练开始时，初始化或更新 TrainerState 中关于数据加载状态的参数。
 
-        Args:
-            args (TrainingArguments): 训练参数。
-            state (TrainerState): 训练状态。
-            control (TrainerControl): 训练控制。
-            **kwargs: 其他可选参数。
-
-        Returns:
-            None: 无返回值，直接修改 state 中的参数。
-
-        """
         if args.custom_data_status:
             custom_trainer_state = TrainerState.load_from_json(args.custom_data_status)
             logger.info(f"load custom data status from {args.custom_data_status}")
@@ -84,7 +72,6 @@ class DataTraceCallback(TrainerCallback):
                 0 for _ in state.trial_params["saved_data_status"]
             ]
 
-        # 兼容之前的训练
         if "consumed_samples" not in state.trial_params:
             state.trial_params["consumed_samples"] = sum(
                 state.trial_params["saved_data_status"]
@@ -93,7 +80,6 @@ class DataTraceCallback(TrainerCallback):
             state.trial_params["global_shuffle_seed"] = 0
 
         if not args.same_data:
-            # 数据有变化 重置起始data_status, consumed_samplers状态清空，重新开始统计
             state.trial_params["last_start_data_status"] = state.trial_params[
                 "saved_data_status"
             ]
@@ -156,14 +142,7 @@ class DataTraceCallback(TrainerCallback):
         inputs,
         **kwargs,
     ):
-        """Trainer load_data_end 时调用
 
-        Args:
-            args (TrainingArguments): _description_
-            state (TrainerState): _description_
-            control (TrainerControl): _description_
-            inputs (_type_): _description_
-        """
         if not args.need_data:
             return
         for part_id in inputs["src_id"]:
@@ -176,13 +155,7 @@ class DataTraceCallback(TrainerCallback):
         control: TrainerControl,
         **kwargs,
     ):
-        """save_checkpoint 在hook on_save前面, 写在on_step_end这里，在后续save_checkpoint时一起落盘
 
-        Args:
-            args (TrainingArguments): _description_
-            state (TrainerState): _description_
-            control (TrainerControl): _description_
-        """
         if not args.need_data:
             if (
                 args.use_hybrid_parallel
@@ -239,7 +212,6 @@ class DataTraceCallback(TrainerCallback):
             state.trial_params["saved_data_status"] = (
                 data_status.numpy() + _saved_data_status
             ).tolist()
-            # consumed_samples 状态变更 (最新数据状态统计)
             state.trial_params["consumed_samples"] += sum(data_status.tolist())
 
     def on_save(
@@ -249,22 +221,9 @@ class DataTraceCallback(TrainerCallback):
         control: TrainerControl,
         **kwargs,
     ):
-        """
-        保存模型时触发的事件处理函数
 
-        Args:
-            args (TrainingArguments): 训练参数对象
-            state (TrainerState): 训练状态对象
-            control (TrainerControl): 训练控制对象
-            **kwargs: 其他关键字参数
-
-        Returns:
-            None
-
-        """
         if not args.need_data:
             return
-        # 清空数据计数存储状态
         state.trial_params["data_status"] = [
             0 for _ in range(len(state.trial_params["data_status"]))
         ]
@@ -285,14 +244,7 @@ class DataTraceCallbackAuto(DataTraceCallback):
         inputs,
         **kwargs,
     ):
-        """Trainer load_data_end 时调用
 
-        Args:
-            args (TrainingArguments): _description_
-            state (TrainerState): _description_
-            control (TrainerControl): _description_
-            inputs (_type_): _description_
-        """
         if not args.need_data:
             return
         for part_id in inputs["input_ids"][3]:  # src_id

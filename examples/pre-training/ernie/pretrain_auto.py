@@ -1,4 +1,3 @@
-
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,45 +14,18 @@
 
 import os
 import time
-from src.utils import logger
-
-try:
-    from paddleformers.trainer.trainer_utils import log_trainer_start
-except ImportError:
-
-    def log_trainer_start():
-        """print main process messgae"""
-        if "MAIN_PROCESS_STARTED" not in os.environ:
-            start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            logger.info(
-                f"The Training Main Process Started Successfully. time: {start_time}, pid: {os.getpid()}"
-            )
-            os.environ["MAIN_PROCESS_STARTED"] = "1"
-
-
-log_trainer_start()
-
 import json
 import numpy as np
-
 from functools import partial
 import random
-
 import paddle
 import paddle.distributed.fleet as fleet
-
-try:
-    from paddle.distributed.fleet import monitor_perf as collective_perf
-except ImportError:
-    from paddle.distributed.fleet import collective_perf
-
-from paddleformers.data import default_data_collator
+from src.utils import logger
 from paddleformers.datasets import MapDataset
 from paddleformers.trainer import (
     PdArgumentParser,
     get_last_checkpoint,
 )
-
 from src.tokenizers.tokenization_eb_v2 import ErnieBotTokenizer
 from omegaconf.listconfig import ListConfig
 from omegaconf.dictconfig import DictConfig
@@ -76,13 +48,36 @@ from src.trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
 from src.utils import (
     setup_logger_output_file,
 )
-from src.utils.data_utils import  merge_fn_group_batch
+from src.utils.data_utils import merge_fn_group_batch
 from src.utils.misc import global_training_logs
 
 
 # from pretrain import create_pretrained_dataset
 
 from config import get_config
+
+try:
+    from paddleformers.trainer.trainer_utils import log_trainer_start
+except ImportError:
+
+    def log_trainer_start():
+        """print main process messgae"""
+        if "MAIN_PROCESS_STARTED" not in os.environ:
+            start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            logger.info(
+                f"The Training Main Process Started Successfully. time: {start_time}, pid: {os.getpid()}"
+            )
+            os.environ["MAIN_PROCESS_STARTED"] = "1"
+
+
+log_trainer_start()
+
+
+try:
+    from paddle.distributed.fleet import monitor_perf as collective_perf
+except ImportError:
+    from paddle.distributed.fleet import collective_perf
+
 
 assert paddle.version.mkl() == "OFF", (
     "MKL is not supported"
@@ -108,16 +103,7 @@ def update_model_config_from_args(config: ErnieConfig, model_args: dict):
 
 
 def init_parameter(model):
-    """
-    初始化模型的参数。
-    该函数会遍历给定的模型，对每个参数进行初始化操作。
 
-    Args:
-        model (torch.nn.Module): Torch神经网络模型，需要初始化其参数。
-
-    Returns:
-        None, 不返回任何值。
-    """
     for param in model.parameters():
         param.initialize()
 
@@ -141,8 +127,6 @@ def main():
             PipelineParallel,
         )
 
-        # Hack， 原 `PipelineParallel.timer_printer` 方法会在 `forward_backward_pipeline` 方法执行完之后清空timmer状态。
-        # 避免这种行为的发生。
         PipelineParallel.timer_printer = lambda _: None
 
     def formatv(v):
@@ -274,22 +258,17 @@ def main():
 
     if args.use_moe:
         global ErnieConfig, ErnieForCausalLMAuto
-        """moe 情况下 Config, Causal组网，CausalPP组网，接口与非moe情况完全一致。"""
-        # TODO：随着支持的网络越来越多，需要引入组网和 Config 的注册机制, 参考 Paddlenlp 的 `AutoModel`
         ErnieConfig = ErnieMoEConfig
-        # ErnieForCausalLMAuto = ErnieMoEForCausalLMAuto
 
     if args.moe_group.lower() in {"mp", "tp", "model", "dummy"}:
         logger.info(f"disable moe flag when using moe-group={args.moe_group}")
         args.use_moe = False
 
     cfg = ErnieConfig.from_pretrained(args.model_name_or_path)
-    cfg = update_model_config_from_args(cfg, model_config)  # 根据yaml更新modle_config
+    cfg = update_model_config_from_args(cfg, model_config)
     cfg.seqlen = args.max_seq_length
     cfg.fp16_opt_level = args.fp16_opt_level
-    cfg.moe_group = (
-        args.moe_group
-    )  # pp mp 下复用sharding 通信组作为moe通信组，其他情况moe通信组都是全局通信组。
+    cfg.moe_group = args.moe_group
     cfg.dtype = dtype
     cfg.pipeline_parallel_degree = args.pipeline_parallel_degree
     cfg.virtual_pp_degree = args.virtual_pp_degree
@@ -312,7 +291,6 @@ def main():
         f"using tokenizer={type(tokenizer)}, bos:{tokenizer.bos_token_id} "
         f"eos:{tokenizer.eos_token_id} pad:{tokenizer.pad_token_id} "
     )
-    vocab = tokenizer.get_vocab()
     image_preprocess = None  # set if `vision_model_name_or_path is not None`
 
     if args.model_type == "ernie":
@@ -340,7 +318,6 @@ def main():
     paddle.set_default_dtype("float32")
 
     logger.info(f"using model={type(model)}, cfg={cfg}")
-
 
     freeze_config = set(args.freeze_config.split(" "))
     if "freeze_vision" in freeze_config and hasattr(model, "freeze_vision"):
@@ -397,7 +374,7 @@ def main():
                 use_shard=args.use_train_part_sharding,
                 dp_rank=args.reeao_dataset_rank,
                 dp_size=args.reeao_dataset_world_size,
-            )  # TODO: MP/PP时候需要传入dp-rank
+            )
             train_dataset = MapDataset(train_dataset)
         else:
             logger.info(
@@ -424,7 +401,6 @@ def main():
     else:
         eval_dataset = None
 
-
     data_collator = partial(
         merge_fn_group_batch,
         tokenizer,
@@ -436,7 +412,6 @@ def main():
     callbacks = [DataTraceCallbackAuto()] if not args.use_dummy_dataset else []
     callbacks += [GlobalRNGCallback()]
 
-
     if args.batch_size_warmup_steps:
         progreesive_batcing_callback = ProgreesiveBatchingCallback(
             args.gradient_accumulation_steps,
@@ -446,12 +421,6 @@ def main():
         )
         callbacks.append(progreesive_batcing_callback)
 
-    rng_states = {
-        "python": random.getstate(),
-        "numpy": np.random.get_state(),
-        "cuda": paddle.get_rng_state(),
-        "cpu": paddle.framework.core.default_cpu_generator().get_state(),
-    }
     init_parameter(model)
     model.apply(model.init_weights)
     trainer = AutoPretrainingTrainer(

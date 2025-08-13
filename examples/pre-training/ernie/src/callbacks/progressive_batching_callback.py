@@ -24,16 +24,7 @@ logger = logging.getLogger(__name__)
 def progressive_accumulate_steps(
     acc_step_begin, acc_step_end, warmup_global_steps, increment, step
 ):
-    """
-    计算Progressive Batch size warmup时，在global_step=`step`时的accumulate_step数。
-    Args:
-        `acc_step_begin`: 初始accumulate step
-        `acc_step_end`: 最终accumulate step
-        `warmup_global_steps`: progressive batch-size warmup 步数。
-        `step`: global_step
-    Returns:
-        accumulate step at `step`
-    """
+
     assert step >= 0, step
     if step >= warmup_global_steps:
         return acc_step_end
@@ -41,6 +32,7 @@ def progressive_accumulate_steps(
     acc_steps = int(slope * step + acc_step_begin)
     acc_steps = int(np.ceil(acc_steps / increment) * increment)
     return acc_steps
+
 
 class ProgreesiveBatchingCallback(TrainerCallback):
     def __init__(self, acc_step_bigin, acc_step_end, warmup_global_steps, increment):

@@ -37,7 +37,7 @@ from models.utils import global_training_logs_enabled
 try:
     from src.utils.misc import global_training_logs
 except ModuleNotFoundError:
-    global_training_logs = {}  # 没有erniebot的环境下无法打印 debug 量
+    global_training_logs = {}
 try:
     import moe_router_loss_ops
 except ImportError:
@@ -213,7 +213,6 @@ def cal_orthogonal_loss_opt_each_weight_func(
 
 def cal_z_loss_func(logits, loss_mask):
     """cal_z_loss_func"""
-    # l_zloss = logits.exp().sum(1).log().square().mean()
     if loss_mask is not None:
         loss_mask = loss_mask.astype(logits.dtype)
         l_zloss = (logits.logsumexp(1).square() * loss_mask).sum() / paddle.clip(
@@ -221,7 +220,6 @@ def cal_z_loss_func(logits, loss_mask):
         )
     else:
         l_zloss = logits.logsumexp(1).square().mean()
-    # TODO group_experts 分group计算zloss
     return l_zloss
 
 
@@ -276,25 +274,13 @@ def cal_aux_loss_func(
         l_aux = l_aux / moe_k
 
     if scale is not None:
-        # 前向用局部me, 反向用全局me
         l_aux = l_aux + (scale - 1) * l_aux.detach()
 
     return l_aux
 
 
 def masked_fill(x, mask, value):
-    """
-    将输入的Tensor中根据mask进行掩盖，并用value值替换。
 
-    Args:
-        x (Tensor): 输入的Tensor。
-        mask (Tensor): 用于掩盖的布尔Tensor，其形状应与x相同。
-        value (Union[float, int]): 需要替换的值。
-
-    Returns:
-        Tensor: 返回一个新的Tensor，其形状与x相同，并且根据mask和value进行掩盖和替换。
-
-    """
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
 
@@ -402,16 +388,7 @@ class Top2Gate(nn.Layer):
     """
 
     def __init__(self, config, layer_idx: int, group, gate_weight=None) -> None:
-        """
-        初始化 MoE 层，包含参数初始化和一些其他功能。
 
-        Args:
-            layer_idx (int): 当前层的索引号。
-            group: 分组名称。
-
-        Returns:
-            None: 不返回任何内容。
-        """
         super().__init__()
         if get_env_device() == "xpu":
             try:
@@ -502,7 +479,6 @@ class Top2Gate(nn.Layer):
             if config.moe_use_hard_gate:
                 self.num_experts_list = []
                 self.experts_type_mask = []
-                # hard-gate + group_experts 需要对gate_logits不同部分分开计算
                 experts_ids = paddle.zeros(
                     [sum(self.num_experts)], dtype="int64"
                 ).reshape([config.moe_world_size, -1])
@@ -522,7 +498,6 @@ class Top2Gate(nn.Layer):
                     )
                     self.num_experts_list.append(expert_num)
             else:
-                # 非group_experts, 依赖token_type_bias实现hard-gate能力。
                 assert (
                     not config.moe_group_experts
                 ), "group_experts must use hard_gate when multimodel_experts is True"
@@ -534,8 +509,7 @@ class Top2Gate(nn.Layer):
                 not self.config.moe_use_token_type_bias
             ), "gate_weights is from outside, token_type_bias can't be used"
             logger.info("moe use gate_weight from outside")
-            # 强制在amp下任使用fp32精度
-            self._cast_to_low_precision = False  # 兼容develop分支paddle
+            self._cast_to_low_precision = False
             self._cast_to_low_precison = False
         else:
             self._create_gate_parameter()
@@ -546,16 +520,7 @@ class Top2Gate(nn.Layer):
         )
 
     def _create_gate_parameter(self):
-        """
-        创建参数权重。
 
-        Args:
-            None
-
-        Returns:
-            weight (Parameter): 创建的参数权重。
-
-        """
         if self.config.multimodel_experts:
             # support setting lambda for each expert group
             self.moe_z_loss_lambda = self.moe_z_loss_lambda.expand(
@@ -588,7 +553,7 @@ class Top2Gate(nn.Layer):
                 self.add_parameter(
                     (
                         "weight" if i == 0 else f"weight_{i}"
-                    ),  # 为了对齐原 state-dict，第一个 gate-weight 不改名.
+                    ), 
                     p,
                 )
         else:
@@ -597,7 +562,7 @@ class Top2Gate(nn.Layer):
                 dtype="float32",
                 attr=paddle.ParamAttr(
                     name=unique_name.generate("moe_gate")
-                ),  # 特殊处理，有利于热启 dense-ckpt
+                ), 
             )
             logger.info(f"moe-Gate, {self.weight}")
 
@@ -622,18 +587,13 @@ class Top2Gate(nn.Layer):
                     initializer=paddle.nn.initializer.Assign(
                         np.zeros([bias_type_num, num_experts])
                     ),
-                ),  # 特殊处理，有利于热启 dense-ckpt
+                ),
             )
             logger.info(f"using token type bias, bias: {self.bias},")
-        # 强制在amp下任使用fp32精度
-        self._cast_to_low_precision = False  # 兼容develop分支paddle
+        self._cast_to_low_precision = False
         self._cast_to_low_precison = False
 
     def get_gate_weight(self, transform_weight):
-        """
-        在`multimodel_experts` 的情况下，将多个 weights merge 成一个整体
-        transform_weight: bool, 按照 local-expert id 将 多模态 weight 交叠
-        """
         if not self.config.multimodel_experts:
             return self.weight
         if not transform_weight:
@@ -671,21 +631,7 @@ class Top2Gate(nn.Layer):
         transform_weight: bool = True,  # [seq]
         correction_bias: Tensor = None,  # [seq]
     ) -> Tuple[Tensor, Tensor, Tensor]:  # type: ignore
-        """
-        Args:
-            input: paddle.Tensor[Seq, Dim], hidden-states of layer
-            token_type_ids: paddle.Tensor[Seqw], token_type_ids of input
-            transform_weight: bool, when using multimodal experts, perform `self.get_gate_weight` if specified
-        Retruns:
-            paddle.Tensor [Seq, Expert, Capacity]: float32, combine weights
-            paddle.Tensor [Seq, Expert, Capacity]: bool, dispatch mask
-            Tuple[paddle.Tensor]: `GateOutput`
-        """
-        num_experts = (
-            sum(self.num_experts)
-            if self.config.multimodel_experts
-            else self.num_experts
-        )
+
         orig_dtype = input.dtype
         weight = self.get_gate_weight(transform_weight)
         with paddle.amp.auto_cast(False):
@@ -778,21 +724,7 @@ class Top2Gate(nn.Layer):
         return capacity
 
     def top2_gating(self, logits, cap=None, correction_bias=None):
-        """
-        Args:
-            logits: 形状为[batch, vocab_size]的logits，用于计算top2 gate。
-            cap[Optional]: capacity-factor, if none, read from config
-            correction_bias[Optional]: used for aux-free router
 
-        Returns:
-            tuple:
-                - capacity: 每个token可分发的最大数量。
-                - dispatch_masks: 用于dispatching的mask。第一个元素是第一类token的mask；第二个元素是第二类token的mask。
-                - combine_weights：用于combining的权重。第一个元素是第一类token的权重；第二个元素是第二类token的权重。
-                - scatter_indexes: 用于scattering的索引。第一个元素是第一类token的索引；第二个元素是第二类token的索引。
-                - loss_aux: aux loss。
-                - loss_z: z loss。
-        """
         # logger.info(f'gate-input: {logits}')
         l_zloss = self._cal_z_loss(logits)
         gates = self.act(logits)
@@ -816,8 +748,7 @@ class Top2Gate(nn.Layer):
         )  # [0,1]
 
         l_aux = self._cal_aux_loss(gates, mask1.sum(axis=0), self.num_experts_tensor)
-        # Create a mask for 2nd's expert per token using Gumbel-max trick
-        # https://timvieira.github.io/blog/post/2014/07/31/gumbel-max-trick/
+
         if self.training and not self.no_jitter:
             gumbels = (
                 -paddle.empty_like(
@@ -842,8 +773,7 @@ class Top2Gate(nn.Layer):
 
         if self.training and self.sinkhorn_2gate:
             r = paddle.ones(num_tokens, "float32") / num_tokens
-            # c = paddle.ones(num_experts, "float32") / num_experts
-            # 非均匀c
+
             c = capacity - mask1.cast("float32").sum(0)
             c = paddle.maximum(c, paddle.zeros_like(c))
             c /= c.sum()
@@ -998,18 +928,7 @@ class Top2Gate(nn.Layer):
         tokens_mask=None,
         dispatch_tokens_mask=None,
     ):
-        """
-        计算辅助损失
 
-        Args:
-            gate_prob (paddle.Tensor[local_seq, num_experts]):
-            dispatch_mask (paddle.Tensor[num_experts]): 每个 expert 被分配的 token 数（不考虑 token drop)
-            tokens_mask (paddle.Tensor[Seq]): 每个 MP 内 token-type-id
-            dispatch_tokens_mask (paddle.Tensor): AllGather 后的`tokens_mask`
-        Returns:
-            paddle.Tensor: 辅助损失值。
-
-        """
         if self.act is F.sigmoid:
             gate_prob = gate_prob / gate_prob.sum(-1, keepdim=True)
 
@@ -1088,16 +1007,7 @@ class Top2Gate(nn.Layer):
             )
 
     def _cal_z_loss(self, logits, loss_mask=None):
-        """
-        计算 Z 损失。
 
-        Args:
-            logits (torch.Tensor): Logits Tensor，形状为 [batch_size, num_classes]。
-
-        Returns:
-            torch.Tensor: Z 损失 Tensor，形状为 []。
-
-        """
         if (
             (moe_router_loss_ops is not None)
             and (loss_mask is None or len(loss_mask.shape) == 1)
@@ -1204,7 +1114,6 @@ class TopKGateFused(Top2Gate):
                 bias = self.bias[token_type_ids]  # [seq]
                 logits = logits + bias
             orthogonal_loss = None
-            # 正交 loss 拿到 moe-layer 里去计算
             router_loss = paddle.zeros([1], dtype="float32")
             router_loss.stop_gradient = False
             if (
@@ -1214,7 +1123,6 @@ class TopKGateFused(Top2Gate):
             ):
                 _log = {
                     f"orthogonal_loss_layer_{self.layer_idx}": orthogonal_loss.item(),
-                    # f"zloss_layer_{self.layer_idx}": l_zloss.item(),
                 }
                 global_training_logs.update(
                     **_log,
@@ -1225,4 +1133,3 @@ class TopKGateFused(Top2Gate):
                 )
 
         return logits, capacity, router_loss
-

@@ -30,6 +30,7 @@ from paddle import framework
 from paddle import nn
 from paddle.distributed.communication import stream
 import paddle.nn.functional as F
+from paddle.distributed import in_auto_parallel_align_mode
 
 from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
@@ -47,17 +48,7 @@ from models.moe.moe_layer_auto_utils import MOELayer
 try:
     from src.utils.misc import global_training_logs
 except ModuleNotFoundError:
-    global_training_logs = {}  # 没有erniebot的环境下无法打印 debug 量
-
-try:
-    from paddle.distributed import in_auto_parallel_align_mode
-except:
-
-    def in_auto_parallel_align_mode():
-        """
-        hack for paddlenlp develop branch.
-        """
-        return False
+    global_training_logs = {}  
 
 
 logger = logging.getLogger(__name__)
@@ -123,7 +114,6 @@ class GateCombineForStatic(PyLayer):
         Output:
             y: [seqlen, hidden_size]
         """
-        # NOTE: Pylayer动静不统一: 动转静只支持使用ctx.save_for_backward, 而不支持ctx.x = x这样的写法
         ctx.save_for_backward(x, combine_weights, scatter_index)
         assert moe_combine_auto is not None
         return moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
@@ -212,30 +202,13 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
         x_gatherd = F.embedding(scatter_index, x)  # [s,k,dim]
         return x_gatherd.squeeze(-2)
     ret = moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
-    # TODO: 支持Pylayer && Pylayer动静统一
-    # if to_static:
-    #     ret = GateCombineForStatic.apply(x, combine_weights, scatter_index)
-    # else:
-    #     ret = GateCombine.apply(x, combine_weights, scatter_index)
+
     ret.stop_gradient = False
     return ret
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
-    """
-    根据 gate 结果重排 `x`,  按照 capacity 截断、padding
 
-    Args:
-        x (Tensor)[Seq, Dim]: 输入张量。
-        dispatch_mask Tensor[Seq, 2]: 分发掩码列表。
-        scatter_index Tensor[Seq, 2]: 分布索引列表。
-        num_experts (int): 专家数量。
-        capacity (int): 容量大小。
-
-    Returns:
-        Tensor [Expert*Capacity, Dim]: 分派后的输出张量。
-
-    """
     output = None
     # init_output = paddle.zeros([num_experts * capacity, x.shape[-1]], dtype='float32')
     # output = init_output + 0. * x.sum()
@@ -267,17 +240,7 @@ def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
 
 
 def combining(x, combine_weights, scatter_index):
-    """
-    对输入的矩阵进行组合和聚合操作
 
-    Args:
-        x: Tensor[num_experts * capacity, dim] 待处理的输入矩阵，最后一维表示特征数量。
-        combine_weights: Tensor[seq, 2] 包含每个特征的组合权重列表。
-        scatter_index:   Tensor[seq, 2]: 表示要被聚合的索引元组，第一个元素为行索引，第二个元素为列索引。
-
-    Returns:
-        Tensor: 经过组合和聚合后的输出矩阵，形状为[n, dim * num_features]，其中n是输入矩阵中的样本数目。
-    """
     dim = x.shape[-1]
     scatter_index = scatter_index.reshape([-1])
     num_k = combine_weights.shape[-1]
@@ -306,7 +269,7 @@ class AlltoAll(PyLayer):
         output = paddle.empty_like(x)
         output.stop_gradient = False
         with profile("moe-all2all"):
-            task = stream.alltoall_single(output, x, None, None, group, True, True)
+            stream.alltoall_single(output, x, None, None, group, True, True)
         return output
 
     @staticmethod
@@ -453,29 +416,6 @@ def bpr_postprocess(output, buffer):
 
 
 class MOELayerAuto(MOELayer):
-    """MOELayerAuto module which implements MixtureOfExperts as described in Gshard_.
-    ::
-
-        gate = Top2Gate(model_dim, num_experts)
-
-        moe = MOELayerAuto(gate, expert)
-        output = moe(input)
-        l_aux = moe.l_aux
-
-    .. Gshard_: https://arxiv.org/pdf/2006.16668.pdf
-
-    Args:
-        gate (paddle.nn.Layer):
-            gate network
-        expert (paddle.nn.LayerList):
-            expert network, LayerList 长度是 per_device 上的 expert 数。
-        group (paddle.ProgressGroup)
-        recompute: 启用MOE内recomupte
-    Returns:
-        output
-        combine_weight
-        router-loss
-    """
 
     def __init__(
         self,
@@ -493,17 +433,6 @@ class MOELayerAuto(MOELayer):
         config=None,
         ipp=0,
     ):
-        """
-        初始化MoE层。
-
-        Args:
-            gate (nn.Layer): 智能门控层，用于选择需要使用的专家。
-            experts (List[nn.Layer]): 需要使用的专家列表。
-            layer_idx (int): 当前MoE层的索引。
-            group (Group): 分布式通信组。默认值为None。
-            recompute (bool): 是否在每个训练迭代中重新计算MoE输出。默认值为False。
-
-        """
         nn.Layer.__init__(self)
         self.config = config
         self.gate = gate
@@ -551,12 +480,6 @@ class MOELayerAuto(MOELayer):
         self.ep_group_num = config.moe_world_size
         self.num_local_experts = self.num_experts_per_group // self.ep_group_num
 
-        moe_num_experts = (
-            sum(config.moe_num_experts)
-            if config.multimodel_experts
-            else config.moe_num_experts
-        )
-
         self.moe_mesh_dim = 0 if config.moe_group == "dp" else 1
         self.dispatch_by_task = (
             hasattr(self.gate, "dispatch_by_task") and self.gate.dispatch_by_task
@@ -582,19 +505,7 @@ class MOELayerAuto(MOELayer):
     def _cal_multimodel_experts_prob(
         self, gate_logits, token_type_ids, group_experts, moe_k
     ):
-        """计算文group_experts 图非group experts 下的prob
 
-        Args:
-            gate_logits (_type_): _description_
-            token_type_ids (_type_): _description_
-            group_experts (_type_): _description_
-            moe_k (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-
-        # TODO(zhangyuqin): 不shard tensor的话会core dump, 需排查
         if not self.gate.experts_type_ids.is_dist():
             self.gate.experts_type_ids = dist.shard_tensor(
                 self.gate.experts_type_ids,
@@ -621,8 +532,7 @@ class MOELayerAuto(MOELayer):
                 self.moe_mesh_dim,
                 [dist.Shard(2), dist.Shard(0)],
             )
-            # 多模中, 如果当前是lm step, 会使用lm expert(48个); 如果是mm step, 会使用全量expert(96个)
-            # lm expert是从全量expert中切片得到的
+
             assert len(self.experts) % len(local_input_list) == 0, (
                 "num of experts must be divided by num of ep_group, "
                 f"but got {len(self.experts)} and {len(local_input_list)}"
@@ -649,8 +559,6 @@ class MOELayerAuto(MOELayer):
             assert len(chunks) == len(self.experts), (len(chunks), len(self.experts))
             for chunk, expert in zip(chunks, self.experts):
                 expert_outputs += [expert(chunk)]
-                # logger.info(f'moe-fwd-expert: {chunk.shape}'
-                # f'-> {expert_outputs[-1].shape}: {chunk.astype("float32").norm(axis=-1)}')
             expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
             return expert_output
 
@@ -669,13 +577,10 @@ class MOELayerAuto(MOELayer):
         """
         with profile("moe-gate"):
             args = ()
-            # 目前只有 `SinkHornGate` aka Top1 gate 支持输入 token type ids
             if token_type_ids is not None:
                 token_type_ids = token_type_ids.reshape([-1])
                 args = (token_type_ids,)
-            use_fuse = isinstance(
-                self.gate, (TopKGateFusedAuto)
-            )
+            use_fuse = isinstance(self.gate, (TopKGateFusedAuto))
             if use_fuse:
                 (gate_logits, capacity, router_loss, local_capacity) = self.gate(
                     input, *args
@@ -730,7 +635,6 @@ class MOELayerAuto(MOELayer):
                         combine_weights_unnorm = (
                             combine_weights_unnorm.unsqueeze(-1) * p
                         ).squeeze(-1)
-                        # gate_prob 进行还原
                         prob = (prob.reshape([p.shape[0], k, -1]) * p).reshape(
                             [p.shape[0], -1]
                         )
@@ -782,22 +686,16 @@ class MOELayerAuto(MOELayer):
 
             if not self.config.moe_use_all2all:
                 if self.config.moe_group == "mp":
-                    # 纯 mp下，dispatch 的 index 用全复制的数据计算，combine 需要和 dispatch 一致，
-                    # 否则会越界，在解决输入数据问题后去掉这个 reshard
-                    # TODO(zhangyichen): 统一 moe_group 是 mp 和其他情况下的代码
                     expert_output = dist.reshard(
                         expert_output,
                         get_mesh(self.ipp),
                         [dist.Replicate(), dist.Replicate()],
                     )
                 else:
-                    # 纯dp
                     expert_output = dist.reshard(
                         expert_output, get_mesh(), [dist.Shard(0), dist.Replicate()]
                     )
-            use_fuse = isinstance(
-                self.gate, (TopKGateFusedAuto)
-            )
+            use_fuse = isinstance(self.gate, (TopKGateFusedAuto))
             combine_fn = combining_fused_auto if use_fuse else combining
             combined_output = combine_fn(expert_output, combine_weights, scatter_index)
 
@@ -891,7 +789,6 @@ class MOELayerAuto(MOELayer):
         )
         expert_out = self.forward_experts(dispatched_input)
         if self.config.moe_group == "mp":
-            # TODO(zhangyichen): 统一 moe_group 是 mp 和其他情况下的代码
             expert_out = dist.auto_parallel.api.moe_global_mesh_tensor(
                 expert_out,
                 get_mesh(self.ipp),
@@ -935,8 +832,6 @@ class MOELayerAuto(MOELayer):
             combined_output += shared_out
 
         if orig_shape:
-            # Todo: use clone in auto_parallel will cause an error
-            # combined_output = combined_output.reshape(orig_shape[:-1] + [combined_output.shape[-1]])
             if self.config.moe_use_all2all:
                 combined_output = dist.auto_parallel.moe_utils._dist_reshape(
                     combined_output,

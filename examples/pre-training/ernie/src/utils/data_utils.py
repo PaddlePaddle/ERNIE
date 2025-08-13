@@ -18,7 +18,6 @@
 data utils
 """
 import logging
-import re
 import numpy as np
 import os
 import datetime
@@ -68,7 +67,6 @@ def pad_sequence(sequences, padding_value=0, fix_len=None):
 
 
 DEBUG_PRINT_CNT = 0
-
 
 
 def smart_concat(tensor, axis=0):
@@ -207,18 +205,14 @@ def merge_fn_group_batch(
         batch["input_ids"] = batch["input_ids"][:, :-1]
 
     if doc_pack_attn:
-        # 计算inbatch_pack_offset 来实现DovAtten
         doc_marks = (batch["input_ids"] == 2).astype(np.int64)
-        doc_marks[:, -1] = 1  # 每条样本最后一个位置的doc_marks为1
+        doc_marks[:, -1] = 1
         _offset = np.where(doc_marks.reshape([-1]))[0]
         _offset = (_offset + 1).tolist()
-        # 开头补 一个 0
         offset = np.expand_dims(np.array([0] + _offset, dtype=np.int64), axis=0)
-        # 使用 -1 pad到固定长度
         offset = pad_sequence(
             offset, padding_value=-1, fix_len=batch["input_ids"].shape[1]
         )
         batch["inbatch_pack_offset"] = offset
 
     return batch
-

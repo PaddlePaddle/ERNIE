@@ -24,7 +24,6 @@ import logging
 from collections import namedtuple
 from functools import partial
 import inspect
-import numpy as np
 
 import paddle
 from paddle import framework
@@ -36,6 +35,7 @@ from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 from paddle.distributed.fleet.utils import recompute
 from paddle.distributed import fleet
+from paddle.distributed import in_auto_parallel_align_mode
 
 import paddle.distributed as dist
 from paddle import Tensor
@@ -49,22 +49,12 @@ from models.sequence_parallel_utils_auto import ScatterOp
 from models.utils import (
     global_training_logs_enabled,
     manual_backward,
-    FakeGather,
-    FusedUnpermutation,
 )
 
 from models.comm_utils import profile
 
 from models.moe.moe_utils import MOEAllGatherDispatcher
 
-from models.moe.token_dispatcher.fp8_utils_auto import (
-    has_config,
-    FP8_ALIGN,
-    tilewise_quant,
-    ExpertsGroupGemmNode,
-    ExpertsGroupGemmContiguousNode,
-    ExpertsGroupGemmWLCHNode,
-)
 
 from paddle.incubate.nn.functional import (
     moe_combine,
@@ -80,20 +70,11 @@ except ImportError:
 try:
     from src.utils.misc import global_training_logs
 except ModuleNotFoundError:
-    global_training_logs = {}  # 没有erniebot的环境下无法打印 debug 量
+    global_training_logs = {} 
 try:
     import moe_router_loss_ops
 except ImportError:
     moe_router_loss_ops = None
-try:
-    from paddle.distributed import in_auto_parallel_align_mode
-except:
-
-    def in_auto_parallel_align_mode():
-        """
-        hack for paddlenlp develop branch.
-        """
-        return False
 
 
 try:
@@ -140,17 +121,6 @@ except ImportError:
 
 
 try:
-    import TokenDispatcherUtils as TDU
-except ImportError:
-    TDU = None
-
-
-try:
-    import FusedQuantOps as FQO
-except ImportError:
-    FQO = None
-
-try:
     import fused_ln as fused
 except ImportError:
     logger.warning(
@@ -163,10 +133,6 @@ try:
 except ImportError:
     matmul_bwd = None
 
-try:
-    import FusedQuantOps
-except ImportError:
-    pass
 
 GateOutput = namedtuple(
     "GateOutput",
@@ -194,13 +160,9 @@ class GateCombine_ori(PyLayer):
         ctx.x = x
         ctx.combine_weights = combine_weights
         ctx.scatter_index = scatter_index
-        if get_env_device() == "xpu":
-            assert xpu_moe_combine is not None
-            return xpu_moe_combine(x, combine_weights, scatter_index)
-        else:
-            assert moe_combine is not None
-            ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
-            return ret
+        assert moe_combine is not None
+        ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
+        return ret
 
     @staticmethod
     def backward(ctx, grad_y, *_):
@@ -215,22 +177,13 @@ class GateCombine_ori(PyLayer):
 
         """
 
-        if get_env_device() == "xpu":
-            assert xpu_moe_combine_bwd is not None
-            grad_x, grad_combine_weight_helper = xpu_moe_combine_bwd(
-                ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
-            )
-        else:
-            assert moe_combine is not None
-            grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
-                ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
-            )
-        # grad_combine_weight_helper is the same shape with grad x [seqlen * K, dim]
-        # reduce the hidden shape
-        # TODO: implement reduce in cuda ops
+        assert moe_combine is not None
+        grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
+            ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
+        )
+
         grad_combine_weight = grad_combine_weight_helper.sum(-1)
         return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
-
 
 
 def combining_fused(x, combine_weights, scatter_index, hard_gate=False):
@@ -250,91 +203,9 @@ def combining_fused(x, combine_weights, scatter_index, hard_gate=False):
     ret.stop_gradient = False
     return ret
 
-class Fp8MoeGateDispatchAndQuant(paddle.autograd.PyLayer):
-    """Fp8MoeGateDispatchAndQuant"""
-
-    @staticmethod
-    def forward(
-        ctx,
-        x,
-        gate_logtis,
-        corr_bias,
-        k,
-        capacity,
-        use_pad,
-        use_pow2_scale=True,
-    ):
-        """forward"""
-        assert moe_gate_dispatch_and_quant is not None, "Please use new version Paddle."
-        with paddle.amp.auto_cast(enable=False):
-            (
-                out_fp8,
-                scale,
-                combine_weights,
-                scatter_index,
-                expert_offset,
-                expert_id,
-            ) = moe_gate_dispatch_and_quant(
-                x,
-                gate_logtis,
-                corr_bias=corr_bias,
-                k=k,
-                capacity=capacity,
-                use_pad=use_pad,
-                use_pow2_scale=use_pow2_scale,
-            )
-        assert out_fp8.shape[0] == scale.shape[0]
-
-        out_fp8.stop_gradient = False
-        combine_weights.stop_gradient = False
-        scatter_index.stop_gradient = True
-        expert_offset.stop_gradient = True
-        expert_id.stop_gradient = True
-        scale.stop_gradient = True
-
-        ctx.k = k
-        ctx.capacity = capacity
-        ctx.use_pad = use_pad
-        ctx.combine_weights = combine_weights
-        ctx.scatter_index = scatter_index
-        ctx.expert_id = expert_id
-        ctx.has_corr_bias = corr_bias is not None
-
-        return (
-            out_fp8,
-            combine_weights,
-            scatter_index,
-            expert_offset,
-            expert_id,
-            {
-                "scale": scale,
-            },
-        )
-
-    @staticmethod
-    def backward(ctx, *grads):
-        """backward"""
-        out_grad, combine_weights_grad = grads[0], grads[1]
-        x_grad, gate_logits_grad = paddle._C_ops.moe_gate_dispatch_grad(
-            ctx.combine_weights,
-            ctx.scatter_index,
-            ctx.expert_id,
-            out_grad,
-            combine_weights_grad,
-            ctx.k,
-            ctx.capacity,
-            ctx.use_pad,
-        )
-        if ctx.has_corr_bias:
-            return x_grad, gate_logits_grad, None
-        else:
-            return x_grad, gate_logits_grad
-
 
 def recompute_fwd_gate_up_func(config, layer_idx):
-    """
-    根据配置和层索引确定是否重计算。
-    """
+
     if "recompute_fwd_gate_up" in config.fp8_mem_configs:
         if isinstance(config.fp8_mem_configs["recompute_fwd_gate_up"], bool):
             return config.fp8_mem_configs["recompute_fwd_gate_up"]
@@ -345,13 +216,10 @@ def recompute_fwd_gate_up_func(config, layer_idx):
 
 
 class MoEStatics(nn.Layer):
-    """
-    存放 MoE 统计信息
-    """
 
     def __init__(self, config, layer_idx):
         super().__init__()
-        self._cast_to_low_precision = False  # 兼容develop分支paddle
+        self._cast_to_low_precision = False
         self._cast_to_low_precison = False
         num_experts = (
             config.moe_num_experts[0]
@@ -375,17 +243,12 @@ class MoEStatics(nn.Layer):
                     name=paddle.utils.unique_name.generate("corr_bias")
                 ),
             )
-            # NOTE: 由于ZCC适配问题, e_score_correction_bias一定要stop_gradient=False
-            # 但实际上e_score_correction_bias是在callback里更新的, 不需要有梯度。所以在使用
-            # e_score_correction_bias时要使用detach(), 避免产生梯度重复更新
-            # 因为 e_score_correction_bias 不会产生梯度，所以通过设置build_skip_comm_buffer
-            # 跳过梯度通信，以支持sharding_overlap
+
             p.stop_gradient = False
             self.e_score_correction_bias = p
             self.e_score_correction_bias.is_distributed = True
             self.e_score_correction_bias.unused_param = True
             if getattr(config, "build_skip_comm_buffer", False):
-                # e_score_correction_bias单独一个buffer和通信组，reduce时会跳过该buffer
                 self.e_score_correction_bias.color = {
                     "color": "skip_comm",
                     "group": paddle.distributed.new_group(
@@ -402,20 +265,7 @@ class MoEStatics(nn.Layer):
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
-    """
-    根据 gate 结果重排 `x`,  按照 capacity 截断、padding
 
-    Args:
-        x (Tensor)[Seq, Dim]: 输入张量。
-        dispatch_mask Tensor[Seq, 2]: 分发掩码列表。
-        scatter_index Tensor[Seq, 2]: 分布索引列表。
-        num_experts (int): 专家数量。
-        capacity (int): 容量大小。
-
-    Returns:
-        Tensor [Expert*Capacity, Dim]: 分派后的输出张量。
-
-    """
     output = None
     # init_output = paddle.zeros([num_experts * capacity, x.shape[-1]], dtype='float32')
     # output = init_output + 0. * x.sum()
@@ -447,17 +297,7 @@ def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
 
 
 def combining(x, combine_weights, scatter_index):
-    """
-    对输入的矩阵进行组合和聚合操作
 
-    Args:
-        x: Tensor[num_experts * capacity, dim] 待处理的输入矩阵，最后一维表示特征数量。
-        combine_weights: Tensor[seq, 2] 包含每个特征的组合权重列表。
-        scatter_index:   Tensor[seq, 2]: 表示要被聚合的索引元组，第一个元素为行索引，第二个元素为列索引。
-
-    Returns:
-        Tensor: 经过组合和聚合后的输出矩阵，形状为[n, dim * num_features]，其中n是输入矩阵中的样本数目。
-    """
     dim = x.shape[-1]
     scatter_index = scatter_index.reshape([-1])
     num_k = combine_weights.shape[-1]
@@ -513,40 +353,6 @@ class GateCombine(PyLayer):
         )
         grad_combine_weight = grad_combine_weight_helper.sum(-1)
         return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
-
-
-class FusionFP8Expert(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(ctx, hidden_states, custom_map):
-        ctx.node = ExpertsGroupGemmNode(None, custom_map)
-
-        t1 = hidden_states.transpose([1, 0, 2, 3]).contiguous()
-        expert_num = t1.shape[0]
-        tokens_num = t1.shape[1] * t1.shape[2]
-        tokens_per_expert = paddle.full(
-            [expert_num], fill_value=tokens_num, dtype="int32"
-        )
-
-        t1 = t1.reshape([-1, hidden_states.shape[-1]])
-        out = ctx.node.forward_no_prob(t1, tokens_per_expert)
-
-        expert_output = (
-            out.reshape(hidden_states.shape).transpose([1, 0, 2, 3]).contiguous()
-        )
-
-        ctx.save_for_backward(tokens_per_expert)
-        return expert_output
-
-    @staticmethod
-    def backward(ctx, output_grad):
-        (tokens_per_expert,) = ctx.saved_tensor()
-
-        t1 = output_grad.transpose([1, 0, 2, 3]).contiguous()
-        t1 = t1.reshape([-1, output_grad.shape[-1]])
-
-        dx = ctx.node.backward_no_prob(t1, tokens_per_expert)
-        dx = dx.reshape(output_grad.shape).transpose([1, 0, 2, 3]).contiguous()
-        return dx
 
 
 class Fp8MoeGateDispatchAndQuant(paddle.autograd.PyLayer):
@@ -795,58 +601,6 @@ def bpr_postprocess(output, buffer):
     return output
 
 
-class FusionFP8Expert(paddle.autograd.PyLayer):
-    """FusionFP8Expert"""
-
-    @staticmethod
-    def forward(ctx, hidden_states, custom_map):
-        """
-            前向传播函数，将输入的隐藏状态转换为特定的形式，并进行计算。
-        该函数接收以下参数：
-            hidden_states (Tensor): 输入的隐藏状态，形状为（N, num_experts, sequence_length, hidden_size）。
-            custom_map (Dict[str, int]): 包含自定义映射的字典，用于指定每个专家对应的权重矩阵。
-        返回值是一个 Tensor，形状为（N, num_experts, sequence_length, hidden_size），表示经过计算后的输出。
-        """
-        ctx.node = ExpertsGroupGemmNode(None, custom_map)
-
-        t1 = hidden_states.transpose([1, 0, 2, 3]).contiguous()
-        expert_num = t1.shape[0]
-        tokens_num = t1.shape[1] * t1.shape[2]
-        tokens_per_expert = paddle.full(
-            [expert_num], fill_value=tokens_num, dtype="int32"
-        )
-
-        t1 = t1.reshape([-1, hidden_states.shape[-1]])
-        out = ctx.node.forward_no_prob(t1, tokens_per_expert)
-
-        expert_output = (
-            out.reshape(hidden_states.shape).transpose([1, 0, 2, 3]).contiguous()
-        )
-
-        ctx.save_for_backward(tokens_per_expert)
-        return expert_output
-
-    @staticmethod
-    def backward(ctx, output_grad):
-        """
-            计算反向传播，返回输出的梯度。
-        参数：
-            ctx (Context): 上下文对象，包含了需要的信息。
-            output_grad (Tensor): 输出的梯度张量，形状为（N, num_expert, seq_len, hidden_size）。
-        返回值：
-            dx (Tensor, Tensor): 返回一个元组，第一个元素是dx，形状为（N, num_expert, seq_len, hidden_size），表示输入的梯度；第二个元素是None。
-            其中，dx = dE / dX，dE / dX = dL / dX，dL / dX = output_grad。
-        """
-        (tokens_per_expert,) = ctx.saved_tensor()
-
-        t1 = output_grad.transpose([1, 0, 2, 3]).contiguous()
-        t1 = t1.reshape([-1, output_grad.shape[-1]])
-
-        dx = ctx.node.backward_no_prob(t1, tokens_per_expert)
-        dx = dx.reshape(output_grad.shape).transpose([1, 0, 2, 3]).contiguous()
-        return dx
-
-
 class FusedNormGateFunc(paddle.autograd.PyLayer):
     """recompute of postnorm and gate"""
 
@@ -953,16 +707,7 @@ class MOELayer(nn.Layer):
         group_experts=False,
         moe_statics=None,
     ):
-        """
-        初始化MoE层。
 
-        Args:
-            gate (nn.Layer): 智能门控层，用于选择需要使用的专家。
-            experts (List[nn.Layer]): 需要使用的专家列表。
-            layer_idx (int): 当前MoE层的索引。
-            group (Group): 分布式通信组。默认值为None。
-            recompute (bool): 是否在每个训练迭代中重新计算MoE输出。默认值为False。
-        """
         super().__init__()
         self.gate = gate
         self.layer_idx = layer_idx
@@ -1109,23 +854,19 @@ class MOELayer(nn.Layer):
             )  # [e,1,c,m]
             expert_outputs = []
             if isinstance(self.experts, nn.LayerList):
-                if self.config.use_fp8_fuse_node:
-                    expert_output = FusionFP8Expert.apply(dispatched_input, self)
-                else:
-                    chunks = (
-                        dispatched_input.transpose([1, 0, 2, 3]).contiguous().unbind(0)
-                    )
-                    assert len(chunks) == len(self.experts), (
-                        len(chunks),
-                        len(self.experts),
-                    )
-                    for chunk, expert in zip(chunks, self.experts):
-                        expert_outputs += [expert(chunk)]
-                        # logger.info(
-                        #     f"moe-fwd-expert: {chunk.shape}"
-                        #     f'-> {expert_outputs[-1].shape}: {chunk.astype("float32").norm(axis=-1)}'
-                        # )
-                    expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
+
+                chunks = dispatched_input.transpose([1, 0, 2, 3]).contiguous().unbind(0)
+                assert len(chunks) == len(self.experts), (
+                    len(chunks),
+                    len(self.experts),
+                )
+                for chunk, expert in zip(chunks, self.experts):
+                    expert_outputs += [expert(chunk)]
+                    # logger.info(
+                    #     f"moe-fwd-expert: {chunk.shape}"
+                    #     f'-> {expert_outputs[-1].shape}: {chunk.astype("float32").norm(axis=-1)}'
+                    # )
+                expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
 
             else:
                 dispatched_input = dispatched_input.transpose([1, 0, 2, 3])
@@ -1141,17 +882,8 @@ class MOELayer(nn.Layer):
     def fused_gate_logits_process(
         self, gate_logits, token_type_ids, offload_helper=None
     ):
-        """处理并合并 gate logits
 
-        Args:
-            gate_logits (_type_): _description_
-            token_type_ids (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
         k = self.k
-        moe_num_experts = gate_logits.shape[-1]
         experts_type_ids = self.gate.experts_type_ids
         use_hard_gate = self.config.moe_use_hard_gate
         max_prob = None
@@ -1191,7 +923,6 @@ class MOELayer(nn.Layer):
                 else:
                     lm_prob = self.gate.act(lm_partial_gate_logits)
                 prob = paddle.scatter_nd_add(prob, lm_mask_nonzero, lm_prob.flatten())
-            # 处理 mm_prob
             is_mm = offload_helper["mm_mask"][1]
             if is_mm:
                 mm_mask = offload_helper["mm_mask"][0]
@@ -1203,7 +934,6 @@ class MOELayer(nn.Layer):
                 mm_prob = self.gate.act(mm_partial_gate_logits)
                 prob = paddle.scatter_nd_add(prob, mm_mask_nonzero, mm_prob.flatten())
         else:
-            # 处理非硬门和不需要token_type_ids的情况
             if self.group_experts:
                 prob = self.gate.act(gate_logits.reshape([gate_logits.shape[0], k, -1]))
                 max_prob = prob.max(-1, keepdim=True)
@@ -1217,16 +947,13 @@ class MOELayer(nn.Layer):
         """
         gate_distpach_and_quant
         """
-        assert isinstance(
-            self.gate, (TopKGateFused)
-        ), "Only fused gate is supported."
+        assert isinstance(self.gate, (TopKGateFused)), "Only fused gate is supported."
         assert not self.config.use_ep_comm_overlap, "ep_comm_overlap is not supported"
         assert (
             self._rr_moe_gate_dispatch is None
         ), "rr_moe_gate_dispatch is not supported"
         assert moe_ops_fp8 is not None
 
-        seqlen, d_model = input.shape
         args = ()
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape([-1])
@@ -1344,14 +1071,11 @@ class MOELayer(nn.Layer):
         """
         seqlen, d_model = input.shape
         args = ()
-        # 目前只有 `SinkHornGate` aka Top1 gate 支持输入 token type ids
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape([-1])
             args = (token_type_ids,)
 
-        use_fuse = isinstance(
-            self.gate, (TopKGateFused)
-        )
+        use_fuse = isinstance(self.gate, (TopKGateFused))
         if use_fuse:
             if self.use_norm_gate_recompute:
                 (
@@ -1468,7 +1192,6 @@ class MOELayer(nn.Layer):
                             world_size=self.group.nranks,
                         )
             dispatch_mask = paddle.diff(F.pad(dispatch_mask, (1, 0)))
-            # 避免recompute的时候重复统计
             if self.use_correction_bias and framework._dygraph_tracer()._has_grad:
                 if self.gate.config.multimodel_experts:
                     for i in range(len(self.moe_statics.expert_usage)):
@@ -1514,7 +1237,6 @@ class MOELayer(nn.Layer):
                 num_experts=self.world_size * self.num_local_experts,
                 capacity=capacity,
             )
-            # 避免recompute的时候重复统计
             if self.use_correction_bias and framework._dygraph_tracer()._has_grad:
                 usage = paddle.bincount(
                     scatter_index.reshape([-1]) // capacity,
@@ -1524,7 +1246,6 @@ class MOELayer(nn.Layer):
                     not self.config.multimodel_experts
                 ), "correction bias not supported, use top2-fused gate"
                 self.moe_statics.expert_usage[0] += usage.detach()
-        # clone 保平安
         if not self.config.use_ep_comm_overlap:
             dispatched_input = dispatched_input.reshape(
                 [
@@ -1635,17 +1356,12 @@ class MOELayer(nn.Layer):
         dispatch_token_type_ids=None,
         offload_helper=None,
     ):
-        """
-        在fused expert 的情况下，计算辅助 loss (Aux-loss, 正交 loss, z-loss) 并 打印 log
-        """
-        use_fuse = isinstance(
-            self.gate, (TopKGateFused)
-        )
+
+        use_fuse = isinstance(self.gate, (TopKGateFused))
         if use_fuse:
             assert gate_prob is not None
             if token_type_ids is not None and self.gate.config.moe_use_hard_gate:
                 if not self.gate.weight.stop_gradient:
-                    # 文参数训练时才计算。
                     lm_tokens_mask = token_type_ids == 0
                     if offload_helper is not None:
                         is_lm = offload_helper["lm_mask"][1]
@@ -1723,14 +1439,7 @@ class MOELayer(nn.Layer):
                 seqlen = gate_logits.shape[0]
                 num_active = paddle.count_nonzero(combine_weights)
                 gate_experts_per_token = num_active.item() / seqlen
-                cap_factor = (
-                    self.gate.cap[0]
-                    if isinstance(self.gate.cap, (tuple, list))
-                    else self.gate.cap
-                )
-                capacity = (
-                    cap_factor * combine_weights.shape[0] // gate_logits.shape[-1]
-                )
+
                 if token_type_ids is not None:
                     token_type_ids = token_type_ids.reshape([-1])
                     combine_weights_type_0 = combine_weights[token_type_ids == 0]
@@ -1827,9 +1536,7 @@ class MOELayer(nn.Layer):
         expert_output = expert_output.reshape(
             [-1, expert_output.shape[-1]]
         )  # [e*1,c,m]
-        use_fuse = isinstance(
-            self.gate, (TopKGateFused)
-        )
+        use_fuse = isinstance(self.gate, (TopKGateFused))
         combine_fn = combining_fused if use_fuse else combining
         combined_output = combine_fn(expert_output, combine_weights, scatter_index)
 
@@ -1890,17 +1597,14 @@ class MOELayer(nn.Layer):
                 for each expert in MoE.
             router_loss (`Tensor`, optional): A scalar tensor representing the loss of routing function.
         """
-        # assert len(input) == 1, "only single input Tensor supported"
         if input.ndim == 3:
             orig_shape = input.shape
-            # clone 保平安
             input = input.reshape([-1, input.shape[-1]])
         else:
             orig_shape = None
         assert (
             len(input.shape) == 2
         ), f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
-        sequence_len = input.shape[0]
         hidden_size = input.shape[1]
         if token_type_ids is not None:
             token_type_ids = token_type_ids.clone()[:, :-1]
@@ -1929,7 +1633,6 @@ class MOELayer(nn.Layer):
         else:
             gate_input = input
 
-        # 依赖关系: use_combine_before_a2a <- use_fp8_fuse_node <- use_fp8_dispatch_a2a
         use_fp8_fuse_node = (
             self.config.use_combine_before_a2a and self.config.use_fp8_fuse_node
         )
@@ -1981,29 +1684,24 @@ class MOELayer(nn.Layer):
                 overwrite=False,
             )
 
-            # TODO(shenliang03): to async alltoall in the furture
-
             token_combine_weights = token_combine_weights.reshape(
                 [cw_shape[0], cw_shape[1], 1]
             )
             token_combine_weights = AlltoAll.apply(token_combine_weights, self.group)
-            # scatter_index = scatter_index.reshape(si_shape)
 
         if not self.config.use_ep_comm_overlap:
             if use_fp8_dispatch_a2a:
-                # 为了反向做overlap, 在FP8FusedWLCHFunc内部做a2a, 外面就不用做a2a了。但是不要漏了shared_experts的计算
                 shared_out = (
                     self.shared_experts(input)
                     if self.shared_experts is not None
                     else None
                 )
             else:
-                # 常规通信
                 with profile("moe_comm_and_shared_expert"):
                     if use_async:
                         dispatched_input, shared_out = AlltoAllAsync.apply(
                             dispatched_input,
-                            input,  # args to shared-experts
+                            input,
                             group=self.group,
                             fn=self.shared_experts,
                             is_first_fwd=is_first_fwd,
@@ -2011,33 +1709,17 @@ class MOELayer(nn.Layer):
                     else:
                         dispatched_input = AlltoAll.apply(dispatched_input, self.group)
 
-            if use_fp8_fuse_node:
-                expert_out = FP8FusedWLCHFunc.apply(
-                    dispatched_input,
-                    token_combine_weights,
-                    self,
-                    recompute_fwd_gate_up=recompute_fwd_gate_up_func(
-                        self.config, self.layer_idx
-                    ),
-                    dequant_input=("dequant_input" in self.config.fp8_mem_configs)
-                    and self.config.fp8_mem_configs["dequant_input"],
-                    fp8_dispatch_a2a=use_fp8_dispatch_a2a,
-                    is_first_fwd=not framework._dygraph_tracer()._has_grad,
-                    group=self.group,
-                    fp8_dispatched_handle=fp8_dispatched_handle,
-                )
-            else:
-                expert_out = (
-                    recompute(self.forward_experts, dispatched_input)
-                    if self.recompute and self.training
-                    else self.forward_experts(dispatched_input)
-                )
+            expert_out = (
+                recompute(self.forward_experts, dispatched_input)
+                if self.recompute and self.training
+                else self.forward_experts(dispatched_input)
+            )
 
-                if self.config.use_combine_before_a2a:
-                    token_combine_weights = token_combine_weights.clone().reshape(
-                        expert_out.shape[:-1] + [1]
-                    )
-                    expert_out = expert_out * token_combine_weights
+            if self.config.use_combine_before_a2a:
+                token_combine_weights = token_combine_weights.clone().reshape(
+                    expert_out.shape[:-1] + [1]
+                )
+                expert_out = expert_out * token_combine_weights
         else:
             assert (
                 len(dispatched_input.shape) == 4
@@ -2097,115 +1779,7 @@ class MOELayer(nn.Layer):
         return combined_output, combine_weights, router_loss2, gate_logits
 
 
-class FP8FusedWLCHFunc(paddle.autograd.PyLayer):
-    """FP8FusedWLCHFunc"""
-
-    @staticmethod
-    def forward(
-        ctx,
-        hidden_states,
-        dispatched_probs,
-        custom_map,
-        recompute_fwd_gate_up=False,
-        dequant_input=False,
-        fp8_dispatch_a2a=False,
-        is_first_fwd=False,
-        group=None,
-        fp8_dispatched_handle=None,
-    ):
-        """
-        根据给定的参数执行前向传播操作。
-
-        Args:
-            hidden_states (tensor): 输入的隐藏状态张量。
-            dispatched_probs (tensor): 分派概率张量。
-
-        Returns:
-            tensor: 前向传播的结果张量。
-        """
-
-        ctx.node = ExpertsGroupGemmWLCHNode(
-            custom_map,
-            recompute_fwd_gate_up=recompute_fwd_gate_up,
-            dequant_input=dequant_input,
-            group=group,
-        )
-        ctx.group = group
-        ctx.fp8_dispatch_a2a = fp8_dispatch_a2a
-        world_size = custom_map.world_size
-        num_local_experts = custom_map.num_local_experts
-
-        def a2a_fn(input_fp8, input_scale):
-            return AlltoAll.apply(input_fp8, group), AlltoAll.apply(input_scale, group)
-
-        if fp8_dispatch_a2a:
-            assert fp8_dispatched_handle is not None
-            assert hidden_states.dtype == paddle.float8_e4m3fn
-            hidden_states, scale = a2a_fn(hidden_states, fp8_dispatched_handle["scale"])
-            scale = scale.reshape([-1, scale.shape[-1]])
-        else:
-            scale = None
-        hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
-        dispatched_probs = dispatched_probs.reshape([-1, dispatched_probs.shape[-1]])
-        tokens_per_expert = [
-            np.prod(hidden_states.shape[:-1]) // num_local_experts
-        ] * num_local_experts
-
-        out = ctx.node.forward(
-            hidden_states,
-            dispatched_probs,
-            tokens_per_expert,
-            tokens_per_expert,
-            scale=scale,
-        )
-
-        if is_first_fwd:
-            ctx.node.reset_statue()
-
-        return out
-
-    @staticmethod
-    def backward(ctx, output_grad):
-        """
-        计算反向传播梯度。
-
-        Args:
-            output_grad (Tensor): 输出梯度张量。
-
-        Returns:
-            Tuple[Tensor, Tensor]: 返回两个梯度张量，前两个分别是隐藏状态和派发概率的梯度，
-
-        """
-
-        def a2a_async_fn(input):
-            return AlltoAll.apply(input, ctx.group, sync_op=False)
-
-        if ctx.fp8_dispatch_a2a:
-            return ctx.node.backward(output_grad, a2a_async_fn=a2a_async_fn)
-        else:
-            return ctx.node.backward(output_grad, a2a_async_fn=None)
-
-
-
 class MOEInferLayer(nn.Layer):
-    """MOEInferLayer module which implements MixtureOfExperts as described in Gshard_.
-    ::
-
-        gate = Top2Gate(model_dim, num_experts)
-        moe = MOEInferLayer(gate, expert)
-        output = moe(input)
-        l_aux = moe.l_aux
-
-    .. Gshard_: https://arxiv.org/pdf/2006.16668.pdf
-
-    Args:
-        gate (paddle.nn.Layer):
-            gate network
-        expert (paddle.nn.LayerList):
-            expert network, LayerList 长度是 per_device 上的 expert 数。
-        group (paddle.ProgressGroup)
-        recompute: 启用MOE内recomupte
-    """
 
     def __init__(
         self,
@@ -2214,25 +1788,7 @@ class MOEInferLayer(nn.Layer):
         group: Group = None,
         recompute=False,
     ) -> None:
-        """
-        初始化 MoE 模型
 
-        Args:
-            gate (nn.Layer): 分流门的网络层
-            experts (List[nn.Layer]): 专家网络层列表，可以是 `nn.Layer` 或 `nn.LayerList` 的实例
-            group (Group, optional): 分布式通信组，默认使用 `None`。如果传入该参数，则会将模型放入指定的分布式通信组中。
-            recompute (bool, optional): 是否启用在推理阶段进行重计算（即每次前向传播时都更新所有专家模型的参数），默认为 `False`，表示禁用重计算。
-
-        Attributes:
-            gate (nn.Layer): 分流门的网络层
-            recompute (bool): 是否启用在推理阶段进行重计算
-            experts (nn.LayerList): 专家网络层列表
-            group (Group): 分布式通信组
-            world_size (int): 当前分布式任务中的总节点数
-            rank (int): 当前节点在当前分布式任务中的编号
-            num_local_experts (int): 当前节点所属的本地专家数目
-
-        """
         super().__init__()
         self.gate = gate
         self.recompute = recompute

@@ -39,14 +39,9 @@ log = logging.getLogger(__name__)
 
 
 class IPCH5Resource:
-    """
-    主进程感知的HDF5 handle, 通过server.call与子进程交互
-    """
 
     def __init__(self, path, name, server):
-        """
-        构造函数, path代表HDF5文件路径, name代表"fp", "lossmask", "off", "meta"这些字段
-        """
+
         self.path = path
         self.name = name
         self.server = server
@@ -54,23 +49,17 @@ class IPCH5Resource:
         self._to_bool = None
 
     def __getitem__(self, key):
-        """
-        __getitem__
-        """
+
         return self.server.call(self.path, "get", (self.path, self.name, key))
 
     def __len__(self):
-        """
-        获取长度(带cache)
-        """
+
         if self._length is None:
             self._length = self.server.call(self.path, "len", (self.path, self.name))
         return self._length
 
     def __bool__(self):
-        """
-        转换为bool(带cache)
-        """
+
         if self._to_bool is None:
             self._to_bool = self.server.call(
                 self.path, "to_bool", (self.path, self.name)
@@ -79,9 +68,6 @@ class IPCH5Resource:
 
 
 class IPCH5MetaResource:
-    """
-    主进程感知的HDF5 Meta handle
-    """
 
     def __init__(self, path, server):
         """
@@ -114,14 +100,9 @@ class IPCH5MetaResource:
 
 
 class DatasetHolder:
-    """
-    子进程感知的HDF5 handle
-    """
 
     def __init__(self, paths, server_idx, server_num):
-        """
-        构造函数
-        """
+
         self.fps = {}
         path_num = len(paths)
         start_t = time()
@@ -200,9 +181,6 @@ class DatasetHolder:
 
 
 class DatasetHolderIniter:
-    """
-    用于在子进程里构造DatasetHolder
-    """
 
     def __init__(self, paths):
         """
@@ -211,16 +189,12 @@ class DatasetHolderIniter:
         self.paths = paths
 
     def __call__(self, server_idx, server_num):
-        """
-        在子进程里调用,构造DatasetHolder
-        """
+
         return DatasetHolder(self.paths, server_idx, server_num)
 
 
 def create_ipc_h5_resources(paths, num_server):
-    """
-    构造主进程里感知的IPCH5Resource, 并构造对应的IPCServer
-    """
+
     n = len(paths)
     if n <= 0:
         return []
@@ -299,10 +273,8 @@ def parse_weights(weights):
             ), f"配比文件至少要4列，格式为：pattern weight num_parts - {cols}"
             pattern, w, num_parts = cols[:3]
             if len(cols) >= 4 and cols[3] in ["lm", "mm", "audio"]:
-                # 允许第4列手动指定 data_type ，后续配比文件建议follow这个格式。
                 data_type = cols[3]
             else:
-                # 向前兼容
                 data_type = "mm" if "multimodal" in i else "lm"
 
             num_parts = int(num_parts)
@@ -312,14 +284,7 @@ def parse_weights(weights):
 
 
 def parse_data_weight(weights, filelist):
-    """
-    解析data_weights文件:
-    Inputs:
-     `weights`  : file
-     `filelist` : List[str]
-    Returns:
-        Dict[str, Tuple[float, int]]
-    """
+
     partids, filelist = parse_filelist(filelist)
     patterns = parse_weights(weights)
     partid2files, weight_filelist = {}, {}
@@ -345,14 +310,7 @@ def parse_data_weight(weights, filelist):
 
 
 def equal_shard(datasets, rank, world_size):
-    """
-    如果有权重，根据权重概率累计概率相等的原则切分 train part.
-    没有权重直接均分parts.
-    args:
-        datasets: List[ExampleSetSingleDataSource]
-        rank: int
-        world_size: int
-    """
+
     assert (
         len(datasets) >= world_size
     ), f"#filelist={len(datasets)} < world_size{world_size}"
@@ -369,9 +327,7 @@ def equal_shard(datasets, rank, world_size):
     total_w = sum([d.weights for d in datasets])
     for d in datasets:
         d.weights = d.weights / total_w
-    datasets = sorted(
-        datasets, key=lambda d: d.weights, reverse=True
-    )  # 先分大part，或许有利于均匀分发？
+    datasets = sorted(datasets, key=lambda d: d.weights, reverse=True)
     for d in datasets:
         this_bucket = np.argmin(bucketsize)
         buckets[this_bucket].append(d)
@@ -408,13 +364,7 @@ class ExampleSetSingleDataSource:
         seed: int = 42,
         combine_batch: int = 1,
     ):
-        """
-        Args:
-            path: str.
-            seqle: int, 序列长度.
-            stride: int, 划窗offset.
-            weights: Tuple[float, int], 二元组(`数据权重`,`数据源id`, `part_id`)
-        """
+
         self.seqlen = seqlen
         if weights is not None:
             assert isinstance(weights, tuple) and len(weights) == 3, weights
@@ -579,7 +529,6 @@ class ExampleSetSingleDataSource:
         return (len(self) + self.num_consecutive - 1) // self.num_consecutive
 
     def sampler(self):
-        # 在DistributedBatchSampler初始化 构造indices 时被调用。（主进程中）
         assert paddle.io.get_worker_info() is None
 
         self.epoch = 0
@@ -615,7 +564,6 @@ class ExampleSet:
         self.exs = exs
         self.fn = fn
         self._load = False
-        # 分shard之前 统计最大的part_id
         self.global_max_part_id = max([ex.part for ex in exs])
         self.partid2ex = {ex.part: ex for ex in exs}
         self.load_process_num = load_process_num
@@ -626,7 +574,9 @@ class ExampleSet:
         lens = [len(e) for e in self.exs]
         len_sum = sum(lens)
         log.info("multi task data portion")
-        log.info("\n".join([f"{e.path}={l/len_sum}" for l, e in zip(lens, self.exs)]))
+        log.info(
+            "\n".join([f"{e.path}={left/len_sum}" for left, e in zip(lens, self.exs)])
+        )
 
     def load(self, use_shard, dp_rank, dp_size):
         self._load = True
@@ -637,8 +587,8 @@ class ExampleSet:
             log.info("#shard train file, before load")
 
             def keyfn(e):
-                l = e.path.strip("/").split("/")
-                return l[0]  # l[-3] if len(l) >= 3 else 1
+                left = e.path.strip("/").split("/")
+                return left[0]
 
             path_per_dp = equal_shard(self.exs, dp_rank, dp_size)
             log.debug(

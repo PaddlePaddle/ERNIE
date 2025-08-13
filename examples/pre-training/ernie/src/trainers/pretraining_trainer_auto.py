@@ -40,13 +40,10 @@ import numpy as np
 
 import paddle
 import paddle.nn as nn
-from paddle import framework
-from paddle.base import core
 from paddle.io import DataLoader
 import paddle.amp.auto_cast as autocast
 from paddle.distributed.communication.group import _get_global_group
 
-from paddleformers.utils.tools import get_env_device
 from paddleformers.trainer import (
     speed_metrics,
 )
@@ -55,9 +52,6 @@ from paddleformers.trainer.auto_trainer import AutoTrainer
 
 try:
     from paddleformers.utils.env import (
-        PREFIX_CHECKPOINT_DIR,
-        SCHEDULER_NAME,
-        TRAINER_STATE_NAME,
         PADDLE_OPTIMIZER_NAME,
     )
 except ImportError:
@@ -82,9 +76,6 @@ from paddle.distributed import fleet
 import paddle.distributed as dist
 from paddleformers.datasets import MapDataset
 
-from paddleformers.trainer.trainer_utils import (
-    _exec_mode_guard,
-)
 from paddleformers.transformers.model_utils import _add_variant
 
 from src.lr_schedulers import get_cosine_schedule_with_warmup
@@ -102,7 +93,7 @@ from src.datasets import (
     ExampleSet,
     ExampleSetSingleDataSource,
 )
-from src.utils.misc import global_training_logs
+from paddle.distributed import in_auto_parallel_align_mode
 from src.clip import ClipGradByAdaptiveNorm, ClipGradForMOEByGlobalNorm
 from src.trainers.pretraining_trainer import DummySampler
 
@@ -117,17 +108,6 @@ except Exception:
         hack for paddlenlp develop branch.
         """
         return True
-
-
-try:
-    from paddle.distributed import in_auto_parallel_align_mode
-except Exception:
-
-    def in_auto_parallel_align_mode():
-        """
-        hack for paddle develop branch.
-        """
-        return False
 
 
 logger = logging.getLogger(__name__)
@@ -145,16 +125,13 @@ def distributed_optimizer_maybe_hack(
     optimizer,
     use_moe,
 ):
-    """重写了 fleet.distributed_optimizer，在 moe 情况下会 hack Optimizer 的 Wrapper"""
     if use_moe:
         from src.trainers.dygraph_optimizer.hybrid_parallel_optimizer import (
             HybridParallelOptimizer as MoEHybridParallelOptimizer,
         )
 
-        # moe下需要定制 `HybridParallelOptimizer` 函数以下重写了 `fleet.distributed_optimizer`
         fleet_env = fleet.fleet
         fleet_env.user_defined_optimizer = optimizer
-        # TODO：sharding group 内做 moe
         hp_optim = MoEHybridParallelOptimizer(
             optimizer, fleet_env._hcg, fleet_env._user_defined_strategy
         )
@@ -175,12 +152,10 @@ def distributed_optimizer_maybe_hack(
 
 DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
 
+
 @dataclass
 @add_start_docstrings(AutoTrainingArguments.__doc__)
 class AutoPreTrainingArguments(AutoTrainingArguments):
-    """
-    预训练相关参数配置
-    """
 
     vocab_path: str = field(
         default=None, metadata={"help": "eb35 streaming data vocab"}
@@ -527,17 +502,7 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     @property
     def need_data(self):
-        """
-        判断当前进程是否需要加载数据。
 
-        Args:
-            无。
-
-        Returns:
-            bool: 如果当前进程为mp0和pp0状态（即主进程），则返回True，表示需要加载数据；
-                  否则返回False，表示不需要加载数据。
-
-        """
         # mp0、pp0状态 卡才需要load数据
         if self.pp_need_data_degree:
             assert self.pipeline_parallel_degree > 1
@@ -559,18 +524,12 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     @property
     def combine_batch(self):
-        """合并batch 用于增大seqlen
 
-        Returns:
-            _type_: _description_
-        """
         return self.max_seq_length // self.base_seq_length
 
     @property
     def reeao_dataset_rank(self):
-        """
-        考虑 pp /sharding/ dp 总和的数据流 rank
-        """
+
         if not self.pp_need_data_degree:
             return super().dataset_rank
         no_need_data_range = list(
@@ -584,7 +543,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         if self.pipeline_parallel_rank not in ranks:
             return None
         reeao_pp_rank = ranks.index(self.pipeline_parallel_rank)
-        pp_need_data_rank = self.pipeline_parallel_rank
 
         assert not (self.sharding_parallel_degree > 1 and self.data_parallel_rank > 1)
         return (
@@ -765,9 +723,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
 
 class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
-    """
-    业务自定义DistributedSampler
-    """
 
     def __init__(
         self,
@@ -778,16 +733,16 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
         dp_size,
         num_consecutive=1,
         seed=0,
-        batch_size_warmup_steps=-1,  # 用来做热启 resumed ckpt热启
-        gradient_accumulation_steps=None,  # 用于在 `Progressive-Batching` 情况下做热启动
-        max_gradient_accumulation_steps=None,  # 用于在 `Progressive-Batching` 情况下做热启动
-        per_device_train_batch_size=None,  # 用于在 `Progressive-Batching` 情况下做热启动
-        batch_size_warmup_increment=None,  # 用于在 `Progressive-Batching` 情况下做热启动
+        batch_size_warmup_steps=-1,
+        gradient_accumulation_steps=None,
+        max_gradient_accumulation_steps=None,
+        per_device_train_batch_size=None,
+        batch_size_warmup_increment=None,
         combine_batch: int = 1,
         shuffle_consecutive: bool = False,
         global_shuffle_num_examples: int = 0,
         same_data: bool = False,
-        modality_ratio: tuple = None,  # 数据流模态配比 ('text_ratio', ‘mm_ratio’)
+        modality_ratio: tuple = None,
         modality_interleave: int = 1,
         **kwargs,
     ):
@@ -799,8 +754,6 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
         self.output_dir = output_dir
         self.rng = random.Random(self.seed + self.epoch)
         self.dp_rank = dp_rank
-        # 并不根据这个ID做切片！切片逻辑用self.local_rank, self.nranks控制，这个变量只是用来打log。
-        # 在按照part切分数据时，`WeightedDistributedSampler`并不切片。所以local_rank/nranksw=0/1
         self.dp_size = dp_size
         self.batch_size_warmup_steps = batch_size_warmup_steps
         self.gradient_accumulation_steps = gradient_accumulation_steps
@@ -845,8 +798,6 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
         self.set_epoch(0)
 
     def load_data_status(self, data_status: List[int], global_shuffle_seed: int = 0):
-        """load data_status 用于 DataTraceCallback 调用"""
-        # 强制data_status整除combine_batch
         self.global_shuffle_seed = global_shuffle_seed
         if not hasattr(self.inner_dataset.exs[0], "data_status"):
             logger.warn(
@@ -951,14 +902,10 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
 
         num_batches = math.inf
         if lm_indices is not None and lm_base > 0:
-            # lm_indices == None 时，表示该模态样本数为0，则不需要生成该模态data_seq
-            # lm_base == 0 时，表示该模态训练step 占比为0，不需要生成该模态data_seq
             num_batches = min(lm_indices.shape[0] // lm_base, num_batches)
         if mm_indices is not None and mm_base > 0:
-            # 定义同lm_indices 和 lm_base
             num_batches = min(mm_indices.shape[0] // mm_base, num_batches)
         if audio_indices is not None and audio_base > 0:
-            # 定义同lm_indices 和 lm_base
             num_batches = min(audio_indices.shape[0] // audio_base, num_batches)
 
         all_indices = []
@@ -989,10 +936,7 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
         return indices
 
     def gen_data_seq_weighted(self, num_examples, data_type=None):
-        """
-        根据数据源权重，生成随机采样序列。在给定seed + epoch 的情况下，序列结果稳定可复现
-        ]
-        """
+
         assert (
             self.load_data_seq is False
         ), "需要保证所有epoch的data_seq都从文件加载，否则下次删data_seq无法控住随机性"
@@ -1005,8 +949,7 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
             logger.debug(
                 "generating data sequence for very large data, consider use large `num_consecutive`"
             )
-        # part内保序全局shuffle
-        # 每个part维护一个generator
+
         if data_type is not None:
             weights = [
                 ex.weights for ex in self.inner_dataset.exs if ex.data_type == data_type
@@ -1042,19 +985,16 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
             self.rng.shuffle(indices)
         logger.debug("shuffle done")
         indices_ret = []
-        # 2. part内顺序进行恢复, 构造index时，保证consecutive内恢复, pop(0) 时间复杂度O(n), pop() 时间复杂度O(1)
         logger.debug("build_index from shuffled placeholder")
 
         for part_id in indices:
             epoch, _index = next(part_indices_gen[part_id])
             # combine_batch = max_seqlen (8k) / base_seqlen (1k)
             if len(_index) % self.combine_batch != 0:
-                # part_id 对应padding idx = -1(part_id + 1)
                 _index += [-1] * (self.combine_batch - len(_index) % self.combine_batch)
             indices_ret += [(part_id, epoch, i) for i in _index]
 
         if self.shuffle_consecutive and self.combine_batch >= 1:
-            # 将num_consecutive 按 combine_batch 进行 chunk、shuffle 再合并
             part_data_gen = defaultdict(lambda: [])
             logger.debug("consecutive placeholder 2 shuffle")
             for item in indices_ret:
@@ -1064,7 +1004,6 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
             for key in part_data_gen.keys():
                 part_data_gen_iter[key] = iter(part_data_gen[key])
             logger.debug("consecutive placeholder 2 shuffle......")
-            # 将part id placeholder 拿出来，拆开consecutive 再按combine_batch 切碎进行shuffle
             placeholder_indices = [i[0] for i in indices_ret]
             placeholder_indices = [
                 placeholder_indices[i : i + self.combine_batch]
@@ -1088,10 +1027,8 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
         return indices
 
     def roundup_and_shard(self, indices):
-        # add extra samples to make it evenly divisible
         if self.nranks == 1:
             logger.info("use use_train_part_sharding, skip padding")
-            # TODO 非train part sharding 也需要保证padding 被combine batch 整除
             return indices
 
         padding_size = self.total_size - len(indices)
@@ -1171,7 +1108,6 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
                 logger.debug(
                     f"using global shuffle num examples: {self.global_shuffle_num_examples}"
                 )
-            # TODO: 提前造好所有idx，在数据量特别大的时候会爆*内存*，后续fix下。
             indices = self.load_data_seq_from_cache()
             if indices is None:
                 indices = (
@@ -1239,24 +1175,9 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
 
         return ret()
 
-    def set_epoch(self, epoch=0, consumed_samples=0):  # PaddleNLP只会调用1次
-        """
-        设置当前训练轮次和已消耗样本数。
+    def set_epoch(self, epoch=0, consumed_samples=0):
 
-        Args:
-            epoch (int, optional): 当前训练轮次。默认为0。
-            consumed_samples (int, optional): 当前轮次已消耗的样本数（全局视角）。
-                在PaddleNLP中，该参数为多机*全局视角的*已消耗样本数，
-                这里会将其转换为单机视角的已消耗样本数。默认为0。
-
-        Returns:
-            None
-
-        Note:
-            PaddleNLP只会调用此函数一次。
-        """
-        consumed_samples = consumed_samples // self.dp_size  # per-device-micro-examples
-        # paddle-NLP提供的consumed-example是多机*全局视角的*, 这里给还原成单机视角的 consumed_samples
+        consumed_samples = consumed_samples // self.dp_size
         logger.debug(f"set consumed samples={consumed_samples}, epoch={epoch}")
         super().set_epoch(epoch, consumed_samples)
 
@@ -1267,26 +1188,21 @@ class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
 
 
 class AutoPretrainingTrainer(AutoTrainer):
-    """
-    自动并行训练器，当前许多功能仍在测试适配中。
-    """
 
     def __init__(self, _shit=None, args=None, model=None, callbacks=[], **kwargs):
         assert _shit is None, "use key-ward argument"
         callbacks = [
-            LoggingCallback(),  # ``LoggingCallback` 需要在`TensorBoardCallback` 前面, timmer会reset
+            LoggingCallback(),
             StopperCallback(),
             TensorBoardCallback(
                 args, model=model, log_tokens_per_step=True, log_flops_per_step=False
             ),
         ] + callbacks
 
-
         if args.adaptive_norm_clip:
             callbacks.append(
                 ClipGradByAdaptiveNormCallback(),
             )
-        # TODO: restore param.name in other ways
         args.use_async_save = (
             args.use_async_save and args.save_sharded_model and args.load_sharded_model
         )
@@ -1329,9 +1245,7 @@ class AutoPretrainingTrainer(AutoTrainer):
         # self.return_value = paddle.zeros([]) #fake return value
 
     def autocast_smart_context_manager(self):
-        """
-        需要精心处理精度上的黑白名单问题。
-        """
+
         if self.enable_autocast_context_manager:
             black = [
                 "reduce_sum",
@@ -1369,13 +1283,8 @@ class AutoPretrainingTrainer(AutoTrainer):
         return ctx_manager
 
     def _load_optimizer_state(self, checkpoint):
-        """重写load_optimizer 方法，兼容moe optimizer merge 功能"""
-        # def _load_moe_optimizer_state(checkpoint):
-        #     opt_moe_suffix = re.sub(r"moe\d\d", "moe00", self.args.optimizer_name_suffix)
-        #     return self._load_optimizer_state_of_one_shard(checkpoint, opt_moe_suffix)
 
         def _broadcast_moe_optimizer_state(state_dict):
-            # boardcast_keys
             base_state_dict = {"master_weights": {}}
             buf = [
                 {
@@ -1396,7 +1305,6 @@ class AutoPretrainingTrainer(AutoTrainer):
                 group = None
 
             dist.broadcast_object_list(buf, src=src_rank, group=group)
-            # logger.info(f"moe-optimizer-gather-keys{buf}")
             for k, s in buf[0].items():
                 v = state_dict.get(k, paddle.zeros(s, "float32")).cuda()
                 v.name = k
@@ -1423,7 +1331,6 @@ class AutoPretrainingTrainer(AutoTrainer):
 
         if self.args.use_moe:
             base_state_dict = _broadcast_moe_optimizer_state(state_dict)
-            # base_state_dict_1 = _load_moe_optimizer_state(checkpoint)
             if self.args.data_parallel_rank > 0:
                 master_weight = state_dict.pop("master_weights", {})
                 base_state_dict.update(state_dict)
@@ -1434,11 +1341,10 @@ class AutoPretrainingTrainer(AutoTrainer):
                         base_state_dict["master_weights"] = master_weight
                 state_dict = base_state_dict
                 del base_state_dict
-                # return base_state_dict
         return state_dict
 
     def _save_moe_weights(self, output_dir):
-        """重写save_mow_weights 方法 进行参数分离存储"""
+
         optimizer_name = _add_variant(
             PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix
         )
@@ -1479,7 +1385,6 @@ class AutoPretrainingTrainer(AutoTrainer):
         ):
             self._save(output_dir=output_dir)
         else:
-            # 0 号sharding 保存模型
             if self.args.sharding_parallel_rank == 0:
                 paddle.save(
                     filtered_state_dict,
@@ -1540,27 +1445,23 @@ class AutoPretrainingTrainer(AutoTrainer):
         """doc"""
         loss, _, labels = super().prediction_pipeline_step(
             model, inputs, prediction_loss_only, ignore_keys
-        )  # ERNIE-PP模型的loss其实是loss-sum。
+        )
         num_tokens = (labels != self.tokenizer.ignored_index).sum().item()
         loss_avg = loss * self.model_wrapped.accumulate_steps / num_tokens
         return loss_avg, loss, labels
 
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
-        # only used in Map-Styled Dataset.
         if self.args.use_dummy_dataset:
             return DummySampler(
                 self.train_dataset,
                 self.args.per_device_train_batch_size * self.args.combine_batch,
             )
-        if (
-            self.args.use_train_part_sharding
-        ):  # 走了train-part-sharding后暂时不需要做进程内切片。
+        if self.args.use_train_part_sharding:
             num_replicas = 1
             rank = 0
         else:
             num_replicas = self.args.reeao_dataset_world_size
             rank = self.args.reeao_dataset_rank
-        # NOTE: batch_size没有乘以dp_world_size，是因为dataset层已经将数据按照dp_rank切片了
         batch_size = self.args.per_device_train_batch_size * self.args.combine_batch
         batch_size *= self.args.gradient_accumulation_steps
         batch_sampler = WeightedDistributedSamplerAuto(
@@ -1594,38 +1495,20 @@ class AutoPretrainingTrainer(AutoTrainer):
         return batch_sampler
 
     def get_train_dataloader(self):
-        """
-        获取训练数据的 DataLoader。
 
-        Args:
-            无。
-
-        Returns:
-            DataLoader: 训练数据的 DataLoader 对象。
-
-        Raises:
-            ValueError: 如果 `self.args.need_data` 为 True 但 `self.train_dataset` 为 None 时，抛出该异常。
-
-        """
         if self.args.need_data and self.train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
-        # NOTE: 纯dp也可以用此dataloader, 无需区分
         _DataLoader = partial(
             DistDataLoaderAuto,
             need_data=self.args.need_data,
             pp_broadcast=not self.args.pp_need_data,
         )
-        # _DataLoader = (
-        #     partial(DistDataLoaderAuto, need_data=self.args.need_data, pp_broadcast=not self.args.pp_need_data)
-        #     if (self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1)
-        #     else DataLoader
-        # )  # fleet初始化之后才能使用`DistDataLoaderAuto`
 
         train_dataset = self.train_dataset
         if self._is_iterable_dataset(train_dataset):
             return DataLoader(
                 train_dataset,
-                batch_size=None,  # we do data collation in Stream
+                batch_size=None,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
                 use_shared_memory=True,
@@ -1665,228 +1548,9 @@ class AutoPretrainingTrainer(AutoTrainer):
             tr_loss, model, epoch, ignore_keys_for_eval, **kwargs
         )
         return
-        with _exec_mode_guard("dynamic"):
-            tr_loss = tr_loss._local_value() if tr_loss.is_dist() else tr_loss
-            flag_log = self.control.should_log
-            if self.control.should_log:
-                logs = {}
-                tr_loss = self._broadcast_final_loss(tr_loss)
-                # TODO(Ruibiao): 自动并行下tr_loss已经经过一次allreduce，需要有接口支持获取每路dp下的loss
-                tr_loss_single_dp_scalar = tr_loss.item()
-                dist.all_reduce(
-                    tr_loss, dist.ReduceOp.SUM
-                )  # 3级并行时，每个pp下的loss会广播，全局reduce-mean的时候，分子分母都会乘以pp_world_size，结果会被约掉
-                tr_loss_scalar = tr_loss.item() / dist.get_world_size()
-                tr_loss.zero_()
-
-                # reset tr_loss to zero
-                logs["loss"] = tr_loss_scalar / (
-                    self.state.global_step - self._globalstep_last_logged
-                )
-                logs["loss_cur_dp"] = tr_loss_single_dp_scalar / (
-                    self.state.global_step - self._globalstep_last_logged
-                )
-                logs["learning_rate"] = float(self._get_learning_rate())
-                logs["global_step"] = int(self.state.global_step)
-
-                divisor = 2**30
-
-                current_device = framework._current_expected_place_()
-                device_id = current_device.get_device_id()
-                current_memory_allocated = core.device_memory_stat_current_value(
-                    "Allocated", device_id
-                )
-                current_memory_reserved = core.device_memory_stat_current_value(
-                    "Reserved", device_id
-                )
-                max_memory_allocated = core.device_memory_stat_peak_value(
-                    "Allocated", device_id
-                )
-                max_memory_reserved = core.device_memory_stat_peak_value(
-                    "Reserved", device_id
-                )
-                logs["mem_allocated_gb"] = current_memory_allocated / divisor
-                logs["max_mem_allocated_gb"] = max_memory_allocated / divisor
-                logs["mem_reserved_gb"] = current_memory_reserved / divisor
-                logs["max_mem_reserved_gb"] = max_memory_reserved / divisor
-
-                if not self.args.enable_global_training_logs:
-                    global_training_logs.global_meters_keys = [
-                        "data_not_valid",
-                        "experts_per_token",
-                    ]
-
-                if get_env_device() == "gpu":
-                    info_callback = global_training_logs.dict(use_async=True)
-
-                if hasattr(self, "scaler"):
-                    logs["loss_scale"] = float(
-                        "{0:.3e}".format(self.scaler._scale.item())
-                    )
-
-                total_train_batch_size = (
-                    self.args.train_batch_size
-                    * self.args.gradient_accumulation_steps
-                    * self.args.reeao_dataset_world_size
-                )
-                num_steps = self.state.global_step - self._globalstep_last_logged
-                logs.update(
-                    speed_metrics(
-                        "global",
-                        self._globalstep_last_start_time,
-                        num_samples=total_train_batch_size * num_steps,
-                        num_steps=num_steps,
-                    )
-                )
-
-                tokens_per_steps = self.args.max_seq_length * total_train_batch_size
-                logs["TFLOPS_per_sec_per_card"] = round(
-                    6
-                    * tokens_per_steps
-                    * self.model_numel
-                    * logs["global_steps_per_second"]
-                    / 1e12
-                    / self.args.world_size,
-                    3,
-                )
-                logs["tokens_per_sec_per_card"] = round(
-                    tokens_per_steps
-                    * logs["global_steps_per_second"]
-                    / self.args.world_size,
-                    1,
-                )
-                self._tokens_per_sec_per_card_buffer.append(
-                    logs["tokens_per_sec_per_card"]
-                )
-                logs["tokens_per_sec_per_card_average"] = round(
-                    np.mean(self._tokens_per_sec_per_card_buffer), 1
-                )
-                if self.resume_global_step == -1:
-                    self.resume_global_step = self.state.global_step - 1
-                if (
-                    self.state.global_step
-                    <= self.resume_global_step + self.first_skip_step
-                ):
-                    self._tokens_per_sec_per_card_buffer = []
-                    self._end_save_time = time.time()
-
-                self._total_loss_scalar += tr_loss_scalar
-                self._globalstep_last_logged = self.state.global_step
-                self._globalstep_last_start_time = time.time()
-
-                if get_env_device() == "xpu":
-                    info, gathered_info = global_training_logs.dict(use_async=False)
-                else:
-                    info, gathered_info = info_callback()
-
-                global_training_logs.reset()
-                logs.update({f"{k}_cur_dp": v for k, v in info.items()})
-                logs.update(gathered_info)
-                if self.args.enable_global_training_logs:
-                    info_list = []
-                    dist.all_gather_object(info_list, info)
-                    logs.update(
-                        {
-                            k: np.mean([v[k] for v in info_list if k in v])
-                            for k in {key for item in info_list for key in item.keys()}
-                        }
-                    )
-
-                self.log(logs, **kwargs)
-
-            metrics = None
-            if self.control.should_evaluate:
-                metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
-
-            if self.control.should_save:
-                self._start_save_time = time.time()
-                self._save_checkpoint(model, metrics=metrics)
-                paddle.distributed.barrier()
-                self.control = self.callback_handler.on_save(
-                    self.args, self.state, self.control
-                )
-                if flag_log:
-                    logs = {}
-                    tbk = self._start_save_time - self._end_save_time
-                    if (
-                        self.state.global_step
-                        == self.resume_global_step + self.args.save_steps
-                    ):
-                        actual_tbk = self._start_save_time - self._first_end_save_time
-                        actual_avg_speed_step = (
-                            self.args.save_steps
-                            * tokens_per_steps
-                            / actual_tbk
-                            / self.args.world_size
-                        )
-                        tbk = (
-                            tbk
-                            / (self.args.save_steps - self.first_skip_step)
-                            * self.args.save_steps
-                        )
-                    ts = time.time() - self._start_save_time
-                    tokens_per_steps = self.args.max_seq_length * total_train_batch_size
-                    avg_speed_step = (
-                        self.args.save_steps
-                        * tokens_per_steps
-                        / tbk
-                        / self.args.world_size
-                    )
-                    logs["global_save_step"] = self.state.global_step
-                    logs["train_time_sec_without_save"] = tbk
-                    logs["save_ckpt_time_sec"] = ts
-                    logs["average_tokens_per_sec_per_card_without_save"] = round(
-                        avg_speed_step, 1
-                    )
-                    logs["average_tokens_per_sec_per_card_with_save"] = round(
-                        self.args.save_steps
-                        * tokens_per_steps
-                        / (tbk + ts)
-                        / self.args.world_size,
-                        2,
-                    )
-                    if (
-                        self.state.global_step
-                        == self.resume_global_step + self.args.save_steps
-                    ):
-                        logs["actual_average_tokens_per_sec_per_card_without_save"] = (
-                            round(actual_avg_speed_step, 1)
-                        )
-                        logs["actual_average_tokens_per_sec_per_card_with_save"] = (
-                            round(
-                                self.args.save_steps
-                                * tokens_per_steps
-                                / (actual_tbk + ts)
-                                / self.args.world_size,
-                                2,
-                            )
-                        )
-                    logs["one_day_billion_tokens_without_save"] = round(
-                        0.0000864 * self.args.save_steps * tokens_per_steps / tbk, 2
-                    )
-                    logs["one_day_billion_tokens_with_save"] = round(
-                        0.0000864
-                        * self.args.save_steps
-                        * tokens_per_steps
-                        / (tbk + ts),
-                        2,
-                    )
-                    self.log(logs, **kwargs)
-                    self._globalstep_last_start_time = time.time()
-                    self._tokens_per_sec_per_card_buffer = []
-                self._end_save_time = time.time()
 
     def create_scheduler(self, num_training_steps):
-        """
-        根据给定的参数创建一个学习率调度器。
 
-        Args:
-            num_training_steps (int): 训练的总步数。
-
-        Returns:
-            torch.optim.lr_scheduler._LRScheduler: 学习率调度器对象。
-
-        """
         if self.args.warmup_steps > 0:
             warmup = self.args.warmup_steps
         else:
@@ -2002,9 +1666,7 @@ class AutoPretrainingTrainer(AutoTrainer):
             self.static_name_to_dyg_name = {
                 p.name: n for n, p in self.model.state_dict().items()
             }
-            gate_pattern = re.compile(
-                r"ernie\.layers\.0\.mlp\.gate\.weight"
-            )  # TODO 换成更加通配的方法
+            gate_pattern = re.compile(r"ernie\.layers\.0\.mlp\.gate\.weight")
             vit_pattern = re.compile(
                 r"vision_model\.(cls_token|pos_embed|patch_embed|blocks)"
             )
@@ -2059,16 +1721,7 @@ class AutoPretrainingTrainer(AutoTrainer):
         return self.optimizer
 
     def save_model(self, output_dir=None):
-        """
-        保存模型到指定目录，并保存静态名称到动态名称的映射关系。
 
-        Args:
-            output_dir (str, optional): 输出目录的路径。默认为 None，即使用父类指定的目录。
-
-        Returns:
-            None
-
-        """
         super().save_model(output_dir)
         if self.args.should_save:
             with open(
@@ -2077,7 +1730,6 @@ class AutoPretrainingTrainer(AutoTrainer):
                 of.write(json.dumps(self.static_name_to_dyg_name))
 
     def _load_rng_state(self, checkpoint):
-        # 预训练环节并不需要由框架控制 `rng`
         pass
 
     def _get_meshes_for_loader(self):
@@ -2086,7 +1738,6 @@ class AutoPretrainingTrainer(AutoTrainer):
 
         meshes = []
         if self.args.pipeline_parallel_degree > 1:
-            # input_ids
             if self.args.multimodal:
                 # `input_ids`, `labels`, `data_id`, `src_id`, `data_type`, `images`, `token_type_ids`,
                 # `image_type_ids`, `has_images`

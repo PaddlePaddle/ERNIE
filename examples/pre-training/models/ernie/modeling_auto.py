@@ -1,5 +1,3 @@
-# !/usr/bin/env python3
-
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
 #
@@ -41,6 +39,12 @@ from paddle.incubate.nn.memory_efficient_attention import (
     memory_efficient_attention,
     BlockDiagonalCausalMask,
 )
+from paddle.distributed import in_auto_parallel_align_mode
+
+from models.comm_utils import subbatch
+
+from models.moe.top2_gate_auto_auto import Top2Gate
+from models.moe.top2_gate_auto import TopKGateFusedAuto
 
 
 # from src/ops which is install in build_envs
@@ -76,7 +80,6 @@ from models.moe.moe_utils_auto import get_mesh
 
 @dataclass
 class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
-    """doc"""
 
     router_loss: Optional[paddle.Tensor] = None
     gate_logits: Optional[Tuple[paddle.Tensor]] = None
@@ -84,15 +87,8 @@ class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
 
 @dataclass
 class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
-    """doc"""
 
     router_loss: Optional[paddle.Tensor] = None
-
-
-from models.comm_utils import subbatch
-
-from models.moe.top2_gate_auto_auto import Top2Gate
-from models.moe.top2_gate_auto import TopKGateFusedAuto
 
 
 logger = logging.getLogger(__name__)
@@ -152,16 +148,6 @@ try:
 except (ImportError, ModuleNotFoundError):
     fused_swiglu = None
 
-try:
-    from paddle.distributed import in_auto_parallel_align_mode
-except:
-
-    def in_auto_parallel_align_mode():
-        """
-        hack for paddlenlp develop branch.
-        """
-        return False
-
 
 ERNIE_PRETRAINED_MODEL_ARCHIVE_LIST = []
 
@@ -179,17 +165,13 @@ gate_class = dict(
 
 
 def is_pp_enable():
-    """
-    判断是否使用pp
-    """
+
     mesh = fleet.auto.get_mesh()
     return "pp" in mesh.dim_names
 
 
 def global_mesh_starts_with_pp():
-    """
-    获得以pp为开始顺序的全局mesh
-    """
+
     mesh = fleet.auto.get_mesh()
     if is_pp_enable():
         return mesh.get_mesh_with_dim("pp")
@@ -197,7 +179,6 @@ def global_mesh_starts_with_pp():
         return mesh
 
 
-# NOTE(zengjinle): do not use this method!
 def is_fleety_func():
     """
     Check whether it is PaddlePaddle FleetY version.
@@ -213,17 +194,7 @@ IS_FLEETY = is_fleety_func()
 
 
 def get_triangle_upper_mask(x, mask=None):
-    """
-    生成上三角矩阵掩码，用于注意力机制中避免对自身的关注。
 
-    Args:
-        x (Tensor): 输入的Tensor，用于确定掩码的形状，形状应为 [bsz, n_head, q_len, kv_seq_len]。
-        mask (Tensor, optional): 如果已经存在掩码，则直接返回该掩码。默认为None。
-
-    Returns:
-        Tensor: 上三角矩阵掩码，形状为 [bsz, 1, q_len, kv_seq_len]，数据类型与输入Tensor相同。
-
-    """
     if mask is not None:
         return mask
     # [bsz, n_head, q_len, kv_seq_len]
@@ -244,7 +215,7 @@ def naive_fuse_split_tp(
     is_column=True,
     fuse_tensor_parts=2,
 ):
-    """doc"""
+
     logging.info(f"spliting fused-ffn: {weight.shape}")
     axis = -1 if is_column else 0
     splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
@@ -261,7 +232,7 @@ def parallel_matmul(
     tensor_parallel_degree=1,
     tensor_parallel_output=True,
 ):
-    """doc"""
+
     if transpose_y:
         logits = paddle.matmul(x, y, transpose_y=True)
         if bias is not None:
@@ -334,21 +305,7 @@ def calc_lm_head_logits(
 
 
 def finfo(dtype: paddle.dtype = None):
-    """
-    返回与给定Paddle数据类型相对应的Numpy finfo对象。
 
-    Args:
-        dtype (paddle.dtype, optional): 要查询的Paddle数据类型。如果为None，则使用Paddle的默认数据类型。
-
-    Returns:
-        Union[BFloatFInfo, np.finfo]:
-        - BFloatFInfo: 当dtype为paddle.bfloat16时，返回自定义的BFloatFInfo类，其中包含bfloat16的最小值。
-        - np.finfo: 当dtype为paddle.float32, paddle.float16或paddle.float64时，返回与Numpy对应数据类型的finfo对象。
-
-    Raises:
-        无特定异常。
-
-    """
     if dtype is None:
         dtype = paddle.get_default_dtype()
 
@@ -371,18 +328,7 @@ def finfo(dtype: paddle.dtype = None):
 
 
 def masked_fill(x, mask, value):
-    """
-    对输入的张量x进行按位填充操作，将mask为True的位置填充为value。
 
-    Args:
-        x (Tensor): 需要进行填充操作的输入张量，数据类型可以是float32、float64、int32、int64等。
-        mask (Tensor): 布尔类型的张量，形状与x相同，用于指示哪些位置需要进行填充。
-        value (float或int): 需要填充的值，数据类型与x相同。
-
-    Returns:
-        Tensor: 经过填充后的张量，与x具有相同的形状和数据类型。
-
-    """
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
 
@@ -390,7 +336,7 @@ def masked_fill(x, mask, value):
 def mem_eff_attn(
     query, key, value, pack_offset, drop_prob=0.0, dtype=paddle.bfloat16, training=True
 ):
-    """doc"""
+
     pack_offset = pack_offset.numpy()
     shape = pack_offset.shape
     assert len(shape) == 2, len(shape)
@@ -459,7 +405,7 @@ def scaled_dot_product_attention(
     inbatch_pack_offset=None,
     training=True,
 ):
-    """doc"""
+
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, num_key_value_heads, _ = value_states.shape
 
@@ -481,11 +427,6 @@ def scaled_dot_product_attention(
             )
 
     if can_use_fa:
-        # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn maskt
-        # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
-        # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        # without past keys
         if rr_flash_attn is not None:
             attn_output, attn_weights = rr_flash_attn(
                 query_states,
@@ -583,7 +524,6 @@ def scaled_dot_product_attention(
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
-        # logger.info(attention_mask)
         if training:
             attn_weights = attention_mask + attn_weights
             attn_weights = paddle.maximum(
@@ -688,7 +628,6 @@ def slice_experts(experts, moe_world_size):
 
     lm_experts = nn.LayerList([])
     for experts_list in experts_per_device:
-        # 每个device上, 前一半为lm expert
         lm_experts.extend(experts_list[: moe_num_experts_per_device // 2])
     return lm_experts
 
@@ -699,16 +638,8 @@ def get_gate(
     layer_idx: int,
     ipp: int = 0,
 ) -> Tuple[nn.Layer, nn.LayerList]:
-    """
-    自动构建gate, 目前支持 {gate_class.keys()}
-    """
-    moe_num_experts = (
-        sum(config.moe_num_experts)
-        if config.multimodel_experts
-        else config.moe_num_experts
-    )
-    print("lzx debug moe_num_experts:", moe_num_experts)
-    print("lzx debug config.moe_world_size:", config.moe_world_size)
+
+    moe_num_experts = config.moe_num_experts
     assert (
         moe_num_experts >= config.moe_world_size
     ), f"expert moe_num_experts={moe_num_experts} >= moe_world_size={config.moe_world_size}"
@@ -717,8 +648,6 @@ def get_gate(
     ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={config.moe_world_size} == 0"
     moe_num_experts_per_device = moe_num_experts // config.moe_world_size
     experts = nn.LayerList([])
-    # 自动并行下, expert在每路dp(ep)下是全局视角, 在每个设备上都会创建全量的experts
-    # 然后再调用redistribute_expert通过shard_tensor每个expert的weight标记到不同的设备上。
     for expert_id, (experts_num, fc) in enumerate(expert):
         assert experts_num % config.moe_world_size == 0
         experts_to_append = []
@@ -735,7 +664,7 @@ def get_gate(
             experts_to_append = fc
         for ex in experts_to_append:
             for p in ex.parameters():
-                p.expert_type = f"expert_type_{expert_id}"  # 不同的 `expert_type` 可以有不同的 intermediate-size
+                p.expert_type = f"expert_type_{expert_id}"
         experts.extend(experts_to_append)
 
     logger.info(
@@ -743,7 +672,6 @@ def get_gate(
         f"expert-per-device: {moe_num_experts_per_device} "
     )
     if config.moe_use_hard_gate and moe_num_experts <= 2:
-        # TODO 3种类型，hard-gate问题
         gate = None
         logger.info("MOE-GATE:-hard-gate")
     else:
@@ -752,18 +680,7 @@ def get_gate(
             config, layer_idx=layer_idx, group=config.moe_group, ipp=ipp
         )
 
-    # 多模下, config.moe_num_experts是[48, 48]
-    # 动手会在每个设备创建 96 / moe_world_size 个专家, 命名为experts。然后在每台设备上将前一半的专家的切片命名为lm_experts。
-    # 动半的专家在ep_group内为全局视角, 每台设备都会创建96个专家, 后续通过redistribute_expert将专家标记到ep_group内的不同设备。
-    if config.multimodel_experts and config.moe_use_hard_gate and moe_num_experts > 2:
-        lm_experts = slice_experts(experts, config.moe_world_size)
-        lm_cfg = deepcopy(config)
-        lm_cfg.moe_num_experts = config.moe_num_experts[0]
-        lm_gate = gate_class[config.moe_gate.lower()](
-            lm_cfg, layer_idx=layer_idx, group=config.moe_group, gate_weight=gate.weight
-        )
-    else:
-        lm_gate, lm_experts = None, None
+    lm_gate, lm_experts = None, None
     logger.info(f"LM-experts-{lm_experts} -- experts-{experts}")
 
     index = 0 if config.moe_group == "dp" else 1
@@ -781,12 +698,6 @@ def get_gate(
 
 
 def _parse_moe_group(moe_group: str):
-    """
-    Args:
-        moe_group (str): 目前支持："dp|mp|none"
-    Returns:
-        str: 返回 moe_group
-    """
     moe_group = moe_group.lower()
     assert moe_group in {
         "dp",
@@ -799,7 +710,7 @@ def _parse_moe_group(moe_group: str):
 
 
 class RMSNorm(nn.Layer):
-    r"""
+    """
     RMSNorm is a variant of layer normalization.
     """
 
@@ -815,16 +726,7 @@ class RMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        """
-        计算 RMSNorm 后的隐藏状态。
 
-        Args:
-            hidden_states (Tensor): 输入的隐藏状态，shape 为 [batch_size, sequence_length, num_features]。
-
-        Returns:
-            Tensor: 经过 RMSNorm 后的隐藏状态，shape 为 [batch_size, sequence_length, num_features]。
-
-        """
         if self.config.fuse_rms_norm:
             return fused.fused_rms_norm(
                 hidden_states, self.weight, self.variance_epsilon
@@ -847,7 +749,7 @@ class RMSNorm(nn.Layer):
 
 
 class LayerNorm(nn.LayerNorm):
-    r"""
+    """
     layer normalization.
     """
 
@@ -877,7 +779,7 @@ class LayerNorm(nn.LayerNorm):
 
 
 class FusedLayerNorm(nn.Layer):
-    r"""
+    """
     FusedLayerNorm is a variant of layer normalization.
     """
 
@@ -904,16 +806,7 @@ class FusedLayerNorm(nn.Layer):
             )
 
     def forward(self, hidden_states):
-        """
-        对输入hidden_states进行Layer Normalization操作并返回结果。
 
-        Args:
-            hidden_states (torch.Tensor): 输入的隐藏状态，形状为(batch_size, sequence_length, embedding_dim)。
-
-        Returns:
-            torch.Tensor: 经过Layer Normalization处理后的隐藏状态，形状与输入hidden_states相同。
-
-        """
         return fused.fused_ln(
             hidden_states, self.weight, self.bias, self.variance_epsilon
         )[0]
@@ -925,9 +818,7 @@ class RotaryEmbedding(nn.Layer):
     """
 
     def __init__(self, dim, max_position_embeddings=4096, base=10000):
-        """
-        `self.sin_cached` 和`self.cos_cached` 的初始化最后会用numpy再做一遍！
-        """
+
         super().__init__()
         # dtype = paddle.get_default_dtype()
         self.base = base
@@ -952,20 +843,6 @@ class RotaryEmbedding(nn.Layer):
         self._cast_to_low_precison = False
 
     def forward(self, x, seq_len=None):
-        """
-        根据输入的张量x和序列长度seq_len，返回对应的缓存的余弦和正弦值。
-
-        Args:
-            x (Tensor): 输入的张量，但在本函数中并不使用。
-            seq_len (int, optional): 序列长度。默认为None，表示使用缓存中的所有值。
-
-        Returns:
-            tuple: 包含两个张量的元组。
-
-                - cos_cached (Tensor): 缓存的余弦值，其形状为(seq_len, *)。
-                - sin_cached (Tensor): 缓存的正弦值，其形状为(seq_len, *)。
-
-        """
 
         return (
             self.cos_cached[:seq_len, :],
@@ -994,9 +871,6 @@ class RotaryEmbedding(nn.Layer):
         cos = cos[:, offset : q.shape[1] + offset, None, :]
         sin = sin[:, offset : q.shape[1] + offset, None, :]
 
-        # q_embed = (q * cos) + (rotate_half(q) * sin)
-        # k_embed = (k * cos) + (rotate_half(k) * sin)
-        # 不使用操作符，防止Paddle 不同精度之间的结合导致问题。
         q_embed = paddle.add(
             paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin)
         )
@@ -1009,9 +883,6 @@ class RotaryEmbedding(nn.Layer):
 
 
 class RopeEmbeddingLegacy(nn.Layer):
-    """
-    从`EB65B`代码搬运而来，在线算cos、sin。算出来的结果和上面有蛮大的diff，
-    """
 
     def __init__(self, head_dim, compression_ratio=1.0, base=10000):
         super().__init__()
@@ -1020,19 +891,7 @@ class RopeEmbeddingLegacy(nn.Layer):
         self.base = base
 
     def forward(self, seq_length, position_ids=None):
-        """
-        计算位置嵌入。
 
-        Args:
-            seq_length (int): 序列长度。
-            position_ids (paddle.Tensor, optional): 可选参数，表示位置ID的Tensor，形状为[batch_size, seq_length]，
-                数据类型为float32。如果为None，则使用从0到seq_length-1的连续整数生成位置ID。
-
-        Returns:
-            paddle.Tensor: 形状为[batch_size, 1, seq_length, head_dim]的位置嵌入Tensor，数据类型为float32，
-                并且不计算梯度。
-
-        """
         indices = paddle.arange(0, self.head_dim, 2, dtype="float32")
         indices = 1 / self.base ** (indices / self.head_dim)
         if position_ids is None:
@@ -1055,20 +914,7 @@ class RopeEmbeddingLegacy(nn.Layer):
         return pos_emb
 
     def apply_rotary(self, rp, q, k):
-        """
-        应用旋转位置编码(Rotary Position Encoding)到查询(q)和键(k)上。
 
-        Args:
-            rp (paddle.Tensor): 旋转位置编码张量，形状为 [sequence_length, embed_size_per_head]。
-            q (paddle.Tensor): 查询张量，形状为 [batch_size, sequence_length, num_heads, embed_size_per_head]。
-            k (paddle.Tensor): 键张量，形状为 [batch_size, sequence_length, num_heads, embed_size_per_head]。
-
-        Returns:
-            tuple: 包含两个paddle.Tensor元素的元组，分别代表旋转后的查询和键。
-            - query (paddle.Tensor): 旋转后的查询张量，形状与输入q相同。
-            - key (paddle.Tensor): 旋转后的键张量，形状与输入k相同。
-
-        """
         # sin [sequence_length, embed_size_per_head//2]
         # cos [sequence_length, embed_size_per_head//2]
         sin, cos = paddle.chunk(rp, 2, axis=-1)
@@ -1097,26 +943,7 @@ class RopeEmbeddingLegacy(nn.Layer):
         return query, key
 
     def forward_single(self, position_ids):
-        """
-        计算单个位置嵌入的罗盘编码（rope embedding）。
 
-        Args:
-            position_ids (paddle.Tensor): 包含位置信息的张量，形状为[B, S]，其中B为批处理大小，S为序列长度。
-
-        Returns:
-            paddle.Tensor: 罗盘编码，形状为[2, B, S, 1, D]，其中B为批处理大小，S为序列长度，D为头维度。
-
-        """
-        """
-        计算单个位置嵌入的旋转编码（rope embedding）。
-
-        Args:
-            position_ids (paddle.Tensor): 包含位置信息的张量，形状为[B, S]，其中B为批处理大小，S为序列长度。
-
-        Returns:
-            paddle.Tensor: 罗盘编码，形状为[2, B, S, 1, D]，其中B为批处理大小，S为序列长度，D为头维度。
-
-        """
         batch_size, seq_length = position_ids.shape[:2]
         rope_emb = paddle.zeros(
             (2, batch_size, seq_length, 1, self.head_dim), dtype="float32"
@@ -1141,17 +968,7 @@ class RopeEmbeddingLegacy(nn.Layer):
 
     @staticmethod
     def apply_rotary_single(x, rope_emb):
-        """
-        对输入张量x进行单通道旋转增强操作。
 
-        Args:
-            x (paddle.Tensor): 输入张量，形状为[N, C, H, W]，其中N为批量大小，C为通道数，H和W分别为高度和宽度。
-            rope_emb (List[paddle.Tensor]): 包含两个元素的列表，每个元素为形状为[1]的paddle.Tensor，用于与输入张量x和旋转后的张量相乘。
-
-        Returns:
-            paddle.Tensor: 形状与输入张量x相同的增强后的张量。
-
-        """
         rotate_half_x = paddle.reshape(
             paddle.stack([-x[:, :, :, 1::2], x[:, :, :, 0::2]], axis=-1),
             paddle.shape(x),
@@ -1160,11 +977,6 @@ class RopeEmbeddingLegacy(nn.Layer):
 
 
 class ErnieLinear(nn.Layer):
-    """
-    ErnieLinear层。用于适配ernie-core中的RowSequenceParallelLinear。
-
-    将自动并行中Linear的逻辑从 matmul, all-reduce, add, scatter 变成 matmul, reduce-satter, add
-    """
 
     def __init__(
         self,
@@ -1195,34 +1007,19 @@ class ErnieLinear(nn.Layer):
         self.ipp = ipp
 
     def forward(self, input):
-        """
-        执行前向传播操作。
 
-        Args:
-            input (Tensor): 输入张量，其形状应为 (seq_length, batch_size, input_dim)。
-
-        Returns:
-            Tensor: 输出张量，其形状为 (seq_length, batch_size, input_dim)。
-
-        """
         out = F.linear(x=input, weight=self.weight, bias=None, name=self.name)
-        # do resuce-scatter, [Shard(1), Partial(ReduceSum)] -> [Shard(1), Shard(0)]
         out = dist.reshard(
             out,
             get_mesh(self.ipp),
             [dist.Shard(1), dist.Shard(0)],
         )
         if self.bias:
-            print("lzx debug += self.bias")
             out += self.bias
-        # out += self.bias
         return out
 
 
 class ErnieMLP(nn.Layer):
-    """
-    ErnieMLP层，用于实现Ernie模型中的MLP操作。
-    """
 
     def __init__(self, config, ipp=None, do_shard_tensor=True):
         super().__init__()
@@ -1282,7 +1079,6 @@ class ErnieMLP(nn.Layer):
                 [dist.Replicate(), dist.Shard(0)],
             )
             if config.use_bias:
-                print("lzx debug use_bias")
                 self.down_proj.bias = dist.shard_tensor(
                     self.down_proj.bias,
                     get_mesh(self.ipp),
@@ -1294,16 +1090,7 @@ class ErnieMLP(nn.Layer):
             assert fused_swiglu is not None, "fused_swiglu operator is not found."
 
     def forward(self, x):
-        """
-        执行前向传播操作。
 
-        Args:
-            x (Tensor): 输入张量，其形状应为 (batch_size, seq_length, input_dim)。
-
-        Returns:
-            Tensor: 输出张量，其形状为 (batch_size, seq_length, output_dim)。
-
-        """
         if self.fuse_swiglu:
             x = fused_swiglu(self.gate_proj(x), self.up_proj(x))
         else:
@@ -1312,7 +1099,6 @@ class ErnieMLP(nn.Layer):
 
 
 class ErnieAttentionAuto(nn.Layer):
-    """Multi-headed attention from 'Attention Is All You Need' paper"""
 
     def __init__(self, config, ipp: Optional[int] = None):
         super().__init__()
@@ -1371,23 +1157,8 @@ class ErnieAttentionAuto(nn.Layer):
                 self.hidden_size,
                 bias_attr=config.use_bias,
             )
-        if config.rope_reorder:
-            self.rotary_emb = RotaryEmbedding(
-                self.head_dim,
-                max_position_embeddings=config.max_position_embeddings,
-                base=config.rope_theta,
-            )
-        else:
-            self.rotary_emb = RopeEmbeddingLegacy(
-                self.head_dim,
-                compression_ratio=config.compression_ratio,
-                base=config.rope_theta,
-            )
-        self.config = config
 
-        self._rr_flash_attn = None
-        if config.use_recompute and config.skip_recompute_ops.get("flash_attn", False):
-            self._rr_flash_attn = None
+        self.config = config
 
         if (
             self.config.tensor_parallel_degree > 1
@@ -1429,11 +1200,6 @@ class ErnieAttentionAuto(nn.Layer):
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(0)],
             )
-            # self.o_proj.bias = dist.shard_tensor(
-            #     self.o_proj.bias,
-            #     get_mesh(self.ipp),
-            #     [dist.Replicate(), dist.Replicate()],
-            # )
 
     def forward(
         self,
@@ -1481,9 +1247,6 @@ class ErnieAttentionAuto(nn.Layer):
             # .transpose([0, 2, 1, 3])
         )
 
-        # print(f"query_states = {query_states}")
-        # print(f"key_states = {key_states}")
-        # print(f"value_states = {value_states}")
         if self.config.sequence_parallel:
             query_states = paddle.transpose(query_states, [1, 0, 2, 3])
             key_states = paddle.transpose(key_states, [1, 0, 2, 3])
@@ -1543,9 +1306,6 @@ class ErnieAttentionAuto(nn.Layer):
         use_cache=False,
         inbatch_pack_offset=None,
     ):
-        """
-        在recompute区域内进行fuse-split， rope, matmul等操作。
-        """
         if mix_layer is not None:
             query_states, key_states, value_states = paddle.split(mix_layer, 3, axis=-1)
         query_states_dtype = query_states.dtype
@@ -1568,12 +1328,6 @@ class ErnieAttentionAuto(nn.Layer):
                 offset=offset if position_ids is None else 0,
             )
         else:
-            # 2.
-            # cos_sin = self.rotary_emb.forward_single(paddle.arange(kv_seq_len).unsqueeze(0).astype('float32'))
-            # query_states = self.rotary_emb.apply_rotary_single(query_states, cos_sin)
-            # key_states = self.rotary_emb.apply_rotary_single(key_states, cos_sin)
-            #
-            # 3.
             if offset > 0 or position_ids is not None or not self.fuse_rope:
                 cos_sin = self.rotary_emb(kv_seq_len, position_ids).transpose(
                     [0, 2, 1, 3]
@@ -1595,18 +1349,13 @@ class ErnieAttentionAuto(nn.Layer):
                         query_states, key_states, None
                     )
 
-        # [bsz, nh, t, hd]
-
         if use_cache:
             query_states = query_states.astype(query_states_dtype)
             key_states = key_states.astype(query_states_dtype)
         if past_key_value is not None:
-            # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
-        # NOTE(for generation): use list instead of tuple to store the cache
-        # tensors, so that we can clear the cache tensors for memory efficiency.
         past_key_value = [key_states, value_states] if use_cache else None
 
         attn_output, attn_weights = scaled_dot_product_attention(
@@ -1616,9 +1365,6 @@ class ErnieAttentionAuto(nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             config=self.config,
-            rr_flash_attn=(
-                self._rr_flash_attn if self.training else None
-            ),  # in eval mode, no using rr
             inbatch_pack_offset=inbatch_pack_offset,
             training=self.training,
         )
@@ -1674,16 +1420,7 @@ class ErnieMoeMLP(ErnieMLP):
             )
 
     def forward(self, x):
-        """
-        将输入张量通过自我和下游项目层次化到一个通道数更高的输出。
 
-        Args:
-            x (Tensor): 输入张量，形状为[batch_size, channels, height, width]。
-
-        Returns:
-            Tensor: 通过自我和下游项目层次化后的输出张量，形状为[batch_size, num_classes, height', width']。其中，height'和width'分别是上游项目的输出高度和宽度。
-
-        """
         if self.fuse_swiglu:
             x = fused_swiglu(self.gate_proj(x), self.up_proj(x))
         else:
@@ -1696,7 +1433,6 @@ class ErnieMoeMLP(ErnieMLP):
 
 
 class BMMLinear(nn.Layer):
-    """BMM 实现的 SwishGLU 层, 实现expert-fusion"""
 
     def __init__(self, experts, d_in, d_out, use_bias=False):
         super().__init__()
@@ -1721,14 +1457,12 @@ class ErnieMoeMLPFused(nn.Layer):
     """Fused Implement of ErnieMoeMLP"""
 
     def __init__(self, config):
-        """doc"""
+
         assert (
             hasattr(config, "disable_ffn_model_parallel")
             or config.tensor_parallel_degree == 1
-        ), f"fused mlp only suport mp-moe, mp={config.tensor_parallel_degree}"  # 还不吃支持  expert 内的mp 通信。
+        ), f"fused mlp only suport mp-moe, mp={config.tensor_parallel_degree}"
         assert config.fuse_attn_ffn, "fused mlp only support fuse_attn_ffn"
-        # config = deepcopy(config)
-        # config.tensor_parallel_degree = 1
         super().__init__()
         self.moe_dropout_prob = config.moe_dropout_prob
         self.num_local_experts = config.moe_num_experts // config.moe_world_size
@@ -1785,7 +1519,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = ErnieAttentionAuto(config, ipp)
         self.use_moe = config.use_moe if hasattr(config, "use_moe") else False
-
         if self.use_moe:
             moe_layer_start_index = (
                 min(config.moe_layer_start_index)
@@ -1797,9 +1530,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 if isinstance(config.moe_layer_end_index, (tuple, list))
                 else config.moe_layer_end_index
             )
-            print(
-                f"[liyamei check moe] self.use_moe={self.use_moe} layer_idx={layer_idx} config.moe_layer_interval={config.moe_layer_interval} moe_layer_start_index={moe_layer_start_index} moe_layer_end_index={moe_layer_end_index}"
-            )
 
         if (
             self.use_moe
@@ -1807,7 +1537,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
             and layer_idx >= moe_layer_start_index
             and layer_idx <= moe_layer_end_index
         ):
-            print("lzx debug create_moe_mlp_layer")
             self.create_moe_mlp_layer(layer_idx, ipp)
         else:
             self.mlp = ErnieMLP(config, ipp)
@@ -1824,7 +1553,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
         )
 
     def create_moe_mlp_layer(self, layer_idx, ipp):
-        """创建MoE模型中的MLP层"""
         _ex_cfg = deepcopy(self.config)
         fc_cls = ErnieMoeMLPFused if _ex_cfg.moe_fuse_experts else ErnieMoeMLP
         if _ex_cfg.moe_intermediate_size:
@@ -1874,7 +1602,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
         )
         _sh_cfg = deepcopy(self.config)
 
-        # 创建 shared_experts
         if _sh_cfg.moe_num_shared_experts > 0:
             if _sh_cfg.moe_intermediate_size:
                 _sh_inter_size = (
@@ -1917,25 +1644,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 config=self.config,
                 ipp=self.ipp,
             )
-            if self.config.multimodel_experts and self.config.moe_use_hard_gate:
-                _mlp_text = MOELayerAuto(
-                    lm_gate,
-                    lm_experts,
-                    layer_idx=layer_idx,
-                    shared_experts=shared_experts,
-                    group=self.config.moe_group,
-                    recompute=self.config.use_recompute_moe,
-                    enable_logging=self.config.moe_logging,
-                    k=self.config.moe_k,
-                    enable_pbr=self.config.moe_use_bpr,
-                    all_to_all_dropout=self.config.moe_all_to_all_dropout,
-                    group_experts=self.config.moe_group_experts,
-                    config=self.config,
-                    ipp=self.ipp,
-                )
-                self.mlp_text = (
-                    lambda: _mlp_text
-                )  # 这个lambd防止 text部分参数被扫进state-dict
 
     def forward(
         self,
@@ -1962,15 +1670,9 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 (see `cache`).
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
-        # print(f"In decoder layers")
-        # print(f"before ln, hidden_states : {hidden_states}")
 
         residual = hidden_states
-        # logger.debug(f'layer-hidden-dtype:{hidden_states.dtype}, norm={hidden_states.astype("float32").norm()}')
         hidden_states = self.input_layernorm(hidden_states)
-        # logger.debug(f'after-norm-1:{hidden_states.dtype}, norm={hidden_states.astype("float32").norm()}')
-
-        # print(f"after ln, hidden_states : {hidden_states}")
 
         # Self Attention
         (hidden_states, self_attn_weights, present_key_value, *router_loss_attn) = (
@@ -2005,19 +1707,10 @@ class ErnieDecoderLayerAuto(nn.Layer):
             self.mlp,
             (MOELayerAuto),
         ):
-            if (
-                self.config.multimodel_experts
-                and self.config.moe_use_hard_gate
-                and token_type_ids is not None
-                and not token_type_ids.any()
-            ):
-                hidden_states, _, router_loss, gate_logits = self.mlp_text()(
-                    hidden_states, None
-                )
-            else:
-                hidden_states, _, router_loss, gate_logits = self.mlp(
-                    hidden_states, token_type_ids
-                )
+
+            hidden_states, _, router_loss, gate_logits = self.mlp(
+                hidden_states, token_type_ids
+            )
         else:
             if self.config.sequence_parallel:
                 # do all-gather
@@ -2050,19 +1743,10 @@ class ErnieDecoderLayerAuto(nn.Layer):
             outputs += (present_key_value,)
 
         if hasattr(self.config, "use_moe") and self.config.use_moe:
-            # 只有 `use_moe` 时为非空
             if router_loss_attn:
                 router_loss_attn = router_loss_attn[0]
-                # if self.config.moe_logging:
-                #     global_training_logs.update(
-                #         **{
-                #             f"router_loss_attn_{self.layer_idx}": router_loss_attn,
-                #             f"router_loss_{self.layer_idx}": router_loss,
-                #         }
-                #     )
                 router_loss = router_loss + router_loss_attn
 
-            # use-moe 时无论这一层有没有 moe layer，都会额外增加一个返回值
             if isinstance(self.mlp, (MOELayerAuto)):
                 outputs += (router_loss,)
             else:
@@ -2088,20 +1772,7 @@ class ErniePretrainedModelAuto(PretrainedModel):
 
     @classmethod
     def _get_name_mappings(cls, config: ErnieMoEConfig) -> StateDictNameMapping:
-        """
-            获取模型的名称映射，包括模型参数和额外的映射关系。
 
-        Args:
-            config (ErnieMoEConfig): ErnieMoE配置类实例，包含了模型的相关信息。
-
-        Returns:
-            StateDictNameMapping (List[Tuple[str, str, Optional[str], int]]): 一个列表，每个元素是一个四元组，分别表示：
-                1. 原始模型中的参数名；
-                2. 转换后的参数名；
-                3. 如果需要进行转换（可选），则为转换操作类型；
-                4. 索引值，用于标识当前参数在所有参数中的位置。
-
-        """
         mappings: StateDictNameMapping = []
         model_mappings = [
             ["embed_tokens.weight"],
@@ -2157,16 +1828,6 @@ class ErniePretrainedModelAuto(PretrainedModel):
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
-        """
-        根据配置和分割或合并的方式，获取张量并行映射关系。
-
-        Args:
-            config (TensorParallelConfig): TensorParallel的配置对象。
-            is_split (bool, optional): 是否为分割操作。默认为True。
-
-        Returns:
-            Dict: 包含张量并行映射关系的字典。
-        """
 
         from paddleformers.transformers.conversion_utils import split_or_merge_func
 
@@ -2236,19 +1897,12 @@ class ErniePretrainedModelAuto(PretrainedModel):
                 paddle.incubate.nn.FusedLinear,
             ),
         ):
-            # In the dygraph mode, use the `set_value` to reset the parameter directly,
-            # and reset the `state_dict` to update parameter in static mode.
-            # logger.info(f'initializing pp:{type(layer)}')
 
             with rng_tracker():
                 dtype = paddle.get_default_dtype()
                 paddle.set_default_dtype("float32")
-                # 在defualt dtype为bfloat16的情况下调用randn会报错，
-                # 实际上randn已经支持bfloat16了，只是API检测层面的错误。
                 if layer.weight._is_initialized():
                     if layer.weight.is_dist():
-                        # 对于DistTensor，应采用local_shape来初始化
-                        # 当模型规模较大时，paddle.randn的输出索引可能会超出int最大值，导致生成的数据为0
                         layer.weight._local_value().set_value(
                             paddle.randn(
                                 layer.weight._local_shape, dtype=layer.weight.dtype
@@ -2280,21 +1934,16 @@ class ErniePretrainedModelAuto(PretrainedModel):
             # Different from paper, but it uses a different permutation in order to obtain the same calculation
             emb = np.concatenate([freqs, freqs], axis=-1)
             # [bs, seqlen, nhead, head_dim]
-            cos_cached = np.cos(emb)[:, :]  # .astype(dtype)
-            sin_cached = np.sin(emb)[:, :]  # .astype(dtype)
-            layer.cos_cached.set_value(cos_cached)  # model后续会被cast成half/bfloat16
+            cos_cached = np.cos(emb)[:, :]
+            sin_cached = np.sin(emb)[:, :]
+            layer.cos_cached.set_value(cos_cached)
             layer.sin_cached.set_value(sin_cached)
         elif isinstance(layer, Top2Gate):
-            if not hasattr(
-                layer, "weight"
-            ):  # no weight to initialie : moe-round-robin-gate
+            if not hasattr(layer, "weight"):
                 return
             with rng_tracker("model_parallel_rng"):
-                dtype = paddle.get_default_dtype()  # layer.weight.dtype  #
+                dtype = paddle.get_default_dtype()
                 paddle.set_default_dtype("float32")
-                print("lzx debug layer name,", layer)
-                # print("lzx debug layer name,", layer.weight)
-                print("self.config.moe_group_experts:", self.config.moe_group_experts)
                 if self.config.moe_group_experts:
                     if layer.weight._is_initialized():
                         layer.weight.set_value(
@@ -2337,18 +1986,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
     """
 
     def __init__(self, config: ErnieMoEConfig):
-        """
-            初始化ErnieDecoderAuto实例。
-
-        Args:
-            config (ErnieMoEConfig): ErnieMoE配置类，包含模型的相关参数，如隐藏单元大小、词表大小等。
-
-        Returns:
-            None.
-
-        Raises:
-            None.
-        """
         if hasattr(config, "use_moe") and config.use_moe:
             if config.moe_group in {"mp", "model", "tp", "mpdp"}:
                 assert config.sequence_parallel
@@ -2433,30 +2070,9 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
         )
 
     def get_input_embeddings(self):
-        """
-        获取输入的词嵌入表示。
-
-        Args:
-            无。
-
-        Returns:
-            torch.Tensor: 输入的词嵌入表示，形状为 (vocab_size, embed_dim)，其中 vocab_size 是词汇表大小，
-            embed_dim 是词嵌入的维度。
-
-        """
         return self.embed_tokens
 
     def set_input_embeddings(self, value):
-        """
-        设置模型的输入嵌入层权重。
-
-        Args:
-            value (nn.Embedding): 一个预训练的词嵌入层对象，用于替换模型当前的输入嵌入层。
-
-        Returns:
-            None: 此函数不返回任何值，但会更新模型内部的 `embed_tokens` 属性。
-
-        """
         self.embed_tokens = value
 
     @classmethod
@@ -2487,8 +2103,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
         )
         return combined_attention_mask
 
-    # NOTE: 存在控制流和Pylayer的逻辑时不能使用not_to_static
-    # @paddle.jit.not_to_static
     def recompute_training(
         self,
         layer_module,
@@ -2501,23 +2115,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
         inbatch_pack_offset,
         token_type_ids,
     ):
-        """
-        重新计算模型的训练过程。
-
-        Args:
-            layer_module (torch.nn.Module): 包含前馈神经网络和注意力机制的层模块。
-            hidden_states (torch.Tensor): 形状为 (batch_size, sequence_length, hidden_size) 的隐藏状态张量。
-            attention_mask (torch.Tensor): 形状为 (batch_size, sequence_length) 的注意力掩码张量。
-            position_ids (torch.Tensor): 形状为 (batch_size, sequence_length) 的位置ID张量。
-            output_attentions (bool): 如果为 True，则输出注意力权重。
-            past_key_value (tuple): 包含过去键值对的元组。
-            use_cache (bool): 如果为 True，则在前向传播中保存已缓存的张量。
-            inbatch_pack_offset (int): 批次内的打包偏移量。
-
-        Returns:
-            torch.Tensor: 经过重新计算的隐藏状态张量。
-
-        """
 
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -2554,10 +2151,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
         token_type_ids=None,
         **kwargs,
     ):
-        """
-        模型的前向传播函数。
-        """
-        # print(f"ErnieModelAuto forward")
         output_attentions = (
             output_attentions
             if output_attentions is not None
@@ -2574,9 +2167,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             return_dict if return_dict is not None else self.config.use_return_dict
         )
 
-        # print(f"retrieve input ids and inputs_embeds")
-        # print(f"input_ids:{input_ids}\ninputs_embeds:{inputs_embeds}")
-        # retrieve input_ids and inputs_embeds
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError(
                 "You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time"
@@ -2604,18 +2194,11 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             inputs_embeds = self.embed_tokens(input_ids).astype(
                 self.embed_tokens.weight.dtype
             )
-            # print(f'emb out:{inputs_embeds} \n emb-weight:{self.embed_tokens.weight}')
 
         global_mesh = global_mesh_starts_with_pp()
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
-            # if token_type_ids is not None:
-            # token_type_ids = token_type_ids.reshape([-1, 1])
-            # token_type_ids = dist.reshard(
-            #     token_type_ids, global_mesh, [dist.Replicate() for _ in range(len(global_mesh._shape))]
-            # )
-            # token_type_ids = token_type_ids.reshape([-1])
 
         if position_ids is not None:
             position_ids = dist.shard_tensor(
@@ -2623,7 +2206,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 global_mesh,
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
-        # embed positions
         can_use_fa = self.config.use_flash_attn and flash_attention is not None
         can_mem_eff_attn = (
             self.config.use_mem_eff_attn and inbatch_pack_offset is not None
@@ -2631,12 +2213,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
         if can_use_fa or can_mem_eff_attn:
             if attention_mask is not None:
                 attention_mask = None
-                # logger.warning无法动转静
-                # logger.warning(
-                #    f"set attention_mask = None when (can_use_fa or can_mem_eff_attn) and attention_mask is not None, "
-                #    f"can_use_fa = {can_use_fa}, can_mem_eff_attn = {can_mem_eff_attn}, "
-                #    f"attention_mask is not None = {attention_mask is not None}"
-                # )
+
         elif attention_mask is None:
             attention_mask = paddle.ones(
                 (batch_size, seq_length_with_past), dtype=paddle.bool
@@ -2660,7 +2237,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             hidden_states = dist.reshard(hidden_states, get_mesh(0), self.placements)
 
         # decoder layers
-        # print(f"decoder layers")
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
@@ -2778,10 +2354,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             )
         hidden_states = self.norm(hidden_states)
 
-        # print(f"after decoder layer, hidden_states is : {hidden_states}")
-
-        # add hidden states from the last decoder layer
-        # print(f"add hidden states from the last decoder layer")
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
@@ -2831,18 +2403,6 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
         )
 
     def forward(self, prediction_scores, masked_lm_labels):
-        """
-        计算模型的前向传播过程。
-
-        Args:
-            prediction_scores (tuple 或 paddle.Tensor): 模型预测的得分，当config.use_sparse_head_and_loss_fn为True时，
-                应为包含hidden_states, outlinear_weight, outlinear_bias的元组；否则为paddle.Tensor。
-            masked_lm_labels (paddle.Tensor): 经过mask的token对应的真实标签，用于计算损失函数。
-
-        Returns:
-            paddle.Tensor: 前向传播的计算结果，包含损失值和其它可能的输出。
-
-        """
         if self.config.use_sparse_head_and_loss_fn:
             hidden_states, outlinear_weight, outlinear_bias = prediction_scores
 
@@ -2906,7 +2466,6 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
         sparse_label_idx=None,
         tensor_parallel_output=None,
     ):
-        """doc"""
 
         logits = calc_lm_head_logits(
             self.config,
@@ -2927,21 +2486,6 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
         return masked_lm_loss
 
     def forward_impl(self, prediction_scores, masked_lm_labels):
-        """
-        计算masked language modeling的损失函数。
-
-        Args:
-            prediction_scores (paddle.Tensor): 预测得分张量，其形状为[batch_size, sequence_length, vocab_size]。
-            masked_lm_labels (paddle.Tensor): masked language modeling的目标标签张量，其形状为[batch_size, sequence_length]。
-
-        Returns:
-            tuple or paddle.Tensor: 如果self.return_tuple为True，则返回包含两个元素的元组，第一个元素为损失值，第二个元素为损失总和；
-            如果self.return_tuple为False，则只返回损失值。
-
-            - 损失值 (paddle.Tensor): 形状为[]的张量，表示masked language modeling的损失。
-            - 损失总和 (paddle.Tensor): 形状为[]的张量，表示masked language modeling的损失总和（不包含mask）。
-
-        """
 
         with paddle.amp.auto_cast(False):
             if self.config.use_sparse_head_and_loss_fn and prediction_scores.shape[
@@ -2957,7 +2501,6 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
                 masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
             else:
                 masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
-            # print(f"after calc cross entropy, masked_lm_loss is : {masked_lm_loss}")
             lossmask = masked_lm_labels != self.ignored_index
 
             if (~lossmask).all():  # empty span
@@ -2989,16 +2532,6 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
     """
 
     def __init__(self, config, return_tuple=True):
-        """
-        用于ERNIE预训练任务的损失函数基类。
-
-        Args:
-            config (PretrainingConfig): ERNIE模型的配置对象。
-            return_tuple (bool，可选): 如果为True，则返回损失函数的值为一个元组（loss），否则返回标量值。默认值为True。
-
-        Returns:
-            None
-        """
         super(ErniePretrainingCriterion, self).__init__(
             config, return_tuple=return_tuple
         )
@@ -3111,19 +2644,7 @@ class ErnieLMHead(nn.Layer):
             )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-        """
-        根据给定的隐藏状态计算模型的前向传播输出。
 
-        Args:
-            hidden_states (torch.Tensor): 模型的隐藏状态，形状为 [batch_size, sequence_length, hidden_size]。
-            tensor_parallel_output (Union[None, Tuple[Any, ...]], optional): 用于并行计算输出的张量元组。默认为None。
-
-        Returns:
-            Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Union[None, Tuple[Any, ...]]], torch.Tensor]:
-                如果启用了重新计算损失函数或使用了稀疏头和损失函数，则返回包含隐藏状态、权重、偏置和并行输出元组的元组。
-                否则，返回通过calc_lm_head_logits函数计算得到的logits张量。
-
-        """
         if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
             out_tensors = (
                 (hidden_states, self.weight, self.bias)
@@ -3166,7 +2687,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                 config.tensor_parallel_degree > 1
             ), f"sequence-parallel needs mp>1, got mp={config.tensor_parallel_degree}"
 
-
         # initialize-trick for big model, see
         # https://github.com/bigscience-workshop/bigscience/blob/master/train/tr11-176B-ml/README.md#std-init
         new_initializer_range = math.sqrt(0.3333 / config.hidden_size)
@@ -3192,7 +2712,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
             else:
                 logger.info("Use normal LayerNorm")
 
-    # Initialize weights and apply final processing
     def _post_init(self, original_init, *args, **kwargs):
         """
         Initialize weights and apply final processing
@@ -3201,134 +2720,60 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
         factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
         logger.info(f"using post init div: factor:{factor}")
 
-        # NOTE: if LazyGuard is enabled, all the weights will not be initialized here,
-        # so w._is_initialized() must be False, _post_init do nothing here.
-        # We should do scale weight into init_weights() if LazyGuard is enabled.
         def scale_by_factor_if_valid(w):
             if w.is_dist() and w._is_initialized():
                 w.scale_(factor)
 
         if hasattr(self.config, "use_moe") and self.config.use_moe:
             with paddle.no_grad():
-                for l in self.ernie.layers:
+                for left in self.ernie.layers:
                     if isinstance(
-                        l.self_attn.o_proj,
+                        left.self_attn.o_proj,
                         (MOELayerAuto),
                     ):
-                        for e in l.self_attn.o_proj.experts:
+                        for e in left.self_attn.o_proj.experts:
                             if isinstance(e, ErnieMoeMLP):
                                 scale_by_factor_if_valid(e.weight)
                     else:
-                        scale_by_factor_if_valid(l.self_attn.o_proj.weight)
+                        scale_by_factor_if_valid(left.self_attn.o_proj.weight)
 
                     if isinstance(
-                        l.mlp,
+                        left.mlp,
                         (MOELayerAuto),
                     ):
-                        for e in l.mlp.experts:
+                        for e in left.mlp.experts:
                             if isinstance(e, ErnieMoeMLP):
                                 scale_by_factor_if_valid(e.down_proj.weight)
                     else:
-                        scale_by_factor_if_valid(l.mlp.down_proj.weight)
+                        scale_by_factor_if_valid(left.mlp.down_proj.weight)
         else:
             with paddle.no_grad():
-                for l in self.ernie.layers:
-                    scale_by_factor_if_valid(l.self_attn.o_proj.weight)
-                    scale_by_factor_if_valid(l.mlp.down_proj.weight)
+                for left in self.ernie.layers:
+                    scale_by_factor_if_valid(left.self_attn.o_proj.weight)
+                    scale_by_factor_if_valid(left.mlp.down_proj.weight)
 
     def get_input_embeddings(self):
-        """
-        获取输入嵌入层（embedding layer）的权重。
 
-        Args:
-            无。
-
-        Returns:
-            torch.nn.Embedding: ERNIE模型中的嵌入层权重。
-
-        """
         return self.ernie.embed_tokens
 
     def set_input_embeddings(self, value):
-        """
-        设置模型输入的词嵌入权重。
 
-        Args:
-            value (torch.Tensor): 形状为 [vocab_size, embed_dim] 的词嵌入权重张量。
-
-        Returns:
-            None: 该函数不返回任何值，而是直接修改模型的内部状态。
-
-        """
         self.ernie.embed_tokens = value
 
     def get_output_embeddings(self):
-        """
-        获取输出嵌入表示（Output Embeddings）
-
-        Args:
-            无
-
-        Returns:
-            torch.nn.Module: 输出嵌入层（LM Head）的实例，用于将模型最后一层的隐藏状态转换为输出嵌入表示。
-
-        """
         return self.lm_head
 
     def set_output_embeddings(self, new_embeddings):
-        """
-        设置模型的输出嵌入层。
-
-        Args:
-            new_embeddings (torch.nn.Module): 新的输出嵌入层模块。
-
-        Returns:
-            None: 此方法没有返回值，直接修改模型的状态。
-
-        """
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        """
-        设置解码器。
-
-        Args:
-            decoder: 一个解码器对象，用于后续生成文本或进行其他解码操作。
-
-        Returns:
-            None
-
-        """
         self.ernie = decoder
 
     def get_decoder(self):
-        """
-        获取解码器对象。
-
-        Args:
-            无
-
-        Returns:
-            解码器对象（self.ernie）：模型中的解码器对象，用于生成文本或其他解码任务。
-
-        """
         return self.ernie
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-        """
-        为生成任务准备注意力掩码（attention mask）。
-
-        Args:
-            input_ids (Tensor): 输入的token IDs，形状为[batch_size, sequence_length]。
-            pad_token_id (int, optional): 填充token的ID。默认为None，表示不使用填充。
-            eos_token_id (int, optional): 结束token的ID。默认为None，表示不使用结束token。
-
-        Returns:
-            Tensor: 注意力掩码，与input_ids形状相同，数据类型为int64。
-                值为1表示对应的token应被考虑在注意力计算中，值为0表示忽略。
-
-        """
         is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
             input_ids == pad_token_id
         ).numpy().item()
@@ -3349,20 +2794,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
         inputs_embeds=None,
         **kwargs,
     ):
-        """
-        准备生成模型的输入参数。
-
-        Args:
-            input_ids (torch.Tensor): 输入的文本ID。
-            use_cache (bool, optional): 是否使用缓存。默认为False。
-            past_key_values (Tuple[Tuple[torch.Tensor]], optional): 包含预计算的键和值的元组列表。默认为None。
-            inputs_embeds (torch.Tensor, optional): 可选的，预先计算的输入嵌入。默认为None。
-            **kwargs: 额外的关键字参数。
-
-        Returns:
-            dict: 包含模型输入参数的字典，包括`input_ids`、`past_key_values`、`use_cache`、`attention_mask`和`return_dict`。
-
-        """
         if past_key_values:
             input_ids = input_ids[:, -1:]
 
@@ -3388,22 +2819,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
     def update_model_kwargs_for_generation(
         outputs, model_kwargs, is_encoder_decoder=False
     ):
-        """
-        更新模型参数以进行文本生成。
-
-        Args:
-            outputs (Union[Tuple[paddle.Tensor, ...], CausalLMOutputWithCrossAttentions]):
-                模型的输出，可能是一个包含多个paddle.Tensor的元组，或者是一个CausalLMOutputWithCrossAttentions对象。
-            model_kwargs (Dict[str, paddle.Tensor]):
-                模型的关键字参数字典，包含需要更新的参数。
-            is_encoder_decoder (bool, optional):
-                是否是编码器-解码器模型。默认为False。
-
-        Returns:
-            Dict[str, paddle.Tensor]:
-                更新后的模型关键字参数字典。
-
-        """
         # update cache
         if (
             isinstance(outputs, tuple)
@@ -3452,8 +2867,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
         self,
         input_ids,
         labels=None,
-        data_id=None,  # no use
-        src_id=None,  # no use
         position_ids=None,
         attention_mask=None,
         inputs_embeds=None,
@@ -3461,89 +2874,13 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
         past_key_values=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=False,  # decode 时需要return-dict, pretrain & eval时不需要。
-        ignored_index=0,  # no use
+        return_dict=False,
+        ignored_index=0,
         inbatch_pack_offset=None,
         token_type_ids=None,
     ):
-        """
-        ErnieForCausalLMAuto模型的前向传播函数。
-
-        Args:
-            input_ids (torch.LongTensor): 输入的token IDs，形状为[batch_size, sequence_length]。
-            position_ids (torch.LongTensor, optional): 输入的token位置IDs，形状为[batch_size, sequence_length]。默认为None。
-            attention_mask (torch.FloatTensor, optional): 注意力掩码，用于避免对填充(padding)位置进行注意力计算。
-                形状为[batch_size, sequence_length]或[batch_size, 1, sequence_length, sequence_length]，
-                其中值为0表示忽略，值为1表示需要计算注意力。默认为None。
-            inputs_embeds (torch.FloatTensor, optional): 可选地，直接提供嵌入张量作为输入，而不用首先通过词汇表查找它们。
-                形状为[batch_size, sequence_length, hidden_size]。默认为None。
-            labels (torch.LongTensor, optional): 标签，用于计算损失。形状为[batch_size, sequence_length]。默认为None。
-            use_cache (bool, optional): 是否使用缓存。默认为False。
-            past_key_values (Tuple[Tuple[torch.FloatTensor]], optional): 来自之前的前向传播的键/值对的元组。
-                用于快速解码。默认为None。
-            output_attentions (bool, optional): 是否输出注意力权重。默认为None。
-            output_hidden_states (bool, optional): 是否输出隐藏状态。默认为None。
-            return_dict (bool, optional): 是否以模型输出字典的形式返回，还是返回一个元组。默认为False。
-            ignored_index (int, optional): 在计算损失时忽略的索引。默认为0。
-            data_id (Any, optional): 无用参数。默认为None。
-            src_id (Any, optional): 无用参数。默认为None。
-            inbatch_pack_offset (Any, optional): 无用参数。默认为None。
-
-        Returns:
-            Union[Tuple[torch.FloatTensor, torch.FloatTensor], CausalLMOutputWithCrossAttentions]:
-                - 如果`return_dict`为False，则返回包含损失和损失总和的元组。
-                - 如果`return_dict`为True，则返回包含以下字段的CausalLMOutputWithCrossAttentions命名元组：
-                    - loss (torch.FloatTensor): 损失张量，形状为[1,]。
-                    - logits (torch.FloatTensor): 预测的对数概率张量，形状为[batch_size, sequence_length, vocab_size]。
-                    - past_key_values (Tuple[Tuple[torch.FloatTensor]]): 来自当前前向传播的键/值对的元组。
-                    - hidden_states (Tuple[torch.FloatTensor], optional): 如果`output_hidden_states`为真，则返回隐藏状态。
-                    - attentions (Tuple[torch.FloatTensor], optional): 如果`output_attentions`为真，则返回注意力权重。
-
-        Raises:
-            AssertionError: 如果`return_dict`为False，并且没有提供`labels`，则会引发异常。
-        """
-        """
-        ErnieForCausalLMAuto模型的前向传播函数。
-
-        Args:
-            input_ids (torch.LongTensor): 输入的token IDs，形状为[batch_size, sequence_length]。
-            position_ids (torch.LongTensor, optional): 输入的token位置IDs，形状为[batch_size, sequence_length]。默认为None。
-            attention_mask (torch.FloatTensor, optional): 注意力掩码，用于避免对填充(padding)位置进行注意力计算。
-                形状为[batch_size, sequence_length]或[batch_size, 1, sequence_length, sequence_length]，
-                其中值为0表示忽略，值为1表示需要计算注意力。默认为None。
-            inputs_embeds (torch.FloatTensor, optional): 可选地，直接提供嵌入张量作为输入，而不用首先通过词汇表查找它们。
-                形状为[batch_size, sequence_length, hidden_size]。默认为None。
-            labels (torch.LongTensor, optional): 标签，用于计算损失。形状为[batch_size, sequence_length]。默认为None。
-            use_cache (bool, optional): 是否使用缓存。默认为False。
-            past_key_values (Tuple[Tuple[torch.FloatTensor]], optional): 来自之前的前向传播的键/值对的元组。
-                用于快速解码。默认为None。
-            output_attentions (bool, optional): 是否输出注意力权重。默认为None。
-            output_hidden_states (bool, optional): 是否输出隐藏状态。默认为None。
-            return_dict (bool, optional): 是否以模型输出字典的形式返回，还是返回一个元组。默认为False。
-            ignored_index (int, optional): 在计算损失时忽略的索引。默认为0。
-            data_id (Any, optional): 无用参数。默认为None。
-            src_id (Any, optional): 无用参数。默认为None。
-            inbatch_pack_offset (Any, optional): 无用参数。默认为None。
-
-        Returns:
-            Union[Tuple[torch.FloatTensor, torch.FloatTensor], CausalLMOutputWithCrossAttentions]:
-                - 如果`return_dict`为False，则返回包含损失和损失总和的元组。
-                - 如果`return_dict`为True，则返回包含以下字段的CausalLMOutputWithCrossAttentions命名元组：
-                    - loss (torch.FloatTensor): 损失张量，形状为[1,]。
-                    - logits (torch.FloatTensor): 预测的对数概率张量，形状为[batch_size, sequence_length, vocab_size]。
-                    - past_key_values (Tuple[Tuple[torch.FloatTensor]]): 来自当前前向传播的键/值对的元组。
-                    - hidden_states (Tuple[torch.FloatTensor], optional): 如果`output_hidden_states`为真，则返回隐藏状态。
-                    - attentions (Tuple[torch.FloatTensor], optional): 如果`output_attentions`为真，则返回注意力权重。
-
-        Raises:
-            AssertionError: 如果`return_dict`为False，并且没有提供`labels`，则会引发异常。
-        """
-        # from dataloader
         if isinstance(input_ids, list):
-            if len(input_ids) == 4:
-                input_ids, labels, data_ids, src_ids = input_ids
-            else:
-                raise ValueError(f"Unexpected input length, inputs = {input_ids}")
+            input_ids, labels = input_ids[:2]
 
         output_attentions = (
             output_attentions
@@ -3574,13 +2911,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
         )
 
         hidden_states = outputs.last_hidden_state
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output
-            and labels is not None
-            and self.config.tensor_parallel_degree > 1
-        )
 
         logits = self.lm_head(
             hidden_states,
@@ -3600,7 +2930,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                 router_loss=outputs.router_loss if self.config.use_moe else None,
             )
 
-        # Pretrain & Eval 必须有labels
         assert labels is not None
         router_loss = (
             outputs.router_loss

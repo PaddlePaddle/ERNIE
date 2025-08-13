@@ -209,16 +209,12 @@ class MOEAllGatherDispatcher(nn.Layer):
 
 
 def get_flatten_mesh(mesh):
-    """
-    使用输入 mesh 的所有进程构建 1 维 mesh
-    """
+
     return dist.ProcessMesh(mesh.process_ids)
 
 
 def get_mesh(pp_idx=0):
-    """
-    获得pp_idx的mesh
-    """
+
     mesh = fleet.auto.get_mesh()
     if "pp" in mesh.dim_names:
         mesh = mesh.get_mesh_with_dim("pp", pp_idx)
@@ -226,12 +222,7 @@ def get_mesh(pp_idx=0):
 
 
 def _reshard(tensor, mesh, placements):
-    """
-    用于相同process id并且相同切分状态的情况下更改mesh
-    例如从mesh_shape:[2,2],process_ids:[0,1,2,3],placements:[Replicate(), Replicate()],dim_names:[dp,mp]
-    变换成mesh_shape:[4],process_ids:[0,1,2,3],placements:[Replicate()],dim_names:[d0]
-    当前暂时通过dist.auto_parallel.moe_utils._dist_reshape来hack进行mesh的变换,后续框架reshard方法会支持该功能
-    """
+
     dst_tensor = dist.auto_parallel.moe_utils._dist_reshape(
         tensor, tensor.shape, mesh, placements
     )

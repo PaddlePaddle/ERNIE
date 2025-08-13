@@ -21,6 +21,7 @@ from typing import Union
 import paddle.distributed.communication.group
 
 from paddleformers.transformers.configuration_utils import PretrainedConfig
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -140,7 +141,7 @@ class ErnieConfig(PretrainedConfig):
         use_fast_ln=False,
         weight_share_add_bias=True,
         fuse_linear=False,
-        seqlen=False,  # pp only 由框架自动设置
+        seqlen=False,
         ignored_index=-100,
         remove_tail_layer=False,
         use_recompute_lm_head=False,
@@ -153,7 +154,7 @@ class ErnieConfig(PretrainedConfig):
         attention_probs_dropout_prob=0.0,
         hidden_dropout_prob=0.0,
         compression_ratio: float = 1.0,
-        quant_bits=-1,  # For Inferencemodel, -1采用半精度推断
+        quant_bits=-1,
         num_key_value_heads=None,
         submatrix_parallel=False,
         submatrix_parallel_low_memory=True,
@@ -169,7 +170,7 @@ class ErnieConfig(PretrainedConfig):
         resampler_fuse_rms_norm=False,
         token_loss_equal_weight=False,
         token_balance_loss=False,
-        token_balance_seqlen=False,  # pretrain根据bsz与seqlen计算
+        token_balance_seqlen=False,
         use_fp8=False,
         fp8_configs=dict(),
         use_fp8_mlp=False,
@@ -244,7 +245,7 @@ class ErnieConfig(PretrainedConfig):
         self.seqlen = seqlen
         self.use_bias = use_bias
         self.weight_share_add_bias = weight_share_add_bias
-        self.rope_reorder = rope_reorder  # 重新排列rope的顺序，防止间隔读取。
+        self.rope_reorder = rope_reorder
         self.rope_yarn_config = rope_yarn_config
         self.rope_theta = rope_theta
         self.fuse_rope = fuse_rope
@@ -265,16 +266,6 @@ class ErnieConfig(PretrainedConfig):
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.hidden_dropout_prob = hidden_dropout_prob
         self.compression_ratio = compression_ratio
-        """
-        `refined_recompute` 内容为一个dict:[op_name, skip_num], 目前只在PP模式下才生效。在PP中会根据`refined_recompute` 填充`self.skip_recompute_ops`
-            `op_name` 选择范围是："mlp_row_ln", "flash_attn", "attention_row_ln", "attention_column_ln", "mlp_column_ln"
-            `skip_num` 表示
-            选择不进行重计算的次数。
-            0表示 0次不重计算，也就是全部都重计算，显存最少。
-            -1表示全部不重计算，显存最多。
-            还可以填 【0，1，。。。，12】中的任意值，进行调整次数。
-            大于等于12。相当于 -1取值
-        """
         self.skip_recompute_ops = dict()
         self.quant_bits = quant_bits
         self.num_key_value_heads = num_key_value_heads
@@ -383,9 +374,7 @@ class ErnieConfig(PretrainedConfig):
             ), "cannot set `use_recompute_attn=True` when `use_recompute=True`"
 
     def register_nonsaveable_keys(self, keys):
-        """
-        兼容PaddleNLP不同分支的API变更
-        """
+
         if hasattr(super(), "register_nonsaveable_keys"):
             return super().register_nonsaveable_keys(keys)
         elif hasattr(super(), "register_unsavable_keys"):
@@ -479,7 +468,6 @@ class ErnieMoEConfig(ErnieConfig):
         moe_dense_experts_token_type_id: int = 3,
         moe_multimodal_dispatch_use_allgather: str = "",
         moe_multimodal_paired_experts: bool = False,
-        # `moe-use-hard-gate` 模态之间硬分离，全部由`token-type-bias` 来进行路由
         moe_reverse_token_drop: bool = False,
         moe_gate_act: str = "softmax",
         moe_norm_gate_logits=True,
@@ -490,7 +478,6 @@ class ErnieMoEConfig(ErnieConfig):
         moe_use_token_type_bias: bool = False,
         moe_k=2,
         moe_use_aux_free: bool = False,
-        # `moe_group_experts` 必须搭配 `moe_use_hard_gate=True` 使用
         moe_group_experts: bool = False,
         moe_group_orthogonal_loss: bool = False,
         moe_with_send_router_loss: bool = True,
@@ -703,7 +690,7 @@ class ErnieMoEConfig(ErnieConfig):
 
     @property
     def multimodel_experts(self) -> bool:
-        """是否有多种类型的experts."""
+
         return (
             isinstance(self.moe_num_experts, (tuple, list))
             and len(self.moe_num_experts) > 1
@@ -730,10 +717,7 @@ class ErnieMoEConfig(ErnieConfig):
             ), "cannot set `use_recompute_moe=True` when `use_recompute=True`"
 
     def to_json_string(self, use_diff: bool = True) -> str:
-        """
-        moe config 中还有一些不能被序列化的对象，例如 paddle.distributed.communication.group.Group,
-        为此，重写json序列化方法。
-        """
+
         if use_diff is True:
             config_dict = self.to_diff_dict()
         else:

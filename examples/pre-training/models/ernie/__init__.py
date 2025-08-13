@@ -13,11 +13,7 @@
 # limitations under the License.
 
 
-"""
-Ernie Padele实现
-"""
 from .configuration import *  # noqa
 from .modeling import *  # noqa
 from .modeling_auto import *  # noqa
 from .modeling_auto_pp import *  # noqa
-from .modeling_pp import ErnieMoEForCausalLMPipe

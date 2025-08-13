@@ -23,9 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class StopperCallback(TrainerCallback):
-    """
-    主动根据外部信号Stop Training 。（防止kill作业炸鸡）
-    """
 
     def on_substep_end(self, args, state, control, **kwargs):
         if os.path.exists("/root/stop"):
