@@ -14,10 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-top2gate
-"""
-
 
 from typing import Tuple
 from functools import partial
@@ -57,11 +53,9 @@ logger = logging.getLogger(__name__)
 
 
 class CalOrthogonalLossOptEachWeightFunctor(paddle.autograd.PyLayer):
-    """CalOrthogonalLossOptEachWeightFunctor"""
 
     @staticmethod
     def forward(ctx, gate_weight, moe_k, use_group, eps=1e-12):
-        """forward"""
         if gate_weight.dtype != paddle.float32:
             gate_weight = gate_weight.astype(paddle.float32)
         (
@@ -83,7 +77,6 @@ class CalOrthogonalLossOptEachWeightFunctor(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, out_grad):
-        """backward"""
         gate_weight, wnorm, weight_scale, normed_weight, weight_matmul = (
             ctx.saved_tensor()
         )
@@ -105,11 +98,9 @@ class CalOrthogonalLossOptEachWeightFunctor(paddle.autograd.PyLayer):
 
 
 class CalZLossFunctor(paddle.autograd.PyLayer):
-    """CalZLossFunctor"""
 
     @staticmethod
     def forward(ctx, logits, loss_mask=None, clip_min=1e-6):
-        """forward"""
         if loss_mask is not None:
             assert loss_mask.stop_gradient
         loss, max_logits, safe_sumexp, logsumexp_per_token = (
@@ -123,7 +114,6 @@ class CalZLossFunctor(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, out_grad):
-        """backward"""
         logits, loss_mask, max_logits, safe_sumexp, logsumexp_per_token = (
             ctx.saved_tensor()
         )
@@ -142,7 +132,6 @@ class CalZLossFunctor(paddle.autograd.PyLayer):
 
 
 class CalAuxLossFunctor(paddle.autograd.PyLayer):
-    """CalAuxLossFunctor"""
 
     @staticmethod
     def forward(
@@ -156,7 +145,6 @@ class CalAuxLossFunctor(paddle.autograd.PyLayer):
         moe_k,
         clip_min=1e-6,
     ):
-        """forward"""
         if tokens_mask is not None and tokens_mask.dtype != gate_prob.dtype:
             tokens_mask = tokens_mask.astype(gate_prob.dtype)
         loss, seqlen_float, ce = paddle.incubate.nn.functional.cal_aux_loss(
@@ -177,7 +165,6 @@ class CalAuxLossFunctor(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, out_grad):
-        """backward"""
         gate_prob, seqlen_float, ce = ctx.saved_tensor()
         num_experts = ctx.num_experts
         use_group = ctx.use_group
@@ -190,7 +177,6 @@ class CalAuxLossFunctor(paddle.autograd.PyLayer):
 def cal_orthogonal_loss_opt_each_weight_func(
     weight, moe_k, use_group, eps, xpu_matmul=None, training=True
 ):
-    """cal_orthogonal_loss_opt_each_weight_func"""
     weight = weight.transpose([1, 0]).contiguous()  # transpose weight here
     wnorm = weight.norm(axis=1)
     weight = weight / paddle.maximum(wnorm, eps).unsqueeze(1)
@@ -212,7 +198,6 @@ def cal_orthogonal_loss_opt_each_weight_func(
 
 
 def cal_z_loss_func(logits, loss_mask):
-    """cal_z_loss_func"""
     if loss_mask is not None:
         loss_mask = loss_mask.astype(logits.dtype)
         l_zloss = (logits.logsumexp(1).square() * loss_mask).sum() / paddle.clip(
@@ -235,7 +220,6 @@ def cal_aux_loss_func(
     rank=None,
     group=None,
 ):
-    """cal_aux_loss_func"""
     if tokens_mask is not None and tokens_mask.dtype != gate_prob.dtype:
         tokens_mask = tokens_mask.astype(gate_prob.dtype)
 
@@ -287,27 +271,10 @@ def masked_fill(x, mask, value):
 
 @paddle.no_grad()
 def compute_optimal_transport(M, r, c, lam=1.0, epsilon=1e-8, max_iters: int = 10):
-    """
-    Computes the optimal transport matrix and Slinkhorn distance using the
-    Sinkhorn-Knopp algorithm
 
-    Inputs:
-        - M : cost matrix (n x m)
-        - r : vector of marginals (n, )
-        - c : vector of marginals (m, )
-        - lam : strength of the entropic regularization
-        - epsilon : convergence parameter
-
-    Outputs:
-        - P : optimal transport matrix (n x m)
-        - dist : Sinkhorn distance
-    """
     n, _ = M.shape
-    # P = (- lam * M).exp()
-    # P /= P.sum()
     P = F.softmax(-M / lam)
     u = paddle.zeros(n, "float32")
-    # normalize this matrix
     for _ in range(max_iters):
         if (u - P.sum(1)).abs().max() < epsilon:
             break
@@ -319,31 +286,22 @@ def compute_optimal_transport(M, r, c, lam=1.0, epsilon=1e-8, max_iters: int = 1
 
 
 def cast_if_needed(x, dtype):
-    """
-    cast_if_needed
-    """
+
     return x.cast(dtype) if x.dtype != dtype else x
 
 
 class FusedGateDetachMatmul(paddle.autograd.PyLayer):
-    """
-    FusedGateDetachMatmul
-    """
 
     @staticmethod
     def forward(ctx, x, w):
-        """
-        forward
-        """
+
         ctx.dtype = paddle.float32
         ctx.save_for_backward(x, w)
         return F.linear(cast_if_needed(x, ctx.dtype), cast_if_needed(w, ctx.dtype))
 
     @staticmethod
     def backward(ctx, y_grad):
-        """
-        backward
-        """
+
         x, w = ctx.saved_tensor()
         assert ctx.dtype == y_grad.dtype, "dtype not match"
         x_g, w_g = matmul_bwd(
@@ -357,9 +315,7 @@ class FusedGateDetachMatmul(paddle.autograd.PyLayer):
 
 
 def gate_detach_matmul(x, weight, use_fuse, use_fake_gate=False):
-    """
-    gate_detach_matmul
-    """
+
     if use_fuse:
         score = FusedGateDetachMatmul.apply(x, weight)
     else:
@@ -372,20 +328,6 @@ def gate_detach_matmul(x, weight, use_fuse, use_fake_gate=False):
 
 
 class Top2Gate(nn.Layer):
-    """Gate module which implements Top2Gating as described in Gshard_.
-    ::
-
-        gate = Top2Gate(model_dim, num_experts)
-        l_aux, combine_weights, dispatch_mask = gate(input)
-
-    .. Gshard_: https://arxiv.org/pdf/2006.16668.pdf
-
-    Args:
-        model_dim (int):
-            size of model embedding dimension
-        num_experts (ints):
-            number of experts in model
-    """
 
     def __init__(self, config, layer_idx: int, group, gate_weight=None) -> None:
 
@@ -551,18 +493,14 @@ class Top2Gate(nn.Layer):
                     )
                 p.expert_type = f"expert_type_{i}"
                 self.add_parameter(
-                    (
-                        "weight" if i == 0 else f"weight_{i}"
-                    ), 
+                    ("weight" if i == 0 else f"weight_{i}"),
                     p,
                 )
         else:
             self.weight = self.create_parameter(
                 shape=[self.model_dim, self.num_experts],
                 dtype="float32",
-                attr=paddle.ParamAttr(
-                    name=unique_name.generate("moe_gate")
-                ), 
+                attr=paddle.ParamAttr(name=unique_name.generate("moe_gate")),
             )
             logger.info(f"moe-Gate, {self.weight}")
 
@@ -699,9 +637,7 @@ class Top2Gate(nn.Layer):
         )
 
     def get_capacity(self, num_tokens, cap_factor=None):
-        """
-        return capcity
-        """
+
         num_experts = (
             sum(self.num_experts)
             if self.config.multimodel_experts
@@ -972,39 +908,18 @@ class Top2Gate(nn.Layer):
         if use_group is None:
             use_group = self.config.moe_group_experts
 
-        moe_router_loss_ops = None
-        if (
-            moe_router_loss_ops is not None
-            and get_env_device() != "xpu"
-            and (tokens_mask is None or len(tokens_mask.shape) == 1)
-            and (tokens_mask is None or tokens_mask.shape[0] == gate_prob.shape[0])
-            and (gate_prob.shape[0] >= gate_prob.shape[1])
-            and (not self.global_aux_loss)
-            and (gate_prob.dtype == paddle.float32)
-        ):
-            return CalAuxLossFunctor.apply(
-                gate_prob,
-                dispatch_mask,
-                tokens_mask,
-                dispatch_tokens_mask,
-                num_experts,
-                use_group,
-                self.config.moe_k,
-                clip_min=1e-6,
-            )
-        else:
-            return cal_aux_loss_func(
-                gate_prob,
-                dispatch_mask,
-                tokens_mask,
-                dispatch_tokens_mask,
-                num_experts,
-                use_group,
-                self.config.moe_k,
-                self.global_aux_loss,
-                self.rank if self.global_aux_loss else None,
-                self.group if self.global_aux_loss else None,
-            )
+        return cal_aux_loss_func(
+            gate_prob,
+            dispatch_mask,
+            tokens_mask,
+            dispatch_tokens_mask,
+            num_experts,
+            use_group,
+            self.config.moe_k,
+            self.global_aux_loss,
+            self.rank if self.global_aux_loss else None,
+            self.group if self.global_aux_loss else None,
+        )
 
     def _cal_z_loss(self, logits, loss_mask=None):
 
@@ -1019,9 +934,7 @@ class Top2Gate(nn.Layer):
             return cal_z_loss_func(logits, loss_mask)
 
     def _cal_orthogonal_loss_opt_each_weight(self, weight, use_group):
-        """
-        gate正交loss(优化版)
-        """
+
         if weight.dtype != paddle.float32:
             weight = weight.astype(paddle.float32)
 
@@ -1044,9 +957,7 @@ class Top2Gate(nn.Layer):
             )
 
     def _cal_orthogonal_loss(self, weight_id=None, use_group=None):
-        """
-        gate正交Loss
-        """
+
         if use_group is None:
             use_group = (
                 self.config.moe_group_experts and self.config.moe_group_orthogonal_loss
@@ -1073,7 +984,6 @@ class Top2Gate(nn.Layer):
 
 
 class TopKGateFused(Top2Gate):
-    """doc"""
 
     def forward(
         self,
@@ -1081,16 +991,7 @@ class TopKGateFused(Top2Gate):
         token_type_ids=None,
         transform_weight=True,
     ) -> Tuple[Tensor, Tensor, Tensor]:  # type: ignore
-        """
-        Args:
-            input: paddle.Tensor, hidden-states of layer
-            token_type_ids: paddle.Tensor[Seqw], token_type_ids of input
-            transform_weight: bool, when using multimodal experts, perform `self.get_gate_weight` if specified
-        Retruns:
-            paddle.Tensor [Seq, Expert, Capacity]: float32, combine weights
-            paddle.Tensor [Seq, Expert, Capacity]: bool, dispatch mask
-            Tuple[paddle.Tensor]: `GateOutput`
-        """
+
         capacity = self.get_capacity(input.shape[0])
         weight = self.get_gate_weight(transform_weight)
         with paddle.amp.auto_cast(False):

@@ -24,7 +24,6 @@ import logging
 from paddle import Tensor
 import paddle.distributed as dist
 
-# import paddle.nn.functional as F
 
 logger = logging.getLogger(__name__)
 
