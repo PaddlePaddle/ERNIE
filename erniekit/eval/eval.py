@@ -332,6 +332,8 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         "random_seed": finetuning_args.seed,
         "num_replicas": finetuning_args.dataset_world_size,
         "rank": finetuning_args.dataset_rank,
+        "packing": data_args.packing,
+        "mix_strategy": data_args.mix_strategy,
     }
     from ernie.dataset.finetuning import collate_fn
 
