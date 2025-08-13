@@ -36,26 +36,28 @@ class DataArguments:
         },
     )
     train_dataset_type: str = field(
-        default="erniekit",
+        default=None,
         metadata={
             "help": "type of training datasets. \
         Multi-source dataset is supported, e.g., erniekit,erniekit."
         },
     )
     train_dataset_path: str = field(
-        default="examples/data/sft-train.jsonl",
+        default=None,
         metadata={
             "help": "path of training datasets. \
         Multi-source dataset is supported, e.g., ./sft-1.jsonl,./sft-2.jsonl."
         },
     )
     train_dataset_prob: str = field(
-        default="1.0",
+        default=None,
         metadata={
             "help": "probabilities of training datasets. \
         Multi-source dataset is supported, e.g., 0.8,0.2."
         },
     )
+    text_dataset_path: str = field(default=None, metadata={"help": "sft txt data path"})
+    text_dataset_prob: str = field(default=None, metadata={"help": "sft txt data prob"})
     eval_dataset_type: str = field(
         default="erniekit", metadata={"help": "type of eval datasets."}
     )

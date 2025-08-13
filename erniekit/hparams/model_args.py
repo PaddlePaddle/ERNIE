@@ -17,6 +17,41 @@ from typing import Optional
 
 
 @dataclass
+class VisionArguments:
+    attn_implementation: str = field(
+        default="eager", metadata={"help": "Attention implementation"}
+    )
+    attn_sep: bool = field(
+        default=True, metadata={"help": "Whether to separate attention"}
+    )
+    depth: int = field(default=32, metadata={"help": "Depth of the vision model"})
+    embed_dim: int = field(default=1280, metadata={"help": "Embedding dimension"})
+    hidden_act: str = field(
+        default="quick_gelu", metadata={"help": "Hidden activation function"}
+    )
+    hidden_size: int = field(default=1280, metadata={"help": "Hidden size"})
+    in_channels: int = field(default=3, metadata={"help": "Input channels"})
+    in_chans: int = field(default=3, metadata={"help": "Input channels (alias)"})
+    mlp_ratio: int = field(default=4, metadata={"help": "MLP ratio"})
+    model_type: str = field(
+        default="DFNRope_vision_transformer", metadata={"help": "Vision model type"}
+    )
+    num_heads: int = field(default=16, metadata={"help": "Number of attention heads"})
+    patch_size: int = field(default=14, metadata={"help": "Patch size"})
+    spatial_merge_size: int = field(default=2, metadata={"help": "Spatial merge size"})
+    spatial_patch_size: int = field(default=14, metadata={"help": "Spatial patch size"})
+    tensor_parallel_degree: int = field(
+        default=4, metadata={"help": "Tensor parallel degree"}
+    )
+    use_recompute: bool = field(
+        default=True, metadata={"help": "Whether to use recompute"}
+    )
+    vit_num_recompute_layers: int = field(
+        default=10000, metadata={"help": "Number of recompute layers"}
+    )
+
+
+@dataclass
 class ModelArguments:
     """Model Argument"""
 
@@ -36,11 +71,17 @@ class ModelArguments:
     )
     stage: str = field(
         default="SFT",
-        metadata={"help": "The type of training, including SFT, DPO."},
+        metadata={"help": "The type of training, including SFT, DPO, VL-SFT."},
     )
     use_flash_attention: bool = field(
         default=True,
         metadata={"help": "Whether to use flash attention"},
+    )
+    use_mem_eff_attn: Optional[bool] = field(
+        default=True, metadata={"help": "use use_mem_eff_attn"}
+    )
+    use_flash_attn_with_mask: Optional[bool] = field(
+        default=True, metadata={"help": "use use_flash_attn_with_mask"}
     )
     use_attn_mask_start_row_indices: bool = field(
         default=True,
@@ -66,6 +107,7 @@ class ModelArguments:
         default=False,
         metadata={"help": "Whether to use fused_gemm_epilogue"},
     )
+    rope_3d: Optional[bool] = field(default=True, metadata={"help": "use rope3d"})
     fuse_rope: bool = field(
         default=False,
         metadata={"help": "Whether to fuse rotary postition embedding"},
@@ -179,6 +221,9 @@ class ModelArguments:
             "of traditional auxiliary loss for MoE."
         },
     )
+    moe_with_send_router_loss: bool = field(
+        default=False, metadata={"help": "use send router loss"}
+    )
 
     # LoRA
     fine_tuning: str = field(default="LoRA", metadata={"help": "The checkpoint type."})
@@ -247,8 +292,24 @@ class ModelArguments:
             )
         },
     )
+
     num_nextn_predict_layers: int = field(
         default=0, metadata={"help": "Number of nextn predict layers."}
+    )
+    # vl model
+    vision_config: VisionArguments = field(
+        default_factory=VisionArguments, metadata={"help": "Vision configuration"}
+    )
+    bos_token_id: int = field(
+        default=0, metadata={"help": "Beginning of sentence token ID"}
+    )
+    eos_token_id: int = field(default=1, metadata={"help": "End of sentence token ID"})
+    max_position_embeddings: int = field(
+        default=4096, metadata={"help": "Maximum position embeddings"}
+    )
+    moe_gate: str = field(default="top2_fused", metadata={"help": "MoE gate type"})
+    use_recompute_loss_fn: bool = field(
+        default=True, metadata={"help": "Whether to recompute loss function"}
     )
 
     def __post_init__(self):

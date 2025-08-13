@@ -53,6 +53,12 @@ from .sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
+try:
+    from ernie.utils.misc import global_training_logs
+except ModuleNotFoundError:
+    global_training_logs = {}
+
+
 __all__ = [
     "Ernie4_5_VLMoeForConditionalGeneration",
 ]
@@ -129,7 +135,11 @@ def get_backbone_lm_param_regex(config):
         if config.multimodel_experts
         else config.moe_num_experts // moe_world_size
     )
-    num_freeze_expert = config.moe_num_experts[0] if config.multimodel_experts else config.moe_num_experts
+    num_freeze_expert = (
+        config.moe_num_experts[0]
+        if config.multimodel_experts
+        else config.moe_num_experts
+    )
 
     freeze_part = [r"ernie\.norm.*", r"ernie\.layers.*norm.*"]  # freeze all norm
     # we do not include gate weight
@@ -197,7 +207,9 @@ class ModalityDetach(PyLayer):
         if not is_first_fwd:
             ctx.fn = fn
         ctx.bwf, outputs = manual_backward(fn, is_first_fwd, token_type_ids, *args)
-        should_freeze = token_type_ids.astype("bool").any().item()  # one image-token appears then freeze.
+        should_freeze = (
+            token_type_ids.astype("bool").any().item()
+        )  # one image-token appears then freeze.
         if should_freeze:
             ctx.freeze_context = freeze_context
         else:
@@ -233,18 +245,28 @@ def construct_types_for_video(image_mask, token_type_ids, image_type_ids):
     if image_type_ids is not None:
         image_type_ids = image_type_ids[image_type_ids >= 0]  # remove padding
         # placeholder before conv3d
-        video_images_with_placeholder = image_type_ids[image_type_ids != IMAGETYPES_2_ID["image"]]
+        video_images_with_placeholder = image_type_ids[
+            image_type_ids != IMAGETYPES_2_ID["image"]
+        ]
         if video_images_with_placeholder.shape[0] != 0:
-            video_images_with_placeholder = video_images_with_placeholder == IMAGETYPES_2_ID["video"]
-            video_images_with_placeholder = video_images_with_placeholder.astype("int64")
+            video_images_with_placeholder = (
+                video_images_with_placeholder == IMAGETYPES_2_ID["video"]
+            )
+            video_images_with_placeholder = video_images_with_placeholder.astype(
+                "int64"
+            )
         else:
             video_images_with_placeholder = None
 
         # image_is_video the type of visual feature to extract video and image from visual feature
         # 1 is video, 0 is image
-        image_is_video = image_type_ids[image_type_ids != IMAGETYPES_2_ID["padded_image"]]
+        image_is_video = image_type_ids[
+            image_type_ids != IMAGETYPES_2_ID["padded_image"]
+        ]
 
-        assert image_is_video.shape[0] != 0, f"image_is_video is 0 shape, {image_is_video.shape}"
+        assert (
+            image_is_video.shape[0] != 0
+        ), f"image_is_video is 0 shape, {image_is_video.shape}"
 
         image_is_video = image_is_video == IMAGETYPES_2_ID["video"]
         image_is_video = image_is_video.astype("int64")
@@ -280,7 +302,12 @@ class VariableResolutionResamplerModel(nn.Layer):
         # compress spatial
         self.spatial_dim = self.in_dim * self.spatial_conv_size * self.spatial_conv_size
         # compress temporal
-        self.temporal_dim = self.in_dim * self.spatial_conv_size * self.spatial_conv_size * self.temporal_conv_size
+        self.temporal_dim = (
+            self.in_dim
+            * self.spatial_conv_size
+            * self.spatial_conv_size
+            * self.temporal_conv_size
+        )
 
         with paddle.utils.unique_name.guard("mm_resampler_"):
 
@@ -324,8 +351,12 @@ class VariableResolutionResamplerModel(nn.Layer):
 
                 if self.use_temporal_conv:
                     for idx in [0, 2, 3]:
-                        mark_as_sequence_parallel_parameter(self.temporal_linear[idx].weight)
-                        mark_as_sequence_parallel_parameter(self.temporal_linear[idx].bias)
+                        mark_as_sequence_parallel_parameter(
+                            self.temporal_linear[idx].weight
+                        )
+                        mark_as_sequence_parallel_parameter(
+                            self.temporal_linear[idx].bias
+                        )
 
                 mark_as_sequence_parallel_parameter(self.mlp.weight)
                 mark_as_sequence_parallel_parameter(self.mlp.bias)
@@ -360,8 +391,11 @@ class VariableResolutionResamplerModel(nn.Layer):
             num_pad = 0
             if self.tensor_parallel_degree > 1:
                 num_pad = (
-                    x.shape[0] + self.tensor_parallel_degree - 1
-                ) // self.tensor_parallel_degree * self.tensor_parallel_degree - x.shape[0]
+                    (x.shape[0] + self.tensor_parallel_degree - 1)
+                    // self.tensor_parallel_degree
+                    * self.tensor_parallel_degree
+                    - x.shape[0]
+                )
 
             if num_pad > 0:
                 x = paddle.nn.functional.pad(x, [0, num_pad, 0, 0])
@@ -387,26 +421,42 @@ class VariableResolutionResamplerModel(nn.Layer):
             grid_hw_after_conv = grid_hw.prod(-1) // (self.spatial_conv_size**2)
 
             tokens_per_img_or_vid = grid_thw_cpu.prod(-1) // (self.spatial_conv_size**2)
-            batch_offset = np.empty(tokens_per_img_or_vid.size, dtype=tokens_per_img_or_vid.dtype)
+            batch_offset = np.empty(
+                tokens_per_img_or_vid.size, dtype=tokens_per_img_or_vid.dtype
+            )
             batch_offset[0] = 0
             batch_offset[1:] = tokens_per_img_or_vid.cumsum()[:-1]
 
-            assert self.temporal_conv_size == 2, f"Hard Code: temporal_conv_size==2, got:{self.temporal_conv_size}"
+            assert (
+                self.temporal_conv_size == 2
+            ), f"Hard Code: temporal_conv_size==2, got:{self.temporal_conv_size}"
 
             # TODO: support any temporal conv size
             slice_offsets = []
-            for temporoal_size, spatial_size, b_offset in zip(grid_t, grid_hw_after_conv, batch_offset):
+            for temporoal_size, spatial_size, b_offset in zip(
+                grid_t, grid_hw_after_conv, batch_offset
+            ):
                 for temp_offset in range(0, temporoal_size, 2):
                     slice_offsets.append(
-                        np.arange(b_offset + (temp_offset) * spatial_size, b_offset + (temp_offset + 1) * spatial_size)
+                        np.arange(
+                            b_offset + (temp_offset) * spatial_size,
+                            b_offset + (temp_offset + 1) * spatial_size,
+                        )
                     )
             slice_offsets = paddle.to_tensor(np.concatenate(slice_offsets, axis=-1))
 
             slice_offsets2 = []
-            for temporoal_size, spatial_size, b_offset in zip(grid_t, grid_hw_after_conv, batch_offset):
-                for temp_offset in range(1 if temporoal_size > 1 else 0, temporoal_size, 2):
+            for temporoal_size, spatial_size, b_offset in zip(
+                grid_t, grid_hw_after_conv, batch_offset
+            ):
+                for temp_offset in range(
+                    1 if temporoal_size > 1 else 0, temporoal_size, 2
+                ):
                     slice_offsets2.append(
-                        np.arange(b_offset + (temp_offset) * spatial_size, b_offset + (temp_offset + 1) * spatial_size)
+                        np.arange(
+                            b_offset + (temp_offset) * spatial_size,
+                            b_offset + (temp_offset + 1) * spatial_size,
+                        )
                     )
             slice_offsets2 = paddle.to_tensor(np.concatenate(slice_offsets2, axis=-1))
 
@@ -420,8 +470,11 @@ class VariableResolutionResamplerModel(nn.Layer):
             num_pad = 0
             if self.tensor_parallel_degree > 1:
                 num_pad = (
-                    x.shape[0] + self.tensor_parallel_degree - 1
-                ) // self.tensor_parallel_degree * self.tensor_parallel_degree - x.shape[0]
+                    (x.shape[0] + self.tensor_parallel_degree - 1)
+                    // self.tensor_parallel_degree
+                    * self.tensor_parallel_degree
+                    - x.shape[0]
+                )
             if num_pad > 0:
                 x = paddle.nn.functional.pad(x, [0, num_pad, 0, 0])
             if self.tensor_parallel_degree > 1:
@@ -469,20 +522,6 @@ class VariableResolutionResamplerModel(nn.Layer):
             num_attention_heads=config.num_attention_heads,
         )
         res = {"spatial_linear.0.weight": partial(fn, is_column=False)}  # row parallel
-        for k in (
-            "spatial_linear.0.bias",  # row linear bias
-            "spatial_linear.2.weight",
-            "spatial_linear.2.bias",  # linear
-            "spatial_linear.3.weight",
-            "spatial_linear.3.bias",  # layernorm
-            "temporal_linear.0.weight",
-            "temporal_linear.0.weight",  # linear
-            "temporal_linear.2.weight",
-            "temporal_linear.2.bias",  # linear
-            "temporal_linear.3.weight",
-            "temporal_linear.3.bias",  # bias
-        ):
-            res.update({k: lambda x: x[:]})
         return res
 
 
@@ -523,25 +562,35 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             loss: text-only CE loss
             loss_sum. text-only CE loss_sum
         """
+        if self.config.use_recompute_loss_fn and self.config.use_fused_head_and_loss_fn:
+            with paddle.no_grad():
+                if token_type_ids_shifted.unique().shape[0] > 1:
+                    labels, token_type_ids_shifted = TensorBalanceByTokenType.apply(
+                        labels.squeeze(0),
+                        token_type_ids_shifted,
+                        is_tensor_sharded=False,
+                    )
+                else:
+                    labels = ScatterOp.apply(labels, axis=-1)
 
         if self.use_one_head:
             if self.config.use_recompute_loss_fn:
-                loss, loss_sum = super().forward((scores_text.unsqueeze(0), lm_weight, lm_bias), labels.unsqueeze(0))
+                loss, loss_sum = super().forward(
+                    (scores_text.unsqueeze(0), lm_weight, lm_bias), labels.unsqueeze(0)
+                )
             else:
-                loss, loss_sum = super().forward(scores_text.unsqueeze(0), labels.unsqueeze(0))
+                loss, loss_sum = super().forward(
+                    scores_text.unsqueeze(0), labels.unsqueeze(0)
+                )
             self.update_log(loss, token_type_ids_untouched)
             return loss, loss_sum
-
-        if self.config.use_recompute_loss_fn and self.config.use_fused_head_and_loss_fn:
-            with paddle.no_grad():
-                labels, token_type_ids_shifted = TensorBalanceByTokenType.apply(
-                    labels.squeeze(0), token_type_ids_shifted, is_tensor_sharded=False
-                )
 
         image_mask_shifted = token_type_ids_shifted == TokenType.image
         text_pos_shifted = token_type_ids_shifted == TokenType.text
 
-        assert scores_text is not None, f"no text or image token provided, text: {scores_text}"
+        assert (
+            scores_text is not None
+        ), f"no text or image token provided, text: {scores_text}"
 
         if scores_text is not None:
             labels_text = labels[text_pos_shifted]
@@ -549,10 +598,13 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             if self.config.use_recompute_loss_fn:
                 assert lm_weight is not None and mm_weight is not None
                 loss, loss_sum = super().forward(
-                    (scores_text.unsqueeze(0), lm_weight, lm_bias), labels_text.unsqueeze(0)
+                    (scores_text.unsqueeze(0), lm_weight, lm_bias),
+                    labels_text.unsqueeze(0),
                 )
             else:
-                loss, loss_sum = super().forward(scores_text.unsqueeze(0), labels_text.unsqueeze(0))
+                loss, loss_sum = super().forward(
+                    scores_text.unsqueeze(0), labels_text.unsqueeze(0)
+                )
             self.update_log(loss, token_type_ids_untouched)
         else:
             assert 0
@@ -568,15 +620,18 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             if self.config.use_recompute_loss_fn:
                 assert mm_weight is not None and mm_bias is not None
                 loss_image, _ = super().forward(
-                    (scores_image.unsqueeze(0), mm_weight, mm_bias), labels_image.unsqueeze(0)
+                    (scores_image.unsqueeze(0), mm_weight, mm_bias),
+                    labels_image.unsqueeze(0),
                 )
             else:
-                loss_image, _ = super().forward(scores_image.unsqueeze(0), labels_image.unsqueeze(0))
-            # global_training_logs.update(image_special_token_loss=loss_image.detach())
+                loss_image, _ = super().forward(
+                    scores_image.unsqueeze(0), labels_image.unsqueeze(0)
+                )
+            global_training_logs.update(image_special_token_loss=loss_image.detach())
             loss = loss + loss_image - loss_image.detach()
 
         if router_loss is not None and isinstance(router_loss, paddle.Tensor):
-            # global_training_logs.update(router_loss=router_loss.detach())
+            global_training_logs.update(router_loss=router_loss.detach())
             loss = loss + router_loss - router_loss.detach()
         return loss, loss_sum
 
@@ -585,8 +640,23 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
         pure_text = (
             token_type_ids_untouched == TokenType.text
         ).all()  # if all tokens are textual, it's a pure text dataset
-        has_video = (token_type_ids_untouched == TokenType.video).any()  # if one token is video, then it's video data
-        has_image = (token_type_ids_untouched == TokenType.image).any()  # if one token is image, then it's image data
+        has_video = (
+            token_type_ids_untouched == TokenType.video
+        ).any()  # if one token is video, then it's video data
+        has_image = (
+            token_type_ids_untouched == TokenType.image
+        ).any()  # if one token is image, then it's image data
+        if pure_text:
+            global_training_logs.update(lm_loss=loss.detach())
+        elif has_video:
+            global_training_logs.update(video_loss=loss.detach())
+        elif has_image:
+            global_training_logs.update(image_loss=loss.detach())
+        else:
+            raise RuntimeError(
+                f"input token must be one of [text, video, image]: {token_type_ids_untouched}"
+            )
+        return
 
 
 def calc_multimodal_logits(
@@ -613,14 +683,21 @@ def calc_multimodal_logits(
     # token_type_ids_shifted = paddle.concat([token_type_ids[:, 1:], token_type_ids[:, -1:]], 1)  #
 
     if config.use_recompute_loss_fn and config.use_fused_head_and_loss_fn:
-        if token_type_ids_shifted.unique().shape[0] > 1:  # Multimodal data
-            last_hidden_state, token_type_ids_shifted = TensorBalanceByTokenType.apply(
-                last_hidden_state, token_type_ids_shifted
-            )
+        if config.sequence_parallel:
+            if token_type_ids_shifted.unique().shape[0] > 1:  # Multimodal data
+                last_hidden_state, token_type_ids_shifted = (
+                    TensorBalanceByTokenType.apply(
+                        last_hidden_state, token_type_ids_shifted
+                    )
+                )
+            else:
+                with paddle.no_grad():
+                    token_type_ids_shifted = ScatterOp.apply(
+                        token_type_ids_shifted, axis=-1
+                    )
+                    token_type_ids_shifted = token_type_ids_shifted.reshape([-1])
         else:
-            with paddle.no_grad():
-                token_type_ids_shifted = ScatterOp.apply(token_type_ids_shifted, axis=-1)
-                token_type_ids_shifted = token_type_ids_shifted.reshape([-1])
+            token_type_ids_shifted = token_type_ids_shifted.reshape([-1])
     else:
         if config.sequence_parallel:
             last_hidden_state = GatherOp.apply(last_hidden_state)
@@ -637,12 +714,18 @@ def calc_multimodal_logits(
         tensor_parallel_degree=config.tensor_parallel_degree,
         tensor_parallel_output=config.tensor_parallel_output,
         fuse_linear=config.fuse_linear,
+        transpose_y=config.tie_word_embeddings,
     )
 
     if mm_head_weight is None:
         if config.use_recompute_loss_fn:
             return last_hidden_state, None, None
-        score_text = parallel_matmul_tp(last_hidden_state, lm_head_weight, lm_head_bias)
+        score_text = parallel_matmul_tp(
+            last_hidden_state,
+            lm_head_weight,
+            lm_head_bias,
+            transpose_y=config.tie_word_embeddings,
+        )
         return score_text, None, None
 
     image_mask_shifted = token_type_ids_shifted == TokenType.image
@@ -652,7 +735,9 @@ def calc_multimodal_logits(
         if config.use_recompute_loss_fn:
             score_text = last_hidden_state[text_pos_shifted]
         else:
-            score_text = parallel_matmul_tp(last_hidden_state[text_pos_shifted], lm_head_weight, lm_head_bias)
+            score_text = parallel_matmul_tp(
+                last_hidden_state[text_pos_shifted], lm_head_weight, lm_head_bias
+            )
     else:
         score_text = None
 
@@ -660,7 +745,9 @@ def calc_multimodal_logits(
         if config.use_recompute_loss_fn:
             score_image = last_hidden_state[image_mask_shifted]
         else:
-            score_image = parallel_matmul_tp(last_hidden_state[image_mask_shifted], mm_head_weight, mm_head_bias)
+            score_image = parallel_matmul_tp(
+                last_hidden_state[image_mask_shifted], mm_head_weight, mm_head_bias
+            )
     else:
         score_image = None
 
@@ -678,7 +765,9 @@ class Ernie4_5_MoeVLHead(Ernie4_5_LMHead):
             mm_vocab_config = deepcopy(config)
             mm_vocab_config.vocab_size = config.mm_vocab_size
             assert mm_vocab_config.vocab_size > 0, mm_vocab_config
-            assert mm_vocab_config.im_patch_id >= mm_vocab_config.max_text_id, mm_vocab_config
+            assert (
+                mm_vocab_config.im_patch_id >= mm_vocab_config.max_text_id
+            ), mm_vocab_config
             self.mm_head = Ernie4_5_LMHead(mm_vocab_config)
         else:
             self.mm_head = None
@@ -697,7 +786,7 @@ class Ernie4_5_MoeVLHead(Ernie4_5_LMHead):
         if not use_cache:
             mm_head_weight = self.mm_head.weight if self.mm_head is not None else None
             mm_head_bias = self.mm_head.bias if self.mm_head is not None else None
-            logits_text, logits_image = calc_multimodal_logits(
+            logits_text, logits_image, *_ = calc_multimodal_logits(  # note!!
                 hidden_state,
                 self.weight,
                 self.bias,
@@ -710,8 +799,12 @@ class Ernie4_5_MoeVLHead(Ernie4_5_LMHead):
         else:
             if self.config.sequence_parallel:
                 hidden_state = GatherOp.apply(hidden_state)
-                logger.warning("you are trying to generate with sequence-parallel model")
-                hidden_state = hidden_state.reshape([-1, self.config.max_sequence_length, hidden_state.shape[-1]])
+                logger.warning(
+                    "you are trying to generate with sequence-parallel model"
+                )
+                hidden_state = hidden_state.reshape(
+                    [-1, self.config.max_sequence_length, hidden_state.shape[-1]]
+                )
             # assert not self.config.sequence_parallel, "generate is not supported in sequence-parallel mode"
             # TODO，support lm_head decode only
             return (
@@ -747,9 +840,13 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
 
         if config.mm_vocab_size > 0:
             if config.tensor_parallel_degree > 1:
-                self.mm_embed_tokens = VocabParallelEmbedding(config.mm_vocab_size, config.hidden_size)
+                self.mm_embed_tokens = VocabParallelEmbedding(
+                    config.mm_vocab_size, config.hidden_size
+                )
             else:
-                self.mm_embed_tokens = nn.Embedding(config.mm_vocab_size, config.hidden_size)
+                self.mm_embed_tokens = nn.Embedding(
+                    config.mm_vocab_size, config.hidden_size
+                )
         else:
             self.mm_embed_tokens = None
 
@@ -764,7 +861,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         self._modality_param_mapping = None
         self.image_preprocess = None
         self.lm_head = Ernie4_5_MoeVLHead(config)
-        vision_model = DFNRopeVisionTransformerPretrainedModel(config=config.vision_config)
+        vision_model = DFNRopeVisionTransformerPretrainedModel(
+            config=config.vision_config
+        )
         self.add_vision_model(vision_model)
 
     def add_vision_model(
@@ -793,15 +892,21 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         )
 
         def get_tensor_parallel_split_mappings(num_layers):
-            final_actions = Ernie4_5_MoeForCausalLM._get_tensor_parallel_mappings(config, is_split=is_split)
+            final_actions = Ernie4_5_MoeForCausalLM._get_tensor_parallel_mappings(
+                config, is_split=is_split
+            )
             return final_actions
 
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
         if isinstance(config.vision_config, DFNRopeVisionTransformerConfig):
-            resampler_actions = VariableResolutionResamplerModel._get_tensor_parallel_mappings(
-                config, is_split=is_split
+            resampler_actions = (
+                VariableResolutionResamplerModel._get_tensor_parallel_mappings(
+                    config, is_split=is_split
+                )
             )
-            mappings.update({f"resampler_model.{k}": v for k, v in resampler_actions.items()})
+            mappings.update(
+                {f"resampler_model.{k}": v for k, v in resampler_actions.items()}
+            )
         else:
             raise RuntimeError(f"unknown vision_config: {config.vision_config}")
 
@@ -823,20 +928,34 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
             monkey_patch_param_hook(param)
             expert_type = getattr(param, "expert_type", None)
             if "vision_model" in name:
-                self._modality_param_mapping["vit"].append((name, param, create_freeze_hook(name, param)))
+                self._modality_param_mapping["vit"].append(
+                    (name, param, create_freeze_hook(name, param))
+                )
                 param.color = "vit"
             elif lm_pattern.match(name) or expert_type == "expert_type_0":
-                self._modality_param_mapping["lm"].append((name, param, create_freeze_hook(name, param)))
+                self._modality_param_mapping["lm"].append(
+                    (name, param, create_freeze_hook(name, param))
+                )
                 param.color = "lm"
             else:
-                self._modality_param_mapping["mm"].append((name, param, create_freeze_hook(name, param)))
+                self._modality_param_mapping["mm"].append(
+                    (name, param, create_freeze_hook(name, param))
+                )
                 param.color = "mm"
-        debug_msg = {k: [i[0] for i in v] for k, v in self._modality_param_mapping.items()}
-        logger.info(f"modality_param_mapping: {json.dumps(debug_msg, ensure_ascii=False, indent=2)}")
+        debug_msg = {
+            k: [i[0] for i in v] for k, v in self._modality_param_mapping.items()
+        }
+        logger.info(
+            f"modality_param_mapping: {json.dumps(debug_msg, ensure_ascii=False, indent=2)}"
+        )
 
     def update_params_stat(self, param_group, stop_gradient):
         """freeze mm"""
-        assert param_group in ("lm", "mm", "vit"), "param_group must be in ('lm', 'mm', 'vit')"
+        assert param_group in (
+            "lm",
+            "mm",
+            "vit",
+        ), "param_group must be in ('lm', 'mm', 'vit')"
         if self._modality_param_mapping is None:
             self._set_modality_param_mapping()
         if self._modality_param_mapping.get(param_group):
@@ -864,14 +983,20 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         if self.image_preprocess is not None:
             assert images.dtype == paddle.uint8, images.dtype
             images = self.image_preprocess.rescale_factor * images.astype("float32")
-            images = (images - self.image_preprocess.image_mean_tensor) / self.image_preprocess.image_std_tensor
+            images = (
+                images - self.image_preprocess.image_mean_tensor
+            ) / self.image_preprocess.image_std_tensor
             images = images.astype("bfloat16")
         else:
             assert images.dtype == paddle.bfloat16, images.dtype
         # logger.info(f"extract feature input - {images}--{grid_thw}")
         if grid_thw is not None:
             grid_thw = grid_thw[grid_thw > 0].reshape([-1, 3])
-            grid_thw = F.pad(paddle.repeat_interleave(grid_thw[:, 1:], grid_thw[:, 0], 0), [0, 0, 1, 0], value=1)
+            grid_thw = F.pad(
+                paddle.repeat_interleave(grid_thw[:, 1:], grid_thw[:, 0], 0),
+                [0, 0, 1, 0],
+                value=1,
+            )
         image_features = self.vision_model.extract_feature(images, grid_thw)
         return image_features
 
@@ -888,8 +1013,12 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
     ):
         """vision_mapping_forward"""
         if self.mm_embed_tokens is not None:
-            mm_ids_features = self.mm_embed_tokens(mm_input_ids - self.config.max_text_id)
-            inputs_embeds[token_type_ids == TokenType.image] = mm_ids_features[token_type_ids == TokenType.image]
+            mm_ids_features = self.mm_embed_tokens(
+                mm_input_ids - self.config.max_text_id
+            )
+            inputs_embeds[token_type_ids == TokenType.image] = mm_ids_features[
+                token_type_ids == TokenType.image
+            ]
         image_mask = input_ids == self.config.im_patch_id
         image_features = self.ernie.resampler_model(
             image_features,
@@ -901,7 +1030,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
 
         if image_features.dim == 2:
             B, N, C = image_features.shape
-            image_features = image_features.reshape([B * N, C]).astype(inputs_embeds.dtype)
+            image_features = image_features.reshape([B * N, C]).astype(
+                inputs_embeds.dtype
+            )
         # Will overwrite the part of `ids==im_patch_id` in `mm_ids_features`
         inputs_embeds[image_mask] = image_features
         # # TODO Normalize some parameters, detach some text, print image token
@@ -942,7 +1073,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         if past_key_values:
             input_ids = input_ids[:, -1:]
             token_type_ids = token_type_ids[:, -1:]
-            image_type_ids = image_type_ids[:, -1:] if image_type_ids is not None else None
+            image_type_ids = (
+                image_type_ids[:, -1:] if image_type_ids is not None else None
+            )
 
         attention_mask = kwargs.get("attention_mask", None)
 
@@ -963,7 +1096,11 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
                 "image_attention_mask": image_attention_mask,
                 "image_type_ids": image_type_ids,
                 "token_type_ids": paddle.concat(
-                    [token_type_ids, paddle.zeros([len(token_type_ids), 1], token_type_ids.dtype)], axis=-1
+                    [
+                        token_type_ids,
+                        paddle.zeros([len(token_type_ids), 1], token_type_ids.dtype),
+                    ],
+                    axis=-1,
                 ),
                 "grid_thw": grid_thw,
             }
@@ -1030,15 +1167,11 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         """
         if grid_thw is not None:
             grid_thw = grid_thw[grid_thw > 0].reshape([-1, 3])
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         image_mask = input_ids == self.config.im_patch_id
-
-        image_rate = image_mask.astype("float32").mean()
-        if labels is not None:
-            pad_rate = ((labels == self.criterion.ignored_index) & (~image_mask)).astype("float32").mean()
-            # global_training_logs.update(image_rate=image_rate, pad_rate=pad_rate)
-            # assert paddle.any(labels > 0).item(), labels
 
         if past_key_values is None:
             if images is not None:
@@ -1057,7 +1190,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
                 if self.config.tensor_parallel_degree > 1:
                     S, C = image_features.shape
                     # When scatterOp cuts feature + 4-in-1, the features of the 4 tokens are merged together in advance.
-                    image_features = image_features.reshape([-1, C * self.config.spatial_conv_size**2])
+                    image_features = image_features.reshape(
+                        [-1, C * self.config.spatial_conv_size**2]
+                    )
                     image_features = ScatterOp.apply(image_features, axis=-1)
                     image_features = image_features.reshape([S, -1])
             else:
@@ -1069,7 +1204,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         if token_type_ids is None:
             # assert 0, f"using default token_type_ids: {token_type_ids}, image_type_ids: {image_type_ids}"
             token_type_ids = image_mask.astype("int64")
-            token_type_ids_labels = paddle.concat([token_type_ids[:, 1:], token_type_ids[:, -1:]], 1)
+            token_type_ids_labels = paddle.concat(
+                [token_type_ids[:, 1:], token_type_ids[:, -1:]], 1
+            )
         else:
             assert (
                 token_type_ids.shape[1] == input_ids.shape[1] + 1
@@ -1081,7 +1218,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         mm_input_ids = input_ids.clone()
         if self.mm_embed_tokens is not None:
             lm_input_ids[token_type_ids[..., :-1] == TokenType.image] = 0
-            mm_input_ids[token_type_ids[..., :-1] == TokenType.text] = self.config.max_text_id
+            mm_input_ids[token_type_ids[..., :-1] == TokenType.text] = (
+                self.config.max_text_id
+            )
         # During embedding lookup, `max_text_id` will be subtracted uniformly.
         # The text part id is replaced with `max_text_id` + 1 to distinguish it from `im_patch_id`.
         # The replacement part will not be added to the final input_embeds so it doesn't matter.
@@ -1090,7 +1229,12 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
 
         if self.training and self.modality_detach:
             assert not return_dict, "modality detach no support `return_dict`"
-            assert not use_cache and past_key_values is None and not output_attentions and not output_hidden_states
+            assert (
+                not use_cache
+                and past_key_values is None
+                and not output_attentions
+                and not output_hidden_states
+            )
             is_first_fwd = not framework._dygraph_tracer()._has_grad
 
             def fwdfn(
@@ -1143,7 +1287,8 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
                     self._modality_param_mapping
                 ), "call `model.freeze_lm(stop_gradient=False) first before modality detach`"
                 unfreeze_handler = [
-                    p.register_hook(hook, 0) for n, p, hook in self._modality_param_mapping["lm"]
+                    p.register_hook(hook, 0)
+                    for n, p, hook in self._modality_param_mapping["lm"]
                 ]  # param has been monkey-patched to have .hooks method
                 yield  # backward fun
                 for h in unfreeze_handler:
@@ -1200,8 +1345,12 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
             logits, logits_image = logits_all
             router_loss = outputs.router_loss
 
-        mm_head_weight = self.lm_head.mm_head.weight if self.lm_head.mm_head is not None else None
-        mm_head_bias = self.lm_head.mm_head.bias if self.lm_head.mm_head is not None else None
+        mm_head_weight = (
+            self.lm_head.mm_head.weight if self.lm_head.mm_head is not None else None
+        )
+        mm_head_bias = (
+            self.lm_head.mm_head.bias if self.lm_head.mm_head is not None else None
+        )
         if return_dict:  # aka Generate Decoding
             if labels is not None:
                 loss, _ = self.criterion(
@@ -1243,7 +1392,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
         return loss
 
     @staticmethod
-    def _resolve_prefix_keys(state_keys_base, state_keys_real, ignore_error=False, base_model_prefix=None):
+    def _resolve_prefix_keys(
+        state_keys_base, state_keys_real, ignore_error=False, base_model_prefix=None
+    ):
         """_resolve_prefix_keys"""
         # state_keys_map base to real
         state_keys_map = {}

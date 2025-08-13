@@ -1,0 +1,132 @@
+document:
+  effect:
+    args: # 1 - (1-0.09)(1-0.02) 1 -> (1-0.20)(1-0.04)=0.232
+      # rotate
+      - prob: 0.05
+        args:
+          weights: [4, 1, 1, 1, 1, 4]
+          args:
+            -
+              angle: [0, 15]
+              ccw: 0.5 # anticlockwise prob.
+            -
+              angle: [15, 30]
+              ccw: 0.5 # nticlockwise prob.
+            -
+              angle: [30, 45]
+              ccw: 0.5 # nticlockwise prob.
+            -
+              angle: [45, 60]
+              ccw: 0.5 # nticlockwise prob.
+            -
+              angle: [60, 75]
+              ccw: 0.5
+            -
+              angle: [75, 90]
+              ccw: 0.5
+      # perspective
+      - prob: 0.05
+        args:
+          weights: [750, 50, 50, 25, 25, 25, 25, 50] # [750, 50, 50, 25, 25, 25, 25, 50]
+          args:
+            - percents: [[0.75, 1], [0.75, 1], [0.75, 1], [0.75, 1]]
+            - percents: [[0.75, 1], [1, 1], [0.75, 1], [1, 1]]
+            - percents: [[1, 1], [0.75, 1], [1, 1], [0.75, 1]]
+            - percents: [[0.75, 1], [1, 1], [1, 1], [1, 1]]
+            - percents: [[1, 1], [0.75, 1], [1, 1], [1, 1]]
+            - percents: [[1, 1], [1, 1], [0.75, 1], [1, 1]]
+            - percents: [[1, 1], [1, 1], [1, 1], [0.75, 1]]
+            - percents: [[1, 1], [1, 1], [1, 1], [1, 1]]
+
+effect_ocr:
+  args:
+    # # elastic distortion
+    # - prob: 0
+    #   args:
+    #     alpha: [0, 1]
+    #     sigma: [0, 0.5]
+    # motion blur
+    - prob: 0.03
+      args:
+        k: [3, 5]
+        angle: [0, 360]
+    # gaussian blur
+    - prob: 0.03
+      args:
+        sigma: [0, 0]
+    # channel shuffle
+    - prob: 0.0
+      args: ~
+    # brightness
+    - prob: 0.03
+      args:
+        beta: [-48, 48]
+    # contrast
+    - prob: 0.03
+      args:
+        alpha: [0.5, 1.5]
+    # grayscale
+    - prob: 0.0
+      args: ~
+    # multiply hue
+    - prob: 0.03
+      args:
+        hue: [0.5, 1.5]
+    # multiply saturation
+    - prob: 0.03
+      args:
+        saturation: [0.5, 1.5]
+    # cutout
+    - prob: 0.0
+      args:
+        nb_iterations: [5, 20]
+        size: [0.05, 0.1]
+        fill_mode: gaussian
+        fill_per_channel: TRUE
+
+
+effect:
+  args:
+    # # elastic distortion
+    # - prob: 0
+    #   args:
+    #     alpha: [0, 1]
+    #     sigma: [0, 0.5]
+    # motion blur
+    - prob: 0
+      args:
+        k: [3, 5]
+        angle: [0, 360]
+    # gaussian blur
+    - prob: 0
+      args:
+        sigma: [0, 0]
+    # channel shuffle
+    - prob: 0.0
+      args: ~
+    # brightness
+    - prob: 0
+      args:
+        beta: [-48, 48]
+    # contrast
+    - prob: 0
+      args:
+        alpha: [0.5, 1.5]
+    # grayscale
+    - prob: 0.0
+      args: ~
+    # multiply hue
+    - prob: 0.0
+      args:
+        hue: [0.5, 1.5]
+    # multiply saturation
+    - prob: 0
+      args:
+        saturation: [0.5, 1.5]
+    # cutout
+    - prob: 0
+      args:
+        nb_iterations: [5, 20]
+        size: [0.05, 0.1]
+        fill_mode: gaussian
+        fill_per_channel: TRUE

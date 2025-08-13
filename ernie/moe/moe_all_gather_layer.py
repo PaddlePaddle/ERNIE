@@ -647,19 +647,21 @@ class AlltoAllSmartXPU(paddle.autograd.PyLayer):
             [recv_size.item()] + input_shape[1:], dtype=input_dtype
         )
 
-        task = dist.stream.alltoall_single(
-            temp_output,
-            all_to_all_input,
-            recv_counts_for_api,
-            send_counts_for_api,
-            group=group,
-            sync_op=False,
-            use_calc_stream=False,
-        )
+        if group.nranks <= 1:
+            task = None
+            if all_to_all_input.shape[0] > 0:
+                temp_output[:] = all_to_all_input[:]
+        else:
+            task = dist.stream.alltoall_single(
+                temp_output,
+                all_to_all_input,
+                recv_counts_for_api,
+                send_counts_for_api,
+                group=group,
+                sync_op=False,
+                use_calc_stream=False,
+            )
 
-        ctx.router_loss_bwfn, (router_loss,) = manual_backward(
-            router_loss_fn, is_first_fwd, *router_loss_args
-        )
         ctx.router_loss_bwfn, (router_loss,) = manual_backward(
             router_loss_fn, is_first_fwd, *router_loss_args
         )
@@ -712,7 +714,9 @@ class AlltoAllSmartXPU(paddle.autograd.PyLayer):
                 )
 
         distributed_input_to_alltoall_out.stop_gradient = True
-        task.wait()
+
+        if task is not None:
+            task.wait()
 
         temp_output_splits_by_src_rank = temp_output.split(recv_counts_for_api, 0)
         chunks_by_expert = [[] for _ in range(num_local_experts)]
@@ -772,18 +776,25 @@ class AlltoAllSmartXPU(paddle.autograd.PyLayer):
             [total_output_grad_size] + list(out_grad.shape[1:]), dtype=out_grad.dtype
         )
 
-        task = dist.stream.alltoall_single(
-            temp_grad_output,
-            all_to_all_grad_input,
-            recv_counts_bw_for_api,
-            send_counts_bw_for_api,
-            group=ctx.group,
-            sync_op=False,
-            use_calc_stream=False,
-        )
+        if ctx.group.nranks <= 1:
+            task = None
+            if all_to_all_grad_input.shape[0] > 0:
+                temp_grad_output[:] = all_to_all_grad_input[:]
+        else:
+            task = dist.stream.alltoall_single(
+                temp_grad_output,
+                all_to_all_grad_input,
+                recv_counts_bw_for_api,
+                send_counts_bw_for_api,
+                group=ctx.group,
+                sync_op=False,
+                use_calc_stream=False,
+            )
 
         router_fn_args_grad = ctx.router_loss_bwfn(d_routerloss)
-        task.wait()
+
+        if task is not None:
+            task.wait()
 
         temp_grad_output_splits = temp_grad_output.split(recv_counts_bw_for_api, 0)
         grad_chunks_by_expert = [[] for _ in range(num_local_experts)]
@@ -815,8 +826,8 @@ class AlltoAllSmartXPU(paddle.autograd.PyLayer):
 
 
 # Conditionally select the AlltoAllSmart implementation
-# if paddle.is_compiled_with_xpu():
-#     AlltoAllSmart = AlltoAllSmartXPU
+if paddle.is_compiled_with_xpu():
+    AlltoAllSmart = AlltoAllSmartXPU
 
 
 class MOEAllGatherLayerV2(MOELayer):
