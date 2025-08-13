@@ -16,4 +16,3 @@
 """
 
 from .dist_data_loader import DistDataLoader, DistDataLoaderAuto
-from .pretrain_task import ExampleSet, ExampleSetSingleDataSource, PretrainTask

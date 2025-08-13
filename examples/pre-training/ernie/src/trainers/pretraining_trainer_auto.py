@@ -1,5 +1,3 @@
-# !/usr/bin/env python3
-
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,18 +23,15 @@ import sys
 import re
 import os
 import json
-import pickle
 import contextlib
-from typing import Optional, List
-from collections import OrderedDict, defaultdict
+from typing import Optional
+from collections import OrderedDict
 from dataclasses import dataclass, field
-import random
 import time
 import math
 import logging
 from functools import partial
 
-import numpy as np
 
 import paddle
 import paddle.nn as nn
@@ -74,7 +69,6 @@ from paddleformers.trainer.utils import add_start_docstrings
 from paddleformers.trainer.trainer_callback import PrinterCallback
 from paddle.distributed import fleet
 import paddle.distributed as dist
-from paddleformers.datasets import MapDataset
 
 from paddleformers.transformers.model_utils import _add_variant
 
@@ -90,12 +84,9 @@ from src.callbacks import (
 )
 from src.datasets import (
     DistDataLoaderAuto,
-    ExampleSet,
-    ExampleSetSingleDataSource,
 )
 from paddle.distributed import in_auto_parallel_align_mode
 from src.clip import ClipGradByAdaptiveNorm, ClipGradForMOEByGlobalNorm
-from src.trainers.pretraining_trainer import DummySampler
 
 try:
     from paddleformers.trainer.trainer import (
@@ -119,35 +110,6 @@ except ImportError:
 
     logger.warning("paddlenlp.trainer.AutoTrainingArguments CANNOT import!")
     logger.warning("Use TrainingArguments as an alternative but will lose some args!")
-
-
-def distributed_optimizer_maybe_hack(
-    optimizer,
-    use_moe,
-):
-    if use_moe:
-        from src.trainers.dygraph_optimizer.hybrid_parallel_optimizer import (
-            HybridParallelOptimizer as MoEHybridParallelOptimizer,
-        )
-
-        fleet_env = fleet.fleet
-        fleet_env.user_defined_optimizer = optimizer
-        hp_optim = MoEHybridParallelOptimizer(
-            optimizer, fleet_env._hcg, fleet_env._user_defined_strategy
-        )
-
-        if fleet_env._user_defined_strategy.hybrid_configs[
-            "pp_configs"
-        ].dp_comm_overlap:
-            hp_optim._dp_enable = False
-
-        if fleet_env._user_defined_strategy.hybrid_configs[
-            "pp_configs"
-        ].sharding_comm_overlap:
-            hp_optim._sharding_enable = False
-        return hp_optim
-    else:
-        return fleet.distributed_optimizer(optimizer)
 
 
 DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
@@ -233,6 +195,11 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         metadata={
             "help": "是否使用多进程加速原始数据读取,与DataLoader的num_workers意义不同"
         },
+    )
+
+    input_dir: str = field(default=None, metadata={"help": "data path"})
+    split: str = field(
+        default="949,50,1", metadata={"help": "Train/valid/test data split ratio"}
     )
 
     data_dir: str = field(default=None, metadata={"help": "数据路径（指向一个目录）"})
@@ -414,6 +381,11 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         },
     )
 
+    multi_token_pred_depth: Optional[int] = field(
+        default=0,
+        metadata={},
+    )
+
     lr_scheduler: str = field(
         default="cosine",
         metadata={
@@ -482,28 +454,8 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
     )
 
     @property
-    def use_moe(self):
-        """_summary_
-
-        Returns:
-            _type_: _description_
-        """
-        return getattr(self, "use_expert_parallel", self._use_moe)
-
-    @use_moe.setter
-    def use_moe(self, value):
-        """_summary_
-
-        Args:
-            value (_type_): _description_
-        """
-        self.use_expert_parallel = value
-        self._use_moe = value
-
-    @property
     def need_data(self):
 
-        # mp0、pp0状态 卡才需要load数据
         if self.pp_need_data_degree:
             assert self.pipeline_parallel_degree > 1
             assert (
@@ -513,7 +465,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                 self.pp_need_data_degree,
                 self.pipeline_parallel_degree,
             )
-            # shift by 1 to avoid last pp no nee data
             no_need_data_range = list(
                 range(self.pp_need_data_degree - 1, self.pipeline_parallel_degree - 1)
             )
@@ -524,12 +475,10 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     @property
     def combine_batch(self):
-
         return self.max_seq_length // self.base_seq_length
 
     @property
     def reeao_dataset_rank(self):
-
         if not self.pp_need_data_degree:
             return super().dataset_rank
         no_need_data_range = list(
@@ -552,9 +501,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     @property
     def reeao_dataset_world_size(self):
-        """
-        考虑 pp /sharding/ dp 总和的数据流 worldsize
-        """
         if not self.pp_need_data:
             return super().dataset_world_size
         return (
@@ -565,11 +511,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
     def __post_init__(self):
         super().__post_init__()
-        # if self.sharding_parallel_degree > 1 and self.data_parallel_degree > 1:
-        #     # MP/PP下， 当前框架不支持同时开启 sharding 和 DP
-        #     assert (
-        #         self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
-        #      ), f"when using mp/pp, `data_parallel_degree` should be 1 but receive {self.data_parallel_degree}"
         if in_auto_parallel_align_mode():
             self.adaptive_norm_clip = False
             self.adaptive_norm_clip_ratio = 0.0
@@ -617,9 +558,7 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         if self.batch_size_warmup_steps > 0:
             assert self.global_batch_size > 0, self.global_batch_size
             assert self.init_global_batch_size > 0, self.init_global_batch_size
-            self.max_gradient_accumulation_steps = (
-                self.gradient_accumulation_steps
-            )  # hack add new
+            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
             (
                 self.per_device_train_batch_size,
                 self.gradient_accumulation_steps,
@@ -657,7 +596,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                     f"gradient_accumulation_steps[{self.gradient_accumulation_steps}] should be divisible by "
                     f"pp_need_data_degree[{self.pp_need_data_degree}]"
                 )
-                # pp_need_data_degree下，args的acc 需要//pp数量，欺骗 在prepare_inputs
                 self.gradient_accumulation_steps = (
                     self.gradient_accumulation_steps // self.pp_need_data_degree
                 )
@@ -685,14 +623,12 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                 else False
             )
             if sharding_comm_overlap_non_pp:
-                # update grad acc steps
                 assert hasattr(fleet.fleet, "_user_defined_strategy")
                 user_defined_strategy = fleet.fleet._user_defined_strategy
                 user_defined_strategy.hybrid_configs[
                     "sharding_configs"
                 ].accumulate_steps = self.gradient_accumulation_steps
 
-        # NOTE(shenliang03): Check sanity of `accumulate_steps` when using sharding comm overlap.
         if hasattr(fleet.fleet, "_user_defined_strategy"):
             user_defined_strategy = fleet.fleet._user_defined_strategy
             if (
@@ -720,471 +656,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                     )
         if self.vision_model_name_or_path is not None:
             self.multimodal = True
-
-
-class WeightedDistributedSamplerAuto(PaddleNLPDistributedBatchSampler):
-
-    def __init__(
-        self,
-        dataset,
-        batch_size,
-        output_dir,
-        dp_rank,
-        dp_size,
-        num_consecutive=1,
-        seed=0,
-        batch_size_warmup_steps=-1,
-        gradient_accumulation_steps=None,
-        max_gradient_accumulation_steps=None,
-        per_device_train_batch_size=None,
-        batch_size_warmup_increment=None,
-        combine_batch: int = 1,
-        shuffle_consecutive: bool = False,
-        global_shuffle_num_examples: int = 0,
-        same_data: bool = False,
-        modality_ratio: tuple = None,
-        modality_interleave: int = 1,
-        **kwargs,
-    ):
-        self.num_consecutive = num_consecutive
-        self.seed = seed
-        super().__init__(dataset, batch_size, **kwargs)
-        self.weights = None
-        self.batch_size = batch_size  # per-device-micro-batchsize
-        self.output_dir = output_dir
-        self.rng = random.Random(self.seed + self.epoch)
-        self.dp_rank = dp_rank
-        self.dp_size = dp_size
-        self.batch_size_warmup_steps = batch_size_warmup_steps
-        self.gradient_accumulation_steps = gradient_accumulation_steps
-        self.max_gradient_accumulation_steps = max_gradient_accumulation_steps
-        self.per_device_train_batch_size = per_device_train_batch_size
-        self.batch_size_warmup_increment = batch_size_warmup_increment
-        self.combine_batch = combine_batch
-        self.shuffle_consecutive = shuffle_consecutive
-        self.global_shuffle_seed = 0
-        self.global_shuffle_num_examples = global_shuffle_num_examples
-        self.same_data = same_data
-        self.load_data_seq = False
-        self.modality_ratio = modality_ratio
-        self.modality_interleave = modality_interleave
-        if self.modality_ratio is not None:
-            print("[my debug] modality_ratio:", modality_ratio)
-            logger.info(f"modality ratio set to {self.modality_ratio}")
-            assert sum(modality_ratio) == 1.0, "modality ratio should sum to 1"
-            assert (
-                self.modality_interleave * self.modality_ratio[0] % 1 == 0
-                if len(self.modality_ratio) >= 1
-                else True
-            ), "modality_interleave * modality_ratio[0] should be integer"
-            assert (
-                self.modality_interleave * self.modality_ratio[1] % 1 == 0
-                if len(self.modality_ratio) >= 2
-                else True
-            ), "modality_interleave * modality_ratio[1] should be integer"
-            assert (
-                self.modality_interleave * self.modality_ratio[2] % 1 == 0
-                if len(self.modality_ratio) >= 3
-                else True
-            ), "modality_interleave * modality_ratio[1] should be integer"
-        if isinstance(self.dataset, MapDataset):
-            self.inner_dataset = self.dataset.data
-        else:
-            self.inner_dataset = self.dataset
-        assert self.inner_dataset._load
-
-        self.max_part_id = self.inner_dataset.global_max_part_id
-
-        self.set_epoch(0)
-
-    def load_data_status(self, data_status: List[int], global_shuffle_seed: int = 0):
-        self.global_shuffle_seed = global_shuffle_seed
-        if not hasattr(self.inner_dataset.exs[0], "data_status"):
-            logger.warn(
-                "Inner Datasource has no attribute data_status, ignore load_data_status"
-            )
-            return
-        data_status = [
-            math.ceil(i / self.combine_batch) * self.combine_batch for i in data_status
-        ]
-        for ex in self.inner_dataset.exs:
-            if ex.part < len(data_status):
-                ex.data_status = data_status[ex.part]
-        logger.debug(
-            f"dp-[{self.dp_rank}/{self.dp_size}]-loaded_data_status--[{data_status[:10]}]"
-        )
-
-    def gen_data_seq(self):
-        """
-        生成随机采样序列。在给定seed + epoch 的情况下，序列结果稳定可复现
-        """
-        total = []
-        for ex in self.inner_dataset.exs:
-            total.extend([(ex.part, 0, i) for i in range(ex.data_status, len(ex))])
-        assert (
-            len(total) > self.num_consecutive
-        ), f"total={total} < num_consecutive={self.num_consecutive}"
-        indices = np.array_split(np.array(total), len(total) // self.num_consecutive)
-        if self.shuffle:
-            self.rng.shuffle(indices)
-        indices = np.concatenate(indices)
-        indices = self.roundup_and_shard(indices)
-        logger.debug(indices[:10])
-        return indices
-
-    def load_data_seq_from_cache(self):
-        """_summary_
-
-        Returns:
-            _type_: _description_
-        """
-        indices_file = os.path.join(
-            self.output_dir,
-            f"data_seq.epoch{self.epoch}.dp_{self.dp_rank}_of_{self.dp_size}"
-            f"_shard_{self.local_rank}_of_{self.nranks}.pth",
-        )
-        if self.same_data and os.path.exists(indices_file):
-            logger.info(f"load data seq from file - {indices_file}")
-            self.load_data_seq = True
-            with open(indices_file, "rb") as of:
-                return pickle.load(of)
-        return None
-
-    def gen_data_seq_weighted_multimodal(
-        self, lm_num_examples, mm_num_examples, audio_num_examples
-    ):
-        """multimodal data seq"""
-        assert self.modality_ratio is not None
-        logger.info(f"LM-num_examples -- {lm_num_examples}")
-        lm_indices = (
-            self.gen_data_seq_weighted(lm_num_examples, DATATYPE_2_ID["lm"])
-            if lm_num_examples > 0
-            else None
-        )
-        mm_indices = (
-            self.gen_data_seq_weighted(mm_num_examples, DATATYPE_2_ID["mm"])
-            if mm_num_examples > 0
-            else None
-        )
-        audio_indices = (
-            self.gen_data_seq_weighted(audio_num_examples, DATATYPE_2_ID["audio"])
-            if audio_num_examples > 0
-            else None
-        )
-
-        lm_base = (
-            int(
-                int(self.modality_ratio[0] * self.modality_interleave)
-                * self.combine_batch
-                * self.per_device_train_batch_size
-            )
-            if len(self.modality_ratio) >= 1
-            else 0
-        )
-        mm_base = (
-            int(
-                int(self.modality_ratio[1] * self.modality_interleave)
-                * self.combine_batch
-                * self.per_device_train_batch_size
-            )
-            if len(self.modality_ratio) >= 2
-            else 0
-        )
-        audio_base = (
-            int(
-                int(self.modality_ratio[2] * self.modality_interleave)
-                * self.combine_batch
-                * self.per_device_train_batch_size
-            )
-            if len(self.modality_ratio) >= 3
-            else 0
-        )
-
-        num_batches = math.inf
-        if lm_indices is not None and lm_base > 0:
-            num_batches = min(lm_indices.shape[0] // lm_base, num_batches)
-        if mm_indices is not None and mm_base > 0:
-            num_batches = min(mm_indices.shape[0] // mm_base, num_batches)
-        if audio_indices is not None and audio_base > 0:
-            num_batches = min(audio_indices.shape[0] // audio_base, num_batches)
-
-        all_indices = []
-        if lm_indices is not None and lm_base > 0:
-            lm_indices = lm_indices[: num_batches * lm_base, :].reshape(
-                num_batches, lm_base, -1
-            )
-            all_indices.append(lm_indices)
-        if mm_indices is not None and mm_base > 0:
-            mm_indices = mm_indices[: num_batches * mm_base, :].reshape(
-                num_batches, mm_base, -1
-            )
-            all_indices.append(mm_indices)
-        if audio_indices is not None and audio_base > 0:
-            audio_indices = audio_indices[: num_batches * audio_base, :].reshape(
-                num_batches, audio_base, -1
-            )
-            all_indices.append(audio_indices)
-
-        assert len(all_indices) > 0
-        indices = np.concatenate(all_indices, axis=1).reshape(
-            -1, all_indices[0].shape[-1]
-        )
-        logger.debug(
-            f"multimodal_data_seq={len(indices)}, example={indices[:10]}, "
-            f"modality_interleave={self.modality_interleave}, lm-{lm_base}, mm-{mm_base}, audio-{audio_base}"
-        )
-        return indices
-
-    def gen_data_seq_weighted(self, num_examples, data_type=None):
-
-        assert (
-            self.load_data_seq is False
-        ), "需要保证所有epoch的data_seq都从文件加载，否则下次删data_seq无法控住随机性"
-        logger.debug(
-            f"generating data sequence... #non_consecutive_data_chunks={num_examples},"
-            f" num_consecutive={self.num_consecutive}"
-        )
-
-        if num_examples > 1e5:
-            logger.debug(
-                "generating data sequence for very large data, consider use large `num_consecutive`"
-            )
-
-        if data_type is not None:
-            weights = [
-                ex.weights for ex in self.inner_dataset.exs if ex.data_type == data_type
-            ]
-            exs = [ex for ex in self.inner_dataset.exs if ex.data_type == data_type]
-        else:
-            weights = [ex.weights for ex in self.inner_dataset.exs]
-            exs = self.inner_dataset.exs
-        assert len(exs) > 0, f"data_type={data_type}, no data found"
-        total_w = sum(weights)
-        weights = [w / total_w for w in weights]
-
-        logger.info(
-            f"using weighted sampler, num_consecutive={self.num_consecutive}:\n"
-            + "\n".join(["%-100s...%.3e" % (e.path, w) for w, e in zip(weights, exs)])
-        )
-
-        part_indices_gen = {}
-        indices = []
-        for i, ex in enumerate(exs):
-            sample_size = int(weights[i] * num_examples)
-            logger.debug(
-                f"part_data_pre_sampling--[part-{ex.part}]-[sampler-size-{sample_size}]"
-            )
-            assert ex.combine_batch == self.combine_batch
-            part_indices_gen[ex.part] = ex.sampler()
-            indices.extend([ex.part] * sample_size)
-
-        logger.debug(
-            f"shuffle part placeholder index, size={len(indices)}, exmaple={indices[0]}"
-        )
-        if self.shuffle:
-            self.rng.shuffle(indices)
-        logger.debug("shuffle done")
-        indices_ret = []
-        logger.debug("build_index from shuffled placeholder")
-
-        for part_id in indices:
-            epoch, _index = next(part_indices_gen[part_id])
-            # combine_batch = max_seqlen (8k) / base_seqlen (1k)
-            if len(_index) % self.combine_batch != 0:
-                _index += [-1] * (self.combine_batch - len(_index) % self.combine_batch)
-            indices_ret += [(part_id, epoch, i) for i in _index]
-
-        if self.shuffle_consecutive and self.combine_batch >= 1:
-            part_data_gen = defaultdict(lambda: [])
-            logger.debug("consecutive placeholder 2 shuffle")
-            for item in indices_ret:
-                part_data_gen[item[0]].append(item)
-            logger.debug("consecutive placeholder 2 shuffle...")
-            part_data_gen_iter = {}
-            for key in part_data_gen.keys():
-                part_data_gen_iter[key] = iter(part_data_gen[key])
-            logger.debug("consecutive placeholder 2 shuffle......")
-            placeholder_indices = [i[0] for i in indices_ret]
-            placeholder_indices = [
-                placeholder_indices[i : i + self.combine_batch]
-                for i in range(0, len(placeholder_indices), self.combine_batch)
-            ]
-            logger.debug("consecutive placeholder 2 shuffle..........")
-            self.rng.shuffle(placeholder_indices)
-            logger.debug("consecutive placeholder 2 shuffle.............")
-            placeholder_indices = [
-                item for sublist in placeholder_indices for item in sublist
-            ]
-            logger.debug("consecutive placeholder 2 shuffle................")
-            indices_ret = [next(part_data_gen_iter[i]) for i in placeholder_indices]
-            logger.debug("consecutive placeholder 2 shuffle done")
-
-        logger.debug("build index done")
-        indices = np.array(indices_ret)
-        del indices_ret
-        logger.debug(f"num_data_seq={len(indices)}, example={indices[:10]}")
-        indices = self.roundup_and_shard(indices)
-        return indices
-
-    def roundup_and_shard(self, indices):
-        if self.nranks == 1:
-            logger.info("use use_train_part_sharding, skip padding")
-            return indices
-
-        padding_size = self.total_size - len(indices)
-        logger.info(
-            f"padding-size={padding_size}, total_size={self.total_size} shard={self.local_rank}/{self.nranks}"
-        )
-        if padding_size < 0:
-            indices = indices[:padding_size]
-        else:
-            indices = np.concatenate(
-                [
-                    indices,
-                    np.tile(indices, math.ceil(padding_size / len(indices)))[
-                        :padding_size
-                    ],
-                ]
-            )
-
-        assert len(indices) == self.total_size, (len(indices), self.total_size)
-
-        # subsample
-        indices = indices[self.local_rank : self.total_size : self.nranks]
-        assert len(indices) == self.num_samples
-        return indices
-
-    def __len__(self):
-        # PaddleNLP expect TypeError for infinite datasets:
-        # https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/trainer/trainer_utils.py#L515
-        raise TypeError
-
-    def __iter__(self):
-        # deterministically shuffle based on epoch and seed
-        self.rng = random.Random(self.seed + self.epoch + self.global_shuffle_seed)
-        logger.info(f"seed={self.seed + self.epoch + self.global_shuffle_seed}")
-        weights = [e.weights for e in self.inner_dataset.exs]
-        if any([w is None for w in weights]) or sum(weights) == 0.0:
-            logger.info(f"using normal sampler, num_consecutive={self.num_consecutive}")
-            indices = self.gen_data_seq()
-            self.weights = None
-        else:
-            self.weights = weights
-            num_examples = sum([ex.num_examples for ex in self.inner_dataset.exs])
-            if self.modality_ratio is not None:
-                lm_num_examples = sum(
-                    [
-                        ex.num_examples
-                        for ex in self.inner_dataset.exs
-                        if ex.data_type == DATATYPE_2_ID["lm"]
-                    ]
-                )
-                mm_num_examples = sum(
-                    [
-                        ex.num_examples
-                        for ex in self.inner_dataset.exs
-                        if ex.data_type == DATATYPE_2_ID["mm"]
-                    ]
-                )
-                audio_num_examples = sum(
-                    [
-                        ex.num_examples
-                        for ex in self.inner_dataset.exs
-                        if ex.data_type == DATATYPE_2_ID["audio"]
-                    ]
-                )
-            if self.global_shuffle_num_examples > 0:
-                num_examples = min([self.global_shuffle_num_examples, num_examples])
-                if self.modality_ratio is not None:
-                    lm_num_examples = min(
-                        [self.global_shuffle_num_examples, lm_num_examples]
-                    )
-                    mm_num_examples = min(
-                        [self.global_shuffle_num_examples, mm_num_examples]
-                    )
-                    audio_num_examples = min(
-                        [self.global_shuffle_num_examples, audio_num_examples]
-                    )
-                logger.debug(
-                    f"using global shuffle num examples: {self.global_shuffle_num_examples}"
-                )
-            indices = self.load_data_seq_from_cache()
-            if indices is None:
-                indices = (
-                    self.gen_data_seq_weighted_multimodal(
-                        lm_num_examples, mm_num_examples, audio_num_examples
-                    )
-                    if self.modality_ratio is not None
-                    else self.gen_data_seq_weighted(num_examples)
-                )
-
-        if self.output_dir:
-            with open(
-                os.path.join(
-                    self.output_dir,
-                    f"data_seq.epoch{self.epoch}.dp_{self.dp_rank}_of_{self.dp_size}"
-                    f"_shard_{self.local_rank}_of_{self.nranks}.pth",
-                ),
-                "wb",
-            ) as of:
-                pickle.dump(indices, of, protocol=4)
-
-        def ret():  # 无穷长reader。
-            # info = paddle.io.get_worker_info()
-            nonlocal indices
-            buf = []
-            logger.info(f"start training sequence, data-sequence: {indices[:10]}")
-            while 1:
-                if self.consumed_samples >= len(indices):
-                    self.consumed_samples -= len(indices)
-                else:
-                    for i in range(self.consumed_samples, len(indices)):
-                        if len(buf) == self.batch_size:
-                            yield buf
-                            buf = []
-                        buf.append(indices[i].tolist())
-                    self.consumed_samples = 0
-                self.epoch += 1
-                logger.info(
-                    f"epoch done, #data={self.total_size}, reshuffle-sequence: epoch={self.epoch}"
-                )
-
-                self.rng = random.Random(self.seed + self.epoch)
-                if self.weights:
-                    indices = self.load_data_seq_from_cache()
-                    if indices is None:
-                        indices = (
-                            self.gen_data_seq_weighted_multimodal(
-                                lm_num_examples, mm_num_examples, audio_num_examples
-                            )
-                            if self.modality_ratio is not None
-                            else self.gen_data_seq_weighted(num_examples)
-                        )
-                else:
-                    indices = self.gen_data_seq()
-                if self.output_dir:
-                    with open(
-                        os.path.join(
-                            self.output_dir,
-                            f"data_seq.epoch{self.epoch}.dp_{self.dp_rank}_of_{self.dp_size}"
-                            f"_shard_{self.local_rank}_of_{self.nranks}.pth",
-                        ),
-                        "wb",
-                    ) as of:
-                        pickle.dump(indices, of, protocol=4)
-
-        return ret()
-
-    def set_epoch(self, epoch=0, consumed_samples=0):
-
-        consumed_samples = consumed_samples // self.dp_size
-        logger.debug(f"set consumed samples={consumed_samples}, epoch={epoch}")
-        super().set_epoch(epoch, consumed_samples)
-
-        if isinstance(self.inner_dataset, ExampleSet):
-            for ex in self.inner_dataset.exs:
-                if isinstance(ex, ExampleSetSingleDataSource):
-                    ex.epoch = epoch
 
 
 class AutoPretrainingTrainer(AutoTrainer):
@@ -1283,8 +754,12 @@ class AutoPretrainingTrainer(AutoTrainer):
         return ctx_manager
 
     def _load_optimizer_state(self, checkpoint):
+        # def _load_moe_optimizer_state(checkpoint):
+        #     opt_moe_suffix = re.sub(r"moe\d\d", "moe00", self.args.optimizer_name_suffix)
+        #     return self._load_optimizer_state_of_one_shard(checkpoint, opt_moe_suffix)
 
         def _broadcast_moe_optimizer_state(state_dict):
+            # boardcast_keys
             base_state_dict = {"master_weights": {}}
             buf = [
                 {
@@ -1308,7 +783,6 @@ class AutoPretrainingTrainer(AutoTrainer):
             for k, s in buf[0].items():
                 v = state_dict.get(k, paddle.zeros(s, "float32")).cuda()
                 v.name = k
-                # k = k.replace("_fp32_master_0", "")  # TODO 这一手replace待品
                 dist.broadcast(v, src=src_rank, group=group)
                 logger.info(f"broadcast moe optimizer {k} from {src_rank}")
                 base_state_dict[k] = v.cpu()
@@ -1402,23 +876,19 @@ class AutoPretrainingTrainer(AutoTrainer):
     def evaluate(
         self, eval_dataset=None, ignore_keys=None, metric_key_prefix: str = "eval"
     ):
-        """doc"""
+
         self.model_wrapped.accumulate_steps = self.args.gradient_accumulation_steps
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
 
         start_time = time.time()
-        # Temporarily disable metric computation, we will do it in the loop here.
         compute_metrics = self.compute_metrics
         eval_loop = self.evaluation_loop
 
         output = eval_loop(
             eval_dataloader,
             description="Evaluation",
-            # No point gathering the predictions if there are no metrics, otherwise we defer to
-            # self.args.prediction_loss_only
             prediction_loss_only=True if compute_metrics is None else None,
             ignore_keys=ignore_keys,
-            # Only evaluate max_eval_iters
             max_eval_iters=self.args.eval_iters,
         )
 
@@ -1442,7 +912,7 @@ class AutoPretrainingTrainer(AutoTrainer):
     def prediction_pipeline_step(
         self, model, inputs, prediction_loss_only, ignore_keys
     ):
-        """doc"""
+
         loss, _, labels = super().prediction_pipeline_step(
             model, inputs, prediction_loss_only, ignore_keys
         )
@@ -1451,48 +921,14 @@ class AutoPretrainingTrainer(AutoTrainer):
         return loss_avg, loss, labels
 
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
-        if self.args.use_dummy_dataset:
-            return DummySampler(
-                self.train_dataset,
-                self.args.per_device_train_batch_size * self.args.combine_batch,
-            )
-        if self.args.use_train_part_sharding:
-            num_replicas = 1
-            rank = 0
-        else:
-            num_replicas = self.args.reeao_dataset_world_size
-            rank = self.args.reeao_dataset_rank
-        batch_size = self.args.per_device_train_batch_size * self.args.combine_batch
-        batch_size *= self.args.gradient_accumulation_steps
-        batch_sampler = WeightedDistributedSamplerAuto(
+        return PaddleNLPDistributedBatchSampler(
             self.train_dataset,
-            batch_size,
-            self.args.output_dir,
-            dp_rank=self.args.reeao_dataset_rank,
-            dp_size=self.args.reeao_dataset_world_size,
-            num_replicas=num_replicas,
-            rank=rank,
-            seed=self.args.seed,
-            batch_size_warmup_steps=self.args.batch_size_warmup_steps,  # used to reesume from ckpt
-            gradient_accumulation_steps=self.args.gradient_accumulation_steps,
-            max_gradient_accumulation_steps=self.args.max_gradient_accumulation_steps,
-            per_device_train_batch_size=self.args.per_device_train_batch_size,
-            batch_size_warmup_increment=self.args.batch_size_warmup_increment,
-            shuffle=not self.args.no_shuffle,
-            drop_last=False,
-            num_consecutive=self.args.num_consecutive,
-            combine_batch=self.args.combine_batch,
-            shuffle_consecutive=self.args.shuffle_consecutive,
-            global_shuffle_num_examples=self.args.global_shuffle_num_examples,
-            same_data=self.args.same_data,
-            modality_ratio=self.args.modality_ratio,
-            modality_interleave=(
-                self.args.modality_interleave * self.args.combine_batch
-                if self.args.modality_interleave
-                else None
-            ),
+            batch_size=self.args.per_device_train_batch_size,
+            shuffle=False,
+            num_replicas=self.args.dataset_world_size,
+            rank=self.args.dataset_rank,
+            drop_last=self.args.dataloader_drop_last,
         )
-        return batch_sampler
 
     def get_train_dataloader(self):
 
@@ -1508,7 +944,7 @@ class AutoPretrainingTrainer(AutoTrainer):
         if self._is_iterable_dataset(train_dataset):
             return DataLoader(
                 train_dataset,
-                batch_size=None,
+                batch_size=None,  # we do data collation in Stream
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
                 use_shared_memory=True,
@@ -1561,7 +997,6 @@ class AutoPretrainingTrainer(AutoTrainer):
             self.args.max_steps,
             min_lr=self.args.min_lr if self.args.min_lr else 0.0,
         )
-        print(f"lr_scheduler : {self.lr_scheduler}")
 
         return self.lr_scheduler
 
@@ -1653,7 +1088,7 @@ class AutoPretrainingTrainer(AutoTrainer):
                 grad_clip = ClipGradForMOEByGlobalNorm(
                     self.args.max_grad_norm,
                     is_expert_param_func=expert_fn,
-                    moe_group=_get_global_group(),  # None 为全局通信组,
+                    moe_group=_get_global_group(),
                     local_clip=False,
                 )
             else:
@@ -1675,7 +1110,6 @@ class AutoPretrainingTrainer(AutoTrainer):
             def lr_ratio_fn(param):
                 if param.name in self.static_name_to_dyg_name.keys():
                     name = self.static_name_to_dyg_name[param.name]
-                    # logger.info(f'search {param.name} -> {name}')
                     if self.args.moe_gate_lr_ratio is not None and gate_pattern.match(
                         name
                     ):
@@ -1738,24 +1172,13 @@ class AutoPretrainingTrainer(AutoTrainer):
 
         meshes = []
         if self.args.pipeline_parallel_degree > 1:
-            if self.args.multimodal:
-                # `input_ids`, `labels`, `data_id`, `src_id`, `data_type`, `images`, `token_type_ids`,
-                # `image_type_ids`, `has_images`
-                meshes.append(
-                    [
-                        _get_mesh(0),
-                        _get_mesh(-1),
-                        _get_mesh(0),
-                        _get_mesh(0),
-                        _get_mesh(0),
-                        _get_mesh(0),
-                        _get_mesh(0),
-                        _get_mesh(0),
-                        _get_mesh(0),
-                    ]
-                )
-            else:
-                meshes.append([_get_mesh(0), _get_mesh(-1), _get_mesh(0), _get_mesh(0)])
+            # input_ids
+            meshes.append(
+                [
+                    _get_mesh(0),
+                    _get_mesh(-1),
+                ]
+            )
             # labels
             meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         else:

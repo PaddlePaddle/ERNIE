@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# !/usr/bin/env python3
-
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +18,8 @@ It is used to support hybrid parallelism.
 It can replace paddle.io.DataLoader in most cases.
 """
 import logging
+import hashlib
+from collections import deque
 from collections import OrderedDict
 from itertools import groupby
 from functools import reduce
@@ -42,12 +41,20 @@ from src.utils.misc import global_training_logs
 logger = logging.getLogger(__name__)
 
 
+input_ids_for_mtp = deque()
+
 log = logging.getLogger(__name__)
 
 _MAX_DATA_DIM = 64
 
 VOCAB_SIZE = os.getenv("VOCAB_SIZE")
 G_DEBUG_DATA_MD5 = os.getenv("G_DEBUG_DATA_MD5")
+
+
+def md5(tensor):
+    numpy_array = tensor.numpy()
+    array_bytes = numpy_array.tobytes()
+    return hashlib.md5(array_bytes).hexdigest()
 
 
 class DummyDataset(paddle.io.Dataset):
@@ -93,14 +100,12 @@ class DistDataLoader(paddle.io.DataLoader):
             num_workers=num_workers,
         )
         self.need_magic_trans = need_magic_trans
-        # log.info(f'DistDataloader using image-dtype: {self.image_dtype}')
         self._hcg = fleet.get_hybrid_communicate_group()
 
         # init pp data comm group
         if self._hcg.get_pipe_parallel_world_size() > 1 and pp_broadcast:
             self._pp_data_group = self._init_dataloader_comm_group()
         else:
-            log.info("skip pp broadcast")
             self._pp_data_group = None
 
         # tensor parallel message
@@ -132,14 +137,11 @@ class DistDataLoader(paddle.io.DataLoader):
                 persistent_workers,
             )
 
-            # self._dataloder_iter = iter(self._dataloder)
             self._lazy_dataloader_iter = None
         else:
             log.info(
-                "mp{}_pp{}_sharding{}_dp{} no data needed, "
-                "skip init dataloader.".format(
-                    self.mp_rank, self.pp_rank, sharding_rank, self.dp_rank
-                )
+                f"mp{self.mp_rank}_pp{self.pp_rank}_sharding{sharding_rank}_dp{self.dp_rank} no data needed, "
+                "skip init dataloader."
             )
 
     @property
@@ -162,7 +164,6 @@ class DistDataLoader(paddle.io.DataLoader):
         parallel_groups = topo.get_comm_list("pipe")
 
         for group in parallel_groups:
-            # only first rank and last rank
             if self.need_magic_trans:
                 assert (
                     len(group) > 2
@@ -181,7 +182,6 @@ class DistDataLoader(paddle.io.DataLoader):
     def __next__(self):
         get_timers() and get_timers()("read-raw-data").start()
         if self._need_data:
-            # {'input_ids': int64, 'labels': int64, 'data_id': int64}
             data = next(self._dataloder_iter)
             if "data_not_valid" in data:
                 global_training_logs.update(
@@ -190,8 +190,6 @@ class DistDataLoader(paddle.io.DataLoader):
             (
                 input_ids,
                 labels,
-                data_id,
-                src_id,
                 data_type,
                 images,
                 token_type_ids,
@@ -205,8 +203,6 @@ class DistDataLoader(paddle.io.DataLoader):
             ) = (
                 data["input_ids"],
                 data["labels"],
-                data["data_id"],
-                data["src_id"],
                 data.get("data_type", None),
                 data.get("images", None),
                 data.get("token_type_ids", None),
@@ -218,18 +214,14 @@ class DistDataLoader(paddle.io.DataLoader):
                 data.get("position_ids", None),
                 data.get("log_prob", None),
             )
-            assert {input_ids.dtype, labels.dtype, data_id.dtype, src_id.dtype} == {
-                paddle.int64
-            }, (
+            assert {input_ids.dtype, labels.dtype} == {paddle.int64}, (
                 f"Distloader requires dtype == `int64`, "
-                f"got:{[input_ids.dtype, labels.dtype, data_id.dtype, src_id.dtype]}"
+                f"got:{[input_ids.dtype, labels.dtype]}"
             )
         else:
             (
                 input_ids,
                 labels,
-                data_id,
-                src_id,
                 data_type,
                 images,
                 token_type_ids,
@@ -241,8 +233,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 position_ids,
                 log_prob,
             ) = (
-                None,
-                None,
                 None,
                 None,
                 None,
@@ -264,8 +254,6 @@ class DistDataLoader(paddle.io.DataLoader):
             (
                 input_ids,
                 labels,
-                data_id,
-                src_id,
                 data_type,
                 images,
                 token_type_ids,
@@ -280,8 +268,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 [
                     input_ids,
                     labels,
-                    data_id,
-                    src_id,
                     data_type,
                     images,
                     token_type_ids,
@@ -298,13 +284,9 @@ class DistDataLoader(paddle.io.DataLoader):
             )
 
         if self._pp_data_group is not None and self._pp_data_group.nranks > 1:
-            # NOTE(shenliang03): in last stage in pp, we don't need input_ids and data_id.
-            # But it's only for paddle-new_model_7 compatible upgrade. It will remove in future.
             (
                 input_ids,
                 labels,
-                data_id,
-                src_id,
                 data_type,
                 images,
                 token_type_ids,
@@ -319,8 +301,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 [
                     input_ids,
                     labels,
-                    data_id,
-                    src_id,
                     data_type,
                     images,
                     token_type_ids,
@@ -336,6 +316,11 @@ class DistDataLoader(paddle.io.DataLoader):
                 self._pp_data_group,
             )
 
+        if self.need_magic_trans:
+            if input_ids is not None:
+                global input_ids_for_mtp
+                input_ids_for_mtp.append(input_ids)
+
         if VOCAB_SIZE is not None:
             if input_ids is not None:
                 input_ids %= int(VOCAB_SIZE)
@@ -346,8 +331,6 @@ class DistDataLoader(paddle.io.DataLoader):
             [
                 ("input_ids", input_ids),
                 ("labels", labels),
-                ("data_id", data_id),
-                ("src_id", src_id),
                 ("data_type", data_type),
                 ("images", images),
                 ("token_type_ids", token_type_ids),
@@ -376,6 +359,9 @@ class DistDataLoader(paddle.io.DataLoader):
         ]
         for k in none_keys:
             to_return.pop(k)
+        if G_DEBUG_DATA_MD5 and int(G_DEBUG_DATA_MD5):
+            printable = map_structure(lambda i: md5(i), to_return)
+            logger.info(f"data-md5: {printable}")
         return to_return
 
 
@@ -383,7 +369,6 @@ def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_r
     """
     Broadcast data from src_rank to all ranks in comm_group.
     """
-    # Move to GPU and broadcast.
     size_cpu = []
     if comm_rank == 0:
         for data in data_list:
@@ -407,9 +392,7 @@ def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_r
     if comm_rank == 0:
         assert (
             data.dtype == datatype
-        ), "input has data type {} which " "is different than {}".format(
-            data.dtype, datatype
-        )
+        ), f"input has data type {data.dtype} which " f"is different than {datatype}"
         data_b = paddle.concat(
             [d.to(get_env_device()).reshape([-1]) for d in data_list], 0
         )
@@ -437,7 +420,8 @@ def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_r
 class _DtypeSndShape:
     """_summary_
 
-    Returns:
+    Returns
+    -------
         _type_: _description_
     """
 
@@ -447,7 +431,8 @@ class _DtypeSndShape:
     def size(self):
         """_summary_
 
-        Returns:
+        Returns
+        -------
             _type_: _description_
         """
         return reduce(lambda x, y: x * y, self.shape)
@@ -460,7 +445,8 @@ def split_group(grouped, split_size):
         grouped (_type_): _description_
         split_size (_type_): _description_
 
-    Yields:
+    Yields
+    ------
         _type_: _description_
     """
     ret = []
@@ -473,9 +459,7 @@ def split_group(grouped, split_size):
         yield ret
 
 
-# Tea.chen congmin(葱明) brodcast
 def broadcast_data_obj(data, src_rank, group):
-
     this_rank = dist.get_rank()
     if this_rank == src_rank:
         template = [
@@ -492,7 +476,6 @@ def broadcast_data_obj(data, src_rank, group):
         template = [None]
     dist.broadcast_object_list(template, src_rank, group)
     template = template[0]
-    # log.info(f'[rank={dist.get_rank()}]: {template}')
 
     temp_flat = flatten(template)
     data_flat = flatten(data)
@@ -520,10 +503,8 @@ def broadcast_data_obj(data, src_rank, group):
                     [sum(data_buf_shapes)], dtype=grouped_chunk[0][1].dtype
                 )
             dist.broadcast(data_buf, src_rank, group)
-            # log.info(f'[rank={dist.get_rank()}]: done broadcast data:{data_buf.shape}')
 
             if this_rank != src_rank:
-                # log.info(f'[rank={dist.get_rank()}] split:{data_buf_shapes}')
                 if len(data_buf_shapes) == 1:
                     data_buf = [data_buf]
                 else:
@@ -547,11 +528,10 @@ class DistDataLoaderAuto(DistDataLoader):
 
         input_list = []
         if "token_type_ids" in data_dict.keys():
+
             (
                 input_ids,
                 labels,
-                data_id,
-                src_id,
                 data_type,
                 images,
                 token_type_ids,
@@ -560,8 +540,6 @@ class DistDataLoaderAuto(DistDataLoader):
             ) = (
                 data_dict["input_ids"],
                 data_dict["labels"],
-                data_dict["data_id"],
-                data_dict["src_id"],
                 data_dict["data_type"],
                 data_dict.get("images", None),
                 data_dict["token_type_ids"],
@@ -583,8 +561,6 @@ class DistDataLoaderAuto(DistDataLoader):
             input_list = [
                 input_ids,
                 labels,
-                data_id,
-                src_id,
                 data_type,
                 images,
                 token_type_ids,

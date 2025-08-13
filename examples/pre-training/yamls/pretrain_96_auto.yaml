@@ -7,9 +7,6 @@ model_args:
     model_name_or_path: model_configs_auto/
     tokenizer_name: ./ernie/src/tokenizers/tokenizer_model
     output_dir: ./output/
-    data_filelist: conf/filelist_ernie45turbo_tk_m100k_250321.txt.1000
-    data_weights:  conf/ratio_eb45t_0321
-    dev_data: ~/afs_ro/baihua.afs.baidu.com/user/sasd-score/rank-score-total/linjianhe/liuweixin/app/model/data/char-en-65536-v1/v4_corpus_wordseg/newgcc.dev.h5
     data_load_process_num: 40
     max_seq_length: 4096
     base_seq_length: 4096
@@ -22,12 +19,14 @@ model_args:
     model_config:
         moe_logging: True
         moe_use_aux_free: true
-        multi_token_pred_depth: 1
+        multi_token_pred_depth: 0
 
 
 
 # ---------------------------trainer args-------------------------------------------------#
 trainer_args:
+    input_dir: "0.4 ./demo_data/data-1-part0 0.6 ./demo_data/data-1-part0"
+    split: "998,1,1"
     loss_spike_settings:
       enable_loss_spike_watcher: 1
       longjob_id: long-78f0ae68688b4659

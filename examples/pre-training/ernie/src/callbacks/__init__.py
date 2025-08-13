@@ -26,7 +26,6 @@ from .moe_correction_bias_adjust_callback import MoECorrectionBiasAdjustCallback
 from .moe_logging_callback import GlobalRNGCallback, MoeLoggingCallback
 from .sp_grad_sync_callback import SPGradSyncCallback
 from .fp8_quant_weight_callback import FP8QuantWeightCallback
-from .data_trace_callback import DataTraceCallback, DataTraceCallbackAuto
 
 __all__ = [
     "TensorBoardCallback",
@@ -40,6 +39,4 @@ __all__ = [
     "ClipGradByAdaptiveNormCallback",
     "StopperCallback",
     "ProgreesiveBatchingCallback",
-    "DataTraceCallbackAuto",
-    "DataTraceCallback",
 ]

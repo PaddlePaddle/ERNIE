@@ -16,7 +16,6 @@
 
 # __all__ = ['logger', 'setup_logger_output_file']
 
-from .data_utils import *  # noqa
 from .logging import *  # noqa
 from .seed_utils import *  # noqa
 from .training_utils import *  # noqa
