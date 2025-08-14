@@ -30,7 +30,6 @@ from dataclasses import dataclass, field
 import time
 import math
 import logging
-from functools import partial
 
 
 import paddle
@@ -934,11 +933,7 @@ class AutoPretrainingTrainer(AutoTrainer):
 
         if self.args.need_data and self.train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
-        _DataLoader = partial(
-            DistDataLoaderAuto,
-            need_data=self.args.need_data,
-            pp_broadcast=not self.args.pp_need_data,
-        )
+        _DataLoader = DistDataLoaderAuto
 
         train_dataset = self.train_dataset
         if self._is_iterable_dataset(train_dataset):
@@ -1173,25 +1168,20 @@ class AutoPretrainingTrainer(AutoTrainer):
         meshes = []
         if self.args.pipeline_parallel_degree > 1:
             # input_ids
-            meshes.append(
-                [
-                    _get_mesh(0),
-                    _get_mesh(-1),
-                ]
-            )
+            meshes.append(_get_mesh(0))
             # labels
             meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         else:
             meshes.append(_get_mesh(0))
         return meshes
 
-    def _wrap_for_dist_loader(self, train_dataloader):
-        self.dense_tensor_idx = None
+    def _wrap_for_dist_loader(self, train_dataloader, dense_tensor_idx=None):
+        self.dense_tensor_idx = dense_tensor_idx
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
             meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
+            dense_tensor_idx=dense_tensor_idx,
             is_dataset_splitted=True,
         )
-        dist_loader._input_keys = ["input_ids", "labels"]
         return dist_loader

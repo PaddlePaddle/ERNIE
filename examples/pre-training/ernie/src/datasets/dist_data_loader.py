@@ -12,177 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-DistDataLoader is a wrapper of paddle.io.DataLoader.
-It is used to support hybrid parallelism.
-It can replace paddle.io.DataLoader in most cases.
-"""
-import logging
-import hashlib
-from collections import deque
 from collections import OrderedDict
 from itertools import groupby
 from functools import reduce
 from dataclasses import dataclass
 
-import numpy as np
-import os
 import paddle
-from paddle.distributed import fleet
 import paddle.distributed as dist
 from paddle.utils.layers_utils import flatten, map_structure, pack_sequence_as
-
-from paddleformers.utils.batch_sampler import DistributedBatchSampler
-from paddleformers.trainer.plugins.timer import get_timers
-from paddleformers.utils.tools import get_env_device
+from paddleformers.data import DistDataLoader
 
 from src.utils.misc import global_training_logs
 
-logger = logging.getLogger(__name__)
 
-
-input_ids_for_mtp = deque()
-
-log = logging.getLogger(__name__)
-
-_MAX_DATA_DIM = 64
-
-VOCAB_SIZE = os.getenv("VOCAB_SIZE")
-G_DEBUG_DATA_MD5 = os.getenv("G_DEBUG_DATA_MD5")
-
-
-def md5(tensor):
-    numpy_array = tensor.numpy()
-    array_bytes = numpy_array.tobytes()
-    return hashlib.md5(array_bytes).hexdigest()
-
-
-class DummyDataset(paddle.io.Dataset):
-    def __len__(self):
-        return 0
-
-
-class DistDataLoader(paddle.io.DataLoader):
-    """
-    DistDataLoader is a wrapper of paddle.io.DataLoader.
-    """
-
+class DistDataLoaderAuto(DistDataLoader):
     def __init__(
         self,
         dataset,
-        feed_list=None,
-        places=None,
-        return_list=True,
         batch_sampler=None,
-        batch_size=1,
-        shuffle=False,
-        drop_last=False,
         collate_fn=None,
         num_workers=0,
-        use_buffer_reader=True,
         prefetch_factor=2,
-        use_shared_memory=True,
-        timeout=0,
-        worker_init_fn=None,
-        persistent_workers=False,
-        need_data=True,
-        pp_broadcast=True,
-        need_magic_trans=False,
     ):
-        if dataset is None:
-            dataset = DummyDataset()
-            batch_sampler = DistributedBatchSampler(dataset, 1)
-            log.info("rank has no data, use Dummpy dataset")
         super().__init__(
             dataset=dataset,
             batch_sampler=batch_sampler,
             collate_fn=collate_fn,
             num_workers=num_workers,
+            prefetch_factor=prefetch_factor,
         )
-        self.need_magic_trans = need_magic_trans
-        self._hcg = fleet.get_hybrid_communicate_group()
-
-        # init pp data comm group
-        if self._hcg.get_pipe_parallel_world_size() > 1 and pp_broadcast:
-            self._pp_data_group = self._init_dataloader_comm_group()
-        else:
-            self._pp_data_group = None
-
-        # tensor parallel message
-        self.mp_rank = self._hcg.get_model_parallel_rank()
-        self.mp_group = self._hcg.get_model_parallel_group()
-        self.mp_src_rank = self._hcg.get_model_parallel_group_src_rank()
-
-        self.pp_rank = self._hcg.get_stage_id()
-        self.dp_rank = self._hcg.get_data_parallel_rank()
-        sharding_rank = self._hcg.get_sharding_parallel_rank()
-        self._need_data = need_data
-        if self._need_data:
-            self._dataloder = paddle.io.DataLoader(
-                dataset,
-                feed_list,
-                places,
-                return_list,
-                batch_sampler,
-                batch_size,
-                shuffle,
-                drop_last,
-                collate_fn,
-                num_workers,
-                use_buffer_reader,
-                prefetch_factor,
-                use_shared_memory,
-                timeout,
-                worker_init_fn,
-                persistent_workers,
-            )
-
-            self._lazy_dataloader_iter = None
-        else:
-            log.info(
-                f"mp{self.mp_rank}_pp{self.pp_rank}_sharding{sharding_rank}_dp{self.dp_rank} no data needed, "
-                "skip init dataloader."
-            )
-
-    @property
-    def _dataloder_iter(self):
-        if self._lazy_dataloader_iter is None:
-            self._lazy_dataloader_iter = iter(self._dataloder)
-        return self._lazy_dataloader_iter
-
-    def __len__(self):
-        if self._need_data:
-            return super().__len__()
-        else:
-            raise ValueError(
-                "raise error for `paddlenlp.trainer.trainer_utils.has_length`"
-            )
-
-    def _init_dataloader_comm_group(self):
-        topo = self._hcg._topo
-        parallel_comm_group = None
-        parallel_groups = topo.get_comm_list("pipe")
-
-        for group in parallel_groups:
-            if self.need_magic_trans:
-                assert (
-                    len(group) > 2
-                ), f"magic_trans need ranks in group greater than 2, but get {len(group)}"
-                ranks = [group[0], group[-2], group[-1]]
-            else:
-                ranks = [group[0], group[-1]]
-            comm_group = paddle.distributed.new_group(ranks=ranks)
-            if paddle.distributed.get_rank() in ranks:
-                parallel_comm_group = comm_group
-        return parallel_comm_group
-
-    def __iter__(self):
-        return self
+        self._pp_data_group = self._hcg.get_pipe_parallel_group()
 
     def __next__(self):
-        get_timers() and get_timers()("read-raw-data").start()
         if self._need_data:
-            data = next(self._dataloder_iter)
+            data = next(self._dataloader_iter)
             if "data_not_valid" in data:
                 global_training_logs.update(
                     data_not_valid=data["data_not_valid"].astype("float32").mean()
@@ -246,10 +109,10 @@ class DistDataLoader(paddle.io.DataLoader):
                 None,
                 None,
             )
-        get_timers() and get_timers()("read-raw-data").stop()
 
         # broadcast data
         pp_broadcast = (self._pp_data_group is None) or self.pp_rank == 0
+        # print(f'pp_broadcast:{pp_broadcast}')
         if self.mp_group is not None and self.mp_group.nranks > 1 and pp_broadcast:
             (
                 input_ids,
@@ -315,18 +178,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 self._pp_data_group.ranks[0],
                 self._pp_data_group,
             )
-
-        if self.need_magic_trans:
-            if input_ids is not None:
-                global input_ids_for_mtp
-                input_ids_for_mtp.append(input_ids)
-
-        if VOCAB_SIZE is not None:
-            if input_ids is not None:
-                input_ids %= int(VOCAB_SIZE)
-            if labels is not None:
-                labels %= int(VOCAB_SIZE)
-
         to_return = OrderedDict(
             [
                 ("input_ids", input_ids),
@@ -359,96 +210,24 @@ class DistDataLoader(paddle.io.DataLoader):
         ]
         for k in none_keys:
             to_return.pop(k)
-        if G_DEBUG_DATA_MD5 and int(G_DEBUG_DATA_MD5):
-            printable = map_structure(lambda i: md5(i), to_return)
-            logger.info(f"data-md5: {printable}")
-        return to_return
 
+        data_dict = to_return
 
-def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_rank=0):
-    """
-    Broadcast data from src_rank to all ranks in comm_group.
-    """
-    size_cpu = []
-    if comm_rank == 0:
-        for data in data_list:
-            size_cpu.append(len(data.shape))
-            size_cpu += data.shape
-    size_cpu = size_cpu + [0] * (_MAX_DATA_DIM - len(size_cpu))
-    size_cuda = paddle.to_tensor(size_cpu)
-    paddle.distributed.broadcast(size_cuda, src_rank, group=comm_group).wait()
-
-    size_cpu = size_cuda.tolist()
-    i = 0
-    numel = 0
-    sizes = []
-    while size_cpu[i] > 0:
-        rank = size_cpu[i]
-        this_size = size_cpu[i + 1 : i + 1 + rank]
-        numel += int(np.prod(this_size))
-        sizes.append(this_size)
-        i += 1 + rank
-
-    if comm_rank == 0:
-        assert (
-            data.dtype == datatype
-        ), f"input has data type {data.dtype} which " f"is different than {datatype}"
-        data_b = paddle.concat(
-            [d.to(get_env_device()).reshape([-1]) for d in data_list], 0
+        return OrderedDict(
+            [("input_ids", data_dict["input_ids"]), ("labels", data_dict["labels"])]
         )
-        assert numel == sum([d.numel().item() for d in data_list]), (
-            numel,
-            [d.numel().item() for d in data_list],
-        )
-    else:
-        data_b = paddle.empty([numel], dtype=datatype).to(get_env_device())
-
-    # Broadcast
-    paddle.distributed.broadcast(data_b, src_rank, group=comm_group).wait()
-
-    ret = []
-    offset = 0
-    for size in sizes:
-        numel = int(np.prod(size))
-        ret.append(data_b[offset : offset + numel].reshape(size))
-        offset += numel
-
-    return ret
 
 
 @dataclass
 class _DtypeSndShape:
-    """_summary_
-
-    Returns
-    -------
-        _type_: _description_
-    """
-
     dtype: paddle.dtype
     shape: list
 
     def size(self):
-        """_summary_
-
-        Returns
-        -------
-            _type_: _description_
-        """
         return reduce(lambda x, y: x * y, self.shape)
 
 
 def split_group(grouped, split_size):
-    """_summary_
-
-    Args:
-        grouped (_type_): _description_
-        split_size (_type_): _description_
-
-    Yields
-    ------
-        _type_: _description_
-    """
     ret = []
     while grouped:
         if sum([r[1].size() for r in ret]) > split_size:
@@ -460,6 +239,7 @@ def split_group(grouped, split_size):
 
 
 def broadcast_data_obj(data, src_rank, group):
+    # print("lzx debug broadcast_data_obj")
     this_rank = dist.get_rank()
     if this_rank == src_rank:
         template = [
@@ -486,7 +266,9 @@ def broadcast_data_obj(data, src_rank, group):
     ret_flat = [-1 for _ in range(len(temp_flat))]
     for dtype, grouped in groupby(sorted(enumerate(temp_flat), key=keyfn), keyfn):
         grouped = list(grouped)
-        for grouped_chunk in split_group(grouped, 2**18):
+        for grouped_chunk in split_group(
+            grouped, 2**18
+        ):  # 对 > 2**31 的 tensor 进行 spilt 会出 paddle 问题。
             idxs = [g[0] for g in grouped_chunk]
             if not dtype:
                 for id in idxs:
@@ -516,59 +298,3 @@ def broadcast_data_obj(data, src_rank, group):
         assert not [r for r in ret_flat if r is -1], ret_flat
         data = pack_sequence_as(template, ret_flat)
     return data
-
-
-class DistDataLoaderAuto(DistDataLoader):
-
-    def _init_dataloader_comm_group(self):
-        return self._hcg.get_pipe_parallel_group()
-
-    def __next__(self):
-        data_dict = super().__next__()
-
-        input_list = []
-        if "token_type_ids" in data_dict.keys():
-
-            (
-                input_ids,
-                labels,
-                data_type,
-                images,
-                token_type_ids,
-                image_type_ids,
-                grid_thw,
-            ) = (
-                data_dict["input_ids"],
-                data_dict["labels"],
-                data_dict["data_type"],
-                data_dict.get("images", None),
-                data_dict["token_type_ids"],
-                data_dict.get("image_type_ids", None),
-                data_dict.get("grid_thw", None),
-            )
-
-            data_world_size = max(self._hcg.get_data_parallel_rank(), 1) * max(
-                self._hcg.get_sharding_parallel_rank(), 1
-            )
-            if images is None:
-                images = paddle.zeros([1, 64, 64], dtype="uint8")
-                has_images = paddle.full([data_world_size, 1], False, dtype="bool")
-            else:
-                raise NotImplementedError
-                has_images = paddle.full([data_world_size, 1], True, dtype="bool")
-            if image_type_ids is None:
-                image_type_ids = paddle.zeros_like(token_type_ids)  # padding for dy2st
-            input_list = [
-                input_ids,
-                labels,
-                data_type,
-                images,
-                token_type_ids,
-                image_type_ids,
-                has_images,
-                grid_thw,
-            ]
-        else:
-            for key, data in data_dict.items():
-                input_list.append(data)
-        return OrderedDict([("input_ids", input_list), ("labels", [])])

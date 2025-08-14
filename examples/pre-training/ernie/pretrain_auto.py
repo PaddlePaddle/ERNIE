@@ -33,7 +33,6 @@ from src.callbacks import (
 )
 from models.ernie import (
     ErnieForCausalLMAuto,
-    ErnieForCausalLMAutoPP,
 )
 from models.ernie_moe.configuration import (
     ErnieConfig,
@@ -283,19 +282,12 @@ def main():
 
     cfg = update_model_config_from_args(cfg, model_config)
 
-    if args.model_type == "ernie":
-        model_class = ErnieForCausalLMAuto
-    elif args.model_type == "ernie_pp":
-        model_class = ErnieForCausalLMAutoPP
-    else:
-        raise ValueError(f"not support model_type: {args.model_type}")
-
     if args.from_scratch:
         with paddle.LazyGuard():
-            model = model_class(cfg)
+            model = ErnieForCausalLMAuto(cfg)
     else:
         with paddle.LazyGuard():
-            model = model_class.from_pretrained(
+            model = ErnieForCausalLMAuto.from_pretrained(
                 args.model_name_or_path,
                 config=cfg,
             )
