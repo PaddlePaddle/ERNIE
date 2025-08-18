@@ -924,6 +924,9 @@ class Client:
 
     def move_useful_file(self, save_dir):
         for file in USEFUL_FILES:
+            assert os.path.exists(
+                f"{self.base_path}/{file}"
+            ), f"{self.base_path}/{file} not exist, please check"
             subprocess.run(
                 ["cp", f"{self.base_path}/{file}", save_dir],
                 capture_output=True,
