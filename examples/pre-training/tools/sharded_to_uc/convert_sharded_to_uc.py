@@ -82,7 +82,6 @@ def convert_ckpt(args):
         for k, v in sharded_name_to_uc_name.items():
             if k in key:
                 output_str = key.replace(k, v)
-                print(output_str, key)
                 break
             else:
                 output_str = key
