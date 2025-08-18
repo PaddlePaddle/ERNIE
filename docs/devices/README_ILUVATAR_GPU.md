@@ -123,7 +123,101 @@ pip install paddleformers
 
 ### (2) Start post-traning：(This will take a relatively long time)
 
-SFT-LoRA fine-tuning
+1. SFT fine-tuning
+
+```
+#!/bin/bash
+
+unset PADDLE_TRAINERS_NUM
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+export PYTHONPATH=$(dirname "$0")/../../../..:$PYTHONPATH
+export FLAGS_set_to_1d=False
+export FLAGS_dataloader_use_file_descriptor=False
+
+export PADDLE_XCCL_BACKEND=iluvatar_gpu
+export LD_PRELOAD=/usr/local/corex/lib64/libcuda.so.1
+
+export FLAGS_embedding_deterministic=1
+
+model_path="ERNIE-4.5-21B-A3B-Paddle"
+task="sft_lora_8k"
+paddle_log_dir="${model_path}_${task}_log"
+vdl_log_dir="${model_path}_${task}_vdl"
+output_dir="${model_path}_${task}_checkpoint"
+
+rm -rf ${log_dir}
+
+python3 -m paddle.distributed.launch \
+    --log_dir ${paddle_log_dir} \
+    --gpus 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 \
+    examples/post-training/sft/train.py \
+    --logging_dir ${vdl_log_dir} \
+    --model_name_or_path ${model_path} \
+    --output_dir ${output_dir} \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
+    --train_dataset_path "examples/data/ARC-Challenge/train.json,examples/data/boolq/train.json,examples/data/piqa/train.json,examples/data/winogrande/train.json,examples/data/hellaswag/train.json,examples/data/ARC-Easy/train.json" \
+    --train_dataset_prob "0.2,0.1,0.1,0.2,0.2,0.2" \
+    --train_dataset_type "erniekit,erniekit,erniekit,erniekit,erniekit,erniekit" \
+    --eval_dataset_path "examples/data/ARC-Challenge/dev.json,examples/data/boolq/dev.json,examples/data/piqa/dev.json,examples/data/winogrande/dev.json,examples/data/hellaswag/dev.json,examples/data/ARC-Easy/dev.json" \
+    --eval_dataset_prob "0.2,0.1,0.1,0.2,0.2,0.2" \
+    --eval_dataset_type "erniekit,erniekit,erniekit,erniekit,erniekit,erniekit" \
+    --max_steps 500 \
+    --max_evaluate_steps 10000 \
+    --eval_accumulation_steps 100 \
+    --num_train_epochs 1 \
+    --save_steps 500 \
+    --logging_steps 1 \
+    --eval_steps 500 \
+    --weight_decay 0.01 \
+    --do_train \
+    --do_eval \
+    --evaluation_strategy steps \
+    --device iluvatar_gpu \
+    --tensor_parallel_degree 4 \
+    --pipeline_parallel_degree 4 \
+    --sharding_parallel_degree 1 \
+    --sharding stage1 \
+    --max_seq_len 8192 \
+    --seed 23 \
+    --gradient_accumulation_steps 2 \
+    --warmup_steps 2000 \
+    --lr_scheduler_type "linear" \
+    --learning_rate 3e-4 \
+    --num_samples_each_epoch 6000000 \
+    --bf16 \
+    --fp16_opt_level O2 \
+    --amp_custom_white_list "lookup_table" "lookup_table_v2" "flash_attn" "matmul" "matmul_v2" "fused_gemm_epilogue" \
+    --amp_custom_black_list "reduce_sum" "softmax_with_cross_entropy" "c_softmax_with_cross_entropy" "elementwise_div" "sin" "cos" \
+    --disable_tqdm True \
+    --recompute 1 \
+    --offload_optim 0 \
+    --recompute_granularity "full" \
+    --dataloader_num_workers 1 \
+    --distributed_dataloader 1 \
+    --use_flash_attention 1 \
+    --use_sparse_head_and_loss_fn 0 \
+    --use_attn_mask_start_row_indices 0 \
+    --use_sparse_flash_attn 0 \
+    --tensor_parallel_output 1 \
+    --pipeline_parallel_config "disable_partial_send_recv enable_clear_every_step_cache disable_batch_p2p_comm" \
+    --greedy_intokens 1 \
+    --lr_scheduler linear \
+    --sequence_parallel 1 \
+    --release_grads 1 \
+    --recompute_use_reentrant True \
+    --fuse_rope 1 \
+    --moe_multimodal_dispatch_use_allgather "v2-alltoall" \
+    --fuse_rms_norm False \
+    --moe_group mp
+```
+
+
+2. SFT-LoRA fine-tuning
 
 ```
 #!/bin/bash
