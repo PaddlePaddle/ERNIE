@@ -127,7 +127,6 @@ class ErnieConfig(PretrainedConfig):
         use_rmsnorm=True,
         z_loss_lambda=None,
         fuse_rms_norm=False,
-        fuse_ln=False,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -230,7 +229,6 @@ class ErnieConfig(PretrainedConfig):
         self.fuse_attn_ffn = fuse_attn_ffn
         self.fuse_swiglu = fuse_swiglu
         self.fuse_rms_norm = fuse_rms_norm
-        self.fuse_ln = fuse_ln
         self.use_rmsnorm = use_rmsnorm
         self.z_loss_lambda = z_loss_lambda
         self.using_dynamic_sequence_length = using_dynamic_sequence_length

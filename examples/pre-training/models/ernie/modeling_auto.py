@@ -119,13 +119,6 @@ try:
 except ImportError:
     fast_ln = None
 
-try:
-    import fused_ln as fused
-except ImportError:
-    logger.warning(
-        "fused-ln not found, run `python src/ops/fused_ln_setup.py install` to build fused ln"
-    )
-    fused = None
 
 try:
     from paddle.incubate.nn.functional import (
@@ -765,7 +758,7 @@ class RMSNorm(nn.Layer):
     def forward(self, hidden_states):
 
         if self.config.fuse_rms_norm:
-            return fused.fused_rms_norm(
+            return paddle.incubate.nn.functional.fused_rms_norm_ext(
                 hidden_states, self.weight, self.variance_epsilon
             )[0]
         if paddle.in_dynamic_mode():
@@ -807,37 +800,6 @@ class LayerNorm(nn.LayerNorm):
             return fast_ln(hidden_states, self.weight, self.bias, self._epsilon)[0]
         else:
             return super().forward(hidden_states)
-
-
-class FusedLayerNorm(nn.Layer):
-
-    def __init__(self, config, ipp=0):
-        super().__init__()
-        self.config = config
-        self.hidden_size = config.hidden_size
-        self.weight = paddle.create_parameter(
-            shape=[self.hidden_size],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=nn.initializer.Constant(1.0),
-        )
-        self.bias = paddle.create_parameter(
-            shape=[self.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True
-        )
-        self.variance_epsilon = config.rms_norm_eps
-        self.ipp = ipp
-        if config.pipeline_parallel_degree > 1:
-            self.weight = dist.shard_tensor(
-                self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
-            )
-            self.bias = dist.shard_tensor(
-                self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
-            )
-
-    def forward(self, hidden_states):
-
-        return fused.fused_ln(
-            hidden_states, self.weight, self.bias, self.variance_epsilon
-        )[0]
 
 
 class RotaryEmbedding(nn.Layer):
@@ -1528,8 +1490,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
         else:
             self.mlp = ErnieMLP(config, ipp)
         Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-        if not config.use_rmsnorm and config.fuse_ln:
-            Norm = FusedLayerNorm
         self.input_layernorm = Norm(config, ipp)
         self.post_attention_layernorm = Norm(config, ipp)
         self.residual_add1 = FusedDropoutImpl(
@@ -2030,8 +1990,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 self.next_pp_stage_indexes.append(layer_idx)
         self.layers = nn.LayerList(layers_list)
         Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-        if not config.use_rmsnorm and config.fuse_ln:
-            Norm = FusedLayerNorm
+
         self.norm = Norm(config, -1)
 
         self.gradient_checkpointing = False
@@ -2668,10 +2627,7 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
             else:
                 logger.info("Use normal RMSNorm")
         else:
-            if self.config.fuse_ln:
-                logger.info("Use fusedLN")
-            else:
-                logger.info("Use normal LayerNorm")
+            logger.info("Use normal LayerNorm")
 
     def _post_init(self, original_init, *args, **kwargs):
         """

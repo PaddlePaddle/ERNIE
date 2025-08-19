@@ -39,7 +39,6 @@ from .modeling_auto import (
     ErniePretrainedModelAuto,
     LayerNorm,
     RMSNorm,
-    FusedLayerNorm,
     ErniePretrainingCriterion,
     ErnieLMHead,
 )
@@ -275,8 +274,7 @@ class ErnieDecoderLayerAutoPP(nn.Layer):
         self.layer = ErnieDecoderLayerAuto(config, layer_idx, ipp)
 
         Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-        if not config.use_rmsnorm and config.fuse_ln:
-            Norm = FusedLayerNorm
+
         if self.layer_idx == self.config.num_hidden_layers - 1:
             self.norm = Norm(config, -1)
             self.lm_head = ErnieLMHead(config)
@@ -556,10 +554,7 @@ class ErnieForCausalLMAutoPP(ErniePretrainedModelAuto):
             else:
                 logger.info("Use normal RMSNorm")
         else:
-            if self.config.fuse_ln:
-                logger.info("Use fusedLN")
-            else:
-                logger.info("Use normal LayerNorm")
+            logger.info("Use normal LayerNorm")
 
         decoder_layers = []
 
