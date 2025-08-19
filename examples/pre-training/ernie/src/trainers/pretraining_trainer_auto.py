@@ -82,9 +82,6 @@ except ImportError:
     logger.warning("Use TrainingArguments as an alternative but will lose some args!")
 
 
-DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
-
-
 @dataclass
 @add_start_docstrings(AutoTrainingArguments.__doc__)
 class AutoPreTrainingArguments(AutoTrainingArguments):

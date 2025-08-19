@@ -131,11 +131,6 @@ __all__ = [
 ]
 
 
-gate_class = dict(
-    top2_fused=TopKGateFusedAuto,
-)
-
-
 def subbatch(f, arg_idx, axis, bs, out_idx, use_recompute=False, same_arg_idx={}):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -654,7 +649,7 @@ def get_gate(
         logger.info("MOE-GATE:-hard-gate")
     else:
         logger.info(f"MOE-GATE:-{config.moe_gate}")
-        gate = gate_class[config.moe_gate.lower()](
+        gate = TopKGateFusedAuto(
             config, layer_idx=layer_idx, group=config.moe_group, ipp=ipp
         )
 

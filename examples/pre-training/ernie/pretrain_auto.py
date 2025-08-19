@@ -49,24 +49,20 @@ from paddleformers.data.causal_dataset import (
     check_data_split,
 )
 
-
 from config import get_config
 
-try:
-    from paddleformers.trainer.trainer_utils import log_trainer_start
-except ImportError:
-
-    def log_trainer_start():
-        """Print main process messgae"""
-        if "MAIN_PROCESS_STARTED" not in os.environ:
-            start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            logger.info(
-                f"The Training Main Process Started Successfully. time: {start_time}, pid: {os.getpid()}"
-            )
-            os.environ["MAIN_PROCESS_STARTED"] = "1"
-
-
 from paddle.distributed.fleet import collective_perf
+
+
+def log_trainer_start():
+    """Print main process messgae"""
+    if "MAIN_PROCESS_STARTED" not in os.environ:
+        start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        logger.info(
+            f"The Training Main Process Started Successfully. time: {start_time}, pid: {os.getpid()}"
+        )
+        os.environ["MAIN_PROCESS_STARTED"] = "1"
+
 
 log_trainer_start()
 
