@@ -53,15 +53,15 @@ trainer_args:
     eval_steps: 1000
     eval_iters: -1
     save_steps:  3000
-    max_steps: 1000
+    max_steps: 10
     adam_beta1: 0.9
     adam_beta2: 0.95
     adam_epsilon: 1e-8
     learning_rate: 2.2e-4
     min_lr: 2.2e-5
 
-    global_batch_size: 2 # 16660
-    gradient_accumulation_steps: 1 # 8008: 14;
+    global_batch_size: 4 # 16660
+    gradient_accumulation_steps: 2 # 8008: 14;
     per_device_train_batch_size: 2
     per_device_eval_batch_size: 1
 
@@ -85,7 +85,7 @@ trainer_args:
     scale_loss: 4096
     seed: 666
     use_train_part_sharding: 1
-    pre_alloc_memory: 60
+    # pre_alloc_memory: 60
 
     # # N7
     # tensor_parallel_degree: 8       # N7:8, N4:8, N1:4
@@ -104,12 +104,9 @@ trainer_args:
 
     # N1 dynamic auto
     tensor_parallel_degree: 4       # N7:8, N4:8, N1:4
-    # pipeline_parallel_degree: 1     # N7:7, N4:4, N1:2
     pipeline_parallel_degree: 2     # N7:7, N4:4, N1:2
-    n_microbatches: 2
     pipeline_schedule_mode: "VPP"
-    model_type: "ernie_pp"
-    virtual_pp_degree: 1            # N7:8, N4:8, N1:1
+    virtual_pp_degree: 2           # N7:8, N4:8, N1:1
 
     data_parallel_degree: 1
     sharding: "stage1"

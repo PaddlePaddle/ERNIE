@@ -87,7 +87,20 @@ if [ ${cuda_version} != "12" ];then
     export LD_LIBRARY_PATH=/usr/local/cuda/compat:$LD_LIBRARY_PATH
 fi
 
-master=`cat /root/paddlejob/workspace/hostfile | head -n 1 | awk '{print $1}'`
+# nnodes=7
+# START_RANK=0
+# END_RANK=$nnodes
+
+# if [[ $rank -lt $START_RANK ]]; then
+#     exit 0
+# fi
+
+# if [[ $rank -ge $END_RANK ]]; then
+#     exit 0
+# fi
+rank=$(($rank-$START_RANK))
+nnodes=$(($END_RANK-$START_RANK))
+master=`cat /root/paddlejob/workspace/hostfile | head -n $(($START_RANK+1)) | tail -n 1 | awk '{print $1}'`
 port=36677
 
 
@@ -113,6 +126,9 @@ rm -rf core.*
 
 python -m paddle.distributed.launch \
     --log_dir $LOG_DIR \
+    --master $master:$port \
+    --nnodes $nnodes \
+    --rank $rank \
     --run_mode=collective \
     ${script:-ernie/pretrain_auto.py}  \
     --config yamls/pretrain_96_auto.yaml

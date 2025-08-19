@@ -2670,6 +2670,7 @@ class ErnieModelAutoPP(ErnieModelAuto):
     def __init__(self, config, layer_idx=0, ipp=0):
         super().__init__(config)
         self.layer = ErnieDecoderLayerAuto(config, layer_idx, ipp)
+        self.config.use_cache = False
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
