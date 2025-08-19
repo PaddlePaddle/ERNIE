@@ -36,10 +36,7 @@ else
 fi
 
 
-export FLAGS_enable_fused_ffn_qkv_pass=1
-export FLAGS_enable_pir_api=1
 export FLAGS_enable_moe_utils=true
-export FLAGS_call_stack_level=2
 
 
 export PYTHONPATH=$PYTHONPATH:./ernie
