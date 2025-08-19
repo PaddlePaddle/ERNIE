@@ -86,3 +86,4 @@ unified_checkpoint: True
 use_recompute_loss_fn: True
 use_lowprecision_moment: True
 loss_subbatch_seqlen: 8192
+unified_checkpoint_config: ignore_merge_optimizer

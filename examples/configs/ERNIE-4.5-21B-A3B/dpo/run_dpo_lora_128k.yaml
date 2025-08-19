@@ -24,7 +24,7 @@ do_eval: True
 dataloader_num_workers: 4
 batch_size: 1
 num_train_epochs: 1
-max_steps: -1
+max_steps: 3
 max_evaluate_steps: 10000
 eval_steps: 100
 evaluation_strategy: epoch
@@ -84,3 +84,4 @@ amp_custom_black_list:
   - "sin"
   - "cos"
 unified_checkpoint: True
+unified_checkpoint_config: ignore_merge_optimizer

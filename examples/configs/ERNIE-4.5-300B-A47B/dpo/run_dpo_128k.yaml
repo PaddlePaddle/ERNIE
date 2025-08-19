@@ -85,3 +85,4 @@ amp_custom_black_list:
   - "cos"
 unified_checkpoint: True
 use_lowprecision_moment: True
+unified_checkpoint_config: ignore_merge_optimizer
