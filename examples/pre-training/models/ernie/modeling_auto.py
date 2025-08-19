@@ -419,9 +419,8 @@ def scaled_dot_product_attention(
     _, kv_seq_len, num_key_value_heads, _ = value_states.shape
 
     can_use_fa = config.use_flash_attn and flash_attention is not None
-    can_use_fa_sparse_mask = False
 
-    if not can_use_fa and not can_use_fa_sparse_mask:
+    if not can_use_fa:
         if query_states.shape[-2] != key_states.shape[-2]:
             key_states = key_states.repeat_interleave(
                 num_heads // num_key_value_heads, axis=-2
