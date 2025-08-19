@@ -123,6 +123,9 @@ def get_parser():
         default=None,
         help="weight_only_int8",
     )
+    parser.add_argument("--from_hf_hub", type=bool, default=False)
+    parser.add_argument("--from_aistudio", type=bool, default=False)
+    parser.add_argument("--from_modelscope", type=bool, default=False)
     parser.add_argument(
         "--input_file", type=str, default="./examples/inference/data/query-demo.jsonl"
     )

@@ -1687,17 +1687,24 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
             if loss_mask is None:
                 loss_mask = masked_lm_labels != self.ignored_index
 
-            loss_mask = loss_mask.reshape([-1]).cast(paddle.float32)
-            # 逐位对齐, 全精度聚合
-            masked_lm_loss = paddle.sum(
-                masked_lm_loss.cast(paddle.float32).reshape([-1]) * loss_mask
-            )
-            loss = masked_lm_loss / loss_mask.sum()
-            if self.token_balance_loss:
-                _loss = masked_lm_loss / self.config.token_balance_seqlen
-                loss = _loss - _loss.detach() + loss.detach()  # for 对线
-            loss_sum = masked_lm_loss.sum().detach()
-
+            lossmask = masked_lm_labels != self.ignored_index
+            if (~lossmask).all():  # empty span
+                logger.warning(
+                    f"encounter empty span when calculate loss, ignored_index={self.ignored_index}"
+                )
+                loss = paddle.mean(masked_lm_loss) * 0.0
+                loss_sum = masked_lm_loss.sum().detach()
+            else:
+                loss_mask = loss_mask.reshape([-1]).cast(paddle.float32)
+                # 逐位对齐, 全精度聚合
+                masked_lm_loss = paddle.sum(
+                    masked_lm_loss.cast(paddle.float32).reshape([-1]) * loss_mask
+                )
+                loss = masked_lm_loss / loss_mask.sum()
+                if self.token_balance_loss:
+                    _loss = masked_lm_loss / self.config.token_balance_seqlen
+                    loss = _loss - _loss.detach() + loss.detach()  # for 对线
+                loss_sum = masked_lm_loss.sum().detach()
         if not self.return_tuple:  # only used in pp
             if self.training:
                 return loss

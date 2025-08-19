@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import os
+import re
+import subprocess
 import platform
 import paddle
 
@@ -154,3 +156,39 @@ def set_ascend_environment():
     )
     os.environ["TOOLCHAIN_HOME"] = f"{ascend_toolkit_home}/toolkit"
     os.environ["ASCEND_HOME_PATH"] = ascend_toolkit_home
+
+
+def remove_paddle_shm_files():
+    try:
+        subprocess.run(
+            r'find /dev/shm/ -type f -name "paddle_*" -print0 | xargs -0 rm -f',
+            shell=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"error while deleting : {e}")
+
+
+def set_cuda_environment():
+    try:
+        nvidia_smi_output = subprocess.check_output(
+            ["nvidia-smi"], stderr=subprocess.PIPE, text=True
+        )
+
+        cuda_version_match = re.search(r"CUDA Version:\s+(\d+)", nvidia_smi_output)
+        if cuda_version_match:
+            cuda_version = cuda_version_match.group(1)
+            print(f"cuda version checked: {cuda_version}")
+
+            if cuda_version != "12":
+                ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+                new_ld_path = f"/usr/local/cuda/compat:{ld_library_path}"
+                os.environ["LD_LIBRARY_PATH"] = new_ld_path
+                print(f"set LD_LIBRARY_PATH to: {new_ld_path}")
+        else:
+            print("cannot detect cuda version from nvidia-smi")
+
+    except subprocess.CalledProcessError as e:
+        print(f"run nvidia-smi error: {e}")
+    except Exception as e:
+        print(f"process cuda version error: {e}")
