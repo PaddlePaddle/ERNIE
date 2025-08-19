@@ -19,7 +19,6 @@ from functools import partial
 import logging
 from typing import Optional, Tuple
 import contextlib
-import inspect
 
 
 from copy import deepcopy
@@ -54,14 +53,16 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 
 from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
 
-from models.sequence_parallel_utils_auto import (
-    sequence_parallel_sparse_mask_labels,
-)
+
 from models.moe.moe_layer_auto import (
     MOELayerAuto,
 )
 from models.ernie.configuration_auto import ErnieMoEConfig
 from models.moe.moe_utils_auto import get_mesh
+
+from paddle.nn.functional.flash_attention import (
+    scaled_dot_product_attention as flash_attention_with_mask,
+)
 
 
 @dataclass
@@ -89,24 +90,6 @@ try:
 except (ImportError, ModuleNotFoundError):
     flash_attention = None
 
-try:
-    from paddle.nn.functional.flash_attention import flash_attention_with_mask
-except (ImportError, ModuleNotFoundError):
-    try:
-        from paddle.nn.functional.flash_attention import (
-            scaled_dot_product_attention as flash_attention_with_mask,
-        )
-    except (ImportError, ModuleNotFoundError):
-        logger.warning(
-            "flash_attention_with_mask not found. Use FleetY8.2 SFT instead."
-        )
-        flash_attention_with_mask = None
-
-try:
-    from paddle.nn.functional.flash_attention import flash_attention_with_sparse_mask
-except (ImportError, ModuleNotFoundError):
-    logger.warning("flash_attention_with_sparse_mask not found. Use FleetY8.9 instead.")
-    flash_attention_with_sparse_mask = None
 
 try:
     from to_block_diag_causal_mask import to_block_diag_causal_mask
@@ -141,8 +124,6 @@ except (ImportError, ModuleNotFoundError):
     fused_swiglu = None
 
 
-ERNIE_PRETRAINED_MODEL_ARCHIVE_LIST = []
-
 __all__ = [
     "ErnieModelAuto",
     "ErniePretrainedModelAuto",
@@ -151,7 +132,6 @@ __all__ = [
 
 
 gate_class = dict(
-    top2=Top2Gate,
     top2_fused=TopKGateFusedAuto,
 )
 
@@ -233,20 +213,6 @@ def global_mesh_starts_with_pp():
         return mesh.get_mesh_with_dim("pp")
     else:
         return mesh
-
-
-def is_fleety_func():
-    """
-    Check whether it is PaddlePaddle FleetY version.
-    """
-    if flash_attention_with_sparse_mask is None:
-        return True
-
-    args = inspect.getfullargspec(flash_attention_with_sparse_mask).args
-    return "causal" in args
-
-
-IS_FLEETY = is_fleety_func()
 
 
 def get_triangle_upper_mask(x, mask=None):
@@ -458,11 +424,7 @@ def scaled_dot_product_attention(
     _, kv_seq_len, num_key_value_heads, _ = value_states.shape
 
     can_use_fa = config.use_flash_attn and flash_attention is not None
-    can_use_fa_sparse_mask = (
-        config.use_mem_eff_attn
-        and inbatch_pack_offset is not None
-        and flash_attention_with_sparse_mask is not None
-    )
+    can_use_fa_sparse_mask = False
 
     if not can_use_fa and not can_use_fa_sparse_mask:
         if query_states.shape[-2] != key_states.shape[-2]:
@@ -501,41 +463,17 @@ def scaled_dot_product_attention(
             not output_attentions
         ), "output_attentions should be False when use_mem_eff_attn=True"
         if config.use_flash_attn_with_mask:
-            if flash_attention_with_sparse_mask is not None:
-                causal_mask_indices, attn_mask_min_start_row = (
-                    inbatch_pack_offset_to_attn_mask_start_row_indices(
-                        inbatch_pack_offset
-                    )
-                )
-                if IS_FLEETY:
-                    kwargs = {
-                        "causal": True,
-                        "dropout": config.attention_probs_dropout_prob,
-                    }
-                else:
-                    kwargs = {
-                        "is_causal": True,
-                        "dropout_p": config.attention_probs_dropout_prob,
-                    }
-                attn_output = flash_attention_with_sparse_mask(
-                    query_states.astype(value_states.dtype),
-                    key_states.astype(value_states.dtype),
-                    value_states.astype(value_states.dtype),
-                    attn_mask_start_row_indices=causal_mask_indices,
-                    attn_mask_start_row=attn_mask_min_start_row,
-                    **kwargs,
-                )
-            else:
-                attn_mask = to_block_diag_causal_mask(
-                    inbatch_pack_offset, q_len, float("-inf"), "bfloat16"
-                )
-                attn_output = flash_attention_with_mask(
-                    query_states,
-                    key_states,
-                    value_states,
-                    attn_mask,
-                    config.attention_probs_dropout_prob,
-                )
+
+            attn_mask = to_block_diag_causal_mask(
+                inbatch_pack_offset, q_len, float("-inf"), "bfloat16"
+            )
+            attn_output = flash_attention_with_mask(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask,
+                config.attention_probs_dropout_prob,
+            )
         else:
             attn_output = mem_eff_attn(
                 query_states,
@@ -2351,14 +2289,14 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
         )
 
 
-class ErniePretrainingCriterionBase(paddle.nn.Layer):
+class ErniePretrainingCriterion(paddle.nn.Layer):
     """
     Criterion for Ernie.
     It calculates the final loss.
     """
 
     def __init__(self, config, return_tuple=True):
-        super(ErniePretrainingCriterionBase, self).__init__()
+        super(ErniePretrainingCriterion, self).__init__()
         self.ignored_index = getattr(config, "ignored_index", -100)
         self.config = config
         self.return_tuple = return_tuple
@@ -2370,81 +2308,30 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
             reduction="none",
         )
 
-    def forward(self, prediction_scores, masked_lm_labels):
-        if self.config.use_sparse_head_and_loss_fn:
-            hidden_states, outlinear_weight, outlinear_bias = prediction_scores
-
-            if self.config.sequence_parallel:
-                masked_lm_labels, sparse_label_idx = (
-                    sequence_parallel_sparse_mask_labels(
-                        masked_lm_labels, self.ignored_index
-                    )
-                )
-            else:
-                masked_lm_labels = masked_lm_labels.flatten()
-                sparse_label_idx = paddle.nonzero(
-                    masked_lm_labels != self.ignored_index
-                ).flatten()
-                masked_lm_labels = paddle.take_along_axis(
-                    masked_lm_labels, sparse_label_idx, axis=0
-                )
-
-                hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
-                hidden_states = paddle.take_along_axis(
-                    hidden_states, sparse_label_idx.reshape([-1, 1]), axis=0
-                )
-
-            if self.config.use_recompute_loss_fn:
-                res = recompute(
-                    self.forward_impl_with_calc_logits,
-                    masked_lm_labels,
-                    hidden_states,
-                    outlinear_weight,
-                    outlinear_bias,
-                    sparse_label_idx,
-                )
-            else:
-                logits = calc_lm_head_logits(
-                    self.config,
-                    hidden_states,
-                    outlinear_weight,
-                    outlinear_bias,
-                    sparse_label_idx,
-                )
-                res = self.forward_impl(logits, masked_lm_labels)
-        elif self.config.use_recompute_loss_fn:
-            assert isinstance(prediction_scores, tuple) and len(prediction_scores) in [
-                3,
-                4,
-            ]
-            res = recompute(
-                self.forward_impl_with_calc_logits, masked_lm_labels, *prediction_scores
-            )
+    def forward(self, prediction_scores, masked_lm_labels, router_loss=None):
+        """
+        calculates the final loss
+        """
+        res = self.forward_impl(prediction_scores, masked_lm_labels)
+        if self.return_tuple:
+            loss, loss_sum = res
         else:
-            res = self.forward_impl(prediction_scores, masked_lm_labels)
-
-        return res
-
-    def forward_impl_with_calc_logits(
-        self,
-        masked_lm_labels,
-        hidden_states,
-        outlinear_weight,
-        outlinear_bias,
-        sparse_label_idx=None,
-        tensor_parallel_output=None,
-    ):
-
-        logits = calc_lm_head_logits(
-            self.config,
-            hidden_states,
-            outlinear_weight,
-            outlinear_bias,
-            sparse_label_idx,
-            tensor_parallel_output,
-        )
-
-        return self.forward_impl(logits, masked_lm_labels)
+            loss, loss_sum = res, None
+        if router_loss is not None and not in_auto_parallel_align_mode():
+            global_mesh = global_mesh_starts_with_pp()
+            if self.config.pipeline_parallel_degree > 1:
+                loss = dist.reshard(
+                    loss,
+                    global_mesh,
+                    [dist.Replicate() for _ in range(len(global_mesh._shape))],
+                )
+                router_loss = dist.reshard(
+                    router_loss,
+                    global_mesh,
+                    [dist.Replicate() for _ in range(len(global_mesh._shape))],
+                )
+            loss = loss + router_loss - router_loss.detach()
+        return loss, loss_sum
 
     def loss_impl(self, prediction_scores, masked_lm_labels):
         """extract loss impl for subbatch"""
@@ -2489,46 +2376,6 @@ class ErniePretrainingCriterionBase(paddle.nn.Layer):
             if self.training:
                 return loss
             return loss_sum
-        return loss, loss_sum
-
-
-class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
-    """
-    Criterion for Ernie.
-    It calculates the final loss.
-    """
-
-    def __init__(self, config, return_tuple=True):
-        super(ErniePretrainingCriterion, self).__init__(
-            config, return_tuple=return_tuple
-        )
-
-    def forward(self, prediction_scores, masked_lm_labels, router_loss=None):
-        """
-        calculates the final loss
-        """
-        res = super().forward(
-            prediction_scores,
-            masked_lm_labels,
-        )
-        if self.return_tuple:
-            loss, loss_sum = res
-        else:
-            loss, loss_sum = res, None
-        if router_loss is not None and not in_auto_parallel_align_mode():
-            global_mesh = global_mesh_starts_with_pp()
-            if self.config.pipeline_parallel_degree > 1:
-                loss = dist.reshard(
-                    loss,
-                    global_mesh,
-                    [dist.Replicate() for _ in range(len(global_mesh._shape))],
-                )
-                router_loss = dist.reshard(
-                    router_loss,
-                    global_mesh,
-                    [dist.Replicate() for _ in range(len(global_mesh._shape))],
-                )
-            loss = loss + router_loss - router_loss.detach()
         return loss, loss_sum
 
 

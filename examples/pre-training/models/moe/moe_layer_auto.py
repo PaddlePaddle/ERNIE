@@ -17,31 +17,22 @@
 
 from typing import Tuple, List, Optional
 import logging
-import inspect
-from collections import namedtuple
 from contextlib import contextmanager
 from functools import partial
 
 import paddle
-from paddle import framework
 from paddle import nn
-from paddle.distributed.communication import stream
 import paddle.nn.functional as F
 from paddle.distributed import in_auto_parallel_align_mode
 
 from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
-from paddle.distributed.fleet.utils import recompute
 from paddle.distributed import fleet
 
 import paddle.distributed as dist
 from paddle import Tensor
 from paddleformers.trainer.plugins.timer import get_timers
 from models.moe.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
-from models.sequence_parallel_utils_auto import ScatterOp
-from models.utils_auto import (
-    manual_backward,
-)
 
 
 from models.moe.moe_utils_auto import get_flatten_mesh, get_mesh, _reshard
@@ -50,22 +41,7 @@ from paddle.incubate.nn.functional import (
 )
 
 
-try:
-    import moe_router_loss_ops
-except ImportError:
-    moe_router_loss_ops = None
-
-
 logger = logging.getLogger(__name__)
-
-try:
-    import moe_ops
-except ImportError:
-    moe_ops = None
-    logger.warning(
-        "`moe-ops` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup.py  install` to install"
-    )
 
 try:
     import moe_ops_auto
@@ -85,20 +61,6 @@ except ImportError:
         "`python3  src/ernie_core/ops/moe/setup_auto.py  install` to install"
     )
 
-try:
-    from moe_combine import moe_combine_no_weight
-except ImportError:
-    moe_combine_no_weight = None
-
-try:
-    import moe_ops_fp8
-except ImportError:
-    moe_ops_fp8 = None
-    logger.warning(
-        "`moe-ops` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup_fp8.py  install` to install"
-    )
-
 
 @contextmanager
 def profile(name):
@@ -108,16 +70,6 @@ def profile(name):
     yield
     if get_timers() is not None:
         get_timers()(name).stop()
-
-
-GateOutput = namedtuple(
-    "GateOutput",
-    [
-        "aux",
-        "z",
-        "logits",
-    ],
-)
 
 
 class GateCombine(PyLayer):
@@ -190,205 +142,6 @@ def combining(x, combine_weights, scatter_index):
     combine_weights = combine_weights.unsqueeze(1)
     x = paddle.gather(x, scatter_index).reshape([-1, num_k, dim])
     return paddle.matmul(combine_weights, x).squeeze(1)
-
-
-class Fp8MoeGateDispatchAndQuant(paddle.autograd.PyLayer):
-
-    @staticmethod
-    def forward(
-        ctx, x, gate_logtis, corr_bias, k, capacity, use_pad, use_pow2_scale=True
-    ):
-        (
-            out_fp8,
-            scale,
-            combine_weights,
-            scatter_index,
-            expert_offset,
-            expert_id,
-        ) = moe_ops_fp8.moe_gate_dispatch_and_quant(
-            x,
-            gate_logtis,
-            corr_bias=corr_bias,
-            k=k,
-            capacity=capacity,
-            use_pad=use_pad,
-            use_pow2_scale=use_pow2_scale,
-        )
-        assert out_fp8.shape[0] == scale.shape[0]
-
-        out_fp8.stop_gradient = False
-        combine_weights.stop_gradient = False
-        scatter_index.stop_gradient = True
-        expert_offset.stop_gradient = True
-        expert_id.stop_gradient = True
-        scale.stop_gradient = True
-
-        ctx.k = k
-        ctx.capacity = capacity
-        ctx.use_pad = use_pad
-        ctx.combine_weights = combine_weights
-        ctx.scatter_index = scatter_index
-        ctx.expert_id = expert_id
-        ctx.has_corr_bias = corr_bias is not None
-
-        return (
-            out_fp8,
-            combine_weights,
-            scatter_index,
-            expert_offset,
-            expert_id,
-            {
-                "scale": scale,
-            },
-        )
-
-    @staticmethod
-    def backward(ctx, *grads):
-        out_grad, combine_weights_grad = grads[0], grads[1]
-        x_grad, gate_logits_grad = moe_ops.moe_gate_dispatch_bwd(
-            ctx.combine_weights,
-            ctx.scatter_index,
-            ctx.expert_id,
-            out_grad,
-            combine_weights_grad,
-            k=ctx.k,
-            capacity=ctx.capacity,
-            use_pad=ctx.use_pad,
-        )
-        if ctx.has_corr_bias:
-            return x_grad, gate_logits_grad, None
-        else:
-            return x_grad, gate_logits_grad
-
-
-class AlltoAll(PyLayer):
-
-    @staticmethod
-    def forward(ctx, x, group, sync_op=True):
-
-        ctx.group = group
-        if dist.get_world_size(group) <= 1:
-            return x
-        output = paddle.empty_like(x)
-        output.stop_gradient = False
-        task = stream.alltoall_single(
-            output, x, None, None, group, sync_op=sync_op, use_calc_stream=sync_op
-        )
-        if not sync_op:
-            return output, task
-        else:
-            return output
-
-    @staticmethod
-    def backward(ctx, *dx):
-        return AlltoAll.apply(*dx, group=ctx.group)
-
-
-class AlltoAllExpertOverlap(PyLayer):
-
-    @staticmethod
-    def forward(
-        ctx, input, group, num_local_experts, forward_func_dict, is_first_fwd=False
-    ):
-        assert (
-            dist.get_world_size(group) > 1
-        ), "AlltoAllExpertOverlap is not supported for a world size less than or equal to 1."
-
-        ctx.bw_funcs = {}
-        ctx.group = group
-        ctx.num_local_experts = num_local_experts
-
-        assert isinstance(forward_func_dict, nn.LayerList)
-        all2all_tasks = []
-        all2all_ins = paddle.unbind(input, axis=0)
-        for stage_id in range(1):
-            stage_input = all2all_ins[stage_id]
-            x_out, task = AlltoAll.apply(stage_input, group=group, sync_op=False)
-            all2all_tasks.append((task, x_out))
-
-        expert_outputs = []
-        for stage_id in range(num_local_experts):
-            if stage_id + 1 != num_local_experts:
-                stage_input = all2all_ins[stage_id + 1]
-                x_out, task = AlltoAll.apply(stage_input, group=group, sync_op=False)
-                all2all_tasks.append((task, x_out))
-
-            task, dispatched_input = all2all_tasks[stage_id]
-            task.wait()
-            bwf, (expert_outputs_cur_stage,) = manual_backward(
-                forward_func_dict[stage_id], is_first_fwd, dispatched_input
-            )
-            ctx.bw_funcs[stage_id] = bwf
-            expert_outputs.append(expert_outputs_cur_stage)
-
-        expert_output = paddle.stack(expert_outputs, axis=1)
-        return expert_output
-
-    @staticmethod
-    def backward(ctx, out_grad):
-        all2all_tasks = []
-        expert_outputs = []
-
-        out_grad_list = paddle.split(
-            out_grad, num_or_sections=out_grad.shape[1], axis=1
-        )
-        for stage_id in range(ctx.num_local_experts):
-            (grad_cur_stage,) = ctx.bw_funcs[stage_id](out_grad_list[stage_id])
-
-            x_out, task = AlltoAll.apply(grad_cur_stage, group=ctx.group, sync_op=False)
-            all2all_tasks.append(task)
-            expert_outputs.append(x_out)
-
-        for task in all2all_tasks:
-            task.wait()
-
-        expert_output = paddle.stack(expert_outputs, axis=0)
-        return expert_output
-
-
-class AlltoAllAsync(PyLayer):
-
-    @staticmethod
-    def forward(ctx, x, *fn_args, group=None, fn=None, is_first_fwd=False):
-
-        assert fn is not None, "use AlltoAll no async"
-        ctx.group = group
-        if dist.get_world_size(group) <= 1:
-            ctx.bwf, fn_out = manual_backward(fn, is_first_fwd, *fn_args)
-            return (x,) + fn_out
-        x_out = paddle.empty_like(x)
-        x_out.stop_gradient = False
-        task = stream.alltoall_single(
-            x_out,
-            x,
-            None,
-            None,
-            group,
-            sync_op=False,
-        )
-        ctx.bwf, fn_out = manual_backward(fn, is_first_fwd, *fn_args)
-        task.wait()
-        return (x_out,) + fn_out
-
-    @staticmethod
-    def backward(ctx, dx_out, *fn_out_grads):
-        if dist.get_world_size(ctx.group) <= 1:
-            fn_args_grads = ctx.bwf(*fn_out_grads)
-            return (dx_out,) + fn_args_grads
-
-        dx = paddle.empty_like(dx_out)
-        dx.stop_gradient = False
-        task = stream.alltoall_single(
-            dx,
-            dx_out,
-            None,
-            None,
-            ctx.group,
-            sync_op=False,
-        )
-        fn_args_grads = ctx.bwf(*fn_out_grads)
-        task.wait()
-        return (dx,) + fn_args_grads
 
 
 class MOELayer(nn.Layer):
@@ -516,41 +269,6 @@ class MOELayer(nn.Layer):
                         p, "color", {"color": "moe_expert", "group": moe_grad_group}
                     )
 
-    def forward_experts(self, dispatched_input):
-
-        with profile("fwd-expert"):
-            dispatched_input = dispatched_input.reshape(
-                [
-                    self.world_size,
-                    self.num_local_experts,
-                    -1,
-                    dispatched_input.shape[-1],
-                ]
-            )
-            expert_outputs = []
-            if isinstance(self.experts, nn.LayerList):
-
-                chunks = dispatched_input.transpose([1, 0, 2, 3]).contiguous().unbind(0)
-                assert len(chunks) == len(self.experts), (
-                    len(chunks),
-                    len(self.experts),
-                )
-                for chunk, expert in zip(chunks, self.experts):
-                    expert_outputs += [expert(chunk)]
-
-                expert_output = paddle.stack(expert_outputs, axis=1)
-
-            else:
-                dispatched_input = dispatched_input.transpose([1, 0, 2, 3])
-                dispatched_input.contiguous()
-                orig_shape = dispatched_input.shape
-                chunks = dispatched_input.reshape([orig_shape[0], -1, orig_shape[-1]])
-                chunks = self.experts(chunks)
-                chunks = chunks.reshape(orig_shape[:-1] + [chunks.shape[-1]]).unbind(0)
-                expert_outputs += chunks
-                expert_output = paddle.stack(expert_outputs, axis=1)
-        return expert_output
-
     def fused_gate_logits_process(
         self, gate_logits, token_type_ids, offload_helper=None
     ):
@@ -613,319 +331,6 @@ class MOELayer(nn.Layer):
             else:
                 prob = self.gate.act(gate_logits)
         return prob, max_prob
-
-    def gate_distpach_and_quant(self, input, token_type_ids):
-
-        assert isinstance(self.gate, (TopKGateFused)), "Only fused gate is supported."
-        assert not self.config.use_ep_comm_overlap, "ep_comm_overlap is not supported"
-        assert (
-            self._rr_moe_gate_dispatch is None
-        ), "rr_moe_gate_dispatch is not supported"
-        assert moe_ops_fp8 is not None
-
-        args = ()
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape([-1])
-            args = (token_type_ids,)
-
-        (
-            gate_logits,
-            capacity,
-            router_loss,
-        ) = self.gate(input, *args)
-
-        if self.config.moe_multimodal_paired_experts:
-            assert token_type_ids is not None
-            input = paddle.concat(
-                [input, token_type_ids.unsqueeze(-1).astype(input.dtype)], axis=-1
-            )
-        if self.input_preprocess is not None:
-            input, gate_logits = self.input_preprocess(input, gate_logits, capacity)
-
-        k = self.k
-        prob, max_prob = self.fused_gate_logits_process(gate_logits, token_type_ids)
-
-        with profile("dispatch_op"):
-            corr_bias = (
-                self.moe_statics.e_score_correction_bias[0].detach()
-                if self.use_correction_bias
-                else None
-            )
-
-            (
-                dispatched_input,
-                combine_weights_unnorm,
-                scatter_index,
-                dispatch_mask,
-                _,
-                fp8_dispatched_handle,
-            ) = Fp8MoeGateDispatchAndQuant.apply(
-                input, prob, corr_bias, k=k, capacity=capacity, use_pad=True
-            )
-
-        dispatch_mask = paddle.diff(F.pad(dispatch_mask, (1, 0)))
-        if self.use_correction_bias:
-            if self.gate.config.multimodel_experts:
-                for i in range(len(self.moe_statics.expert_usage)):
-                    self.moe_statics.expert_usage[i] += dispatch_mask[
-                        self.gate.experts_type_mask[i]
-                    ].detach()
-            else:
-                self.moe_statics.expert_usage[0] += dispatch_mask.detach()
-        dispatched_input.stop_gradient = False
-        combine_weights_unnorm.stop_gradient = False
-        scatter_index.stop_gradient = True
-        dispatch_mask.stop_gradient = True
-
-        scatter_index = scatter_index.transpose([1, 0])
-        if self.group_experts:
-            if max_prob is not None:
-                if token_type_ids is not None:
-                    p = paddle.ones_like(combine_weights_unnorm.unsqueeze(-1))
-                    p = paddle.scatter_nd_add(
-                        p, paddle.nonzero(token_type_ids == 0), -1 + max_prob
-                    )
-                else:
-                    p = max_prob
-                combine_weights_unnorm = (
-                    combine_weights_unnorm.unsqueeze(-1) * p
-                ).squeeze(-1)
-                prob = (prob.reshape([p.shape[0], k, -1]) * p).reshape([p.shape[0], -1])
-        if self.gate.norm_gate_logits:
-            combine_weights = combine_weights_unnorm / paddle.clip(
-                combine_weights_unnorm.sum(-1, keepdim=True), min=1e-12
-            )
-        else:
-            combine_weights = combine_weights_unnorm
-        combine_weights = combine_weights.cast("bfloat16")
-
-        def reshape_for_a2a(tensor):
-            return tensor.reshape(
-                [
-                    self.world_size * self.num_local_experts,
-                    capacity,
-                    -1,
-                ]
-            )
-
-        dispatched_input = reshape_for_a2a(dispatched_input)
-        fp8_dispatched_handle["scale"] = reshape_for_a2a(fp8_dispatched_handle["scale"])
-        dispatch_mask.stop_gradient = True
-        scatter_index.stop_gradient = True
-        return (
-            dispatched_input,
-            combine_weights,
-            dispatch_mask,
-            scatter_index,
-            router_loss,
-            gate_logits,
-            prob,
-            fp8_dispatched_handle,
-        )
-
-    def gate_and_distpach(self, input, token_type_ids):
-
-        seqlen, d_model = input.shape
-        args = ()
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape([-1])
-            args = (token_type_ids,)
-
-        use_fuse = isinstance(self.gate, (TopKGateFused))
-        if use_fuse:
-            if self.use_norm_gate_recompute:
-                (
-                    gate_logits,
-                    capacity,
-                    router_loss,
-                    norm_res,
-                ) = self.fused_norm_gate(input)
-                input = norm_res
-            else:
-                (
-                    gate_logits,
-                    capacity,
-                    router_loss,
-                ) = self.gate(input, *args)
-        else:
-            (
-                capacity,
-                dispatch_mask,
-                combine_weights,
-                scatter_index,
-                router_loss,
-                gate_logits,
-            ) = self.gate(
-                input,
-                *args,
-                correction_bias=(
-                    self.moe_statics.e_score_correction_bias[0]
-                    if self.use_correction_bias
-                    else None
-                ),
-            )
-            prob = None
-        if self.config.moe_multimodal_paired_experts:
-            assert token_type_ids is not None
-            input = paddle.concat(
-                [input, token_type_ids.unsqueeze(-1).astype(input.dtype)], axis=-1
-            )
-        if self.input_preprocess is not None:
-            input, gate_logits = self.input_preprocess(input, gate_logits, capacity)
-        if use_fuse:
-            k = self.k
-            prob, max_prob = self.fused_gate_logits_process(gate_logits, token_type_ids)
-
-            assert moe_ops is not None
-            with profile("dispatch_op"):
-                if (
-                    "corr_bias"
-                    in inspect.signature(moe_ops.moe_gate_dispatch).parameters
-                ):
-                    if self.use_correction_bias:
-                        compat_args = (self.moe_statics.e_score_correction_bias[0],)
-                    else:
-                        compat_args = (None,)
-                else:
-                    assert (
-                        not self.use_correction_bias
-                    ), "correction bias not supported, rebuild moe-ops"
-                    compat_args = ()
-                if not self.config.use_ep_comm_overlap:
-                    if self._rr_moe_gate_dispatch is None:
-                        (
-                            dispatched_input,
-                            combine_weights_unnorm,
-                            scatter_index,
-                            dispatch_mask,
-                            _,
-                        ) = moe_ops.moe_gate_dispatch(
-                            input,
-                            prob,
-                            *compat_args,
-                            k=k,
-                            capacity=capacity,
-                            use_pad=True,
-                        )
-                    else:
-                        (
-                            dispatched_input,
-                            combine_weights_unnorm,
-                            scatter_index,
-                            dispatch_mask,
-                            _,
-                        ) = self._rr_moe_gate_dispatch(
-                            input,
-                            prob,
-                            compat_args,
-                            k=k,
-                            capacity=capacity,
-                            use_pad=True,
-                        )
-                else:
-                    (
-                        dispatched_input,
-                        combine_weights_unnorm,
-                        scatter_index,
-                        dispatch_mask,
-                        _,
-                    ) = moe_ops.moe_gate_dispatch_permute(
-                        input,
-                        prob,
-                        *compat_args,
-                        k=k,
-                        capacity=capacity,
-                        world_size=self.group.nranks,
-                    )
-            dispatch_mask = paddle.diff(F.pad(dispatch_mask, (1, 0)))
-            if self.use_correction_bias and framework._dygraph_tracer()._has_grad:
-                if self.gate.config.multimodel_experts:
-                    for i in range(len(self.moe_statics.expert_usage)):
-                        self.moe_statics.expert_usage[i] += dispatch_mask[
-                            self.gate.experts_type_mask[i]
-                        ].detach()
-                else:
-                    self.moe_statics.expert_usage[0] += dispatch_mask.detach()
-            dispatched_input.stop_gradient = False
-            combine_weights_unnorm.stop_gradient = False
-            scatter_index.stop_gradient = True
-            dispatch_mask.stop_gradient = True
-
-            scatter_index = scatter_index.transpose([1, 0])
-            if self.group_experts:
-                if max_prob is not None:
-                    if token_type_ids is not None:
-                        p = paddle.ones_like(combine_weights_unnorm.unsqueeze(-1))
-                        p = paddle.scatter_nd_add(
-                            p, paddle.nonzero(token_type_ids == 0), -1 + max_prob
-                        )
-                    else:
-                        p = max_prob
-                    combine_weights_unnorm = (
-                        combine_weights_unnorm.unsqueeze(-1) * p
-                    ).squeeze(-1)
-                    prob = (prob.reshape([p.shape[0], k, -1]) * p).reshape(
-                        [p.shape[0], -1]
-                    )
-            if self.gate.norm_gate_logits:
-                combine_weights = combine_weights_unnorm / paddle.clip(
-                    combine_weights_unnorm.sum(-1, keepdim=True), min=1e-12
-                )
-            else:
-                combine_weights = combine_weights_unnorm
-            combine_weights = combine_weights.cast(dispatched_input.dtype)
-        else:
-            dispatched_input = dispatching(
-                input,
-                dispatch_mask,
-                scatter_index,
-                num_experts=self.world_size * self.num_local_experts,
-                capacity=capacity,
-            )
-            if self.use_correction_bias and framework._dygraph_tracer()._has_grad:
-                usage = paddle.bincount(
-                    scatter_index.reshape([-1]) // capacity,
-                    minlength=self.world_size * self.num_local_experts,
-                )
-                assert (
-                    not self.config.multimodel_experts
-                ), "correction bias not supported, use top2-fused gate"
-                self.moe_statics.expert_usage[0] += usage.detach()
-        if not self.config.use_ep_comm_overlap:
-            dispatched_input = dispatched_input.reshape(
-                [
-                    self.world_size * self.num_local_experts,
-                    capacity,
-                    (
-                        d_model
-                        if not self.config.moe_multimodal_paired_experts
-                        else d_model + 1
-                    ),
-                ]
-            )
-        else:
-            assert (
-                len(dispatched_input.shape) == 4
-                and dispatched_input.shape[1] == self.world_size
-                and dispatched_input.shape[0] == self.num_local_experts
-            ), (
-                f"When using ep_comm_overlap, moe_gate_dispatch_permute is needed. "
-                f"Expected dispatched_input to have shape[1] == {self.world_size} "
-                f"and shape[0] == {self.num_local_experts}, "
-                f"but got shape {dispatched_input.shape}"
-            )
-            dispatched_input = dispatched_input
-        dispatch_mask.stop_gradient = True
-        scatter_index.stop_gradient = True
-        return (
-            dispatched_input,
-            combine_weights,
-            dispatch_mask,
-            scatter_index,
-            router_loss,
-            gate_logits,
-            prob,
-        )
 
     def _calc_router_loss(
         self,
@@ -1053,206 +458,13 @@ class MOELayer(nn.Layer):
 
         return router_loss
 
-    def combine_expert_output(self, expert_output, combine_weights, scatter_index):
-
-        expert_output = expert_output.reshape([-1, expert_output.shape[-1]])
-        use_fuse = isinstance(self.gate, (TopKGateFused))
-        combine_fn = combining_fused if use_fuse else combining
-        combined_output = combine_fn(expert_output, combine_weights, scatter_index)
-
-        if self.output_postprocess is not None:
-            combined_output = self.output_postprocess(combined_output)
-        return combined_output
-
-    def forward_single_stage(self, dispatched_input, stage_id):
-        assert isinstance(self.experts, nn.LayerList)
-        return self.experts[stage_id](dispatched_input)
-
     def forward(
         self,
         input: Tensor,
         token_type_ids=None,
-    ) -> Tuple[paddle.Tensor, paddle.Tensor, paddle.Tensor]:
-
-        if input.ndim == 3:
-            orig_shape = input.shape
-            input = input.reshape([-1, input.shape[-1]])
-        else:
-            orig_shape = None
-        assert (
-            len(input.shape) == 2
-        ), f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
-        hidden_size = input.shape[1]
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.clone()[:, :-1]
-            if self.config.sequence_parallel:
-                token_type_ids = token_type_ids.reshape([-1])
-                token_type_ids = ScatterOp.apply(token_type_ids)
-                token_type_ids.stop_gradient = True
-
-        assert self.gate is not None
-        if hasattr(self, "rng") and self.rng.random() < self.all_to_all_dropout:
-            orig_shape_2 = input.shape
-            if self.config.moe_multimodal_paired_experts:
-                assert token_type_ids is not None
-                input = paddle.concat(
-                    [input, token_type_ids.unsqueeze(-1).astype(input.dtype)], axis=-1
-                )
-            output = self.forward_experts(input)
-            output += self.gate.weight.sum() * 0.0
-            output = output.reshape(orig_shape or orig_shape_2)
-            return output, None, 0
-
-        is_first_fwd = not framework._dygraph_tracer()._has_grad
-        use_async = self.shared_experts is not None
-        if in_auto_parallel_align_mode():
-            gate_input = paddle.assign(input)
-        else:
-            gate_input = input
-
-        use_fp8_fuse_node = (
-            self.config.use_combine_before_a2a and self.config.use_fp8_fuse_node
-        )
-        use_fp8_dispatch_a2a = self.config.use_fp8_dispatch_a2a and use_fp8_fuse_node
-
-        with profile("fused_gate_and_dispatch"):
-            fp8_dispatched_handle = None
-            if use_fp8_dispatch_a2a:
-                (
-                    dispatched_input,
-                    combine_weights,
-                    dispatch_mask,
-                    scatter_index,
-                    router_loss,
-                    gate_logits,
-                    gate_prob,
-                    fp8_dispatched_handle,
-                ) = self.gate_distpach_and_quant(gate_input, token_type_ids)
-            else:
-                (
-                    dispatched_input,
-                    combine_weights,
-                    dispatch_mask,
-                    scatter_index,
-                    router_loss,
-                    gate_logits,
-                    gate_prob,
-                ) = self.gate_and_distpach(gate_input, token_type_ids)
-
-        if self.config.use_combine_before_a2a:
-            assert (
-                not self.config.use_ep_comm_overlap
-            ), "Dont support use_ep_comm_overlap"
-            assert (
-                moe_combine_no_weight is not None
-            ), "use_combine_before_a2a can only use with moe_combine_no_weight op, please install it first."
-            cw_shape = combine_weights.shape
-            si_shape = scatter_index.shape
-            scatter_index = scatter_index.reshape([-1])
-
-            token_combine_weights = paddle.zeros(
-                [cw_shape[0] * cw_shape[1]], dtype=combine_weights.dtype
-            )
-            token_combine_weights = paddle.scatter(
-                token_combine_weights,
-                scatter_index,
-                combine_weights.reshape([-1]),
-                overwrite=False,
-            )
-
-            token_combine_weights = token_combine_weights.reshape(
-                [cw_shape[0], cw_shape[1], 1]
-            )
-            token_combine_weights = AlltoAll.apply(token_combine_weights, self.group)
-
-        if not self.config.use_ep_comm_overlap:
-            if use_fp8_dispatch_a2a:
-                shared_out = (
-                    self.shared_experts(input)
-                    if self.shared_experts is not None
-                    else None
-                )
-            else:
-                with profile("moe_comm_and_shared_expert"):
-                    if use_async:
-                        dispatched_input, shared_out = AlltoAllAsync.apply(
-                            dispatched_input,
-                            input,
-                            group=self.group,
-                            fn=self.shared_experts,
-                            is_first_fwd=is_first_fwd,
-                        )
-                    else:
-                        dispatched_input = AlltoAll.apply(dispatched_input, self.group)
-
-            expert_out = (
-                recompute(self.forward_experts, dispatched_input)
-                if self.recompute and self.training
-                else self.forward_experts(dispatched_input)
-            )
-
-            if self.config.use_combine_before_a2a:
-                token_combine_weights = token_combine_weights.clone().reshape(
-                    expert_out.shape[:-1] + [1]
-                )
-                expert_out = expert_out * token_combine_weights
-        else:
-            assert (
-                len(dispatched_input.shape) == 4
-                and dispatched_input.shape[1] == self.world_size
-                and dispatched_input.shape[0] == self.num_local_experts
-            ), (
-                f"When using ep_comm_overlap, moe_gate_dispatch_permute is needed. "
-                f"Expected dispatched_input to have shape[1] == {self.world_size} "
-                f"and shape[0] == {self.num_local_experts}, "
-                f"but got shape {dispatched_input.shape}"
-            )
-            with profile("moe_comm_and_forward_expert"):
-                expert_out = AlltoAllExpertOverlap.apply(
-                    dispatched_input,
-                    self.group,
-                    self.num_local_experts,
-                    self.experts,
-                    is_first_fwd=is_first_fwd,
-                )
-                if self.shared_experts is not None:
-                    shared_out = self.shared_experts(input)
-
-        with profile("moe_comm_and_calc_routerloss"):
-            expert_out, router_loss2 = AlltoAllAsync.apply(
-                expert_out,
-                router_loss,
-                combine_weights,
-                dispatch_mask,
-                gate_logits,
-                gate_prob,
-                token_type_ids,
-                group=self.group,
-                fn=self.calc_router_loss_and_logging,
-                is_first_fwd=is_first_fwd,
-            )
-
-        with profile("combine"):
-            if self.config.use_combine_before_a2a:
-                expert_out = expert_out.reshape([-1, hidden_size])
-
-                scatter_index = scatter_index.reshape(si_shape)
-                combined_output = moe_combine_no_weight(
-                    expert_out, combine_weights, scatter_index, epsilon=1e-15
-                )
-            else:
-                combined_output = self.combine_expert_output(
-                    expert_out, combine_weights, scatter_index
-                )
-
-        if self.shared_experts is not None:
-            combined_output += shared_out
-
-        if orig_shape:
-            combined_output = combined_output.clone().reshape(
-                orig_shape[:-1] + [combined_output.shape[-1]]
-            )
-        return combined_output, combine_weights, router_loss2, gate_logits
+    ):
+        # This function will not be called in automatic parallelism.
+        pass
 
 
 def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
@@ -1271,15 +483,6 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
     ret = moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
 
     ret.stop_gradient = False
-    return ret
-
-
-def detach_and_requires_grad_(*args):
-    """detach_and_requires_grad_"""
-    ret = [a.detach() if a is not None else None for a in args]
-    for r, a in zip(ret, args):
-        if a is not None:
-            r.stop_gradient = a.stop_gradient
     return ret
 
 
@@ -1385,20 +588,6 @@ class MOELayerAuto(MOELayer):
         else:
             self.input_preprocess = self.output_postprocess = None
         self.group_experts = group_experts
-
-    def _cal_multimodel_experts_prob(
-        self, gate_logits, token_type_ids, group_experts, moe_k
-    ):
-
-        if not self.gate.experts_type_ids.is_dist():
-            self.gate.experts_type_ids = dist.shard_tensor(
-                self.gate.experts_type_ids,
-                get_mesh(),
-                [dist.Replicate(), dist.Replicate()],
-            )
-        return super()._cal_multimodel_experts_prob(
-            gate_logits, token_type_ids, group_experts, moe_k
-        )
 
     def forward_experts(self, dispatched_input):
         """
