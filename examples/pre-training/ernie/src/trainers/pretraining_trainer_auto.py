@@ -67,7 +67,9 @@ except ImportError:
 from paddleformers.trainer.utils import add_start_docstrings
 from paddleformers.trainer.trainer_callback import PrinterCallback
 from paddle.distributed import fleet
+from paddle.distributed.auto_parallel.pipelining.schedules import get_pp_schedule
 import paddle.distributed as dist
+from typing import Any, Dict, Union
 
 from paddleformers.transformers.model_utils import _add_variant
 
@@ -713,6 +715,78 @@ class AutoPretrainingTrainer(AutoTrainer):
                             which will regenerate the global shuffle domain."
             )
         # self.return_value = paddle.zeros([]) #fake return value
+        if self.args.pipeline_parallel_degree > 1:
+            if self.criterion is None:
+                self.criterion = self.model.criterion
+            self.pp_schedule = get_pp_schedule(
+                model,
+                self.args.gradient_accumulation_steps,
+                self.criterion,
+                self.args.pipeline_schedule_mode,
+                self.args.pipeline_parallel_degree,
+                self.comm_group_in_pp,
+            )
+            self.args.per_device_train_batch_size = (
+                self.args.per_device_train_batch_size
+                * self.args.gradient_accumulation_steps
+            )
+            self.args.gradient_accumulation_steps = 1
+
+    def compute_pipeline_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+        Subclass and override for custom behavior.
+        """
+        if self.criterion is not None:
+            if "labels" in inputs:
+                labels = inputs.pop("labels")
+
+            elif "start_positions" in inputs and "end_positions" in inputs:
+                labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+            elif self.args.label_names is not None:
+                labels = []
+                for label in self.label_names:
+                    labels.append(inputs.pop(label))
+                labels = tuple(labels)
+            elif "generator_labels" in inputs:
+                labels = inputs["generator_labels"]
+        else:
+            labels = None
+
+        pp_rank = self.comm_group_in_pp.rank
+        losses = []
+        if pp_rank == 0:
+            self.pp_schedule.step(**inputs)
+        elif pp_rank == self.args.pipeline_parallel_degree - 1:
+            self.pp_schedule.step(target=labels, losses=losses)
+        else:
+            self.pp_schedule.step()
+
+        final_loss = None
+        if len(losses) != 0:
+            losses = [loss[0] for loss in losses]
+            final_loss = paddle.stack(losses).mean()
+
+        return final_loss
+
+    def dynamic_auto_parallel_pipeline_training(
+        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
+    ) -> paddle.Tensor:
+        assert (
+            self.args.pipeline_parallel_degree > 1
+        ), "pipeline_parallel_degree must be greater than 1."
+        with self.autocast_smart_context_manager():
+            loss = self.compute_pipeline_loss(model, inputs)
+
+        return loss
+
+    def dynamic_training(
+        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
+    ) -> paddle.Tensor:
+        if self.args.pipeline_parallel_degree > 1:
+            return self.dynamic_auto_parallel_pipeline_training(model, inputs)
+        else:
+            return super().dynamic_training(model, inputs)
 
     def autocast_smart_context_manager(self):
 
