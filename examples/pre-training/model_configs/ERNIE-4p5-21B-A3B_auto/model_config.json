@@ -36,9 +36,10 @@
   "fuse_swiglu": true,
   "fuse_gate_detach_matmul": false,
   "remove_tail_layer": 2,
-  "moe_num_experts": 16,
-  "moe_num_shared_experts": 0,
-  "moe_layer_start_index": 2,
+  "tie_word_embeddings": true,
+  "moe_num_experts": 64,
+  "moe_num_shared_experts": 2,
+  "moe_layer_start_index": 1,
   "moe_group_experts": false,
   "moe_intermediate_size": 1536,
   "moe_capacity": [6,6,6],
@@ -49,11 +50,8 @@
   "moe_aux_loss_lambda": 1e-5,
   "moe_group_orthogonal_loss": true,
   "moe_orthogonal_loss_lambda": 0.0,
-  "moe_z_loss_lambda": 0.0,
   "moe_layer_interval": 1,
-  "z_loss_lambda": 0,
   "using_precision_check": false,
   "use_ep_comm_overlap": true,
-  "moe_use_all2all": true,
-  "tie_word_embeddings": true
+  "moe_use_all2all": true
 }
