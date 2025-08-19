@@ -93,7 +93,7 @@ from src.callbacks import (
     FP8QuantWeightCallback,
 )
 from src.callbacks.moe_logging_callback import MoeLoggingCallback
-from src.clip import ClipGradForMOEByGlobalNormAuto
+from src.clip import ClipGradForMOEByGlobalNorm
 from src.lr_schedulers import get_wsd_schedule_with_warmup
 from src.trainers.data_parallel import sync_dp_moe_params_across_sharding
 from src.utils.misc import global_training_logs
@@ -1540,7 +1540,7 @@ class PretrainingTrainer(Trainer):
                 def expert_fn(p):
                     return getattr(p, "no_sync", False)
 
-                grad_clip = ClipGradForMOEByGlobalNormAuto(
+                grad_clip = ClipGradForMOEByGlobalNorm(
                     self.args.max_grad_norm,
                     is_expert_param_func=expert_fn,
                     moe_group=_get_global_group(),
