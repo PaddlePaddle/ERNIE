@@ -34,7 +34,7 @@
   "rope_reorder": false,
   "fuse_rope": true,
   "fuse_swiglu": true,
-  "fuse_gate_detach_matmul": true,
+  "fuse_gate_detach_matmul": false,
   "remove_tail_layer": 2,
   "moe_num_experts": 16,
   "moe_num_shared_experts": 0,
