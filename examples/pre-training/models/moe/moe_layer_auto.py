@@ -940,7 +940,7 @@ class MOELayer(nn.Layer):
         dispatch_tokens_mask=None,
         prefix="",
     ):
-        router_loss, l_aux, orthogonal_loss, zloss = 0.0, None, None, None
+        router_loss, l_aux, orthogonal_loss = 0.0, None, None
         if self.gate.config.moe_aux_loss_lambda:
             l_aux = self.gate._cal_aux_loss(
                 gate_prob,
@@ -958,9 +958,6 @@ class MOELayer(nn.Layer):
             router_loss += (
                 self.gate.moe_orthogonal_loss_lambda[token_type or 0] * orthogonal_loss
             )
-        if self.gate.config.moe_z_loss_lambda and not in_auto_parallel_align_mode():
-            zloss = self.gate._cal_z_loss(gate_logits, tokens_type_mask)
-            router_loss += self.gate.moe_z_loss_lambda[token_type or 0] * zloss
 
         return router_loss
 

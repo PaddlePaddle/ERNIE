@@ -125,7 +125,6 @@ class ErnieConfig(PretrainedConfig):
         use_recompute_attn=False,
         recompute_use_reentrant=False,
         use_rmsnorm=True,
-        z_loss_lambda=None,
         fuse_rms_norm=False,
         fuse_ln=False,
         pad_token_id=0,
@@ -232,7 +231,6 @@ class ErnieConfig(PretrainedConfig):
         self.fuse_rms_norm = fuse_rms_norm
         self.fuse_ln = fuse_ln
         self.use_rmsnorm = use_rmsnorm
-        self.z_loss_lambda = z_loss_lambda
         self.using_dynamic_sequence_length = using_dynamic_sequence_length
         if using_dynamic_sequence_length:
             assert (
@@ -448,7 +446,6 @@ class ErnieMoEConfig(ErnieConfig):
         moe_layer_start_index: Union[int, list] = 0,
         moe_layer_end_index: Union[int, list] = -1,
         moe_aux_loss_lambda=1e-2,
-        moe_z_loss_lambda=1e-4,
         moe_orthogonal_loss_lambda=1e-2,
         moe_use_size_all2all=False,
         sinkhorn_2gate=True,
@@ -527,7 +524,6 @@ class ErnieMoEConfig(ErnieConfig):
         self.moe_num_experts = moe_num_experts
         self.moe_capacity = moe_capacity
         self.moe_aux_loss_lambda = moe_aux_loss_lambda
-        self.moe_z_loss_lambda = moe_z_loss_lambda
         self.moe_orthogonal_loss_lambda = moe_orthogonal_loss_lambda
         self.global_aux_loss = global_aux_loss
         self.sinkhorn_2gate = sinkhorn_2gate

@@ -48,4 +48,4 @@ python -m paddle.distributed.launch \
     --log_dir output/paddle_distributed_logs \
     --run_mode=collective \
     ${script:-ernie/pretrain_auto.py}  \
-    --config yamls/pretrain_96_auto.yaml
+    --config yamls/ERNIE-4p5-21B-A3B_auto/pretrain_8_auto.yaml

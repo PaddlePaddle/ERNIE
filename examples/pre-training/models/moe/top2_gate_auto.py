@@ -92,40 +92,6 @@ class CalOrthogonalLossOptEachWeightFunctor(paddle.autograd.PyLayer):
         )
 
 
-class CalZLossFunctor(paddle.autograd.PyLayer):
-
-    @staticmethod
-    def forward(ctx, logits, loss_mask=None, clip_min=1e-6):
-        if loss_mask is not None:
-            assert loss_mask.stop_gradient
-        loss, max_logits, safe_sumexp, logsumexp_per_token = (
-            moe_router_loss_ops.cal_z_loss(logits, loss_mask, clip_min)
-        )
-        ctx.save_for_backward(
-            logits, loss_mask, max_logits, safe_sumexp, logsumexp_per_token
-        )
-        ctx.clip_min = clip_min
-        return loss
-
-    @staticmethod
-    def backward(ctx, out_grad):
-        logits, loss_mask, max_logits, safe_sumexp, logsumexp_per_token = (
-            ctx.saved_tensor()
-        )
-        if logits.stop_gradient:
-            return None
-        clip_min = ctx.clip_min
-        return moe_router_loss_ops.cal_z_loss_grad(
-            out_grad,
-            logits,
-            loss_mask,
-            max_logits,
-            safe_sumexp,
-            logsumexp_per_token,
-            clip_min,
-        )
-
-
 class CalAuxLossFunctor(paddle.autograd.PyLayer):
 
     @staticmethod
@@ -187,17 +153,6 @@ def cal_orthogonal_loss_opt_each_weight_func(
     orthogonal_loss = weight_matmul - eye_matrix
     orthogonal_loss = _squared_l2_norm(orthogonal_loss) / orthogonal_loss.size
     return orthogonal_loss
-
-
-def cal_z_loss_func(logits, loss_mask):
-    if loss_mask is not None:
-        loss_mask = loss_mask.astype(logits.dtype)
-        l_zloss = (logits.logsumexp(1).square() * loss_mask).sum() / paddle.clip(
-            loss_mask.sum(), min=1e-6
-        )
-    else:
-        l_zloss = logits.logsumexp(1).square().mean()
-    return l_zloss
 
 
 def cal_aux_loss_func(
@@ -370,16 +325,13 @@ class Top2Gate(nn.Layer):
         self.moe_aux_loss_lambda = paddle.to_tensor(
             config.moe_aux_loss_lambda, dtype="float32"
         )
-        self.moe_z_loss_lambda = paddle.to_tensor(
-            config.moe_z_loss_lambda, dtype="float32"
-        )
+
         self.moe_orthogonal_loss_lambda = paddle.to_tensor(
             config.moe_orthogonal_loss_lambda, dtype="float32"
         )
         if self.moe_aux_loss_lambda.ndim == 0:
             self.moe_aux_loss_lambda = self.moe_aux_loss_lambda.unsqueeze(0)
-        if self.moe_z_loss_lambda.ndim == 0:
-            self.moe_z_loss_lambda = self.moe_z_loss_lambda.unsqueeze(0)
+
         if self.moe_orthogonal_loss_lambda.ndim == 0:
             self.moe_orthogonal_loss_lambda = self.moe_orthogonal_loss_lambda.unsqueeze(
                 0
@@ -444,9 +396,7 @@ class Top2Gate(nn.Layer):
     def _create_gate_parameter(self):
 
         if self.config.multimodel_experts:
-            self.moe_z_loss_lambda = self.moe_z_loss_lambda.expand(
-                len(self.num_experts)
-            )
+
             self.moe_aux_loss_lambda = self.moe_aux_loss_lambda.expand(
                 len(self.num_experts)
             )
@@ -567,12 +517,10 @@ class Top2Gate(nn.Layer):
                 combine_weights,
                 scatter_index,
                 l_aux,
-                l_zloss,
             ) = self.top2_gating(logits, correction_bias=correction_bias)
             orthogonal_loss = self._cal_orthogonal_loss()
             router_loss = (
                 l_aux * self.moe_aux_loss_lambda
-                + l_zloss * self.moe_z_loss_lambda
                 + orthogonal_loss * self.moe_orthogonal_loss_lambda
             )
             router_loss.stop_gradient = False
@@ -611,7 +559,6 @@ class Top2Gate(nn.Layer):
 
     def top2_gating(self, logits, cap=None, correction_bias=None):
 
-        l_zloss = self._cal_z_loss(logits)
         gates = self.act(logits)
 
         assert logits.ndim == 2, logits.shape
@@ -716,7 +663,6 @@ class Top2Gate(nn.Layer):
             paddle.concat((combine1_weight, combine2_weight), 1),
             paddle.stack((scatter1_index, scatter2_index), 1),
             l_aux,
-            l_zloss,
         )
 
     def _cal_aux_loss(
@@ -784,17 +730,6 @@ class Top2Gate(nn.Layer):
             self.rank if self.global_aux_loss else None,
             self.group if self.global_aux_loss else None,
         )
-
-    def _cal_z_loss(self, logits, loss_mask=None):
-
-        if (
-            (moe_router_loss_ops is not None)
-            and (loss_mask is None or len(loss_mask.shape) == 1)
-            and (logits.dtype == paddle.float32)
-        ):
-            return CalZLossFunctor.apply(logits, loss_mask)
-        else:
-            return cal_z_loss_func(logits, loss_mask)
 
     def _cal_orthogonal_loss_opt_each_weight(self, weight, use_group):
 
