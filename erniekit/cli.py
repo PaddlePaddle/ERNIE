@@ -57,7 +57,7 @@ USAGE = (
 WELCOME = (
     "-" * 60
     + "\n"
-    + f"Welcome to ErnieKit"
+    + "Welcome to ErnieKit"
     + "\n"
     + f"version : {VERSION}"
     + "\n"
