@@ -1,3 +1,5 @@
+# !/usr/bin/env python3
+
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,10 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .clip import ClipGradByAdaptiveNorm
-from .moe_clip import ClipGradForMOEByGlobalNorm
 
-__all__ = [
-    "ClipGradForMOEByGlobalNorm",
-    "ClipGradByAdaptiveNorm",
-]
+import paddle.distributed as dist
+from paddle.distributed import fleet
+
+
+def get_flatten_mesh(mesh):
+
+    return dist.ProcessMesh(mesh.process_ids)
+
+
+def get_mesh(pp_idx=0):
+
+    mesh = fleet.auto.get_mesh()
+    if "pp" in mesh.dim_names:
+        mesh = mesh.get_mesh_with_dim("pp", pp_idx)
+    return mesh
+
+
+def _reshard(tensor, mesh, placements):
+
+    dst_tensor = dist.auto_parallel.moe_utils._dist_reshape(
+        tensor, tensor.shape, mesh, placements
+    )
+    return dst_tensor

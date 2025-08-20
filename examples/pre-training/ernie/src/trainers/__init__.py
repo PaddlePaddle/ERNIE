@@ -17,9 +17,12 @@ from .pretraining_trainer import (
     PretrainingTrainer,
     WeightedDistributedSampler,
 )
+from .pretraining_trainer_auto import AutoPretrainingTrainer, AutoPreTrainingArguments
 
 __all__ = [
-    'PretrainingTrainer',
-    'PreTrainingArguments',
-    'WeightedDistributedSampler',
+    "PretrainingTrainer",
+    "PreTrainingArguments",
+    "WeightedDistributedSampler",
+    "AutoPretrainingTrainer",
+    "AutoPreTrainingArguments",
 ]
