@@ -145,6 +145,76 @@ Required fields for DPO:
 }
 ```
 
+### SFT VL Dataset
+
+We provide demo data for quick training, please download the [image](https://paddleformers.bj.bcebos.com/datasets/DoclingMatix.tar.gz) or [video](
+https://paddleformers.bj.bcebos.com/datasets/NExTVideo.tar.gz) data according to your needs and unzip it to the [demo](../examples/data/)  data directory. You can either use these samples or train with your own data.
+
+Required fields for SFT VL:
+
+
+* `text_info`: The list of text data, each element contains a `text` and a `tag`
+  * `text`: The text content from User question or System response
+  * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
+* `image_info`: The list of image data, each element contains a `image_url` and a `matched_text_index`
+  * `image_url`: The url to download image online or the path to access image locally
+  * `matched_text_index`: The index of matched text in `text_info`
+    * Default: `matched_text_index=0` means the image is matched with the first text, and will be palced before the first text
+* `is_system(optional)`: The system flag (1=system configuration, 0=no system configuration)
+  * system configuration = `text_info[0]` if `is_system=1`
+
+Notes:
+* Each training sample is in JSON format, with multiple samples separated by newlines
+* Video data is supported by replacing the `image_info` with `video_info`
+  * the `image_url` can be a video url or video path
+* Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
+
+Here is a multi-image example of SFT VL dataset:
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./DoclingMatix/218/0.png"},
+        {"matched_text_index": 0, "image_url": "./DoclingMatix/218/1.png"}
+    ],
+    "text_info": [
+        {"text": "What is the purpose of the resolution discussed in the text?", "tag": "mask"},
+        {"text": "The purpose of the resolution is to approve the redevelopment contract of the Philadelphia Redevelopment Authority for the redevelopment and urban renewal of a portion of the Haddington Urban Renewal Area, Unit Nos. 2 and 3, and to authorize the Redevelopment Authority to execute the redevelopment contract with Danielle M. Carson-Varns.", "tag": "no_mask"},
+        {"text": "Who introduced Resolution No. 160204 to the City Council?", "tag": "mask"},
+        {"text": "Councilmember Blackwell introduced Resolution No. 160204 to the City Council.", "tag": "no_mask"},
+        ...
+    ]
+}
+```
+
+Here is a video example of SFT VL dataset:
+```json
+{
+    "video_info": [
+        {"matched_text_index": 0, "image_url": "./NExTVideo/1027/4789497818.mp4"}
+    ],
+    "text_info": [
+        {"text": "how does the man sit on the grass?\nA. kneel\nB. one leg in the air\nC. sitting on bicycle seat\nD. legs spread out\nE. squatting down\n Answer with the option's letter from the given choices directly.", "tag": "mask"},
+        {"text": "D", "tag": "no_mask"}
+    ]
+}
+```
+
+Here is a system configuration example of SFT VL dataset:
+```json
+{
+    "is_system": 1,
+    "text_info": [
+        {"text": "Your role as ...", "tag": "mask"},
+        {"text": "好的", "tag": "no_mask"},
+        {"text": "What is written...", "tag": "mask"},
+        {"text": "<think>So I've got...", "tag": "no_mask"},
+        ...
+    ]
+    "image_info": [...]
+}
+```
+
+
 ## alpaca Format
 
 ### SFT Dataset
