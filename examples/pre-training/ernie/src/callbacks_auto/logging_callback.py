@@ -41,6 +41,8 @@ class LoggingCallback(TrainerCallback):
             if data_type is not None:
                 logs.update(data_type="-".join(map(str, (data_type.numpy().tolist()))))
 
+        current_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.INFO)
         if type(logs) is dict:
             logger.info(
                 ", ".join(
@@ -61,3 +63,4 @@ class LoggingCallback(TrainerCallback):
                 metrics_dumper.append(logs)
         else:
             logger.info(logs)
+        logger.setLevel(current_level)
