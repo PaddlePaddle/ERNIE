@@ -12,17 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .pretraining_trainer import (
-    PreTrainingArguments,
-    PretrainingTrainer,
-    WeightedDistributedSampler,
-)
-from .pretraining_trainer_auto import AutoPretrainingTrainer, AutoPreTrainingArguments
+from .logging import logger, setup_logger_output_file
 
-__all__ = [
-    "PretrainingTrainer",
-    "PreTrainingArguments",
-    "WeightedDistributedSampler",
-    "AutoPretrainingTrainer",
-    "AutoPreTrainingArguments",
-]
+__all__ = ["logger", "setup_logger_output_file"]

@@ -93,7 +93,7 @@ from src.callbacks import (
     FP8QuantWeightCallback,
 )
 from src.callbacks.moe_logging_callback import MoeLoggingCallback
-from src.clip import ClipGradForMOEByGlobalNorm
+from src.clip import ClipGradForMOEByGlobalNormAuto
 from src.lr_schedulers import get_wsd_schedule_with_warmup
 from src.trainers.data_parallel import sync_dp_moe_params_across_sharding
 from src.utils.misc import global_training_logs
@@ -493,7 +493,7 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
     def gen_data_seq_weighted(self, num_examples, data_type=None):
         assert (
             self.load_data_seq is False
-        ), "需要保证所有epoch的data_seq都从文件加载，否则下次删data_seq无法控住随机性"
+        ), "Ensure that the data_seq for all epochs is loaded from the file; otherwise, the randomness cannot be controlled when deleting data_seq next time."
         logger.info(
             f"generating data sequence... #non_consecutive_data_chunks={num_examples},"
             f" num_consecutive={self.num_consecutive}"
@@ -1540,7 +1540,7 @@ class PretrainingTrainer(Trainer):
                 def expert_fn(p):
                     return getattr(p, "no_sync", False)
 
-                grad_clip = ClipGradForMOEByGlobalNorm(
+                grad_clip = ClipGradForMOEByGlobalNormAuto(
                     self.args.max_grad_norm,
                     is_expert_param_func=expert_fn,
                     moe_group=_get_global_group(),

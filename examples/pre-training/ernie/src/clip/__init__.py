@@ -13,5 +13,6 @@
 # limitations under the License.
 
 from .moe_clip import ClipGradForMOEByGlobalNorm
+from .moe_clip_auto import ClipGradForMOEByGlobalNormAuto
 
-__all__ = ['ClipGradForMOEByGlobalNorm']
+__all__ = ["ClipGradForMOEByGlobalNorm", "ClipGradForMOEByGlobalNormAuto"]

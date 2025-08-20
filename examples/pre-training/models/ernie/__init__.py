@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .configuration import ErnieMoEConfig
-from .modeling_pp import ErnieMoEForCausalLMPipe
 
-__all__ = ['ErnieMoEConfig', 'ErnieMoEForCausalLMPipe']
+from .configuration import *  # noqa
+from .modeling import *  # noqa
+from .modeling_auto import *  # noqa
+from .modeling_auto_pp import *  # noqa
