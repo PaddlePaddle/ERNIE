@@ -21,8 +21,6 @@ Constants for dataset
 IDTYPES_2_ID = {"text": 0, "image": 1, "video": 2}
 IMAGETYPES_2_ID = {"image": 0, "video": 1, "padded_image": 2}
 DATATYPE_2_ID = {"mm": 0, "lm": 1}
-MIN_CROP_NUM = 4  # only support 4 now
-MIN_CROP_SUPPORT_RANGE = [4]  # only support 4 now
 MAX_RATIO = 50
 GIVEN_MAX_TILE = 144
 
@@ -30,7 +28,6 @@ GIVEN_MAX_TILE = 144
 DATA_TYPE_TO_DATASET_TYPE = {
     "image": ["image-text-pair", "image-text_location-pair", "interleave", "default"],
     "video": ["video"],
-    "omini": ["omini"],
 }
 DATASET_TYPE_TO_DATA_TYPE = {
     dataset_type: data_type
@@ -43,21 +40,12 @@ AUGMENT_FN = {"image": "AugmentImage"}
 
 # determined by dataset_type
 PROCESS_FN_TO_DATASET_TYPE = {
-    "LocationProcess": ["image-text_location-pair"],
     "VideoProcess": ["video"],
-    "InterleaveProcess": ["interleave"],
 }
 DATASET_TYPE_TO_PROCESS_FN = {
     dataset_type: process_fn
     for process_fn, dataset_types in PROCESS_FN_TO_DATASET_TYPE.items()
     for dataset_type in dataset_types
-}
-
-# determined by data_type
-CROP_FN = {
-    "image": "CropImage",
-    "video": "CropVideo",
-    "adaptive": "CropAdaptive",
 }
 
 

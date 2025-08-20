@@ -35,3 +35,7 @@ gpu_ci_test:
 .PHONY: xpu_ci_test
 xpu_ci_test:
 	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/xpu/
+
+.PHONY: npu_ci_test
+npu_ci_test:
+	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/npu/

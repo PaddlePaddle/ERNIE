@@ -1,0 +1,97 @@
+# 
+stage: VL-SFT
+
+# model
+model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Paddle/
+multimodal: true
+fuse_linear: true
+fuse_rms_norm: false
+use_flash_attention: 1
+use_moe: true
+moe_group: "mp"
+moe_use_aux_free_update_coef: 0.0
+moe_aux_loss_lambda: 0.0
+moe_use_aux_free: true
+moe_use_hard_gate: true
+moe_multimodal_dispatch_use_allgather: v2-alltoall-unpad-text
+
+# data
+train_dataset_path: "examples/data/sft_vl-train_demo1.json"
+train_dataset_prob: "1.0"
+text_dataset_path: ""
+text_dataset_prob: ""
+max_seq_len: 8192
+num_samples_each_epoch: 10000000
+modality_ratio: "[1,1]"
+
+# preprocess
+variable_resolution: 1
+pad_to_max_seqlen: 8192
+render_timestamp: true
+serialize_output: false
+one_sample_in_one_seq: true
+
+# dataloader
+dataloader_num_workers: 1
+
+# train
+do_train: true
+batch_size: 1
+prefetch_factor: 10
+seed: 42
+gradient_accumulation_steps: 4
+max_steps: 8000
+save_steps: 10000
+logging_steps: 1
+weight_decay: 0.1
+warmup_steps: 100
+output_dir: ./output
+add_sys_token: true
+same_data: true
+freeze_config: "freeze_vision"
+trigger_data_prob: 1.0
+from_scratch: 0
+load_sharded_model: true
+save_sharded_model: true
+gc_interval: 100000
+drop_history_with_k: true
+overwrite_output_dir: true
+
+# optim
+lr_scheduler_type: "cosine"
+learning_rate: 1.0e-05
+min_lr: 1.0e-06
+moe_gate_lr_ratio: 0.01
+visual_ld: 0.9
+vit_lr_ratio: 0.9
+adam_beta2: 0.95
+adam_beta1: 0.9
+adam_epsilon: 1.0e-08
+scale_loss: 4096
+
+# performance
+sequence_parallel: 1
+use_sp_callback: true
+tensor_parallel_degree: 2
+pipeline_parallel_degree: 4
+pp_need_data: true
+pp_need_data_degree: 4
+virtual_pp_degree: 7
+tensor_parallel_config: "sync_param sync_grad sync_moment"
+pipeline_parallel_config: "enable_offload_queue enable_delay_scale_loss enable_overlap_p2p_comm best_unbalanced_scheduler"
+disable_pipeline_warmup: false
+sharding: "stage1"
+sharding_parallel_config: "split_param enable_fuse_optimizer_states"
+sharding_comm_buffer_size_MB: 2048
+save_sharding_stage1_model_include_freeze_params: true
+offload_optim: true
+recompute_granularity: core_attn
+pre_alloc_memory: 60
+
+# amp
+bf16: true
+fp16_opt_level: "O2"
+amp_master_grad: 1
+
+# checkpoint
+unified_checkpoint: true

@@ -5,16 +5,8 @@ processor_args:
     tokenizer: ./tokenizer_models/ernie45v_tk_m250k
     max_seq_length: 8192
     im_prefix_length: 64
-    crop_tile_option: "36"
-    min_tile: 4
-    crop_tile_rate: "1"
-    use_crop_specialtoken: true
-    use_loc_specialtoken: true
-    min_crop_flag: True
     one_sample_in_one_seq: true
-    video_max_tile: 2
     use_pic_id: true
-    use_multi_image_crop: true
     serialize_output: false
 
     # image modification
