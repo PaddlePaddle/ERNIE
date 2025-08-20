@@ -357,6 +357,12 @@ def run_vl_sft(
     ).repeat_interleave(cfg.vision_config.patch_size**2 * 1, -1)
 
     cfg.use_flash_attention = model_args.use_flash_attention
+    cfg.use_recompute_moe = model_args.use_recompute_moe
+    cfg.recompute = finetuning_args.recompute
+    cfg.recompute_granularity = model_args.recompute_granularity
+    cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
+    cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
+    cfg.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
     cfg.use_mem_eff_attn = model_args.use_mem_eff_attn
     cfg.use_flash_attn_with_mask = model_args.use_flash_attn_with_mask
     cfg.hidden_dropout_prob = finetuning_args.hidden_dropout_prob
@@ -403,6 +409,9 @@ def run_vl_sft(
                 config=cfg,
             )
     logger.info(f"vision_model: {model.vision_model}")
+
+    if model.config.head_dim is None:
+        del model.config.head_dim
 
     if image_preprocess is not None and hasattr(model, "add_image_preprocess"):
         model.add_image_preprocess(image_preprocess)

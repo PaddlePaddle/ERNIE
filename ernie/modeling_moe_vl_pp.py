@@ -1017,7 +1017,12 @@ class ErnieDecoderLayerPipe(ErnieMoEDecoderLayer):
         else:
             attn_mask_start_row_indices = None
 
-        if self.training and self.use_full_recompute:
+        has_gradient = not hidden_states.stop_gradient
+        if (
+            self.config.recompute
+            and self.config.recompute_granularity == "full"
+            and has_gradient
+        ):
             decoderlayer_act_offload_settings = self.config.get(
                 "decoderlayer_act_offload_settings", {"type": "", "value": ""}
             )

@@ -495,6 +495,8 @@ class FinetuningArguments(
             self.weight_quantize_algo = "weight_only_int8"
         elif self.compute_type == "wint4/8":
             self.weight_quantize_algo = "weight_only_mix"
+        elif self.compute_type == "nf4":
+            self.weight_quantize_algo = "nf4"
         else:
             raise ValueError(f"Unknown compute_type: {self.compute_type}")
         self.per_device_train_batch_size = self.batch_size

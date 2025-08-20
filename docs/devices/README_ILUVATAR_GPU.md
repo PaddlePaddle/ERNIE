@@ -211,7 +211,7 @@ python3 -m paddle.distributed.launch \
     --release_grads 1 \
     --recompute_use_reentrant True \
     --fuse_rope 1 \
-    --moe_multimodal_dispatch_use_allgather "" \
+    --moe_multimodal_dispatch_use_allgather "v2-alltoall" \
     --lora \
     --lora_rank 32 \
     --fuse_rms_norm False \

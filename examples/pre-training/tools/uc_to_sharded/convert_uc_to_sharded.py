@@ -24,6 +24,7 @@ import fnmatch
 import re
 import paddle
 from safetensors.numpy import load_file
+from tqdm import tqdm
 
 
 def parse_args():
@@ -73,6 +74,7 @@ class Checkpoint:
         assert self.mp_degree == 1, "currently not support mp"
         self.pp_degree = parallel_config["pp_degree"]
         self.sharding_degree = parallel_config["sharding_degree"]
+        assert self.sharding_degree > 1, "currently only support sharding"
         self.ep_degree = parallel_config["ep_degree"]
         self.moe_sharding_degree = parallel_config["moe_sharding_degree"]
         assert (
@@ -86,7 +88,7 @@ class Checkpoint:
                 self.mp_degree, self.pp_degree, self.sharding_degree
             )
         )
-        self.sharding_strategy = self.meta["sharding_metas"]["tp00_pp00"][
+        self.sharding_strategy = self.meta["sharding_metas"]["tp00_pp00_ep00"][
             "sharding_strategy"
         ]
         self.pdparams_files = find_files(args.cur, "*.pdparams")
@@ -122,7 +124,7 @@ class Checkpoint:
             if matched_layer_name in ckpt.keys():
                 return matched_layer_name, paddle.to_tensor(ckpt[matched_layer_name])
             else:
-                print("{} not found in safetensors".format(matched_layer_name))
+                print("{} not found in safetensors index".format(matched_layer_name))
                 return None, None
         else:
             print("{} not found in safetensors index".format(matched_layer_name))
@@ -130,7 +132,9 @@ class Checkpoint:
 
     def process_one_pdparam(self, pdparam_path):
         pdparam = paddle.load(pdparam_path)
-        for layer_name, tensor_data in pdparam.items():
+        for layer_name, tensor_data in tqdm(
+            pdparam.items(), desc=f"Processing {pdparam_path}"
+        ):
             _, loaded_value = self.load_from_org_model(layer_name)
             if loaded_value is None:
                 continue
@@ -138,14 +142,12 @@ class Checkpoint:
                 loaded_value.shape == tensor_data.shape
             ), f"Shape mismatch: loaded_value.shape={loaded_value.shape}, expected={tensor_data.shape}"
             pdparam[layer_name].set_value(paddle.cast(loaded_value, tensor_data.dtype))
-            print("successfully convert {}: {}".format(layer_name, tensor_data.shape))
         paddle.save(
             pdparam, os.path.join(self.args.dst, os.path.basename(pdparam_path))
         )
 
     def process_pdparams(self):
         for pdparam_path in self.pdparams_files:
-            print("processing {}".format(pdparam_path))
             self.process_one_pdparam(pdparam_path)
 
     def load_from_org_model_with_tensor_name(
@@ -170,11 +172,6 @@ class Checkpoint:
                     lambda m: m.group(1) + str(expert_id),
                     matched_org_structure_name,
                 )
-                print(
-                    "adapt expert id from org {} to cur {}".format(
-                        expert_id, int(match.group(1))
-                    )
-                )
 
             if matched_org_structure_name in self.safetensors_index["weight_map"]:
                 file_name = self.safetensors_index["weight_map"][
@@ -185,7 +182,6 @@ class Checkpoint:
                     print("{} not exists".format(safetensor_file))
                 ckpt = load_file(safetensor_file)
                 if matched_org_structure_name in ckpt.keys():
-                    print("{} found in safetensors".format(matched_org_structure_name))
                     matched_name_pairs.append(
                         [
                             matched_org_structure_name,
@@ -194,10 +190,13 @@ class Checkpoint:
                         ]
                     )
                 else:
-                    print(
-                        "{} not found in safetensors".format(matched_org_structure_name)
-                    )
-            else:
+                    if len(matched_name_pairs) == 0:
+                        print(
+                            "{} not found in safetensors index".format(
+                                matched_org_structure_name
+                            )
+                        )
+            elif len(matched_name_pairs) == 0:
                 print(
                     "{} not found in safetensors index".format(
                         matched_org_structure_name
@@ -217,8 +216,10 @@ class Checkpoint:
             assert match is not None
             pp_num = match.group(1)
             shard_num = match.group(2)
-            print(f"pp: {pp_num}, shard: {shard_num}")
-            sharding_metas_key = "tp00_pp{}".format(pp_num)
+            sharding_metas_key = "tp00_pp{}_ep{}".format(pp_num, shard_num)
+            print(
+                f"pp: {pp_num}, shard: {shard_num}, sharding_metas_key: {sharding_metas_key}"
+            )
             structure_name_mapping = self.meta["sharding_metas"][sharding_metas_key][
                 "structure_name_mapping"
             ]
@@ -227,15 +228,17 @@ class Checkpoint:
             match = re.search(r"shard(\d+)", pdopt_path)
             assert match is not None
             shard_num = match.group(1)
-            print(f"shard: {shard_num}")
-            sharding_metas_key = "tp00_pp00"
+            sharding_metas_key = "tp00_pp00_ep{}".format(shard_num)
+            print(f"shard: {shard_num}, sharding_metas_key: {sharding_metas_key}")
             structure_name_mapping = self.meta["sharding_metas"][sharding_metas_key][
                 "structure_name_mapping"
             ]
             param_meta = self.meta["sharding_metas"][sharding_metas_key]["param_meta"]
 
         pdopt = paddle.load(pdopt_path)
-        for tensor_name, tensor_data in pdopt["master_weights"].items():
+        for tensor_name, tensor_data in tqdm(
+            pdopt["master_weights"].items(), desc=f"Processing {pdopt_path}"
+        ):
             matched_org_structure_name, loaded_value, cur_structure_name = (
                 self.load_from_org_model_with_tensor_name(
                     tensor_name, structure_name_mapping, shard_num
@@ -259,9 +262,6 @@ class Checkpoint:
                 real_data_num = 1
                 for data_num in param_meta[cur_structure_name][0]:
                     real_data_num *= data_num
-                print(
-                    f"Shape mismatch for {tensor_name}, change the data num from {tensor_data_num} to {real_data_num}"
-                )
                 assert loaded_value.flatten().shape[0] >= offset + real_data_num, (
                     f"Shape mismatch: org_shape={loaded_value.shape}, cur_shape={tensor_data.shape}, "
                     f"real_shape={real_data_num}, tensor_name={tensor_name}, "
@@ -285,17 +285,11 @@ class Checkpoint:
                 )
                 weight_t = paddle.concat([weight_t, zeros])
             pdopt["master_weights"][tensor_name].set_value(weight_t)
-            print(
-                "successfully convert org name:{}, cur name{}, tensor shape {}.".format(
-                    matched_org_structure_name, cur_structure_name, tensor_data.shape
-                )
-            )
             self.tensor_offset_map[tensor_name] += tensor_data_num
         paddle.save(pdopt, os.path.join(self.args.dst, os.path.basename(pdopt_path)))
 
     def process_pdopts(self):
         for pdopt_path in self.pdopt_files:
-            print("processing {}".format(pdopt_path))
             self.process_one_pdopt(pdopt_path)
 
 

@@ -506,6 +506,9 @@ def main():
             )
     logger.info(f"vision_model: {model.vision_model}")
 
+    if model.config.head_dim is None:
+        del model.config.head_dim
+
     if image_preprocess is not None and hasattr(model, "add_image_preprocess"):
         model.add_image_preprocess(image_preprocess)
 

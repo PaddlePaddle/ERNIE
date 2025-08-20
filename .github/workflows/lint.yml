@@ -47,6 +47,7 @@ jobs:
         run: |
           docker exec -t ${container_name} /bin/bash -c '
           rm -rf ERNIE
+          source $work_dir/../../../proxy
           git clone https://github.com/PaddlePaddle/ERNIE.git
           cd ERNIE
           git config --global user.name "PaddleCI"
@@ -57,6 +58,7 @@ jobs:
           git checkout -b test_pr upstream/${BRANCH}
           git merge --no-edit origin_pr
           git diff --numstat ${BRANCH} -- | awk "{print \$NF}"
+          PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple pre-commit run --files setup.py
           make lint
           '
 
