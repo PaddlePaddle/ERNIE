@@ -56,24 +56,6 @@ logger = logging.getLogger(__name__)
 
 
 
-try:
-    import moe_ops_auto
-except ImportError:
-    moe_ops_auto = None
-    logger.warning(
-        "`moe_ops_auto` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup_auto.py  install` to install"
-    )
-
-try:
-    import moe_combine_auto
-except ImportError:
-    moe_combine_auto = None
-    logger.warning(
-        "`moe_combine_auto` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup_auto.py  install` to install"
-    )
-
 
 
 
@@ -105,7 +87,7 @@ class GateCombine(PyLayer):
         ctx.combine_weights = combine_weights
         ctx.scatter_index = scatter_index
         assert moe_combine is not None
-        ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
+        ret = paddle.incubate.nn.functional.moe_combine(x, combine_weights, scatter_index)
         return ret
 
     @staticmethod
@@ -518,7 +500,7 @@ class MOELayer(nn.Layer):
                     self.moe_statics.expert_usage[0] += dispatch_mask.detach()
             dispatched_input.stop_gradient = False
             combine_weights_unnorm.stop_gradient = False
-            scatter_index.stop_gradient = True
+            scatter_index.stop_gradient = False
             dispatch_mask.stop_gradient = True
 
             scatter_index = scatter_index.transpose([1, 0])
@@ -586,7 +568,7 @@ class MOELayer(nn.Layer):
             )
             dispatched_input = dispatched_input
         dispatch_mask.stop_gradient = True
-        scatter_index.stop_gradient = True
+        scatter_index.stop_gradient = False
         return (
             dispatched_input,
             combine_weights,
@@ -759,7 +741,7 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
     if hard_gate:
         x_gatherd = F.embedding(scatter_index, x)
         return x_gatherd.squeeze(-2)
-    ret = moe_combine_auto.moe_combine_auto(x, combine_weights, scatter_index)
+    ret = paddle.incubate.nn.functional.moe_combine(x, combine_weights, scatter_index)
 
     ret.stop_gradient = False
     return ret
@@ -985,9 +967,7 @@ class MOELayerAuto(MOELayer):
                     scatter_index,
                     dispatch_mask,
                     _,
-                ) = moe_ops_auto.moe_gate_dispatch_auto(
-                    input, prob, k, local_capacity, True
-                )
+                ) = paddle.incubate.nn.functional.moe_gate_dispatch(input, prob, None, k, local_capacity, True)
                 dispatched_input.stop_gradient = False
                 combine_weights_unnorm.stop_gradient = False
                 dispatch_mask.stop_gradient = True
@@ -1022,7 +1002,7 @@ class MOELayerAuto(MOELayer):
                     capacity=capacity,
                 )
         dispatch_mask.stop_gradient = True
-        scatter_index.stop_gradient = True
+        scatter_index.stop_gradient = False
         return (
             dispatched_input,
             combine_weights,
