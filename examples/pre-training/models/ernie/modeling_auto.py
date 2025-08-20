@@ -15,7 +15,6 @@
 """Paddle Ernie model"""
 import math
 import functools
-from functools import partial
 import logging
 from typing import Optional, Tuple
 import contextlib
@@ -41,11 +40,6 @@ from paddle.distributed import in_auto_parallel_align_mode
 from models.moe.top2_gate_auto import Top2Gate, TopKGateFusedAuto
 
 
-from paddleformers.transformers.conversion_utils import (
-    StateDictNameMapping,
-    init_name_mappings,
-)
-
 from paddleformers.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions as _BaseModelOutput,
 )
@@ -63,6 +57,9 @@ from models.moe.moe_utils_auto import get_mesh
 from paddle.nn.functional.flash_attention import (
     scaled_dot_product_attention as flash_attention_with_mask,
 )
+from paddle.nn.functional.flash_attention import flash_attention
+
+from to_block_diag_causal_mask import to_block_diag_causal_mask
 
 
 @dataclass
@@ -80,22 +77,6 @@ class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
 
 logger = logging.getLogger(__name__)
 
-
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-
-    logger.warning(
-        "Use flash attention in scaled-dot-product. Attention mask is deprecated"
-    )
-except (ImportError, ModuleNotFoundError):
-    flash_attention = None
-
-
-try:
-    from to_block_diag_causal_mask import to_block_diag_causal_mask
-except (ImportError, ModuleNotFoundError):
-    logger.warning("to_block_diag_causal_mask not found. Use FleetY8.2 SFT instead.")
-    to_block_diag_causal_mask = None
 
 try:
     from fast_ln import fast_ln
@@ -214,22 +195,6 @@ def get_triangle_upper_mask(x, mask=None):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
-
-
-def naive_fuse_split_tp(
-    weight,
-    tensor_parallel_degree,
-    tensor_parallel_rank=None,
-    is_column=True,
-    fuse_tensor_parts=2,
-):
-
-    logging.info(f"spliting fused-ffn: {weight.shape}")
-    axis = -1 if is_column else 0
-    splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
-    return np.concatenate(
-        splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis
-    )
 
 
 def parallel_matmul(
@@ -378,23 +343,6 @@ def mem_eff_attn(
     return out
 
 
-def inbatch_pack_offset_to_attn_mask_start_row_indices(inbatch_pack_offset):
-    inbatch_pack_offset = inbatch_pack_offset.numpy()
-    attn_mask_row_start_indices = []
-    min_start_row = np.inf
-    for bidx in range(inbatch_pack_offset.shape[0]):
-        item = inbatch_pack_offset[bidx]
-        cumsum_item = item[item != -1]
-        record_lens = cumsum_item[1:] - cumsum_item[0:-1]
-        min_start_row = min(cumsum_item[1], min_start_row)
-        row_start_indices = np.repeat(cumsum_item[1:], record_lens)
-        attn_mask_row_start_indices.append(row_start_indices[None, None, ...])
-    attn_mask_row_start_indices = np.concatenate(attn_mask_row_start_indices, axis=0)
-    return paddle.to_tensor(attn_mask_row_start_indices, dtype=paddle.int32), int(
-        min_start_row
-    )
-
-
 def scaled_dot_product_attention(
     query_states,
     key_states,
@@ -411,7 +359,7 @@ def scaled_dot_product_attention(
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, num_key_value_heads, _ = value_states.shape
 
-    can_use_fa = config.use_flash_attn and flash_attention is not None
+    can_use_fa = config.use_flash_attn
 
     if not can_use_fa:
         if query_states.shape[-2] != key_states.shape[-2]:
@@ -732,146 +680,6 @@ class LayerNorm(nn.LayerNorm):
             return fast_ln(hidden_states, self.weight, self.bias, self._epsilon)[0]
         else:
             return super().forward(hidden_states)
-
-
-class RotaryEmbedding(nn.Layer):
-
-    def __init__(self, dim, max_position_embeddings=4096, base=10000):
-
-        super().__init__()
-        self.base = base
-        self.max_position_embeddings = max_position_embeddings
-        inv_freq = 1.0 / (
-            base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim)
-        )
-        t = paddle.arange(max_position_embeddings, dtype="float32")
-        freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
-        emb = paddle.concat([freqs, freqs], axis=-1)
-
-        self.cos_cached = emb.cos()
-        self.sin_cached = emb.sin()
-
-        self._cast_to_low_precision = False
-        self._cast_to_low_precison = False
-
-    def forward(self, x, seq_len=None):
-
-        return (
-            self.cos_cached[:seq_len, :],
-            self.sin_cached[:seq_len, :],
-        )
-
-    @classmethod
-    def rotate_half(cls, x):
-
-        x1 = x[..., : x.shape[-1] // 2]
-        x2 = x[..., x.shape[-1] // 2 :]
-        return paddle.concat([-x2, x1], axis=-1)
-
-    @classmethod
-    def apply_rotary_pos_emb(cls, q, k, cos, sin, offset: int = 0, position_ids=None):
-        if position_ids is not None:
-            assert offset == 0, offset
-            cos = F.embedding(position_ids, cos)
-            sin = F.embedding(position_ids, sin)
-        else:
-            cos = cos.unsqueeze(0)
-            sin = sin.unsqueeze(0)
-        cos = cos[:, offset : q.shape[1] + offset, None, :]
-        sin = sin[:, offset : q.shape[1] + offset, None, :]
-
-        q_embed = paddle.add(
-            paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin)
-        )
-        k_embed = paddle.add(
-            paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin)
-        )
-        q_embed = q_embed.astype(q.dtype)
-        k_embed = k_embed.astype(k.dtype)
-        return q_embed, k_embed
-
-
-class RopeEmbeddingLegacy(nn.Layer):
-
-    def __init__(self, head_dim, compression_ratio=1.0, base=10000):
-        super().__init__()
-        self.head_dim = head_dim
-        self.compression_ratio = compression_ratio
-        self.base = base
-
-    def forward(self, seq_length, position_ids=None):
-
-        indices = paddle.arange(0, self.head_dim, 2, dtype="float32")
-        indices = 1 / self.base ** (indices / self.head_dim)
-        if position_ids is None:
-            position_ids = paddle.arange(0, seq_length, 1, dtype="float32").unsqueeze(1)
-            position_ids = position_ids / self.compression_ratio
-            sinusoid_inp = position_ids * indices.unsqueeze(0)
-        else:
-            position_ids = position_ids / self.compression_ratio
-            seq_length = position_ids.shape[-1]
-            sinusoid_inp = position_ids.unsqueeze(-1).astype(
-                "float32"
-            ) * indices.unsqueeze(0)
-        pos_emb = paddle.concat(
-            [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1
-        )
-        pos_emb = paddle.reshape(pos_emb, (-1, 1, seq_length, self.head_dim))
-        pos_emb.stop_gradient = True
-        return pos_emb
-
-    def apply_rotary(self, rp, q, k):
-
-        sin, cos = paddle.chunk(rp, 2, axis=-1)
-        sin_pos = paddle.reshape(paddle.stack([sin, sin], axis=-1), rp.shape)
-        cos_pos = paddle.reshape(paddle.stack([cos, cos], axis=-1), rp.shape)
-        rotate_half_q = paddle.reshape(
-            paddle.stack([-q[:, :, :, 1::2], q[:, :, :, 0::2]], axis=-1),
-            paddle.shape(q),
-        )
-        query = paddle.add(
-            paddle.multiply(q.astype("float32"), cos_pos),
-            paddle.multiply(rotate_half_q.astype("float32"), sin_pos),
-        )
-        rotate_half_k = paddle.reshape(
-            paddle.stack([-k[:, :, :, 1::2], k[:, :, :, 0::2]], axis=-1),
-            paddle.shape(k),
-        )
-        key = paddle.add(
-            paddle.multiply(k.astype("float32"), cos_pos),
-            paddle.multiply(rotate_half_k.astype("float32"), sin_pos),
-        )
-        return query, key
-
-    def forward_single(self, position_ids):
-
-        batch_size, seq_length = position_ids.shape[:2]
-        rope_emb = paddle.zeros(
-            (2, batch_size, seq_length, 1, self.head_dim), dtype="float32"
-        )
-        inv_freq = self.base ** (
-            -paddle.arange(0, self.head_dim, 2, dtype="float32") / self.head_dim
-        )
-        position_ids = position_ids.cast("float32")
-        position_ids = position_ids / self.compression_ratio
-        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
-        emb = paddle.stack([freqs, freqs], axis=-1).reshape(
-            (batch_size, seq_length, self.head_dim)
-        )
-        emb = paddle.unsqueeze(emb, 2)
-
-        rope_emb[0] = paddle.cos(emb)
-        rope_emb[1] = paddle.sin(emb)
-        return rope_emb
-
-    @staticmethod
-    def apply_rotary_single(x, rope_emb):
-
-        rotate_half_x = paddle.reshape(
-            paddle.stack([-x[:, :, :, 1::2], x[:, :, :, 0::2]], axis=-1),
-            paddle.shape(x),
-        )
-        return x * rope_emb[0] + rotate_half_x * rope_emb[1]
 
 
 class ErnieLinear(nn.Layer):
@@ -1644,114 +1452,6 @@ class ErniePretrainedModelAuto(PretrainedModel):
     config_class = ErnieMoEConfig
     base_model_prefix = "ernie"
 
-    @classmethod
-    def _get_name_mappings(cls, config: ErnieMoEConfig) -> StateDictNameMapping:
-
-        mappings: StateDictNameMapping = []
-        model_mappings = [
-            ["embed_tokens.weight"],
-            ["norm.weight"],
-        ]
-        for layer_index in range(
-            config.num_hidden_layers
-            if not config.remove_tail_layer
-            else config.num_hidden_layers - 1
-        ):
-            layer_mappings = [
-                [
-                    f"layers.{layer_index}.self_attn.q_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [
-                    f"layers.{layer_index}.self_attn.k_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [
-                    f"layers.{layer_index}.self_attn.v_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [
-                    f"layers.{layer_index}.self_attn.o_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
-                [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.input_layernorm.weight"],
-                [f"layers.{layer_index}.post_attention_layernorm.weight"],
-            ]
-            model_mappings.extend(layer_mappings)
-
-        init_name_mappings(mappings=model_mappings)
-        if "ErnieModelAuto" not in config.architectures:
-            for mapping in model_mappings:
-                mapping[0] = "model." + mapping[0]
-                mapping[1] = "ernie." + mapping[1]
-            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
-
-        mappings = [
-            StateDictNameMapping(*mapping, index=index)
-            for index, mapping in enumerate(model_mappings)
-        ]
-        return mappings
-
-    @classmethod
-    def _get_tensor_parallel_mappings(cls, config, is_split=True):
-
-        from paddleformers.transformers.conversion_utils import split_or_merge_func
-
-        fn = split_or_merge_func(
-            is_split=is_split,
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_rank=config.tensor_parallel_rank,
-            num_attention_heads=config.num_attention_heads,
-        )
-
-        def get_tensor_parallel_split_mappings(num_layers):
-            final_actions = {}
-            base_actions = {
-                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
-                "lm_head.weight": partial(fn, is_column=not config.tie_word_embeddings),
-                "embed_tokens.weight": partial(fn, is_column=False),
-                "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
-            }
-            if config.use_bias:
-                base_actions.update(
-                    {
-                        "layers.0.self_attn.q_proj.bias": partial(fn, is_column=True),
-                        "layers.0.self_attn.k_proj.bias": partial(fn, is_column=True),
-                        "layers.0.self_attn.v_proj.bias": partial(fn, is_column=True),
-                        "layers.0.mlp.gate_proj.bias": partial(fn, is_column=True),
-                        "layers.0.mlp.up_proj.bias": partial(fn, is_column=True),
-                        "lm_head.bias": partial(fn, is_column=True),
-                    }
-                )
-            for key, action in base_actions.items():
-                if "layers.0." in key:
-                    for i in range(num_layers):
-                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
-                final_actions[key] = action
-
-            return final_actions
-
-        mappings = get_tensor_parallel_split_mappings(
-            config.num_hidden_layers
-            if not config.remove_tail_layer
-            else config.num_hidden_layers - 1
-        )
-
-        return mappings
-
     def init_weights(self, layer):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:
@@ -1792,19 +1492,6 @@ class ErniePretrainedModelAuto(PretrainedModel):
                         f' type={type(layer)},norm={layer.weight.astype("float32").norm()}'
                     )
 
-        elif isinstance(layer, RotaryEmbedding):
-            head_dim = self.config.hidden_size // self.config.num_attention_heads
-            inv_freq = 1.0 / (
-                layer.base ** (np.arange(0, head_dim, 2).astype("float32") / head_dim)
-            )
-
-            t = np.arange(layer.max_position_embeddings, dtype="float32")
-            freqs = np.einsum("i,j->ij", t, inv_freq)
-            emb = np.concatenate([freqs, freqs], axis=-1)
-            cos_cached = np.cos(emb)[:, :]
-            sin_cached = np.sin(emb)[:, :]
-            layer.cos_cached.set_value(cos_cached)
-            layer.sin_cached.set_value(sin_cached)
         elif isinstance(layer, Top2Gate):
             if not hasattr(layer, "weight"):
                 return
@@ -2066,7 +1753,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 global_mesh,
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
-        can_use_fa = self.config.use_flash_attn and flash_attention is not None
+        can_use_fa = self.config.use_flash_attn
         can_mem_eff_attn = (
             self.config.use_mem_eff_attn and inbatch_pack_offset is not None
         )
@@ -2530,20 +2217,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
     def get_decoder(self):
         return self.ernie
 
-    @staticmethod
-    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
-        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
-            (eos_token_id is not None) and (pad_token_id != eos_token_id)
-        )
-        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
-            attention_mask = (input_ids != pad_token_id).astype("int64")
-        else:
-            attention_mask = paddle.ones_like(input_ids, dtype="int64")
-        return attention_mask
-
     def prepare_inputs_for_generation(
         self,
         input_ids,
@@ -2571,50 +2244,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
             }
         )
         return model_inputs
-
-    @staticmethod
-    def update_model_kwargs_for_generation(
-        outputs, model_kwargs, is_encoder_decoder=False
-    ):
-        if (
-            isinstance(outputs, tuple)
-            and len(outputs) > 1
-            and not isinstance(outputs[1], paddle.Tensor)
-        ):
-            model_kwargs["past_key_values"] = outputs[1]
-
-        if (
-            isinstance(outputs, CausalLMOutputWithCrossAttentions)
-            and "past_key_values" in outputs
-        ):
-            model_kwargs["past_key_values"] = outputs.past_key_values
-
-        if (
-            "token_type_ids" in model_kwargs
-            and model_kwargs["token_type_ids"] is not None
-        ):
-            token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.concat(
-                [token_type_ids, token_type_ids[:, -1:]], axis=-1
-            )
-
-        if not is_encoder_decoder:
-            if "attention_mask" in model_kwargs:
-                attention_mask = model_kwargs["attention_mask"]
-                model_kwargs["attention_mask"] = paddle.concat(
-                    [
-                        attention_mask,
-                        paddle.ones([attention_mask.shape[0], 1], dtype="int64"),
-                    ],
-                    axis=-1,
-                )
-        if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
-            role_ids = model_kwargs["role_ids"]
-            model_kwargs["role_ids"] = paddle.concat(
-                [role_ids, role_ids[:, -1:]], axis=-1
-            )
-
-        return model_kwargs
 
     def forward(
         self,

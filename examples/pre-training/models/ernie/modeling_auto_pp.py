@@ -29,7 +29,7 @@ from paddle.distributed.auto_parallel.pipelining.schedules import (
 from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
 
 from paddle.distributed.fleet.utils import recompute
-
+from paddle.nn.functional.flash_attention import flash_attention
 
 from models.moe.moe_utils_auto import get_mesh
 
@@ -47,15 +47,6 @@ from paddle.distributed import in_auto_parallel_align_mode
 
 
 logger = logging.getLogger(__name__)
-
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-
-    logger.warning(
-        "Use flash attention in scaled-dot-product. Attention mask is deprecated"
-    )
-except (ImportError, ModuleNotFoundError):
-    flash_attention = None
 
 
 __all__ = [
