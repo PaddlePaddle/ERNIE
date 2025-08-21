@@ -25,7 +25,6 @@ from paddle import nn
 import paddle.nn.functional as F
 from paddle.distributed import in_auto_parallel_align_mode
 
-from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 from paddle.distributed import fleet
 
@@ -36,30 +35,9 @@ from models.moe.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
 
 
 from models.moe.moe_utils_auto import get_flatten_mesh, get_mesh, _reshard
-from paddle.incubate.nn.functional import (
-    moe_combine,
-)
-
+from paddle.incubate.nn.functional import moe_combine, moe_gate_dispatch
 
 logger = logging.getLogger(__name__)
-
-try:
-    import moe_ops_auto
-except ImportError:
-    moe_ops_auto = None
-    logger.warning(
-        "`moe_ops_auto` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup_auto.py  install` to install"
-    )
-
-try:
-    import moe_combine_auto
-except ImportError:
-    moe_combine_auto = None
-    logger.warning(
-        "`moe_combine_auto` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup_auto.py  install` to install"
-    )
 
 
 @contextmanager
@@ -70,38 +48,6 @@ def profile(name):
     yield
     if get_timers() is not None:
         get_timers()(name).stop()
-
-
-class GateCombine(PyLayer):
-
-    @staticmethod
-    def forward(ctx, x, combine_weights, scatter_index):
-        ctx.x = x
-        ctx.combine_weights = combine_weights
-        ctx.scatter_index = scatter_index
-        assert moe_combine is not None
-        ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
-        return ret
-
-    @staticmethod
-    def backward(ctx, grad_y, *_):
-        assert moe_combine is not None
-        grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
-            ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
-        )
-
-        grad_combine_weight = grad_combine_weight_helper.sum(-1)
-        return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
-
-
-def combining_fused(x, combine_weights, scatter_index, hard_gate=False):
-
-    if hard_gate:
-        x_gatherd = F.embedding(scatter_index, x)
-        return x_gatherd.squeeze(-2)
-    ret = GateCombine.apply(x, combine_weights, scatter_index)
-    ret.stop_gradient = False
-    return ret
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -480,7 +426,7 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
     if hard_gate:
         x_gatherd = F.embedding(scatter_index, x)
         return x_gatherd.squeeze(-2)
-    ret = paddle.incubate.nn.functional.moe_combine(x, combine_weights, scatter_index)
+    ret = moe_combine(x, combine_weights, scatter_index)
 
     ret.stop_gradient = False
     return ret
@@ -683,9 +629,7 @@ class MOELayerAuto(MOELayer):
                     scatter_index,
                     dispatch_mask,
                     _,
-                ) = paddle.incubate.nn.functional.moe_gate_dispatch(
-                    input, prob, None, k, local_capacity, True
-                )
+                ) = moe_gate_dispatch(input, prob, None, k, local_capacity, True)
                 dispatched_input.stop_gradient = False
                 combine_weights_unnorm.stop_gradient = False
                 dispatch_mask.stop_gradient = True
