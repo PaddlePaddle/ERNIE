@@ -575,9 +575,6 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
 
         if self.use_one_head:
             if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
-                print("pzl: scores_text.unsqueeze(0):", scores_text.unsqueeze(0))
-                print("pzl: lm_weight: ", lm_weight)
-                print("pzl: lm_bias: ", lm_bias)
                 loss, loss_sum = super().forward(
                     (scores_text.unsqueeze(0), lm_weight, lm_bias), labels.unsqueeze(0)
                 )
