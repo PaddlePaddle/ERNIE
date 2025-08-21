@@ -1,3 +1,5 @@
+# !/usr/bin/env python3
+
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,17 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .pretraining_trainer import (
-    PreTrainingArguments,
-    PretrainingTrainer,
-    WeightedDistributedSampler,
-)
-from .pretraining_trainer_auto import AutoPretrainingTrainer, AutoPreTrainingArguments
 
-__all__ = [
-    "PretrainingTrainer",
-    "PreTrainingArguments",
-    "WeightedDistributedSampler",
-    "AutoPretrainingTrainer",
-    "AutoPreTrainingArguments",
-]
+import os
+import logging
+from paddleformers.trainer.trainer_callback import TrainerCallback
+
+logger = logging.getLogger(__name__)
+
+
+class StopperCallback(TrainerCallback):
+
+    def on_substep_end(self, args, state, control, **kwargs):
+        if os.path.exists("/root/stop"):
+            control.should_training_stop = True
