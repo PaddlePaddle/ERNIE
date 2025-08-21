@@ -86,6 +86,49 @@ except ImportError:
 @add_start_docstrings(AutoTrainingArguments.__doc__)
 class AutoPreTrainingArguments(AutoTrainingArguments):
 
+
+    data_filelist: str = field(
+        default=None, metadata={"help": "数据文件列表，与`args.data_dir`互斥"}
+    )
+    data_weights: str = field(default=None, metadata={"help": "数据配比权重"})
+
+    dev_data: str = field(
+        default=None,
+        metadata={"help": "The name of the dataset to use (via the datasets library)."},
+    )
+    base_seq_length: Optional[int] = field(
+        default=4096, metadata={"help": "reeao最小seq_length"}
+    )
+    no_shuffle: Optional[int] = field(default=0, metadata={"help": "不要shuffle数据"})
+    no_part_shuffle: Optional[int] = field(
+        default=0, metadata={"help": "不进行part内数据shuffle"}
+    )
+    data_load_process_num: int = field(
+        default=10,
+        metadata={
+            "help": "是否使用多进程加速原始数据读取,与DataLoader的num_workers意义不同"
+        },
+    )
+    use_train_part_sharding: Optional[int] = field(
+        default=1,
+        metadata={"help": "根据file进行数据切片，只在预训练时候使用。否则会很慢"},
+    )
+    num_consecutive: int = field(
+        default=1,
+        metadata={
+            "help": "H5文件连续采样。为了保证AFS性能，在读取AFS H5文件的时候需要尽量读取一片ID"
+            "，这个参数指定了一次连续读取的`样本`大小"
+        },
+    )
+    pp_need_data_degree: int = field(
+        default=0,
+        metadata={
+            "help": "pipline 并行中的机器也需要 fetch 数据，提升吞吐，搭配 `ErniemmMoEForCausalPipe` 使用"
+        },
+    )
+    pp_need_data: bool = field(default=False, metadata={"help": "向前兼容"})
+
+
     multimodal: bool = field(
         default=False, metadata={"help": "whether training with multimodal"}
     )
@@ -229,8 +272,62 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         metadata={"help": "Control the num of microbatches in one pp step."},
     )
 
+
+    @property
+    def combine_batch(self):
+        return self.max_seq_length // self.base_seq_length
+
+
+    @property
+    def reeao_dataset_rank(self):
+        if not self.pp_need_data_degree:
+            return super().dataset_rank
+        no_need_data_range = list(
+            range(self.pp_need_data_degree - 1, self.pipeline_parallel_degree - 1)
+        )
+        ranks = [
+            i
+            for i in range(self.pipeline_parallel_degree)
+            if i not in no_need_data_range
+        ]
+        if self.pipeline_parallel_rank not in ranks:
+            return None
+        reeao_pp_rank = ranks.index(self.pipeline_parallel_rank)
+
+        assert not (self.sharding_parallel_degree > 1 and self.data_parallel_rank > 1)
+        return (
+            max(self.pp_need_data_degree, 1) * self.sharding_parallel_rank
+            + reeao_pp_rank
+        )
+
+    @property
+    def reeao_dataset_world_size(self):
+        if not self.pp_need_data:
+            return super().dataset_world_size
+        return (
+            max(self.sharding_parallel_degree, 1)
+            * max(self.data_parallel_degree, 1)
+            * max(self.pipeline_parallel_degree, 1)
+        )
+
     @property
     def need_data(self):
+
+        if self.pp_need_data_degree:
+            assert self.pipeline_parallel_degree > 1
+            assert (
+                self.pp_need_data_degree >= 2
+                and self.pp_need_data_degree <= self.pipeline_parallel_degree
+            ), (
+                self.pp_need_data_degree,
+                self.pipeline_parallel_degree,
+            )
+            no_need_data_range = list(
+                range(self.pp_need_data_degree - 1, self.pipeline_parallel_degree - 1)
+            )
+            return self.tensor_parallel_rank == 0 and (
+                self.pipeline_parallel_rank not in no_need_data_range
+            )
         return self.pipeline_parallel_rank == 0 and self.tensor_parallel_rank == 0
 
     @property
@@ -292,7 +389,24 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
                 self.gradient_accumulation_steps
             )
 
-            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
+            if self.pp_need_data and not self.pp_need_data_degree:
+                self.pp_need_data_degree = self.pipeline_parallel_degree
+            if self.pp_need_data_degree:
+                assert (
+                    self.gradient_accumulation_steps % self.pp_need_data_degree == 0
+                ), (
+                    f"gradient_accumulation_steps[{self.gradient_accumulation_steps}] should be divisible by "
+                    f"pp_need_data_degree[{self.pp_need_data_degree}]"
+                )
+                self.gradient_accumulation_steps = (
+                    self.gradient_accumulation_steps // self.pp_need_data_degree
+                )
+                logger.info(
+                    f"pp-need-data hack args.gradient_accumulation_steps to - {self.gradient_accumulation_steps}"
+                )
+            self.max_gradient_accumulation_steps = (
+                self.gradient_accumulation_steps
+            )  # hack add new
             logger.info(f"fixing pp configs: {user_defined_strategy.pipeline_configs}")
         else:
             self.per_device_eval_batch_size = self.per_device_train_batch_size

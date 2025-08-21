@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+
+from paddleformers.datasets import MapDataset
+from functools import partial
+from old_data_utils import PretrainTask, merge_fn_group_batch, parse_data_weight
+
+
+
+
 import os
 import time
 import json
@@ -325,10 +334,62 @@ def main():
     logger.info(f"using model={type(model)}, cfg={cfg}")
 
     # data
-    logger.info("loading data...")
-    train_dataset, eval_dataset, test_dataset, data_collator = (
-        create_pretrained_dataset(args)
+    # logger.info("loading data...")
+    # train_dataset, eval_dataset, test_dataset, data_collator = (
+    #     create_pretrained_dataset(args)
+    # )
+
+
+
+    logger.info(f"loading data...")
+    train_file_list, data_weights = parse_data_weight(args.data_weights, args.data_filelist)
+
+    assert args.max_seq_length // args.base_seq_length >= 1 and args.max_seq_length % args.base_seq_length == 0
+    if args.combine_batch > 1:
+        logger.info(f"max seq length is larger than base_seq_length, use combine batch: {args.combine_batch}")
+        assert (
+            args.use_train_part_sharding
+        ), f"not `use_train_part_sharding` is not supported when using `combine_batch`"
+        assert (
+            args.num_consecutive // args.combine_batch >= 1 and args.num_consecutive % args.combine_batch == 0
+        ), "num_consecutive must be a multiple of max_seq_length / base_seq_length"
+        assert args.data_weights, f"no `data_weights` is not supported when using `combine_batch`"
+
+    max_seq_length = args.base_seq_length
+
+    pretrain_task = PretrainTask(train_file_list, tokenizer)
+
+    train_dataset = pretrain_task.train_data(
+        max_seq_length + 1,
+        stride=max_seq_length,
+        rng=random.Random(args.seed),
+        weights=data_weights,
+        evaluate=False,
+        seed=args.seed,
+        num_consecutive=args.num_consecutive,
+        shuffle=not args.no_part_shuffle,
+        combine_batch=args.combine_batch,
+        load_process_num=args.data_load_process_num,
     )
+    train_dataset.load(
+        use_shard=args.use_train_part_sharding,
+        dp_rank=args.reeao_dataset_rank,
+        dp_size=args.reeao_dataset_world_size,
+    ) 
+    train_dataset = MapDataset(train_dataset)
+
+    eval_dataset = None
+
+    data_collator = partial(
+        merge_fn_group_batch,
+        tokenizer,
+        pad_to_max_seqlen=args.max_seq_length,
+        combine_batch=args.combine_batch,
+        image_dtype="uint8",
+    )
+
+
+
 
     callbacks = [GlobalRNGCallback()]
 
