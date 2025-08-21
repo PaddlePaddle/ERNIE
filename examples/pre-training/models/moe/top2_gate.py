@@ -29,6 +29,12 @@ try:
 except ModuleNotFoundError:
     global_training_logs = {}
 
+try:
+    from custom_setup_ops import matmul_bwd
+except ImportError:
+    matmul_bwd = None
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -147,7 +153,7 @@ class FusedGateDetachMatmul(paddle.autograd.PyLayer):
     def backward(ctx, y_grad):
         x, w = ctx.saved_tensor()
         assert ctx.dtype == y_grad.dtype, "dtype not match"
-        x_g, w_g = paddle._C_ops.matmul_grad(
+        x_g, w_g = matmul_bwd(
             cast_if_needed(x, ctx.dtype),
             cast_if_needed(w, ctx.dtype),
             y_grad,

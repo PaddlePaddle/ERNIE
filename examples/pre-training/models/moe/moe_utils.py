@@ -12,17 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .pretraining_trainer import (
-    PreTrainingArguments,
-    PretrainingTrainer,
-    WeightedDistributedSampler,
-)
-from .pretraining_trainer_auto import AutoPretrainingTrainer, AutoPreTrainingArguments
+""" moe utils for allgather dispatcher """
+import paddle.distributed as dist
+from paddle.distributed import fleet
 
-__all__ = [
-    "PretrainingTrainer",
-    "PreTrainingArguments",
-    "WeightedDistributedSampler",
-    "AutoPretrainingTrainer",
-    "AutoPreTrainingArguments",
-]
+
+def get_flatten_mesh(mesh):
+
+    return dist.ProcessMesh(mesh.process_ids)
+
+
+def get_mesh(pp_idx=0):
+
+    mesh = fleet.auto.get_mesh()
+    if "pp" in mesh.dim_names:
+        mesh = mesh.get_mesh_with_dim("pp", pp_idx)
+    return mesh
+
+
+def _reshard(tensor, mesh, placements):
+
+    dst_tensor = dist.auto_parallel.moe_utils._dist_reshape(
+        tensor, tensor.shape, mesh, placements
+    )
+    return dst_tensor
