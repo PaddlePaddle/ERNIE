@@ -29,7 +29,7 @@ def get_version() -> str:
     Returns:
         str: _description_
     """
-    with open(os.path.join("erniekit", "utils", "env.py"), encoding="utf-8") as f:
+    with open(os.path.join("erniekit", "version", "env.py"), encoding="utf-8") as f:
         file_content = f.read()
         pattern = r"{}\W*=\W*\"([^\"]+)\"".format("VERSION")
         (version,) = re.findall(pattern, file_content)
