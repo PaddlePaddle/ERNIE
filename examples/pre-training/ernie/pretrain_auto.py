@@ -21,23 +21,31 @@ from typing import Dict, Any
 import numpy as np
 import paddle
 from omegaconf import ListConfig, DictConfig
-from paddle.distributed.fleet import fleet, monitor_perf as collective_perf
+from paddle.distributed.fleet import fleet, collective_perf
 
 from paddleformers.trainer import PdArgumentParser, get_last_checkpoint
 
 from config import get_config
 from models.ernie import (
-    ErnieConfig,
-    ErnieMoEConfig,
     ErnieForCausalLMAuto,
     ErnieForCausalLMAutoPP,
 )
-from pretrain import create_pretrained_dataset
-from src.callbacks import GlobalRNGCallback
+from models.ernie.configuration_auto import (
+    ErnieConfig,
+    ErnieMoEConfig,
+)
+
+from src.callbacks_auto import GlobalRNGCallback
 from src.tokenizers.tokenization_eb_v2 import ErnieBotTokenizer
 from src.trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
-from src.utils import logger, setup_logger_output_file
-from src.utils.misc import global_training_logs
+from src.utils_auto import logger, setup_logger_output_file
+from src.utils_auto.misc import global_training_logs
+
+
+from paddleformers.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+)
 
 def log_trainer_start():
     if "MAIN_PROCESS_STARTED" not in os.environ:
@@ -46,6 +54,56 @@ def log_trainer_start():
             f"Training Main Process Started. time: {start_time}, pid: {os.getpid()}"
         )
         os.environ["MAIN_PROCESS_STARTED"] = "1"
+
+
+
+def create_pretrained_dataset(args):
+    assert args.input_dir is not None and len(args.input_dir.split()) > 1
+
+    check_data_split(
+        args.split,
+        args.do_train,
+        args.do_eval,
+        args.do_predict,
+    )
+
+    train_val_test_num_samples = [
+        args.per_device_train_batch_size
+        * args.dataset_world_size
+        * args.max_steps
+        * args.gradient_accumulation_steps,
+        args.per_device_eval_batch_size
+        * args.dataset_world_size
+        * args.eval_iters
+        * (args.max_steps // args.eval_steps + 1),
+        args.per_device_eval_batch_size * args.dataset_world_size * args.test_iters,
+    ]
+
+    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
+        data_prefix=args.input_dir.split(),
+        data_impl="mmap",
+        splits_string=args.split,
+        train_val_test_num_samples=train_val_test_num_samples,
+        seq_length=args.max_seq_length + args.multi_token_pred_depth,
+        seed=args.seed,
+        skip_warmup=True,
+        data_cache_path=None,
+    )
+
+    from paddleformers.data import Stack
+
+    def _collate_data(data, stack_fn=Stack()):
+        tokens_ = stack_fn([x["text"] for x in data])
+
+        labels = tokens_[:, 1:]
+        tokens = tokens_[:, :-1]
+
+        return {
+            "input_ids": tokens,
+            "labels": labels,
+        }
+
+    return train_dataset, valid_dataset, test_dataset, _collate_data
 
 
 def format_config_value(v):
@@ -264,7 +322,7 @@ def main():
     setup_logger_output_file(config.model_args.output_dir, args.local_rank)
     setup_device_and_seed(args)
     check_memory_preallocation(args)
-    run_fleet_tests() # liyamei not need？
+    run_fleet_tests()
     set_dtype(args)
     
     # 4. init model
@@ -275,20 +333,11 @@ def main():
     tokenizer = setup_tokenizer(args, cfg)
     
     with paddle.LazyGuard():
-        if args.from_scratch:
-            model = model_class(cfg)
-        else:
-            model = model_class.from_pretrained(args.model_name_or_path, config=cfg)
+        model = model_class(cfg)
     
     logger.info(f"Using model: {type(model)}, config: {model.config}")
     paddle.set_default_dtype("float32")
-    
-    # freeze
-    freeze_config = set(args.freeze_config.split())
-    if "freeze_vision" in freeze_config and hasattr(model, "freeze_vision"):
-        logger.info("Freezing model vision module")
-        model.freeze_vision()
-    
+
     # 5. dataset
     logger.info("Loading datasets...")
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(args)
