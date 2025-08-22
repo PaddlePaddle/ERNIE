@@ -3,14 +3,15 @@ stage: VL-SFT
 
 # model
 model_name_or_path: baidu/ERNIE-4.5-VL-424B-A47B-Paddle/
+multimodal: true
 fuse_linear: true
 fuse_rms_norm: false
 use_flash_attention: 1
 use_moe: true
 fine_tuning: LoRA
 lora_rank: 32
-use_sparse_head_and_loss_fn: true
-use_recompute_loss_fn: true
+use_sparse_head_and_loss_fn: false
+use_recompute_loss_fn: false
 moe_group: "mp"
 moe_use_aux_free_update_coef: 0.0
 moe_aux_loss_lambda: 0.0
@@ -28,7 +29,6 @@ num_samples_each_epoch: 10000000
 modality_ratio: "[1,1]"
 
 # preprocess
-chat_template: "deepseek"
 variable_resolution: 1
 pad_to_max_seqlen: 8192
 render_timestamp: true
