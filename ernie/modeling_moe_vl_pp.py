@@ -892,13 +892,24 @@ class ErnieVLEmbeddingPipe(Ernie4_5_EmbeddingPipe):
                 inputs_embeds = inputs_embeds[0]
             if image_features is not None:  # text sample will pass through vit
                 # mapping_forward
-                image_features = self.resampler_model(
-                    image_features,
-                    image_mask,
-                    token_type_ids_input_ori,
-                    image_type_ids,
-                    grid_thw,
-                )
+                if self.use_full_recompute and self.training:
+                    image_features = recompute(
+                        self.resampler_model,
+                        image_features,
+                        image_mask,
+                        token_type_ids_input_ori,
+                        image_type_ids,
+                        grid_thw,
+                        # offload_indices=[0, 1] if self.offload_resamler else [],
+                    )
+                else:
+                    image_features = self.resampler_model(
+                        image_features,
+                        image_mask,
+                        token_type_ids_input_ori,
+                        image_type_ids,
+                        grid_thw,
+                    )
                 # B, N, C = image_features.shape
                 # image_features = image_features.reshape([B * N, C])
 
@@ -954,15 +965,7 @@ class ErnieVLEmbeddingPipe(Ernie4_5_EmbeddingPipe):
         fake_tensor = paddle.zeros([])
         fake_tensor.stop_gradient = False
 
-        if self.use_full_recompute and self.training:
-            inputs_embeds = recompute(
-                fwd,
-                image_features,
-                fake_tensor,
-                offload_indices=[0, 1] if self.offload_resamler else [],
-            )
-        else:
-            inputs_embeds = fwd(image_features, fake_tensor)
+        inputs_embeds = fwd(image_features, fake_tensor)
 
         # modify video token type to image token type for expert gating
         token_type_ids[token_type_ids == TokenType.video] = TokenType.image

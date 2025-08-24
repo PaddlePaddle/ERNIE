@@ -30,6 +30,10 @@ def initialize_lora_model(
             ".*o_proj.*",
             ".*up_gate_proj.*",
             ".*down_proj.*",
+            ".*spatial_linear.0.*",
+            ".*spatial_linear.2.*",
+            ".*temporal_linear.0.*",
+            ".*temporal_linear.2.*",
         ]
         if model_args.rslora_plus:
             model_args.rslora = True
