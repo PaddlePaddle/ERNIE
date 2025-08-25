@@ -526,9 +526,7 @@ class ExampleToFeature(ProcessorBase):
                 split_token_id = self.sep_token_id
                 min_num = 1
             else:
-                raise NotImplementedError(
-                    f"{self.chat_tempelate} is not supported now."
-                )
+                raise NotImplementedError(f"{self.chat_template} is not supported now.")
 
             split_token_num = sum(truncate_ids == split_token_id)
             if split_token_num < min_num:
