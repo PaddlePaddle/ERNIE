@@ -139,6 +139,14 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
             logger.debug(
                 f'Copy failed: "config.json" not found in {config["base_model_path"]}'
             )
+        src_file = os.path.join(config["base_model_path"], "preprocessor_config.json")
+        dst_file = os.path.join(config["output_path"], "preprocessor_config.json")
+        if os.path.isfile(src_file):
+            shutil.copy2(src_file, dst_file)
+        else:
+            logger.debug(
+                f'Copy failed: "preprocessor_config.json" not found in {config["base_model_path"]}'
+            )
         logger.info(
             f"***** Successfully finished merging LoRA model. Time cost: {time.time() - start} s *****"
         )

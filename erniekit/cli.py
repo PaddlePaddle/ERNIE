@@ -22,7 +22,8 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
-from .utils.env import VERSION
+from .version.env import VERSION
+from .version import commit
 from .utils.process import terminate_process_tree, detect_device, set_ascend_environment
 
 script_dir = Path(__file__).parent.resolve()
@@ -54,14 +55,15 @@ USAGE = (
 
 
 WELCOME = (
-    "-" * 48
+    "-" * 60
     + "\n"
-    + f"| Welcome to ErnieKit, version {VERSION}"
-    + " " * (16 - len(VERSION))
-    + "|\n|"
-    + " " * 46
-    + "|\n"
-    + "-" * 48
+    + "Welcome to ErnieKit"
+    + "\n"
+    + f"version : {VERSION}"
+    + "\n"
+    + f"commit : {commit}"
+    + "\n"
+    + "-" * 60
 )
 
 

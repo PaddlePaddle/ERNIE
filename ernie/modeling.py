@@ -1466,7 +1466,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         """
 
         if self.config.use_sparse_head_and_loss_fn:
-            hidden_states, outlinear_weight, outlinear_bias, _ = prediction_scores
+            hidden_states, outlinear_weight, outlinear_bias = prediction_scores[:3]
 
             if self.config.sequence_parallel:
                 masked_lm_labels, sparse_label_idx = (

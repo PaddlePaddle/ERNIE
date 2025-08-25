@@ -45,6 +45,7 @@ from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
 from ernie.modeling_moe_vl import Ernie4_5_VLMoeForConditionalGeneration
 from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
+from ernie.utils.common_utils import check_refined_recompute
 from ernie.modeling_moe_vl_pp import Ernie4_5_VLMoeForConditionalGenerationPipe
 from ernie.utils.misc import global_training_logs
 from ernie.utils.mm_data_utils import MMSpecialTokensConfig
@@ -152,6 +153,16 @@ def run_vl_sft(
 
         PipelineParallel.timer_printer = lambda _: None
 
+    # checkpoint O1 quantization is open by default.
+    if (
+        not finetuning_args.disable_ckpt_quant
+        and finetuning_args.ckpt_quant_stage == "O0"
+        and not model_args.lora
+    ):
+        finetuning_args.ckpt_quant_stage = "O1"
+    elif finetuning_args.disable_ckpt_quant:
+        finetuning_args.ckpt_quant_stage = "O0"
+
     finetuning_args.resume_from_checkpoint = get_resume_checkpoint_path(finetuning_args)
     if (
         finetuning_args.resume_from_checkpoint is not None
@@ -258,6 +269,59 @@ def run_vl_sft(
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    if (
+        last_checkpoint is not None
+        and model_args.continue_training
+        and not model_args.lora
+    ):
+        model_args.continue_training = False
+        logger.info(
+            f"Checkpoint detected, resuming training at {last_checkpoint}. Set `continue_training` to False."
+        )
+
+    check_refined_recompute(
+        finetuning_args.refined_recompute,
+        finetuning_args.sequence_parallel,
+        lora=model_args.lora,
+    )
+
+    if finetuning_args.weight_quantize_algo is not None:
+        if finetuning_args.weight_quantize_algo == "weight_only_mix":
+            weight_quantize_algo = {
+                "weight_only_int4": [".*mlp.experts.*"],
+                "weight_only_int8": [
+                    ".*self_attn.qkv_proj.*",
+                    ".*self_attn.o_proj.*",
+                    ".*mlp.up_gate_proj.*",
+                    ".*mlp.down_proj.*",
+                ],
+            }
+        else:
+            weight_quantize_algo = finetuning_args.weight_quantize_algo
+        quantization_config = dict(
+            weight_quantize_algo=weight_quantize_algo,
+            ignore_modules=[".*out_linear.*"],
+            apply_hadamard=finetuning_args.apply_hadamard,
+            hadamard_block_size=finetuning_args.hadamard_block_size,
+            quant_input_grad=finetuning_args.quant_input_grad,
+            quant_weight_grad=finetuning_args.quant_weight_grad,
+            apply_online_actscale_step=finetuning_args.apply_online_actscale_step,
+            actscale_moving_rate=finetuning_args.actscale_moving_rate,
+            fp8_format_type=finetuning_args.fp8_format_type,
+        )
+        if finetuning_args.weight_quantize_algo == "fp8linear":
+            quantization_config.update(
+                {
+                    "dense_quant_type": "tensor_wise_fp8",
+                    "moe_quant_type": "tensor_wise_fp8",
+                    "quantization": "mix_quant",
+                }
+            )
+    else:
+        quantization_config = dict(
+            weight_quantize_algo=finetuning_args.weight_quantize_algo
+        )
+
     # Define the metrics of tasks.
     def compute_metrics(p):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
@@ -302,7 +366,8 @@ def run_vl_sft(
         finetuning_args.use_moe = False
 
     cfg = Ernie4_5_VLMoeConfig.from_pretrained(
-        os.path.join(model_args.model_name_or_path)
+        os.path.join(model_args.model_name_or_path),
+        quantization_config=quantization_config,
     )
     cfg.use_cache = False
     cfg.max_sequence_length = data_args.max_seq_len
@@ -363,6 +428,9 @@ def run_vl_sft(
     cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
     cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
     cfg.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
+    cfg.moe_multimodal_dispatch_use_allgather = (
+        model_args.moe_multimodal_dispatch_use_allgather
+    )
     cfg.use_mem_eff_attn = model_args.use_mem_eff_attn
     cfg.use_flash_attn_with_mask = model_args.use_flash_attn_with_mask
     cfg.hidden_dropout_prob = finetuning_args.hidden_dropout_prob
@@ -390,7 +458,10 @@ def run_vl_sft(
                 finetuning_args.pp_need_data
             ), "balanced image preprocess must use with pp_need_data"
 
-        if finetuning_args.from_scratch:
+        if (
+            finetuning_args.from_scratch
+            and finetuning_args.weight_quantize_algo is None
+        ):
             model = Ernie4_5_VLMoeForConditionalGenerationPipe(cfg)
 
         else:
@@ -401,7 +472,10 @@ def run_vl_sft(
         if finetuning_args.pp_need_data_degree:
             model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
     else:
-        if finetuning_args.from_scratch:
+        if (
+            finetuning_args.from_scratch
+            and finetuning_args.weight_quantize_algo is None
+        ):
             model = Ernie4_5_VLMoeForConditionalGeneration(cfg)
         else:
             model = Ernie4_5_VLMoeForConditionalGeneration.from_pretrained(
@@ -607,6 +681,17 @@ def run_vl_sft(
         rng=random.Random(2024),
         combine_batch=1,
     )
+
+    if model_args.lora:
+        from ernie.utils.peft_utils import initialize_lora_model
+
+        model = initialize_lora_model(
+            model=model,
+            training_args=finetuning_args,
+            model_args=model_args,
+            resume_from_checkpoint=last_checkpoint is not None,
+            dtype=dtype,
+        )
 
     callbacks = []
     callbacks += [GlobalRNGCallback()]

@@ -493,7 +493,7 @@ class WeightedDistributedSampler(PaddleNLPDistributedBatchSampler):
     def gen_data_seq_weighted(self, num_examples, data_type=None):
         assert (
             self.load_data_seq is False
-        ), "需要保证所有epoch的data_seq都从文件加载，否则下次删data_seq无法控住随机性"
+        ), "Ensure that the data_seq for all epochs is loaded from the file; otherwise, the randomness cannot be controlled when deleting data_seq next time."
         logger.info(
             f"generating data sequence... #non_consecutive_data_chunks={num_examples},"
             f" num_consecutive={self.num_consecutive}"

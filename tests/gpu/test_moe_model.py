@@ -358,7 +358,7 @@ def test_dpo():
     attach_log_file()
     assert_result(ret_code, err_log)
 
-    base_loss = 0.690705
+    base_loss = 0.690319
     assert_loss(base_loss)
 
 
@@ -396,7 +396,7 @@ def test_dpo_lora():
     attach_log_file()
     assert_result(ret_code, err_log)
 
-    base_loss = 0.692727
+    base_loss = 0.692539
     assert_loss(base_loss)
 
 
@@ -434,7 +434,7 @@ def test_dpo_wint8mix_lora():
     attach_log_file()
     assert_result(ret_code, err_log)
 
-    base_loss = 0.693656
+    base_loss = 0.693491
     assert_loss(base_loss)
 
 

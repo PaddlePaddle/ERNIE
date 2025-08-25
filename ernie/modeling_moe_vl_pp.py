@@ -171,7 +171,7 @@ class ErniePretrainingCriterionPipe(ErniePretrainingCriterion):
     """
 
     def __init__(self, config):
-        if config.use_recompute_loss_fn:
+        if config.use_recompute_loss_fn or config.use_sparse_head_and_loss_fn:
             config = deepcopy(config)
             config.sequence_parallel = False  # Do GatherOp in LMHead
         super().__init__(config)
@@ -185,7 +185,7 @@ class ErniePretrainingCriterionPipe(ErniePretrainingCriterion):
             # audio_labels = None
         else:
             token_type_ids_untouched, labels, audio_labels = labels
-        if self.config.use_recompute_loss_fn:
+        if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
             token_type_ids, logits_text, logits_image, logits_audio, *head_and_bias = (
                 logits
             )
@@ -763,7 +763,7 @@ class ErnieMoELMHeadPipe(Ernie4_5_MoeVLHead):
         )
         token_type_ids = token_type_ids.detach()
         token_type_ids.stop_gradient = True
-        if self.config.use_recompute_loss_fn:
+        if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
             mm_head_weight = self.mm_head.weight if self.mm_head is not None else None
             mm_head_bias = self.mm_head.bias if self.mm_head is not None else None
             return (
@@ -892,13 +892,24 @@ class ErnieVLEmbeddingPipe(Ernie4_5_EmbeddingPipe):
                 inputs_embeds = inputs_embeds[0]
             if image_features is not None:  # text sample will pass through vit
                 # mapping_forward
-                image_features = self.resampler_model(
-                    image_features,
-                    image_mask,
-                    token_type_ids_input_ori,
-                    image_type_ids,
-                    grid_thw,
-                )
+                if self.use_full_recompute and self.training:
+                    image_features = recompute(
+                        self.resampler_model,
+                        image_features,
+                        image_mask,
+                        token_type_ids_input_ori,
+                        image_type_ids,
+                        grid_thw,
+                        # offload_indices=[0, 1] if self.offload_resamler else [],
+                    )
+                else:
+                    image_features = self.resampler_model(
+                        image_features,
+                        image_mask,
+                        token_type_ids_input_ori,
+                        image_type_ids,
+                        grid_thw,
+                    )
                 # B, N, C = image_features.shape
                 # image_features = image_features.reshape([B * N, C])
 
@@ -954,15 +965,7 @@ class ErnieVLEmbeddingPipe(Ernie4_5_EmbeddingPipe):
         fake_tensor = paddle.zeros([])
         fake_tensor.stop_gradient = False
 
-        if self.use_full_recompute and self.training:
-            inputs_embeds = recompute(
-                fwd,
-                image_features,
-                fake_tensor,
-                offload_indices=[0, 1] if self.offload_resamler else [],
-            )
-        else:
-            inputs_embeds = fwd(image_features, fake_tensor)
+        inputs_embeds = fwd(image_features, fake_tensor)
 
         # modify video token type to image token type for expert gating
         token_type_ids[token_type_ids == TokenType.video] = TokenType.image
@@ -1914,7 +1917,6 @@ class Ernie4_5_VLMoeForConditionalGenerationPipe(
     ):
         """add_vision_model"""
         self.vision_model = encoder
-        self._set_modality_param_mapping()
 
     def add_image_preprocess(self, preprocess):
         """add image_preprocess"""
@@ -2000,3 +2002,21 @@ class Ernie4_5_VLMoeForConditionalGenerationPipe(
             logger.info(f"Freezing vision parameter: {name}")
             param.stop_gradient = True
         self.vision_model.config.freeze_vision = True
+
+    # Rewrite state dict
+    def state_dict(self, *args, **kwargs):
+        state_dict = PretrainedModel.state_dict(self, *args, **kwargs)
+
+        if self._modality_param_mapping is None:
+            self._set_modality_param_mapping()
+        if self._single_to_pp_mapping is None:
+            self._set_pipeline_name_mapping()
+        assert (
+            len(self._single_to_pp_mapping) > 0
+        ), "The pipeline stage must have parameters!"
+
+        for k in list(state_dict.keys()):
+            v = state_dict.pop(k)
+            state_dict[self._pp_to_single_mapping[k]] = v
+
+        return state_dict

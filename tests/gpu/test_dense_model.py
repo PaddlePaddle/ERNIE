@@ -351,7 +351,7 @@ def test_dpo_lora():
     attach_log_file()
     assert_result(ret_code, err_log)
 
-    base_loss = 0.694127
+    base_loss = 0.693696
     assert_loss(base_loss)
 
 

@@ -29,7 +29,9 @@ import re
 import sys
 import time
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from types import MethodType
+from typing import Optional
 
 import numpy as np
 import paddle
@@ -37,8 +39,10 @@ import paddle.amp.auto_cast as autocast
 from paddle import framework, nn
 from paddle.base import core
 from paddle.distributed.fleet.utils import mix_precision_utils
+from paddleformers.peft import LoRAModel
 from paddleformers.trainer import (
     Trainer,
+    TrainingArguments,
     speed_metrics,
 )
 from paddleformers.utils.tools import get_env_device
@@ -66,6 +70,7 @@ from paddleformers.trainer.trainer_callback import PrinterCallback
 from paddleformers.trainer.trainer_utils import (
     ShardingOption,
 )
+from paddleformers.trainer.utils import add_start_docstrings
 from paddleformers.transformers.model_utils import _add_variant, unwrap_model
 from paddleformers.utils.log import logger
 
@@ -147,6 +152,519 @@ def distributed_optimizer_maybe_hack(
         return hp_optim
     else:
         return fleet.distributed_optimizer(optimizer)
+
+
+@dataclass
+@add_start_docstrings(TrainingArguments.__doc__)
+class PreTrainingArguments(TrainingArguments):
+    """pretraining arguments"""
+
+    vocab_path: str = field(
+        default=None, metadata={"help": "eb35 streaming data vocab"}
+    )
+    task_need_convert: str = field(default=None, metadata={"help": "glm task id"})
+    multimodal: bool = field(
+        default=False, metadata={"help": "whether training with multimodal"}
+    )
+    model_name_or_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to pretrained model or model identifier from "
+            "https://paddleformers.readthedocs.io/zh/latest/model_zoo/transformers.html"
+        },
+    )
+    vision_model_name_or_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to pretrained model or model identifier from "
+            "https://paddleformers.readthedocs.io/zh/latest/model_zoo/transformers.html"
+        },
+    )
+    prefetch_factor: int = field(
+        default=2,
+        metadata={"help": "global random seed factor."},
+    )
+    eval_iters: int = field(
+        default=-1,
+        metadata={"help": "eval iteration for every evaluation."},
+    )
+    num_consecutive: int = field(
+        default=1,
+        metadata={
+            "help": "H5 file continuous sampling. For performance reason, read one ID at once."
+        },
+    )
+    train_emb_only: int = field(
+        default=0,
+        metadata={"help": "train emb only flag"},
+    )
+    use_train_part_sharding: Optional[int] = field(
+        default=1,
+        metadata={
+            "help": "according to file, cut data into pieces. Only used in pre-training."
+        },
+    )
+    min_lr: float = field(
+        default=0.0,
+        metadata={"help": "minus learning rate"},
+    )
+    use_map_style_data: int = field(
+        default=0,
+        metadata={
+            "help": "use HF dataset map style",
+        },
+    )
+    use_streaming_data: int = field(
+        default=0,
+        metadata={
+            "help": "use streaming data",
+        },
+    )
+    dataset: str = field(
+        default=None,
+        metadata={"help": "The name of the dataset to use (via the datasets library)."},
+    )
+    data_load_process_num: int = field(
+        default=10, metadata={"help": "use multi process to speed up raw data reading"}
+    )
+
+    data_dir: str = field(default=None, metadata={"help": "data path (a dir)"})
+
+    data_filelist: tuple = field(default=None, metadata={"help": "data file list"})
+    data_weights: tuple = field(default=None, metadata={"help": "data weights"})
+
+    dev_data: str = field(
+        default=None,
+        metadata={"help": "The name of the dataset to use (via the datasets library)."},
+    )
+
+    max_seq_length: int = field(
+        default=512,
+        metadata={
+            "help": "The maximum total input sequence length after tokenization. Sequences longer "
+            "than this will be truncated, sequences shorter will be padded."
+        },
+    )
+    preprocessing_num_workers: Optional[int] = field(
+        default=None,
+        metadata={"help": "The number of processes to use for the preprocessing."},
+    )
+    config_name: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Pretrained config name or path if not the same as model_name"
+        },
+    )
+    init_ckpt: Optional[str] = field(
+        default=None,
+        metadata={},
+    )
+    sequence_parallel: Optional[int] = field(
+        default=0,
+        metadata={},
+    )
+
+    config_file: Optional[str] = field(
+        default=None,
+        metadata={"help": "config file (YAML) to update hyper-parameters"},
+    )
+    virtual_pp_degree: Optional[int] = field(
+        default=1,
+        metadata={
+            "help": "vpp",
+        },
+    )
+    from_scratch: Optional[int] = field(
+        default=1, metadata={"help": "if set, ignore init_ckpt"}
+    )
+    no_shuffle: Optional[int] = field(default=0, metadata={"help": "no shuffle data"})
+    no_part_shuffle: Optional[int] = field(
+        default=0, metadata={"help": "no shuffle data within part"}
+    )
+    record_optimizer_stat: Optional[bool] = field(
+        default=False, metadata={"help": "whether record optimizer momentum info"}
+    )
+    skip_optimizer_badcases: Optional[bool] = field(
+        default=False, metadata={"help": "whether skip optimizer badcases"}
+    )
+    same_data: Optional[bool] = field(
+        default=None, metadata={"help": "whether keep the same data with previous run"}
+    )
+    base_seq_length: Optional[int] = field(
+        default=4096, metadata={"help": "reao min seq_length"}
+    )
+    shuffle_consecutive: Optional[bool] = field(
+        default=False,
+        metadata={"help": "shuffle num_consecutive or not"},
+    )
+    global_shuffle_num_examples: Optional[int] = field(
+        default=0,
+        metadata={"help": "max num of shuffling among different parts"},
+    )
+    adaptive_norm_clip: Optional[bool] = field(
+        default=False, metadata={"help": "whether enable AdaptiveNormClip"}
+    )
+    adaptive_norm_clip_ratio: Optional[float] = field(
+        default=1.03, metadata={"help": "AdaptiveNormClip threshold ratio"}
+    )
+    adaptive_norm_force_clear_state: Optional[bool] = field(
+        default=False, metadata={"help": "AdaptiveNormClip force clear state dict"}
+    )
+    adaptive_norm_shard_clip: Optional[bool] = field(
+        default=False, metadata={"help": "AdaptiveNormClip clip on local shards"}
+    )
+    adaptive_norm_enable_record: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "whether enable AdaptiveNormClip statistics history norm value"
+        },
+    )
+    adaptive_norm_start_clip_steps: Optional[int] = field(
+        default=100, metadata={"help": "AdaptiveNormClip starting clip step"}
+    )
+    adaptive_norm_enable_record_clip_history: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether enable AdaptiveNormClip statistics history clip"},
+    )
+    adaptive_norm_verbose: Optional[bool] = field(
+        default=False, metadata={"help": "whether print AdaptiveNormClip clip log"}
+    )
+    use_async_save: Optional[bool] = field(
+        default=False, metadata={"help": "whether enable async save"}
+    )
+    pre_alloc_memory: float = field(
+        default=0.0,
+        metadata={
+            "help": "Pre-allocate one specific-capacity empty tensor "
+            "and release it for avoiding memory fragmentation"
+        },
+    )
+    enable_global_training_logs: bool = field(
+        default=False, metadata={"help": "whether enable global_training_logs"}
+    )
+    use_dummy_dataset: Optional[bool] = field(
+        default=False, metadata={"help": "whether use DummyDataSet, 仅用于Debug"}
+    )
+    reshard_save_then_exit: Optional[bool] = field(
+        default=False, metadata={"help": "whether reshard save then exit"}
+    )
+    moe_group: Optional[str] = field(
+        default="dp", metadata={"help": "moe group, “dp|sharding|mp|dummy”"}
+    )
+    use_moe: Optional[bool] = field(
+        default=False, metadata={"help": "whether enable moe"}
+    )
+    log_global_grad_norm: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "whether print global grad-norm, only valid when `enable_global_training_logs` is True"
+        },
+    )
+    multi_token_pred_depth: Optional[int] = field(
+        default=0,
+        metadata={},
+    )
+    enable_mtp_magic_send: Optional[bool] = field(default=False, metadata={"help": ""})
+
+    lr_scheduler: str = field(
+        default="cosine",
+        metadata={
+            "help": "The scheduler type to use. suppor linear, cosine, constant, constant_with_warmup"
+        },
+    )
+    decay_function: str = field(
+        default="half_life",
+        metadata={
+            "help": "The decay function for WSD LR scheduler. support half_life(default), 1-sqrt"
+        },
+    )
+
+    freeze_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional config for freeze params, we provide some option to config it."
+                "following config is support: freeze_vision,freeze_lm"
+            )
+        },
+    )
+    moe_gate_lr_ratio: float = field(
+        default=None,
+        metadata={
+            "help": ("when using MoE, we need a special way to handle gate/router's LR")
+        },
+    )
+    vit_lr_ratio: float = field(
+        default=None,
+        metadata={"help": ("when use vit, we need a special way to handle vit's LR")},
+    )
+    visual_ld: float = field(
+        default=None,
+        metadata={"help": ("when use vit, we need a special way to handle vit's LR")},
+    )
+    modality_interleave: str = field(default="acc", metadata={"help": "acc"})
+    modality_ratio: tuple = field(
+        default=None,
+        metadata={"help": "ratio of modality tokens to be masked out"},
+    )
+
+    pp_need_data_degree: int = field(
+        default=0,
+        metadata={"help": "pipline need data degree"},
+    )
+    pp_need_data: bool = field(
+        default=False, metadata={"help": "pipline need fetch data"}
+    )
+    balanced_image_preprocess: bool = field(
+        default=False, metadata={"help": "balanced image preprocess"}
+    )
+    remote_vision_model_name_or_path: str = field(
+        default=None,
+        metadata={"help": "remote vision model name or path"},
+    )
+    remote_freeze_expert_model_name_or_path_prefix: str = field(
+        default=None,
+        metadata={"help": "remote export model name or path"},
+    )
+
+    freeze_expert_model_name_or_path: str = field(
+        default=None,
+        metadata={"help": "local export model name or path"},
+    )
+
+    gc_interval: int = field(default=0, metadata={"help": "gc interval"})
+    skip_load_data_seq_cache: bool = field(
+        default=False, metadata={"help": "whether skip load data seq cache"}
+    )
+    vit_second_fwd_batch_size: int = field(
+        default=None, metadata={"help": "vit second forward batch size"}
+    )
+    use_sp_callback: bool = field(
+        default=True, metadata={"help": "whether use SP callback"}
+    )
+    debug_reeao_dataset_world_size: int = field(
+        default=0, metadata={"help": "debug reeao dataset world size"}
+    )
+    moe_use_aux_free_update_coef: float = field(
+        default=1.0e-3,
+        metadata={"help": "moe aux free update coef"},
+    )
+
+    use_fp8: bool = field(
+        default=False,
+        metadata={"help": "whether to use fp8 training"},
+    )
+    fp8_force_clear_state: bool = field(
+        default=False,
+        metadata={"help": "whether to force clear TE FP8 amax state when resume"},
+    )
+    enable_fp8_quantize_analysis: bool = field(
+        default=False,
+        metadata={"help": "whether to enable FP8 quantize analysis"},
+    )
+    disable_pipeline_warmup: bool = field(
+        default=False,
+        metadata={"help": "whether to disable pipeline warmup"},
+    )
+    global_logging_interval: int = field(
+        default=1,
+        metadata={"help": "the logging interval of global_training_logs"},
+    )
+    custom_data_status: str = field(
+        default=None,
+        metadata={"help": "load data status from custom trainer_state.json"},
+    )
+    train_moe_only: int = field(
+        default=None, metadata={"help": "train moe params only"}
+    )
+    use_ortho_loss_callback: bool = field(
+        default=False, metadata={"help": "whether use ortho loss callback"}
+    )
+    use_doc_pack_atten: bool = field(
+        default=False, metadata={"help": "whether enable Doc Pack Atten"}
+    )
+    enable_flash_save_mode: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable Flash Save Mode"},
+    )
+
+    @property
+    def need_data(self):
+        """
+        whether need load data
+        return True
+        """
+        # only mp0、pp0 need data
+        if self.pp_need_data_degree:
+            assert self.pipeline_parallel_degree > 1
+            assert (
+                self.pp_need_data_degree >= 2
+                and self.pp_need_data_degree <= self.pipeline_parallel_degree
+            ), (
+                self.pp_need_data_degree,
+                self.pipeline_parallel_degree,
+            )
+            # shift by 1 to avoid last pp no nee data
+            no_need_data_range = list(
+                range(self.pp_need_data_degree - 1, self.pipeline_parallel_degree - 1)
+            )
+            return self.tensor_parallel_rank == 0 and (
+                self.pipeline_parallel_rank not in no_need_data_range
+            )
+        return self.pipeline_parallel_rank == 0 and self.tensor_parallel_rank == 0
+
+    @property
+    def combine_batch(self):
+        """concat batch size
+
+        Returns:
+            _type_: _description_
+        """
+        return self.max_seq_length // self.base_seq_length
+
+    @property
+    def reeao_dataset_rank(self):
+        """
+        pp /sharding/ dp sum data stream rank
+        """
+        if not self.pp_need_data_degree:
+            return super().dataset_rank
+        no_need_data_range = list(
+            range(self.pp_need_data_degree - 1, self.pipeline_parallel_degree - 1)
+        )
+        ranks = [
+            i
+            for i in range(self.pipeline_parallel_degree)
+            if i not in no_need_data_range
+        ]
+        if self.pipeline_parallel_rank not in ranks:
+            return None
+        reeao_pp_rank = ranks.index(self.pipeline_parallel_rank)
+        return (
+            max(self.sharding_parallel_degree, 1)
+            * max(self.pp_need_data_degree, 1)
+            * self.data_parallel_rank
+            + max(self.pp_need_data_degree, 1) * self.sharding_parallel_rank
+            + reeao_pp_rank
+        )
+
+    @property
+    def reeao_dataset_world_size(self):
+        """
+        pp /sharding/ dp sum data stream worldsize
+        """
+        if not self.pp_need_data_degree:
+            return super().dataset_world_size
+        return (
+            max(self.sharding_parallel_degree, 1)
+            * max(self.pp_need_data_degree, 1)
+            * max(self.data_parallel_degree, 1)
+        )
+
+    def __post_init__(self):
+        super().__post_init__()
+        if in_auto_parallel_align_mode():
+            self.adaptive_norm_clip = False
+            self.adaptive_norm_clip_ratio = 0.0
+            self.no_shuffle = 1
+            self.no_part_shuffle = 1
+
+        self.global_batch_size = (
+            self.per_device_train_batch_size
+            * self.dataset_world_size
+            * self.gradient_accumulation_steps
+        )
+        logger.info(
+            f"reset finetuning arguments global_batch_size to {self.global_batch_size}"
+        )
+
+        self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
+
+        if self.pipeline_parallel_degree > 1:
+            self.per_device_eval_batch_size = (
+                self.per_device_train_batch_size * self.gradient_accumulation_steps
+            )
+            logger.warning(
+                f"eval_batch_size set to {self.per_device_eval_batch_size} in Pipeline Parallel!"
+            )
+            user_defined_strategy = fleet.fleet._user_defined_strategy
+            user_defined_strategy.strategy.pipeline_configs.accumulate_steps = (
+                self.gradient_accumulation_steps
+            )
+            if self.pp_need_data and not self.pp_need_data_degree:
+                self.pp_need_data_degree = self.pipeline_parallel_degree
+            if self.pp_need_data_degree:
+                assert (
+                    self.gradient_accumulation_steps % self.pp_need_data_degree == 0
+                ), (
+                    f"gradient_accumulation_steps[{self.gradient_accumulation_steps}] should be divisible by "
+                    f"pp_need_data_degree[{self.pp_need_data_degree}]"
+                )
+
+                self.gradient_accumulation_steps = (
+                    self.gradient_accumulation_steps // self.pp_need_data_degree
+                )
+                logger.info(
+                    f"pp-need-data hack args.gradient_accumulation_steps to - {self.gradient_accumulation_steps}"
+                )
+            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
+            logger.info(f"fixing pp configs: {user_defined_strategy.pipeline_configs}")
+        else:
+            self.per_device_eval_batch_size = self.per_device_train_batch_size
+            logger.warning(f"eval_batch_size set to {self.per_device_eval_batch_size}")
+
+        if self.sharding_parallel_degree > 1:
+            sharding_parallel_config = (
+                set(self.sharding_parallel_config.split(" "))
+                if self.sharding_parallel_config
+                else set()
+            )
+            sharding_comm_overlap_non_pp = (
+                True
+                if "shardingv1_comm_overlap" in sharding_parallel_config
+                or "sharding_comm_overlap" in sharding_parallel_config
+                else False
+            )
+            if sharding_comm_overlap_non_pp:
+                assert hasattr(fleet.fleet, "_user_defined_strategy")
+                user_defined_strategy = fleet.fleet._user_defined_strategy
+                user_defined_strategy.hybrid_configs[
+                    "sharding_configs"
+                ].accumulate_steps = self.gradient_accumulation_steps
+
+        if hasattr(fleet.fleet, "_user_defined_strategy"):
+            user_defined_strategy = fleet.fleet._user_defined_strategy
+            if (
+                hasattr(user_defined_strategy, "hybrid_configs")
+                and "sharding_configs" in user_defined_strategy.hybrid_configs
+            ):
+                sd_configs = user_defined_strategy.hybrid_configs["sharding_configs"]
+                if sd_configs.comm_overlap:
+                    assert self.global_batch_size % self.dataset_world_size == 0, (
+                        f"global_batch_size[{self.global_batch_size}] should be divisible by "
+                        f"dataset_world_size[{self.dataset_world_size}]"
+                    )
+                    lbs = self.global_batch_size // self.dataset_world_size
+                    assert lbs % self.per_device_train_batch_size == 0, (
+                        f"local_batch_size[{lbs}] should be divisible by "
+                        f"per_device_train_batch_size[{self.per_device_train_batch_size}]"
+                    )
+                    assert (
+                        lbs // self.per_device_train_batch_size
+                        == sd_configs.accumulate_steps
+                    ), (
+                        f"local_batch_size[{lbs}] should be equal to "
+                        f"accumulate_steps[{sd_configs.accumulate_steps}] * "
+                        f"per_device_train_batch_size[{self.per_device_train_batch_size}]"
+                    )
+        if self.vision_model_name_or_path is not None:
+            self.multimodal = True
+        if self.visual_ld and not self.vit_lr_ratio:
+            self.vit_lr_ratio = self.visual_ld
+
+        if ShardingOption.SHARD_GRAD_OP in self.sharding:
+            logger.info("disabling `sp_callback` b/c using sharding stage2")
+            self.use_sp_callback = False
 
 
 class PretrainingTrainer(Trainer):
@@ -417,6 +935,8 @@ class PretrainingTrainer(Trainer):
                 if hasattr(model, "_prepare_pipeline_inputs_func")
                 else None
             )
+            if isinstance(model, LoRAModel):
+                model = model.model
             model = fleet.distributed_model(model)
             if prepare_pipeline_inputs_func is not None:
                 model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func

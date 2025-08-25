@@ -110,7 +110,7 @@ python -m paddle.distributed.launch \
     --lr_scheduler_type "cosine" \
     --min_lr 5e-7 \
     --fuse_rope 1 \
-    --offset_alpha 1.0 \
+    --offset_alpha 0.0 \
     --unified_checkpoint_config "async_save" \
     --lora 1 \
     --lora_rank 32 \

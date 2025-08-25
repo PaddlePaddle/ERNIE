@@ -502,7 +502,7 @@ class DistDataLoader(paddle.io.DataLoader):
 
         if dataset is None:
             dataset = DummyDataset()
-            batch_sampler = DistributedBatchSampler(dataset, 1)
+            batch_sampler = None
             log.info("rank has no data, use Dummpy dataset")
         super().__init__(
             dataset=dataset,

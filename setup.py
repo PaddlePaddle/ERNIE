@@ -19,8 +19,26 @@ Returns:
 """
 import os
 import re
+import io
 
 from setuptools import find_packages, setup
+
+
+def read_requirements_file(filepath):
+    with open(filepath) as fin:
+        requirements = fin.read()
+    return requirements
+
+
+def read(*names, **kwargs):
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *names),
+        encoding=kwargs.get("encoding", "utf8"),
+    ) as fp:
+        return fp.read()
+
+
+REQUIRED_PACKAGES = read_requirements_file("requirements/gpu/requirements.txt")
 
 
 def get_version() -> str:
@@ -29,7 +47,7 @@ def get_version() -> str:
     Returns:
         str: _description_
     """
-    with open(os.path.join("erniekit", "utils", "env.py"), encoding="utf-8") as f:
+    with open(os.path.join("erniekit", "version", "env.py"), encoding="utf-8") as f:
         file_content = f.read()
         pattern = r"{}\W*=\W*\"([^\"]+)\"".format("VERSION")
         (version,) = re.findall(pattern, file_content)
@@ -52,9 +70,20 @@ def main():
     setup(
         name="erniekit",
         version=get_version(),
+        maintainer="PaddlePaddle",
+        maintainer_email="Paddle-better@baidu.com",
+        description="The official repository for ERNIE 4.5 and ERNIEKit - its industrial-grade development toolkit based on PaddlePaddle.",
+        long_description=read("README.md"),
+        long_description_content_type="text/markdown",
+        url="https://github.com/PaddlePaddle/ERNIE",
         license="Apache 2.0 License",
-        packages=find_packages(include=["erniekit*"]),
+        license_files=("LICENSE",),
+        packages=find_packages(
+            where=".",
+            exclude=("tests*", "examples*", "cookbook*"),
+        ),
         include_package_data=True,
+        install_requires=REQUIRED_PACKAGES,
         entry_points={"console_scripts": get_console_scripts()},
     )
 
