@@ -28,7 +28,6 @@ num_samples_each_epoch: 10000000
 modality_ratio: "[1,1]"
 
 # preprocess
-chat_template: "deepseek"
 variable_resolution: 1
 pad_to_max_seqlen: 32768
 render_timestamp: true

@@ -574,7 +574,10 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
                     labels = ScatterOp.apply(labels, axis=-1)
 
         if self.use_one_head:
-            if self.config.use_recompute_loss_fn:
+            if (
+                self.config.use_recompute_loss_fn
+                or self.config.use_sparse_head_and_loss_fn
+            ):
                 loss, loss_sum = super().forward(
                     (scores_text.unsqueeze(0), lm_weight, lm_bias), labels.unsqueeze(0)
                 )
@@ -595,7 +598,10 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
         if scores_text is not None:
             labels_text = labels[text_pos_shifted]
             assert labels_text.size > 0, labels
-            if self.config.use_recompute_loss_fn:
+            if (
+                self.config.use_recompute_loss_fn
+                or self.config.use_sparse_head_and_loss_fn
+            ):
                 assert lm_weight is not None and mm_weight is not None
                 loss, loss_sum = super().forward(
                     (scores_text.unsqueeze(0), lm_weight, lm_bias),
@@ -617,7 +623,10 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             labels_image = paddle.where(
                 labels_image >= 0, labels_image - self.max_text_id, labels_image
             )  # do not move ignored-index
-            if self.config.use_recompute_loss_fn:
+            if (
+                self.config.use_recompute_loss_fn
+                or self.config.use_sparse_head_and_loss_fn
+            ):
                 assert mm_weight is not None and mm_bias is not None
                 loss_image, _ = super().forward(
                     (scores_image.unsqueeze(0), mm_weight, mm_bias),
@@ -718,7 +727,7 @@ def calc_multimodal_logits(
     )
 
     if mm_head_weight is None:
-        if config.use_recompute_loss_fn:
+        if config.use_recompute_loss_fn or config.use_sparse_head_and_loss_fn:
             return last_hidden_state, None, None
         score_text = parallel_matmul_tp(
             last_hidden_state,
@@ -732,7 +741,7 @@ def calc_multimodal_logits(
     text_pos_shifted = token_type_ids_shifted == TokenType.text
 
     if text_pos_shifted.any().item() > 0:
-        if config.use_recompute_loss_fn:
+        if config.use_recompute_loss_fn or config.use_sparse_head_and_loss_fn:
             score_text = last_hidden_state[text_pos_shifted]
         else:
             score_text = parallel_matmul_tp(
@@ -742,7 +751,7 @@ def calc_multimodal_logits(
         score_text = None
 
     if mm_head_weight is not None and image_mask_shifted.any().item() > 0:
-        if config.use_recompute_loss_fn:
+        if config.use_recompute_loss_fn or config.use_sparse_head_and_loss_fn:
             score_image = last_hidden_state[image_mask_shifted]
         else:
             score_image = parallel_matmul_tp(
