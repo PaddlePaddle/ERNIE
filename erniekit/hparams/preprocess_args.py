@@ -48,12 +48,12 @@ class CoarseProcessorArguments(BasePreprocessArguments):
     args for CoarseProcessor
     """
 
-    video_fps: int = field(default=-1, metadata={"help": "fps for sampling frames"})
+    video_fps: int = field(default=2, metadata={"help": "fps for sampling frames"})
     video_min_frames: int = field(
-        default=-1, metadata={"help": "fps for sampling frames with min"}
+        default=16, metadata={"help": "fps for sampling frames with min"}
     )
     video_max_frames: int = field(
-        default=-1, metadata={"help": "fps for sampling frames with max"}
+        default=480, metadata={"help": "fps for sampling frames with max"}
     )
     video_target_frames: int = field(
         default=-1, metadata={"help": "fps for sampling frames with target"}
