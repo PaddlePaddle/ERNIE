@@ -297,10 +297,11 @@ def main():
     ):
         last_checkpoint = get_last_checkpoint(args.output_dir)
         if last_checkpoint is None and len(os.listdir(args.output_dir)) > 0:
-            raise ValueError(
-                f"Output directory ({args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
-            )
+            # raise ValueError(
+            #     f"Output directory ({args.output_dir}) already exists and is not empty. "
+            #     "Use --overwrite_output_dir to overcome."
+            # )
+            pass
         elif last_checkpoint is not None and args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
