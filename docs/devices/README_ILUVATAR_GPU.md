@@ -107,10 +107,10 @@ docker exec -it paddle-ixuca-dev bash
 4. Install paddlepaddle & paddle-iluvatar-gpu
 ```
 # Install PaddlePaddle CPU package
-python -m pip install paddlepaddle==3.1.0a0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+python -m pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
 
 # Install PaddlePaddle iluvatar-gpu plugin package
-python -m pip install paddle-iluvatar-gpu==3.1.0 -i https://www.paddlepaddle.org.cn/packages/stable/ixuca/
+python -m pip install --pre paddle-iluvatar-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/ixuca/
 
 Nightly version link:
 https://www.paddlepaddle.org.cn/packages/nightly/ixuca/
