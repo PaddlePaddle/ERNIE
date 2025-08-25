@@ -1,4 +1,4 @@
-# 
+#
 stage: VL-SFT
 
 # model
@@ -55,8 +55,6 @@ same_data: true
 freeze_config: "freeze_vision"
 trigger_data_prob: 1.0
 from_scratch: 0
-load_sharded_model: true
-save_sharded_model: true
 gc_interval: 100000
 drop_history_with_k: true
 overwrite_output_dir: true
