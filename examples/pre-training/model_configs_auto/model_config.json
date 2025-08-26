@@ -21,7 +21,7 @@
   "use_cache": false,
   "vocab_size": 100352,
   "rope_theta": 10000,
-  "use_recompute": false,
+  "use_recompute": true,
   "use_recompute_attn": false,
   "use_recompute_moe": false,
   "use_recompute_loss_fn": false,
