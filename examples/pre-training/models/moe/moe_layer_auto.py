@@ -14,52 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from typing import Tuple, List, Optional
 import logging
 from contextlib import contextmanager
-from functools import partial
 
 import paddle
 from paddle import nn
 import paddle.nn.functional as F
-from paddle.distributed import in_auto_parallel_align_mode
 
 from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 from paddle.distributed import fleet
-
 import paddle.distributed as dist
 from paddle import Tensor
+from paddle.incubate.nn.functional import moe_combine
+
 from paddleformers.trainer.plugins.timer import get_timers
 from models.moe.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
-
-
 from models.moe.moe_utils_auto import get_flatten_mesh, get_mesh, _reshard
-from paddle.incubate.nn.functional import (
-    moe_combine,
-)
-
 
 logger = logging.getLogger(__name__)
-
-try:
-    import moe_ops_auto
-except ImportError:
-    moe_ops_auto = None
-    logger.warning(
-        "`moe_ops_auto` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup_auto.py  install` to install"
-    )
-
-try:
-    import moe_combine_auto
-except ImportError:
-    moe_combine_auto = None
-    logger.warning(
-        "`moe_combine_auto` not found, run "
-        "`python3  src/ernie_core/ops/moe/setup_auto.py  install` to install"
-    )
 
 
 @contextmanager
@@ -76,36 +50,21 @@ class GateCombine(PyLayer):
 
     @staticmethod
     def forward(ctx, x, combine_weights, scatter_index):
-        ctx.x = x
-        ctx.combine_weights = combine_weights
-        ctx.scatter_index = scatter_index
-        assert moe_combine is not None
+        ctx.save_for_backward(x, combine_weights, scatter_index)
         ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
         return ret
 
     @staticmethod
     def backward(ctx, grad_y, *_):
-        assert moe_combine is not None
+        x, combine_weights, scatter_index = ctx.saved_tensor()
         grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
-            ctx.x, ctx.combine_weights, ctx.scatter_index, grad_y
+            x, combine_weights, scatter_index, grad_y
         )
-
         grad_combine_weight = grad_combine_weight_helper.sum(-1)
         return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
 
 
-def combining_fused(x, combine_weights, scatter_index, hard_gate=False):
-
-    if hard_gate:
-        x_gatherd = F.embedding(scatter_index, x)
-        return x_gatherd.squeeze(-2)
-    ret = GateCombine.apply(x, combine_weights, scatter_index)
-    ret.stop_gradient = False
-    return ret
-
-
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
-
     output = None
     orig_dtype = x.dtype
     scatter_index = scatter_index.unbind(1)
@@ -115,27 +74,19 @@ def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
             [num_experts * capacity, x.shape[-1]], dtype="float32"
         )
         updates = x * i_dispatch_mask.unsqueeze(-1).cast(x.dtype)
-        if output is None:
-            output = paddle.scatter(
-                init_output,
-                i_scatter_index,
-                updates,
-                overwrite=False,
-            )
-        else:
-            output = output + paddle.scatter(
-                init_output,
-                i_scatter_index,
-                updates,
-                overwrite=False,
-            )
-        if output.dtype != orig_dtype:
-            output = output.cast(orig_dtype)
+
+        cur_out = paddle.scatter(
+            init_output,
+            i_scatter_index,
+            updates,
+            overwrite=False,
+        )
+        output = cur_out if output is None else cur_out + output
+        output = output.cast(orig_dtype) if output.dtype != orig_dtype else output
     return output
 
 
 def combining(x, combine_weights, scatter_index):
-
     dim = x.shape[-1]
     scatter_index = scatter_index.reshape([-1])
     num_k = combine_weights.shape[-1]
@@ -145,39 +96,20 @@ def combining(x, combine_weights, scatter_index):
 
 
 class MOELayer(nn.Layer):
-
     def __init__(
         self,
         gate: nn.Layer,
         experts: List[nn.Layer],
-        layer_idx,
+        layer_idx: int,
         shared_experts: Optional[List[nn.Layer]] = None,
         group: Group = None,
-        recompute=False,
-        k=2,
-        enable_bpr: bool = False,
-        all_to_all_dropout=0,
-        group_experts=False,
+        recompute: bool = False,
+        k: int = 2,
+        all_to_all_dropout: float = 0,
+        group_experts: bool = False,
         moe_statics=None,
     ):
 
-        super().__init__()
-        self.gate = gate
-        self.layer_idx = layer_idx
-        self.recompute = recompute
-        logger.info(f"using moe recompute={recompute}")
-        for p in self.gate.parameters():
-            p.is_gate = True
-        if isinstance(experts, nn.LayerList):
-            self.experts = experts
-        else:
-            logger.info(f"using fused experts, type={type(experts)}")
-            self.experts = experts
-        self.shared_experts = shared_experts
-
-        self.group = group
-        self.k = k
-        self.all_to_all_dropout = all_to_all_dropout
         self.use_correction_bias = moe_statics is not None
         self.moe_statics = moe_statics
         if self.use_correction_bias:
@@ -245,29 +177,99 @@ class MOELayer(nn.Layer):
         self.config = self.gate.config
         self.zero = paddle.to_tensor(0, dtype=paddle.float32)
 
-        self._rr_moe_gate_dispatch = None
-        self._rr_moe_combine = None
-        self.use_norm_gate_recompute = None
 
-        if self.config.use_recompute and self.config.skip_recompute_ops.get(
-            "moe_gate_dispatch", False
-        ):
-            self._rr_moe_gate_dispatch = None
-        if self.config.use_recompute and self.config.skip_recompute_ops.get(
-            "moe_combine", False
-        ):
-            self._rr_moe_combine = None
-        if hasattr(fleet.fleet, "_hcg"):
-            hcg = fleet.get_hybrid_communicate_group()
-            if (
-                hasattr(hcg, "get_moe_sharding_parallel_world_size")
-                and hcg.get_moe_sharding_parallel_world_size() > 0
-            ):
-                moe_grad_group = hcg.get_moe_sharding_parallel_group()
-                for p in self.experts.parameters():
-                    setattr(
-                        p, "color", {"color": "moe_expert", "group": moe_grad_group}
-                    )
+def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
+    """
+    Args:
+        x: Tensor[seq, dim]
+        combine_weights: [s, k]
+        scatter_index:  ** [k, s] **
+
+    Returns:
+        y: Tensor[s, dim]
+    """
+    if hard_gate:
+        x_gatherd = F.embedding(scatter_index, x)
+        return x_gatherd.squeeze(-2)
+    ret = paddle.incubate.nn.functional.moe_combine(x, combine_weights, scatter_index)
+
+    ret.stop_gradient = False
+    return ret
+
+
+class MOELayerAuto(MOELayer):
+
+    def __init__(
+        self,
+        gate: nn.Layer,
+        experts: List[nn.Layer],
+        layer_idx,
+        shared_experts: Optional[List[nn.Layer]] = None,
+        group: Group = None,
+        recompute=False,
+        k=2,
+        all_to_all_dropout=0,
+        group_experts=False,
+        config=None,
+        ipp=0,
+    ):
+        nn.Layer.__init__(self)
+        self.config = config
+        self.gate = gate
+        self.layer_idx = layer_idx
+        self.ipp = ipp
+        self.recompute = recompute
+        logger.info(f"using moe recompute={recompute}")
+        for p in self.gate.parameters():
+            p.is_gate = True
+        if isinstance(experts, nn.LayerList):
+            self.experts = experts
+        else:
+            logger.info(f"using fused experts, type={type(experts)}")
+            self.experts = experts
+        self.shared_experts = shared_experts
+
+        self.group = group
+        self.k = k
+        self.all_to_all_dropout = all_to_all_dropout
+        is_mp_moe = (
+            hasattr(fleet.fleet, "_hcg")
+            and group is fleet.get_hybrid_communicate_group().get_model_parallel_group()
+        )
+        is_dummy_moe = config.moe_world_size == 1
+
+        for p in experts.parameters():
+            p.expert = not (is_mp_moe or is_dummy_moe)
+            p.no_sync = not (is_mp_moe or is_dummy_moe)
+            logger.info(f"expert no-sync={p.no_sync}-{p.name}")
+            if is_mp_moe or is_mp_moe:
+                p.is_distributed = True
+
+        self.world_size = config.moe_world_size
+        if self.group in fleet.auto.get_mesh().dim_names:
+            self.rank = fleet.auto.get_mesh().get_rank_by_dim_and_process_id(
+                self.group, dist.get_rank()
+            )
+            if self.rank < 0:
+                self.rank = 0
+        else:
+            self.rank = 0
+
+        self.num_experts_per_group = len(self.experts)
+        self.ep_group_num = config.moe_world_size
+        self.num_local_experts = self.num_experts_per_group // self.ep_group_num
+
+        self.moe_mesh_dim = 0 if config.moe_group == "dp" else 1
+        self.dispatch_by_task = (
+            hasattr(self.gate, "dispatch_by_task") and self.gate.dispatch_by_task
+        )
+
+        if self.dispatch_by_task:
+            assert 0, "no supported, checkout earylier code"
+            assert self.num_local_experts == 1
+
+        self.input_preprocess = self.output_postprocess = None
+        self.group_experts = group_experts
 
     def fused_gate_logits_process(
         self, gate_logits, token_type_ids, offload_helper=None
@@ -457,137 +459,6 @@ class MOELayer(nn.Layer):
                 )
 
         return router_loss
-
-    def forward(
-        self,
-        input: Tensor,
-        token_type_ids=None,
-    ):
-        # This function will not be called in automatic parallelism.
-        pass
-
-
-def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
-    """
-    Args:
-        x: Tensor[seq, dim]
-        combine_weights: [s, k]
-        scatter_index:  ** [k, s] **
-
-    Returns:
-        y: Tensor[s, dim]
-    """
-    if hard_gate:
-        x_gatherd = F.embedding(scatter_index, x)
-        return x_gatherd.squeeze(-2)
-    ret = paddle.incubate.nn.functional.moe_combine(x, combine_weights, scatter_index)
-
-    ret.stop_gradient = False
-    return ret
-
-
-def bpr_preprocess(input, logits, capacity, buffer):
-    """impletment bpr sorting"""
-    assert input.ndim == 2, input.shape
-    idx = paddle.argsort(logits.max(-1), axis=0, descending=True)
-    input = input[idx]
-    logits = logits[idx]
-    buffer["idx"] = idx
-    return input, logits
-
-
-def bpr_postprocess(output, buffer):
-    """bpr sorting"""
-    idx = buffer.pop("idx")
-    rev_idx = paddle.argsort(idx)
-    output = output[rev_idx]
-    return output
-
-
-class MOELayerAuto(MOELayer):
-
-    def __init__(
-        self,
-        gate: nn.Layer,
-        experts: List[nn.Layer],
-        layer_idx,
-        shared_experts: Optional[List[nn.Layer]] = None,
-        group: Group = None,
-        recompute=False,
-        k=2,
-        enable_pbr: bool = False,
-        all_to_all_dropout=0,
-        group_experts=False,
-        config=None,
-        ipp=0,
-    ):
-        nn.Layer.__init__(self)
-        self.config = config
-        self.gate = gate
-        self.layer_idx = layer_idx
-        self.ipp = ipp
-        self.recompute = recompute
-        logger.info(f"using moe recompute={recompute}")
-        for p in self.gate.parameters():
-            p.is_gate = True
-        if isinstance(experts, nn.LayerList):
-            self.experts = experts
-        else:
-            logger.info(f"using fused experts, type={type(experts)}")
-            self.experts = experts
-        self.shared_experts = shared_experts
-
-        self.group = group
-        self.k = k
-        self.all_to_all_dropout = all_to_all_dropout
-        is_mp_moe = (
-            hasattr(fleet.fleet, "_hcg")
-            and group is fleet.get_hybrid_communicate_group().get_model_parallel_group()
-        )
-        is_dummy_moe = config.moe_world_size == 1
-
-        for p in experts.parameters():
-            p.expert = not (is_mp_moe or is_dummy_moe)
-            p.no_sync = not (is_mp_moe or is_dummy_moe)
-            logger.info(f"expert no-sync={p.no_sync}-{p.name}")
-            if is_mp_moe or is_mp_moe:
-                p.is_distributed = True
-
-        self.world_size = config.moe_world_size
-        if self.group in fleet.auto.get_mesh().dim_names:
-            self.rank = fleet.auto.get_mesh().get_rank_by_dim_and_process_id(
-                self.group, dist.get_rank()
-            )
-            if self.rank < 0:
-                self.rank = 0
-        else:
-            self.rank = 0
-
-        self.num_experts_per_group = len(self.experts)
-        self.ep_group_num = config.moe_world_size
-        self.num_local_experts = self.num_experts_per_group // self.ep_group_num
-
-        self.moe_mesh_dim = 0 if config.moe_group == "dp" else 1
-        self.dispatch_by_task = (
-            hasattr(self.gate, "dispatch_by_task") and self.gate.dispatch_by_task
-        )
-
-        if self.dispatch_by_task:
-            assert 0, "no supported, checkout earylier code"
-            assert self.num_local_experts == 1
-
-        if enable_pbr:
-            logger.info("using BPR")
-            prepost_process_buffer = {}
-            self.input_preprocess = partial(
-                bpr_preprocess, buffer=prepost_process_buffer
-            )
-            self.output_postprocess = partial(
-                bpr_postprocess, buffer=prepost_process_buffer
-            )
-        else:
-            self.input_preprocess = self.output_postprocess = None
-        self.group_experts = group_experts
 
     def forward_experts(self, dispatched_input):
         """
@@ -868,20 +739,15 @@ class MOELayerAuto(MOELayer):
             expert_out = dist.reshard(
                 expert_out, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(1)]
             )
-        if not in_auto_parallel_align_mode():
-            router_loss2 = self.calc_router_loss_and_logging(
-                router_loss,
-                combine_weights,
-                dispatch_mask,
-                gate_logits,
-                gate_prob,
-                token_type_ids,
-            )
-        else:
-            router_loss2 = router_loss
-            router_loss2 = dist.shard_tensor(
-                router_loss2, get_flatten_mesh(get_mesh(self.ipp)), [dist.Replicate()]
-            )
+        router_loss2 = self.calc_router_loss_and_logging(
+            router_loss,
+            combine_weights,
+            dispatch_mask,
+            gate_logits,
+            gate_prob,
+            token_type_ids,
+        )
+
         combined_output = self.combine_expert_output(
             expert_out, combine_weights, scatter_index
         )
