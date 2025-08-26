@@ -41,6 +41,17 @@ export FLAGS_enable_moe_utils=true
 
 export PYTHONPATH=$PYTHONPATH:./ernie
 
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+export NNODES=1
+export PADDLE_TRAINERS_NUM=1
+unset CUDA_DEVICE_MAX_CONNECTIONS
+
+rm -rf output/
+
 python -m paddle.distributed.launch \
     --log_dir output/paddle_distributed_logs \
     --run_mode=collective \
