@@ -451,20 +451,6 @@ def get_checkpoint(args, output_dir):
     return args.resume_from_checkpoint or last_checkpoint
 
 
-def setup_pipeline_config(args):
-    if "enable_dp_comm_overlap" in args.pipeline_parallel_config:
-        logger.warning(
-            "Pipeline dp_comm_overlap and FusedLinearWithGradAdd cannot be used together."
-        )
-    if "enable_timer" in args.pipeline_parallel_config:
-        PipelineParallel.timer_printer = lambda _: None
-    if args.strategy.pipeline.enable and args.virtual_pp_degree > 1:
-        pipeline = args.strategy.pipeline
-        pipeline.vpp_degree = args.virtual_pp_degree
-        pipeline.vpp_seg_method = args.virtual_pipeline_seg_method
-    return args
-
-
 def main():
     # 1. init config and parse arg
     config = get_config(verbose=True)
@@ -480,7 +466,6 @@ def main():
     (args,) = parser.parse_dict(dict(**model_args, **trainer_args))
 
     # 2. check and update
-    # setup_pipeline_config(config.trainer_args)
     if "enable_dp_comm_overlap" in config.trainer_args.pipeline_parallel_config:
         logger.warning(
             "Pipeline dp_comm_overlap and FusedLinearWithGradAdd cannot be used together."
@@ -507,7 +492,7 @@ def main():
     setup_logger_output_file(config.model_args.output_dir, args.local_rank)
     setup_device_and_seed(args)
     check_memory_preallocation(args)
-    run_fleet_tests()  # liyamei not need？
+    run_fleet_tests()
     set_dtype(args)
 
     # 4. init model
