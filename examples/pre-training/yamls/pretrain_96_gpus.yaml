@@ -58,8 +58,8 @@ trainer_args:
     logging_steps: 1
     eval_steps: 1000
     eval_iters: -1
-    save_steps: 5
-    max_steps: 9
+    save_steps: 3
+    max_steps: 5
     adam_beta1: 0.9
     adam_beta2: 0.95
     adam_epsilon: 1e-8
@@ -87,13 +87,15 @@ trainer_args:
     pre_alloc_memory: 60
     offload_optim: True
 
+    sequence_parallel: 1
+
     pipeline_parallel_degree: 2
-    tensor_parallel_degree: 2
+    tensor_parallel_degree: 4
     virtual_pp_degree: 1
     data_parallel_degree: 1
-    expert_parallel_degree: 2
+    expert_parallel_degree: 1
     sharding: "stage1"
-    sharding_parallel_degree: 2
+    sharding_parallel_degree: 1
     amp_master_grad: 1
     pipeline_parallel_config: enable_delay_scale_loss enable_overlap_p2p_comm best_unbalanced_scheduler
     sharding_parallel_config: split_param
@@ -111,9 +113,10 @@ trainer_args:
     metrics_output_path: ./output/paddle_distributed_logs/
     use_moe: true
     moe_with_send_router_loss: False
-    moe_group: ep
+    moe_group: mp
     log_global_grad_norm: True
     enable_optimizer_timer: False
     gc_interval: 100000
-    using_flex_checkpoint: True
+    using_flex_checkpoint: False
     resume_from_checkpoint: ./output/checkpoint-5
+    
