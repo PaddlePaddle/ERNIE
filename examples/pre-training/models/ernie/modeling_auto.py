@@ -14,7 +14,6 @@
 # limitations under the License.
 """Paddle Ernie model"""
 import math
-import functools
 import logging
 from typing import Optional, Tuple
 import contextlib
@@ -46,7 +45,7 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 
 from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
 
-
+from models.comm_utils import subbatch
 from models.moe.moe_layer_auto import (
     MOELayerAuto,
 )
@@ -63,24 +62,16 @@ from to_block_diag_causal_mask import to_block_diag_causal_mask
 
 @dataclass
 class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
-
     router_loss: Optional[paddle.Tensor] = None
     gate_logits: Optional[Tuple[paddle.Tensor]] = None
 
 
 @dataclass
 class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
-
     router_loss: Optional[paddle.Tensor] = None
 
 
 logger = logging.getLogger(__name__)
-
-
-try:
-    from fast_ln import fast_ln
-except ImportError:
-    fast_ln = None
 
 
 try:
@@ -104,55 +95,7 @@ __all__ = [
 ]
 
 
-def subbatch(f, arg_idx, axis, bs, out_idx, use_recompute=False, same_arg_idx={}):
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-
-        assert len(arg_idx) == len(
-            axis
-        ), "Number of batching args and number of batching dims should match."
-
-        inps = [args[i] for i in arg_idx]
-        axis_width = [inp.shape[d] for inp, d in zip(inps, axis)]
-        assert len(set(axis_width)) == 1, "Batch sizes should be kept equal."
-
-        inp_axis = {inp: d for inp, d in zip(inps, axis)}
-
-        axis_width = axis_width[0]
-        if axis_width < bs:
-            return f(*args, **kwargs)
-
-        outs = []
-        for slice_at in np.arange(0, axis_width, bs):
-            _args = []
-            for i, inp in enumerate(args):
-                if i in same_arg_idx:
-                    assert (
-                        i > same_arg_idx[i]
-                    ), f"expect i > same_arg_idx[i], but got i: {i} and same_arg_idx[i]: {same_arg_idx[i]}"
-                    _args.append(_args[same_arg_idx[i]])
-                elif i in arg_idx:
-                    inp = inp.slice(
-                        [inp_axis[inp]],
-                        [slice_at],
-                        [min(inp.shape[inp_axis[inp]], slice_at + bs)],
-                    )
-                    _args.append(inp)
-                else:
-                    _args.append(inp)
-            if use_recompute:
-                out = paddle.distributed.fleet.utils.recompute(f, *_args, **kwargs)
-            else:
-                out = f(*_args, **kwargs)
-            outs.append(out)
-
-        return paddle.concat(outs, out_idx)
-
-    return wrapper
-
-
 class FusedDropoutImpl(nn.Layer):
-
     def __init__(self, prob, mode):
         super().__init__()
         self.prob = prob
@@ -168,14 +111,9 @@ class FusedDropoutImpl(nn.Layer):
         return output
 
 
-def is_pp_enable():
-    mesh = fleet.auto.get_mesh()
-    return "pp" in mesh.dim_names
-
-
 def global_mesh_starts_with_pp():
     mesh = fleet.auto.get_mesh()
-    if is_pp_enable():
+    if "pp" in mesh.dim_names:
         return mesh.get_mesh_with_dim("pp")
     else:
         return mesh
@@ -193,28 +131,6 @@ def get_triangle_upper_mask(x, mask=None):
     return mask
 
 
-def parallel_matmul(
-    x,
-    y,
-    bias=None,
-    transpose_y=False,
-    tensor_parallel_degree=1,
-    tensor_parallel_output=True,
-):
-
-    if transpose_y:
-        logits = paddle.matmul(x, y, transpose_y=True)
-        if bias is not None:
-            logits += bias
-    else:
-        logits = F.linear(x, y, bias)
-
-    if tensor_parallel_degree > 1 and not tensor_parallel_output:
-        logits = dist.reshard(logits, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
-
-    return logits
-
-
 def calc_lm_head_logits(
     config,
     hidden_states,
@@ -225,7 +141,6 @@ def calc_lm_head_logits(
 ):
     """the core function to calc lm head"""
     if config.sequence_parallel:
-
         assert (
             not config.use_sparse_head_and_loss_fn
         ), "use_sparse_head_and_loss_fn is not supported now."
@@ -260,39 +175,20 @@ def calc_lm_head_logits(
             )
     if tensor_parallel_output is None:
         tensor_parallel_output = config.tensor_parallel_output
-    logits = parallel_matmul(
-        hidden_states,
-        weight,
-        bias=bias,
-        transpose_y=config.tie_word_embeddings,
-        tensor_parallel_degree=config.tensor_parallel_degree,
-        tensor_parallel_output=tensor_parallel_output,
+
+    logits = paddle.matmul(
+        hidden_states, weight, transpose_y=config.tie_word_embeddings
     )
+    if bias is not None:
+        logits += bias
+
+    if config.tensor_parallel_degree > 1 and not tensor_parallel_output:
+        logits = dist.reshard(logits, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
 
     return logits
 
 
-def finfo(dtype: paddle.dtype = None):
-
-    if dtype is None:
-        dtype = paddle.get_default_dtype()
-
-    if dtype == paddle.bfloat16:
-
-        class BFloatFInfo:
-            min = -3.3895313892515355e38
-
-        return BFloatFInfo
-    if dtype == paddle.float32:
-        return np.finfo(np.float32)
-    if dtype == paddle.float16:
-        return np.finfo(np.float16)
-    if dtype == paddle.float64:
-        return np.finfo(np.float64)
-
-
 def masked_fill(x, mask, value):
-
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
 
@@ -300,7 +196,6 @@ def masked_fill(x, mask, value):
 def mem_eff_attn(
     query, key, value, pack_offset, drop_prob=0.0, dtype=paddle.bfloat16, training=True
 ):
-
     pack_offset = pack_offset.numpy()
     shape = pack_offset.shape
     assert len(shape) == 2, len(shape)
@@ -351,7 +246,6 @@ def scaled_dot_product_attention(
     inbatch_pack_offset=None,
     training=True,
 ):
-
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, num_key_value_heads, _ = value_states.shape
 
@@ -416,7 +310,6 @@ def scaled_dot_product_attention(
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return attn_output, None
     else:
-
         query_states = paddle.transpose(query_states, [0, 2, 1, 3]) / math.sqrt(
             head_dim
         )
@@ -444,7 +337,8 @@ def scaled_dot_product_attention(
             attn_weights = paddle.maximum(
                 attn_weights,
                 paddle.to_tensor(
-                    float(finfo(query_states.dtype).min), dtype=query_states.dtype
+                    float(paddle.finfo(query_states.dtype).min),
+                    dtype=query_states.dtype,
                 ),
             )
 
@@ -491,7 +385,7 @@ def scaled_dot_product_attention(
 def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     batch_size, target_length = input_ids_shape
 
-    mask = paddle.full((target_length, target_length), float(finfo(dtype).min))
+    mask = paddle.full((target_length, target_length), float(paddle.finfo(dtype).min))
 
     mask_cond = paddle.arange(mask.shape[-1])
     mask = masked_fill(
@@ -523,22 +417,8 @@ def _expand_mask(mask, dtype, tgt_length):
 
     inverted_mask = 1.0 - expanded_mask
     return masked_fill(
-        inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min)
+        inverted_mask, inverted_mask.cast("bool"), float(paddle.finfo(dtype).min)
     )
-
-
-def slice_experts(experts, moe_world_size):
-    moe_num_experts_per_device = len(experts) // moe_world_size
-    experts_per_device = [[] for _ in range(moe_world_size)]
-
-    for i, expert in enumerate(experts):
-        ep_group_id = i // moe_num_experts_per_device
-        experts_per_device[ep_group_id].append(expert)
-
-    lm_experts = nn.LayerList([])
-    for experts_list in experts_per_device:
-        lm_experts.extend(experts_list[: moe_num_experts_per_device // 2])
-    return lm_experts
 
 
 def get_gate(
@@ -547,7 +427,6 @@ def get_gate(
     layer_idx: int,
     ipp: int = 0,
 ) -> Tuple[nn.Layer, nn.LayerList]:
-
     moe_num_experts = config.moe_num_experts
     assert (
         moe_num_experts >= config.moe_world_size
@@ -606,20 +485,7 @@ def get_gate(
     return gate, experts, lm_gate, lm_experts
 
 
-def _parse_moe_group(moe_group: str):
-    moe_group = moe_group.lower()
-    assert moe_group in {
-        "dp",
-        "mp",
-        "none",
-    }, f"moe-group not supported, got: {moe_group}"
-    logger.info(f"using moe-group: {moe_group}")
-
-    return moe_group
-
-
 class RMSNorm(nn.Layer):
-
     def __init__(self, config, ipp=0):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -632,7 +498,6 @@ class RMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-
         if self.config.fuse_rms_norm:
             return paddle.incubate.nn.functional.fused_rms_norm_ext(
                 hidden_states, self.weight, self.variance_epsilon
@@ -658,10 +523,7 @@ class LayerNorm(nn.LayerNorm):
 
     def __init__(self, config, ipp=0):
         super().__init__(config.hidden_size, epsilon=config.rms_norm_eps)
-
         self.use_fast_ln = config.use_fast_ln
-        if self.use_fast_ln:
-            assert fast_ln is not None
         self.ipp = ipp
         if config.pipeline_parallel_degree > 1:
             self.weight = dist.shard_tensor(
@@ -671,17 +533,10 @@ class LayerNorm(nn.LayerNorm):
                 self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
             )
 
-    def forward(self, hidden_states):
-        if self.use_fast_ln:
-            return fast_ln(hidden_states, self.weight, self.bias, self._epsilon)[0]
-        else:
-            return super().forward(hidden_states)
-
 
 class RotaryEmbedding(nn.Layer):
 
     def __init__(self, dim, max_position_embeddings=4096, base=10000):
-
         super().__init__()
         self.base = base
         self.max_position_embeddings = max_position_embeddings
@@ -700,7 +555,6 @@ class RotaryEmbedding(nn.Layer):
         self._cast_to_low_precison = False
 
     def forward(self, x, seq_len=None):
-
         return (
             self.cos_cached[:seq_len, :],
             self.sin_cached[:seq_len, :],
@@ -708,7 +562,6 @@ class RotaryEmbedding(nn.Layer):
 
     @classmethod
     def rotate_half(cls, x):
-
         x1 = x[..., : x.shape[-1] // 2]
         x2 = x[..., x.shape[-1] // 2 :]
         return paddle.concat([-x2, x1], axis=-1)
@@ -736,8 +589,7 @@ class RotaryEmbedding(nn.Layer):
         return q_embed, k_embed
 
 
-class RopeEmbeddingLegacy(nn.Layer):
-
+class RopeEmbedding(nn.Layer):
     def __init__(self, head_dim, compression_ratio=1.0, base=10000):
         super().__init__()
         self.head_dim = head_dim
@@ -745,7 +597,6 @@ class RopeEmbeddingLegacy(nn.Layer):
         self.base = base
 
     def forward(self, seq_length, position_ids=None):
-
         indices = paddle.arange(0, self.head_dim, 2, dtype="float32")
         indices = 1 / self.base ** (indices / self.head_dim)
         if position_ids is None:
@@ -766,7 +617,6 @@ class RopeEmbeddingLegacy(nn.Layer):
         return pos_emb
 
     def apply_rotary(self, rp, q, k):
-
         sin, cos = paddle.chunk(rp, 2, axis=-1)
         sin_pos = paddle.reshape(paddle.stack([sin, sin], axis=-1), rp.shape)
         cos_pos = paddle.reshape(paddle.stack([cos, cos], axis=-1), rp.shape)
@@ -789,7 +639,6 @@ class RopeEmbeddingLegacy(nn.Layer):
         return query, key
 
     def forward_single(self, position_ids):
-
         batch_size, seq_length = position_ids.shape[:2]
         rope_emb = paddle.zeros(
             (2, batch_size, seq_length, 1, self.head_dim), dtype="float32"
@@ -811,7 +660,6 @@ class RopeEmbeddingLegacy(nn.Layer):
 
     @staticmethod
     def apply_rotary_single(x, rope_emb):
-
         rotate_half_x = paddle.reshape(
             paddle.stack([-x[:, :, :, 1::2], x[:, :, :, 0::2]], axis=-1),
             paddle.shape(x),
@@ -819,51 +667,7 @@ class RopeEmbeddingLegacy(nn.Layer):
         return x * rope_emb[0] + rotate_half_x * rope_emb[1]
 
 
-class ErnieLinear(nn.Layer):
-
-    def __init__(
-        self,
-        in_features,
-        out_features,
-        weight_attr=None,
-        bias_attr=None,
-        name=None,
-        ipp=0,
-    ):
-        super(ErnieLinear, self).__init__()
-        self._dtype = self._helper.get_default_dtype()
-        self._weight_attr = weight_attr
-        self._bias_attr = bias_attr
-        self.weight = self.create_parameter(
-            shape=[in_features, out_features],
-            attr=self._weight_attr,
-            dtype=self._dtype,
-            is_bias=False,
-        )
-        self.bias = self.create_parameter(
-            shape=[out_features],
-            attr=self._bias_attr,
-            dtype=self._dtype,
-            is_bias=True,
-        )
-        self.name = name
-        self.ipp = ipp
-
-    def forward(self, input):
-
-        out = F.linear(x=input, weight=self.weight, bias=None, name=self.name)
-        out = dist.reshard(
-            out,
-            get_mesh(self.ipp),
-            [dist.Shard(1), dist.Shard(0)],
-        )
-        if self.bias:
-            out += self.bias
-        return out
-
-
 class ErnieMLP(nn.Layer):
-
     def __init__(self, config, ipp=None, do_shard_tensor=True):
         super().__init__()
         self.config = config
@@ -871,25 +675,15 @@ class ErnieMLP(nn.Layer):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
 
-        LinearFN = nn.Linear
-        self.gate_proj = LinearFN(
+        self.gate_proj = nn.Linear(
             self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
         )
-        self.up_proj = LinearFN(
+        self.up_proj = nn.Linear(
             self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
         )
-
-        if config.sequence_parallel:
-            self.down_proj = ErnieLinear(
-                self.intermediate_size,
-                self.hidden_size,
-                bias_attr=config.use_bias,
-                ipp=self.ipp,
-            )
-        else:
-            self.down_proj = LinearFN(
-                self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
-            )
+        self.down_proj = nn.Linear(
+            self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
+        )
 
         if do_shard_tensor and (
             self.config.tensor_parallel_degree > 1
@@ -933,16 +727,18 @@ class ErnieMLP(nn.Layer):
             assert fused_swiglu is not None, "fused_swiglu operator is not found."
 
     def forward(self, x):
-
         if self.fuse_swiglu:
             x = fused_swiglu(self.gate_proj(x), self.up_proj(x))
         else:
             x = F.silu(self.gate_proj(x)) * self.up_proj(x)
-        return self.down_proj(x)
+
+        out = self.down_proj(x)
+        if self.config.sequence_parallel:
+            out = dist.reshard(out, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)])
+        return out
 
 
 class ErnieAttentionAuto(nn.Layer):
-
     def __init__(self, config, ipp: Optional[int] = None):
         super().__init__()
         self.ipp = ipp
@@ -970,36 +766,26 @@ class ErnieAttentionAuto(nn.Layer):
                 self.hidden_size // self.num_heads * self.num_key_value_heads
             )
 
-        LinearFN = nn.Linear
-        self.q_proj = LinearFN(
+        self.q_proj = nn.Linear(
             self.hidden_size,
             self.hidden_size,
             bias_attr=config.use_bias,
         )
-        self.k_proj = LinearFN(
+        self.k_proj = nn.Linear(
             self.hidden_size,
             self.hidden_size if not self.is_gqa else kv_hidden_size,
             bias_attr=config.use_bias,
         )
-        self.v_proj = LinearFN(
+        self.v_proj = nn.Linear(
             self.hidden_size,
             self.hidden_size if not self.is_gqa else kv_hidden_size,
             bias_attr=config.use_bias,
         )
-
-        if config.sequence_parallel:
-            self.o_proj = ErnieLinear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=config.use_bias,
-                ipp=self.ipp,
-            )
-        else:
-            self.o_proj = LinearFN(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=config.use_bias,
-            )
+        self.o_proj = nn.Linear(
+            self.hidden_size,
+            self.hidden_size,
+            bias_attr=config.use_bias,
+        )
         if config.rope_reorder:
             self.rotary_emb = RotaryEmbedding(
                 self.head_dim,
@@ -1007,7 +793,7 @@ class ErnieAttentionAuto(nn.Layer):
                 base=config.rope_theta,
             )
         else:
-            self.rotary_emb = RopeEmbeddingLegacy(
+            self.rotary_emb = RopeEmbedding(
                 self.head_dim,
                 compression_ratio=config.compression_ratio,
                 base=config.rope_theta,
@@ -1128,9 +914,12 @@ class ErnieAttentionAuto(nn.Layer):
             )
 
         if self.config.sequence_parallel:
-            attn_output = paddle.transpose(attn_output, [1, 0, 2])
-
-        attn_output = self.o_proj(attn_output)
+            attn_output = self.o_proj(paddle.transpose(attn_output, [1, 0, 2]))
+            attn_output = dist.reshard(
+                attn_output, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)]
+            )
+        else:
+            attn_output = self.o_proj(attn_output)
 
         if not output_attentions:
             attn_weights = None
@@ -1260,7 +1049,6 @@ class ErnieMoeMLP(ErnieMLP):
             )
 
     def forward(self, x):
-
         if self.fuse_swiglu:
             x = fused_swiglu(self.gate_proj(x), self.up_proj(x))
         else:
@@ -1273,7 +1061,6 @@ class ErnieMoeMLP(ErnieMLP):
 
 
 class BMMLinear(nn.Layer):
-
     def __init__(self, experts, d_in, d_out, use_bias=False):
         super().__init__()
         self.weight = self.create_parameter(
@@ -1294,9 +1081,7 @@ class BMMLinear(nn.Layer):
 
 
 class ErnieMoeMLPFused(nn.Layer):
-
     def __init__(self, config):
-
         assert (
             hasattr(config, "disable_ffn_model_parallel")
             or config.tensor_parallel_degree == 1
@@ -1538,7 +1323,6 @@ class ErnieDecoderLayerAuto(nn.Layer):
             self.mlp,
             (MOELayerAuto),
         ):
-
             hidden_states, _, router_loss, gate_logits = self.mlp(
                 hidden_states, token_type_ids
             )
@@ -1695,7 +1479,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 )
                 config.disable_ffn_model_parallel = True
 
-            config.moe_group = _parse_moe_group(config.moe_group)
             if config.moe_group in fleet.auto.get_mesh().dim_names:
                 config.moe_world_size = fleet.auto.get_mesh().get_dim_size(
                     config.moe_group
@@ -1785,7 +1568,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             )
         combined_attention_mask = paddle.maximum(
             combined_attention_mask.astype(dtype),
-            paddle.to_tensor(float(finfo(dtype).min), dtype=dtype),
+            paddle.to_tensor(float(paddle.finfo(dtype).min), dtype=dtype),
         )
         return combined_attention_mask
 
@@ -2081,7 +1864,6 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         return masked_lm_loss
 
     def forward_impl(self, prediction_scores, masked_lm_labels):
-
         with paddle.amp.auto_cast(False):
             if self.config.use_sparse_head_and_loss_fn and prediction_scores.shape[
                 0
@@ -2194,7 +1976,6 @@ class ErnieLMHead(nn.Layer):
             )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-
         if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
             out_tensors = (
                 (hidden_states, self.weight, self.bias)
@@ -2352,11 +2133,9 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                     scale_by_factor_if_valid(left.mlp.down_proj.weight)
 
     def get_input_embeddings(self):
-
         return self.ernie.embed_tokens
 
     def set_input_embeddings(self, value):
-
         self.ernie.embed_tokens = value
 
     def get_output_embeddings(self):

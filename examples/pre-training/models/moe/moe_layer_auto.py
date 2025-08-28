@@ -22,12 +22,11 @@ import paddle
 from paddle import nn
 import paddle.nn.functional as F
 
-from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 from paddle.distributed import fleet
 import paddle.distributed as dist
 from paddle import Tensor
-from paddle.incubate.nn.functional import moe_combine
+from paddle.incubate.nn.functional import moe_combine, moe_gate_dispatch
 
 from paddleformers.trainer.plugins.timer import get_timers
 from models.moe.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
@@ -44,24 +43,6 @@ def profile(name):
     yield
     if get_timers() is not None:
         get_timers()(name).stop()
-
-
-class GateCombine(PyLayer):
-
-    @staticmethod
-    def forward(ctx, x, combine_weights, scatter_index):
-        ctx.save_for_backward(x, combine_weights, scatter_index)
-        ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
-        return ret
-
-    @staticmethod
-    def backward(ctx, grad_y, *_):
-        x, combine_weights, scatter_index = ctx.saved_tensor()
-        grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
-            x, combine_weights, scatter_index, grad_y
-        )
-        grad_combine_weight = grad_combine_weight_helper.sum(-1)
-        return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -191,7 +172,7 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
     if hard_gate:
         x_gatherd = F.embedding(scatter_index, x)
         return x_gatherd.squeeze(-2)
-    ret = paddle.incubate.nn.functional.moe_combine(x, combine_weights, scatter_index)
+    ret = moe_combine(x, combine_weights, scatter_index)
 
     ret.stop_gradient = False
     return ret
@@ -554,9 +535,7 @@ class MOELayerAuto(MOELayer):
                     scatter_index,
                     dispatch_mask,
                     _,
-                ) = paddle.incubate.nn.functional.moe_gate_dispatch(
-                    input, prob, None, k, local_capacity, True
-                )
+                ) = moe_gate_dispatch(input, prob, None, k, local_capacity, True)
                 dispatched_input.stop_gradient = False
                 combine_weights_unnorm.stop_gradient = False
                 dispatch_mask.stop_gradient = True
