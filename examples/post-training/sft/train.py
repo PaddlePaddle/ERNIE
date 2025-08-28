@@ -241,17 +241,11 @@ class ModelArgument:
             "ParallelCrossEntropy to calculate cross-entropy loss for parallel model."
         },
     )
-    from_hf_hub: bool = field(
-        default=False,
-        metadata={"help": "Whether to download model from huggingface hub"},
-    )
-    from_aistudio: bool = field(
-        default=False,
-        metadata={"help": "Whether to download model from aistudio"},
-    )
-    from_modelscope: bool = field(
-        default=False,
-        metadata={"help": "Whether to download model from modelscope"},
+    download_hub: str = field(
+        default=None,
+        metadata={
+            "help": "The source for model downloading, options include `huggingface`, `aistudio`, `modelscope`, default `None`."
+        },
     )
     # LoRA
     lora: bool = field(
@@ -587,13 +581,8 @@ def main():
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
-
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
 
     model_class = Ernie4_5_MoeForCausalLM
     if training_args.pipeline_parallel_degree > 1:
@@ -656,13 +645,30 @@ def main():
             weight_quantize_algo=training_args.weight_quantize_algo
         )
 
+    try:
+        from paddleformers.utils.download import (
+            DownloadSource,
+        )  # test if paddleformers is the newest
+    except Exception:
+        DownloadSource = None
+
+    download_source_kwargs = {}
+    if DownloadSource is None:
+        if model_args.download_hub == "huggingface":
+            download_source_kwargs["from_hf_hub"] = True
+        elif model_args.download_hub == "aistudio":
+            download_source_kwargs["from_aistudio"] = True
+        elif model_args.download_hub == "modelscope":
+            download_source_kwargs["from_modelscope"] = True
+    else:
+        download_source_kwargs["download_hub"] = model_args.download_hub
+
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
         convert_from_torch=False,
+        **download_source_kwargs,
     )
     model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -727,9 +733,8 @@ def main():
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
             convert_from_torch=False,
+            **download_source_kwargs,
         )
     else:
         model = model_class.from_config(model_config, dtype=dtype)
@@ -744,9 +749,8 @@ def main():
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
         convert_from_torch=False,
+        **download_source_kwargs,
     )
 
     logger.info("Start to create dataset ...")

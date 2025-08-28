@@ -22,8 +22,6 @@ import paddle.distributed as dist
 from paddle.utils.layers_utils import flatten, map_structure, pack_sequence_as
 from paddleformers.data import DistDataLoader
 
-from src.utils.misc import global_training_logs
-
 
 class DistDataLoaderAuto(DistDataLoader):
     def __init__(
@@ -46,99 +44,23 @@ class DistDataLoaderAuto(DistDataLoader):
     def __next__(self):
         if self._need_data:
             data = next(self._dataloader_iter)
-            if "data_not_valid" in data:
-                global_training_logs.update(
-                    data_not_valid=data["data_not_valid"].astype("float32").mean()
-                )
-            (
-                input_ids,
-                labels,
-                data_type,
-                images,
-                token_type_ids,
-                image_type_ids,
-                audio_input_ids,
-                audio_labels,
-                grid_thw,
-                inbatch_pack_offset,
-                position_ids,
-                log_prob,
-            ) = (
-                data["input_ids"],
-                data["labels"],
-                data.get("data_type", None),
-                data.get("images", None),
-                data.get("token_type_ids", None),
-                data.get("image_type_ids", None),
-                data.get("audio_input_ids", None),
-                data.get("audio_labels", None),
-                data.get("grid_thw", None),
-                data.get("inbatch_pack_offset", None),
-                data.get("position_ids", None),
-                data.get("log_prob", None),
-            )
+            input_ids = data["input_ids"]
+            labels = data["labels"]
             assert {input_ids.dtype, labels.dtype} == {paddle.int64}, (
                 f"Distloader requires dtype == `int64`, "
                 f"got:{[input_ids.dtype, labels.dtype]}"
             )
         else:
-            (
-                input_ids,
-                labels,
-                data_type,
-                images,
-                token_type_ids,
-                image_type_ids,
-                audio_input_ids,
-                audio_labels,
-                grid_thw,
-                inbatch_pack_offset,
-                position_ids,
-                log_prob,
-            ) = (
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
-
+            input_ids, labels = None, None
         pp_broadcast = (self._pp_data_group is None) or self.pp_rank == 0
         if self.mp_group is not None and self.mp_group.nranks > 1 and pp_broadcast:
             (
                 input_ids,
                 labels,
-                data_type,
-                images,
-                token_type_ids,
-                image_type_ids,
-                audio_input_ids,
-                audio_labels,
-                grid_thw,
-                inbatch_pack_offset,
-                position_ids,
-                log_prob,
             ) = broadcast_data_obj(
                 [
                     input_ids,
                     labels,
-                    data_type,
-                    images,
-                    token_type_ids,
-                    image_type_ids,
-                    audio_input_ids,
-                    audio_labels,
-                    grid_thw,
-                    inbatch_pack_offset,
-                    position_ids,
-                    log_prob,
                 ],
                 self.mp_src_rank,
                 self.mp_group,
@@ -148,69 +70,15 @@ class DistDataLoaderAuto(DistDataLoader):
             (
                 input_ids,
                 labels,
-                data_type,
-                images,
-                token_type_ids,
-                image_type_ids,
-                audio_input_ids,
-                audio_labels,
-                grid_thw,
-                inbatch_pack_offset,
-                position_ids,
-                log_prob,
             ) = broadcast_data_obj(
                 [
                     input_ids,
                     labels,
-                    data_type,
-                    images,
-                    token_type_ids,
-                    image_type_ids,
-                    audio_input_ids,
-                    audio_labels,
-                    grid_thw,
-                    inbatch_pack_offset,
-                    position_ids,
-                    log_prob,
                 ],
                 self._pp_data_group.ranks[0],
                 self._pp_data_group,
             )
-        to_return = OrderedDict(
-            [
-                ("input_ids", input_ids),
-                ("labels", labels),
-                ("data_type", data_type),
-                ("images", images),
-                ("token_type_ids", token_type_ids),
-                ("image_type_ids", image_type_ids),
-                ("audio_input_ids", audio_input_ids),
-                ("audio_labels", audio_labels),
-                ("grid_thw", grid_thw),
-                ("inbatch_pack_offset", inbatch_pack_offset),
-                ("position_ids", position_ids),
-            ]
-        )
-        optional_keys = [
-            "data_type",
-            "images",
-            "token_type_ids",
-            "image_type_ids",
-            "audio_input_ids",
-            "audio_labels",
-            "grid_thw",
-            "inbatch_pack_offset",
-            "position_ids",
-            "log_prob",
-        ]
-        none_keys = [
-            k for k, v in to_return.items() if v is None and k in optional_keys
-        ]
-        for k in none_keys:
-            to_return.pop(k)
-        return OrderedDict(
-            [("input_ids", to_return["input_ids"]), ("labels", to_return["labels"])]
-        )
+        return OrderedDict([("input_ids", input_ids), ("labels", labels)])
 
 
 @dataclass

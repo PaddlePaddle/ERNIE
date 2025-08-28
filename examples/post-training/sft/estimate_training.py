@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import json
-import os
 
 import numpy as np
 from paddleformers.trainer.argparser import strtobool
@@ -124,22 +123,10 @@ def parse_arguments():
         help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument(
-        "--from_hf_hub",
-        type=bool,
-        default=False,
-        help="Whether to download model from huggingface hub",
-    )
-    parser.add_argument(
-        "--from_aistudio",
-        type=bool,
-        default=False,
-        help="Whether to download model from aistudio",
-    )
-    parser.add_argument(
-        "--from_modelscope",
-        type=bool,
-        default=False,
-        help="Whether to download model from modelscope",
+        "--download_hub",
+        type=str,
+        default=None,
+        help="The source for model downloading, options include `huggingface`, `aistudio`, `modelscope`, default `None`.",
     )
 
     # Data args, should be same with training.
@@ -194,19 +181,29 @@ def estimate_training(args):
     # convert paddle model repo id
     args.model_name_or_path = check_download_repo(
         args.model_name_or_path,
-        from_hf_hub=args.from_hf_hub,
-        from_aistudio=args.from_aistudio,
-        from_modelscope=args.from_modelscope,
+        download_hub=args.download_hub,
     )
 
-    if getattr(args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
+    try:
+        from paddleformers.utils.download import (
+            DownloadSource,
+        )  # test if paddleformers is the newest
+    except Exception:
+        DownloadSource = None
+
+    download_source_kwargs = {}
+    if DownloadSource is None:
+        if args.download_hub == "huggingface":
+            download_source_kwargs["from_hf_hub"] = True
+        elif args.download_hub == "aistudio":
+            download_source_kwargs["from_aistudio"] = True
+        elif args.download_hub == "modelscope":
+            download_source_kwargs["from_modelscope"] = True
+    else:
+        download_source_kwargs["download_hub"] = args.download_hub
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
-        args.model_name_or_path,
-        from_hf_hub=args.from_hf_hub,
-        from_aistudio=args.from_aistudio,
-        convert_from_torch=False,
+        args.model_name_or_path, convert_from_torch=False, **download_source_kwargs
     )
     logger.info("Start to estimate max training steps...")
     dataset_config = {
