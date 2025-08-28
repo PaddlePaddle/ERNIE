@@ -23,12 +23,11 @@ import paddle
 from paddle import nn
 import paddle.nn.functional as F
 
-from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 from paddle.distributed import fleet
 import paddle.distributed as dist
 from paddle import Tensor
-from paddle.incubate.nn.functional import moe_combine
+from paddle.incubate.nn.functional import moe_combine, moe_gate_dispatch
 
 from paddleformers.trainer.plugins.timer import get_timers
 from models.moe.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
@@ -95,24 +94,6 @@ def profile(name):
     yield
     if get_timers() is not None:
         get_timers()(name).stop()
-
-
-class GateCombine(PyLayer):
-
-    @staticmethod
-    def forward(ctx, x, combine_weights, scatter_index):
-        ctx.save_for_backward(x, combine_weights, scatter_index)
-        ret = moe_combine.moe_combine(x, combine_weights, scatter_index)
-        return ret
-
-    @staticmethod
-    def backward(ctx, grad_y, *_):
-        x, combine_weights, scatter_index = ctx.saved_tensor()
-        grad_x, grad_combine_weight_helper = moe_combine.moe_combine_bwd(
-            x, combine_weights, scatter_index, grad_y
-        )
-        grad_combine_weight = grad_combine_weight_helper.sum(-1)
-        return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -242,7 +223,7 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
     if hard_gate:
         x_gatherd = F.embedding(scatter_index, x)
         return x_gatherd.squeeze(-2)
-    ret = paddle.incubate.nn.functional.moe_combine(x, combine_weights, scatter_index)
+    ret = moe_combine(x, combine_weights, scatter_index)
 
     ret.stop_gradient = False
     return ret
@@ -599,12 +580,7 @@ class MOELayerAuto(MOELayer):
                 prob, max_prob = self.fused_gate_logits_process(
                     gate_logits, token_type_ids
                 )
-                if (
-                    "corr_bias"
-                    in inspect.signature(
-                        paddle.incubate.nn.functional.moe_gate_dispatch
-                    ).parameters
-                ):
+                if "corr_bias" in inspect.signature(moe_gate_dispatch).parameters:
                     if self.use_correction_bias:
                         compat_args = (self.moe_statics.e_score_correction_bias[0],)
                     else:
@@ -620,7 +596,7 @@ class MOELayerAuto(MOELayer):
                     scatter_index,
                     dispatch_mask,
                     _,
-                ) = paddle.incubate.nn.functional.moe_gate_dispatch(
+                ) = moe_gate_dispatch(
                     input, prob, *compat_args, k, local_capacity, True
                 )
                 dispatch_mask = paddle.diff(F.pad(dispatch_mask, (1, 0)))
