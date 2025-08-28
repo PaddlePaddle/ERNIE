@@ -37,7 +37,10 @@ from models.ernie.configuration_auto import (
     ErnieMoEConfig,
 )
 
-from src.callbacks import GlobalRNGCallback
+from src.callbacks_auto import (
+    GlobalRNGCallback,
+    MoECorrectionBiasAdjustCallback,
+)
 from src.tokenizers.tokenization_eb_v2 import ErnieBotTokenizer
 from src.trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
 from src.utils_auto import setup_logger_output_file, logger
@@ -539,6 +542,13 @@ def main():
 
     # 6. prepare for train/eval
     callbacks = [GlobalRNGCallback()]
+    if getattr(cfg, "moe_use_aux_free", 0.0) > 0.0:
+        logger.info("adding aux free callback")
+        callbacks += [
+            MoECorrectionBiasAdjustCallback(
+                args.moe_use_aux_free_update_coef, args.sequence_parallel
+            )
+        ]
     init_parameters(model)
 
     trainer = AutoPretrainingTrainer(
