@@ -53,16 +53,16 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
             dist.all_reduce(usages_tensor)
             return
 
-        # hcg = fleet.get_hybrid_communicate_group()
-        # mp_group = hcg.get_model_parallel_group()
-        # dp_group = hcg.get_data_parallel_group()
-        # sd_group = hcg.get_sharding_parallel_group()
-        # if self.use_sp and mp_group.nranks > 1:
-        #     dist.all_reduce(usages_tensor, group=mp_group)
-        # if dp_group.nranks > 1:
-        #     dist.all_reduce(usages_tensor, group=dp_group)
-        # if sd_group.nranks > 1:
-        #     dist.all_reduce(usages_tensor, group=sd_group)
+        hcg = fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+        dp_group = hcg.get_data_parallel_group()
+        sd_group = hcg.get_sharding_parallel_group()
+        if self.use_sp and mp_group.nranks > 1:
+            dist.all_reduce(usages_tensor._local_value(), group=mp_group)
+        if dp_group.nranks > 1:
+            dist.all_reduce(usages_tensor._local_value(), group=dp_group)
+        if sd_group.nranks > 1:
+            dist.all_reduce(usages_tensor._local_value(), group=sd_group)
         usages_mean = usages_tensor.mean(-1, keepdim=True)
         update = paddle.sign(usages_mean - usages_tensor) * self.update_lr
         update_dict = dict(zip(keys, update))
