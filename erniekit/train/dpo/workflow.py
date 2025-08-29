@@ -42,7 +42,7 @@ from paddleformers.utils.log import logger
 
 from ernie.callbacks import LayerwiseDropoutCallback
 from ernie.configuration import Ernie4_5_MoeConfig
-from ernie.dataset.dpo import collate_fn, create_dataset
+from paddleformers.datasets.dpo import collate_fn, create_dataset
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer

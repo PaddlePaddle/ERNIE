@@ -29,7 +29,7 @@ from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.configuration import Ernie4_5_MoeConfig
 # isort: on
 
-from ernie.dataset.dpo import create_dataset
+from paddleformers.datasets.dpo import create_dataset
 from ernie.utils.download_utils import check_download_repo
 
 

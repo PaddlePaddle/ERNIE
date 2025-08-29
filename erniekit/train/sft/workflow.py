@@ -385,12 +385,12 @@ def run_sft(
         "packing": data_args.packing,
         "mix_strategy": data_args.mix_strategy,
     }
-    from ernie.dataset.finetuning import collate_fn
+    from paddleformers.datasets.finetuning import collate_fn
 
     if data_args.dataset_type == "map":
-        from ernie.dataset.finetuning import create_indexed_dataset as create_dataset
+        from paddleformers.datasets.finetuning import create_indexed_dataset as create_dataset
     else:
-        from ernie.dataset.finetuning import create_dataset
+        from paddleformers.datasets.finetuning import create_dataset
     dataset_config.update(
         {
             "num_samples_each_epoch": data_args.num_samples_each_epoch,

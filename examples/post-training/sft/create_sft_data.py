@@ -23,7 +23,7 @@ from paddleformers.utils.log import logger
 from sft_utils import BuildDataArgument, BuildSFTTrainingArguments, DataGenerator
 from train import ModelArgument
 
-from ernie.dataset.finetuning import Sequence, create_dataset
+from paddleformers.datasets.finetuning import Sequence, create_dataset
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import estimate_training
 from ernie.utils.download_utils import check_download_repo

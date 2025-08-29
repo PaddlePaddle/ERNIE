@@ -30,7 +30,7 @@ from paddleformers.trainer import TrainerState
 from paddleformers.trainer.trainer import TRAINER_STATE_NAME
 
 from .data_utils import RandomNoReplacementSampler, sampling_pseudo_examples
-from ernie.dataset.data_utils import pad_batch_data
+from paddleformers.datasets.data_utils import pad_batch_data
 
 logger = logging.getLogger(__name__)
 

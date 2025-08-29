@@ -70,7 +70,7 @@ train_dataset_prob: "0.8,0.2"
   - Under `Set Built-in Dataset`, select the dataset name in `Dataset Selection`
   - The system will automatically configure the path and type, then download and read from Hugging Face
 
-Supported Hugging Face datasets are defined in `ernie.dataset.hf.data_info.json`:
+Supported Hugging Face datasets are defined:
 
 ### Supported Hugging Face Datasets
 | Dataset Name | Type |Format | File | File Format |
@@ -103,6 +103,13 @@ Supported Hugging Face datasets are defined in `ernie.dataset.hf.data_info.json`
 | [mayflowergmbh/airoboros-3.0_de](https://huggingface.co/datasets/mayflowergmbh/airoboros-3.0_de) | sft | alpaca | airoboros_3.json | json |
 | [mayflowergmbh/ultra-chat_de](https://huggingface.co/datasets/mayflowergmbh/ultra-chat_de) | sft | alpaca | ultra_chat_german.json | json |
 | [Intel/orca_dpo_pairs](https://huggingface.co/datasets/Intel/orca_dpo_pairs) | dpo | alpaca | orca_rlhf.jsonl | jsonl |
+| [shibing624/sharegpt_gpt4](https://huggingface.co/datasets/shibing624/sharegpt_gpt4) | sft | sharegpt | sharegpt_gpt4.jsonl | jsonl |
+| [llamafactory/lima](https://huggingface.co/datasets/llamafactory/lima) | sft | sharegpt | lima.json | json |
+| [Open-Orca/SlimOrca](https://huggingface.co/datasets/Open-Orca/SlimOrca) | sft | sharegpt | oo-labeled_correct.gpt4.sharegpt.jsonl | jsonl |
+| [totally-not-an-llm/sharegpt-hyperfiltered-3k](https://huggingface.co/datasets/totally-not-an-llm/sharegpt-hyperfiltered-3k) | sft | sharegpt | sharegptclean_final.json | json |
+| [m-a-p/neo_sft_phase2](https://huggingface.co/datasets/m-a-p/neo_sft_phase2) | sft | sharegpt | neo_sft_phase2.json | json |
+| [llamafactory/DPO-En-Zh-20k](https://huggingface.co/datasets/llamafactory/DPO-En-Zh-20k) | sft | sharegpt | dpo_zh.json | json |
+| [avemio/German-RAG-DPO-ShareGPT-HESSIAN-AI](https://huggingface.co/datasets/avemio/German-RAG-DPO-ShareGPT-HESSIAN-AI) | dpo | sharegpt | qa-with-multiple-references/DPO_equally-distributed-wikipedia-trainingdata-qa-with-multiple-references_id-over-800k-under-1000k_sharegpt.jsonl | jsonl |
 
 ## erniekit Data Format
 

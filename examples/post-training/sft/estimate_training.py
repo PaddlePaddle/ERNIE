@@ -18,7 +18,7 @@ import numpy as np
 from paddleformers.trainer.argparser import strtobool
 from paddleformers.utils.log import logger
 
-from ernie.dataset.finetuning import create_dataset
+from paddleformers.datasets.finetuning import create_dataset
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.download_utils import check_download_repo
 
