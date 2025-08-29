@@ -26,7 +26,6 @@ export FLAGS_use_paddle_recall_error=0
 export FLAGS_tcp_max_syn_backlog=16384
 export FLAGS_call_stack_level=2
 
-
 SM=`nvidia-smi --query-gpu=compute_cap --format=csv | tail -n 1 | sed 's/\.//g'`
 if [ $SM -eq 90 ]
 then
@@ -35,14 +34,9 @@ else
     export FLAGS_flash_attn_version=2
 fi
 
-
 export FLAGS_enable_moe_utils=true
 
-
-export PYTHONPATH=$PYTHONPATH:./ernie
-
 python -m paddle.distributed.launch \
-    --log_dir output/paddle_distributed_logs \
-    --run_mode=collective \
-    ${script:-ernie/pretrain_auto.py}  \
-    --config yamls/pretrain_96_auto.yaml
+    --log_dir ${log_dir} \
+    pretrain_auto.py  \
+    --config pretrain_96_auto.yaml

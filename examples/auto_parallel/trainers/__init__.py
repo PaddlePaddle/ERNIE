@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
+from .pretraining_trainer_auto import AutoPretrainingTrainer, AutoPreTrainingArguments
+from .callbacks_auto import (
+    TensorBoardCallback,
+    LoggingCallback,
+    GlobalRNGCallback,
+    StopperCallback,
+)
 
-from paddleformers.trainer.trainer_callback import TrainerCallback
-from models.ernie.modeling_moe import ErnieMoEForCausalLM
-
-__all__ = ["GlobalRNGCallback"]
-
-
-class GlobalRNGCallback(TrainerCallback):
-    def on_step_end(self, args, state, control, model, **kwargs):
-        isinstance(model, ErnieMoEForCausalLM), type(model)
-        random.Random(state.global_step)
+__all__ = [
+    "AutoPretrainingTrainer",
+    "AutoPreTrainingArguments",
+    "TensorBoardCallback",
+    "LoggingCallback",
+    "GlobalRNGCallback",
+    "StopperCallback",
+]

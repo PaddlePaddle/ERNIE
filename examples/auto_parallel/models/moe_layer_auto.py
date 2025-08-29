@@ -29,8 +29,8 @@ from paddle import Tensor
 from paddle.incubate.nn.functional import moe_combine, moe_gate_dispatch
 
 from paddleformers.trainer.plugins.timer import get_timers
-from models.moe.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
-from models.moe.moe_utils_auto import get_flatten_mesh, get_mesh, _reshard
+from models.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
+from models.moe_utils_auto import get_flatten_mesh, get_mesh, _reshard
 
 logger = logging.getLogger(__name__)
 

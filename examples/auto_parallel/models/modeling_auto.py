@@ -35,7 +35,7 @@ from paddle.incubate.nn.memory_efficient_attention import (
 )
 from paddle.distributed import in_auto_parallel_align_mode
 
-from models.moe.top2_gate_auto import Top2Gate, TopKGateFusedAuto
+from models.top2_gate_auto import Top2Gate, TopKGateFusedAuto
 
 
 from paddleformers.transformers.model_outputs import (
@@ -45,12 +45,11 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 
 from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
 
-from models.comm_utils import subbatch
-from models.moe.moe_layer_auto import (
+from models.moe_layer_auto import (
     MOELayerAuto,
 )
-from models.ernie.configuration_auto import ErnieMoEConfig
-from models.moe.moe_utils_auto import get_mesh
+from models.configuration_auto import ErnieMoEConfig
+from models.moe_utils_auto import get_mesh
 
 from paddle.nn.functional.flash_attention import (
     scaled_dot_product_attention as flash_attention_with_mask,
@@ -141,10 +140,6 @@ def calc_lm_head_logits(
 ):
     """the core function to calc lm head"""
     if config.sequence_parallel:
-        assert (
-            not config.use_sparse_head_and_loss_fn
-        ), "use_sparse_head_and_loss_fn is not supported now."
-
         hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
         dp_rank = hcg.get_data_parallel_rank()
         sharding_rank = hcg.get_sharding_parallel_rank()
@@ -1857,7 +1852,6 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         return loss, loss_sum
 
     def loss_impl(self, prediction_scores, masked_lm_labels):
-        """extract loss impl for subbatch"""
         masked_lm_loss = self.loss_func(
             prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(-1)
         )
@@ -1865,19 +1859,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     def forward_impl(self, prediction_scores, masked_lm_labels):
         with paddle.amp.auto_cast(False):
-            if self.config.use_sparse_head_and_loss_fn and prediction_scores.shape[
-                0
-            ] > self.config.get("loss_subbatch_seqlen", 32768):
-                sb_loss_func = subbatch(
-                    self.loss_impl,
-                    [0, 1],
-                    [0, 0],
-                    self.config.get("loss_subbatch_seqlen", 32768),
-                    0,
-                )
-                masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
-            else:
-                masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
+            masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
             lossmask = masked_lm_labels != self.ignored_index
 
             if (~lossmask).all():
@@ -1976,15 +1958,6 @@ class ErnieLMHead(nn.Layer):
             )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-        if self.config.use_recompute_loss_fn or self.config.use_sparse_head_and_loss_fn:
-            out_tensors = (
-                (hidden_states, self.weight, self.bias)
-                if tensor_parallel_output is None
-                else (hidden_states, self.weight, self.bias, tensor_parallel_output)
-            )
-
-            return out_tensors
-
         return calc_lm_head_logits(
             self.config,
             hidden_states,

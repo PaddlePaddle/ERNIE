@@ -28,21 +28,20 @@ from paddleformers.data.causal_dataset import (
     check_data_split,
 )
 from paddle.distributed.fleet.meta_parallel.pipeline_parallel import PipelineParallel
-from paddleformers.trainer import PdArgumentParser, get_last_checkpoint
+from paddleformers.trainer.trainer_utils import get_last_checkpoint
 
-from config import get_config
-from models.ernie import ErnieForCausalLMAuto
-from models.ernie.configuration_auto import (
+from data_processor.utils.argparser import PdArgumentParser, get_config
+from models import ErnieForCausalLMAuto
+from models.configuration_auto import (
     ErnieConfig,
     ErnieMoEConfig,
 )
+from trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
 
-from src.callbacks import GlobalRNGCallback
-from src.tokenizers.tokenization_eb_v2 import ErnieBotTokenizer
-from src.trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
-from src.utils_auto import setup_logger_output_file, logger
-from src.utils_auto.misc import global_training_logs
+from utils_auto import setup_logger_output_file, logger
+from utils_auto.misc import global_training_logs
 
+from tokenization import ErnieTokenizer
 
 from paddle.distributed.fleet import collective_perf
 from paddle import Tensor
@@ -423,7 +422,7 @@ def set_dtype(args):
 
 
 def setup_tokenizer(args, config):
-    tokenizer = ErnieBotTokenizer.from_pretrained(args.tokenizer_name)
+    tokenizer = ErnieTokenizer.from_pretrained(args.tokenizer_name)
     tokenizer.ignored_index = config.ignored_index
     logger.info(
         f"Using tokenizer={type(tokenizer)}, bos:{tokenizer.bos_token_id} "
@@ -523,7 +522,6 @@ def main():
     )
 
     # 6. prepare for train/eval
-    callbacks = [GlobalRNGCallback()]
     init_parameters(model)
 
     trainer = AutoPretrainingTrainer(
@@ -534,7 +532,6 @@ def main():
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
         compute_metrics=lambda p: compute_metrics(p, tokenizer),
-        callbacks=callbacks,
     )
 
     global_training_logs.accumulate = args.gradient_accumulation_steps
