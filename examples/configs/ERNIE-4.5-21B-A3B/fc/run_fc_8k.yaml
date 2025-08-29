@@ -36,7 +36,7 @@ logging_steps: 1
 release_grads: True
 gradient_accumulation_steps: 8
 logging_dir: ./vdl_log
-output_dir: ./fc_output
+output_dir: ./output
 disable_tqdm: True
 
 # train

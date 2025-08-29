@@ -711,9 +711,6 @@ class PretrainingTrainer(Trainer):
             callbacks.append(
                 ClipGradByAdaptiveNormCallback(),
             )
-        args.use_async_save = (
-            args.use_async_save and args.save_sharded_model and args.load_sharded_model
-        )
         super().__init__(args=args, model=model, callbacks=callbacks, **kwargs)
         self.pop_callback(PrinterCallback)
         self.pp_data_buffer = []

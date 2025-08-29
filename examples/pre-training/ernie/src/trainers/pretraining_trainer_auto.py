@@ -20,66 +20,45 @@ __all__ = [
 
 
 import sys
-import re
-import os
-import json
 import contextlib
 from typing import Optional
 from dataclasses import dataclass, field
 import time
 import math
 import logging
-from functools import partial
 
 
 import paddle
 import paddle.nn as nn
-from paddle.io import DataLoader
 import paddle.amp.auto_cast as autocast
-from paddle.distributed.communication.group import _get_global_group
 
 from paddleformers.trainer import (
     speed_metrics,
 )
 
 from paddleformers.trainer.auto_trainer import AutoTrainer
-
-
-from paddleformers.utils.batch_sampler import (
-    DistributedBatchSampler as PaddleNLPDistributedBatchSampler,
-)
+from paddleformers.trainer import AutoTrainingArguments
 
 
 from paddleformers.trainer.utils import add_start_docstrings
 from paddleformers.trainer.trainer_callback import PrinterCallback
 from paddle.distributed import fleet
+from paddle.distributed.auto_parallel.pipelining.schedules import get_pipeline_schedule
+from typing import Any, Dict, Union
 import paddle.distributed as dist
 
 
 from src.lr_schedulers import get_cosine_schedule_with_warmup
-from src.utils_auto.training_utils import (
-    reset_per_device_batch_size,
-)
+from src.utils_auto.training_utils import reset_per_device_batch_size
 from src.callbacks_auto import (
     TensorBoardCallback,
     LoggingCallback,
     StopperCallback,
 )
-from src.datasets.dist_data_loader import (
-    DistDataLoaderAuto,
-)
-from src.clip import ClipGradForMOEByGlobalNormAuto
+from src.datasets.dist_data_loader import DistDataLoaderAuto
 
 
 logger = logging.getLogger(__name__)
-
-try:
-    from paddleformers.trainer import AutoTrainingArguments
-except ImportError:
-    from paddleformers.trainer import TrainingArguments as AutoTrainingArguments
-
-    logger.warning("paddlenlp.trainer.AutoTrainingArguments CANNOT import!")
-    logger.warning("Use TrainingArguments as an alternative but will lose some args!")
 
 
 @dataclass
@@ -104,11 +83,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
     eval_iters: int = field(
         default=-1,
         metadata={"help": "eval iteration for every evaluation."},
-    )
-
-    min_lr: float = field(
-        default=0.0,
-        metadata={"help": "minus learning rate"},
     )
 
     input_dir: str = field(default=None, metadata={"help": "data path"})
@@ -138,11 +112,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         },
     )
 
-    sequence_parallel: Optional[int] = field(
-        default=0,
-        metadata={},
-    )
-
     virtual_pp_degree: Optional[int] = field(
         default=1,
         metadata={
@@ -150,10 +119,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         },
     )
 
-    use_async_save: Optional[bool] = field(
-        default=False,
-        metadata={"help": "Whether to use async_save instead of paddle.save."},
-    )
     pre_alloc_memory: float = field(
         default=0.0,
         metadata={
@@ -185,13 +150,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
     multi_token_pred_depth: Optional[int] = field(
         default=0,
         metadata={},
-    )
-
-    lr_scheduler: str = field(
-        default="cosine",
-        metadata={
-            "help": "The scheduler type to use. suppor linear, cosine, constant, constant_with_warmup"
-        },
     )
 
     moe_gate_lr_ratio: float = field(
@@ -232,10 +190,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
     @property
     def need_data(self):
         return self.pipeline_parallel_rank == 0 and self.tensor_parallel_rank == 0
-
-    @property
-    def reeao_dataset_world_size(self):
-        return super().dataset_world_size
 
     def __post_init__(self):
         super().__post_init__()
@@ -298,51 +252,6 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
             self.per_device_eval_batch_size = self.per_device_train_batch_size
             logger.warn(f"eval_batch_size set to {self.per_device_eval_batch_size}")
 
-        if self.sharding_parallel_degree > 1:
-            sharding_parallel_config = (
-                set(self.sharding_parallel_config.split(" "))
-                if self.sharding_parallel_config
-                else set()
-            )
-            sharding_comm_overlap_non_pp = (
-                True
-                if "shardingv1_comm_overlap" in sharding_parallel_config
-                or "sharding_comm_overlap" in sharding_parallel_config
-                else False
-            )
-            if sharding_comm_overlap_non_pp:
-                assert hasattr(fleet.fleet, "_user_defined_strategy")
-                user_defined_strategy = fleet.fleet._user_defined_strategy
-                user_defined_strategy.hybrid_configs[
-                    "sharding_configs"
-                ].accumulate_steps = self.gradient_accumulation_steps
-
-        if hasattr(fleet.fleet, "_user_defined_strategy"):
-            user_defined_strategy = fleet.fleet._user_defined_strategy
-            if (
-                hasattr(user_defined_strategy, "hybrid_configs")
-                and "sharding_configs" in user_defined_strategy.hybrid_configs
-            ):
-                sd_configs = user_defined_strategy.hybrid_configs["sharding_configs"]
-                if sd_configs.comm_overlap:
-                    assert self.global_batch_size % self.dataset_world_size == 0, (
-                        f"global_batch_size[{self.global_batch_size}] should be divisible by "
-                        f"dataset_world_size[{self.dataset_world_size}]"
-                    )
-                    lbs = self.global_batch_size // self.dataset_world_size
-                    assert lbs % self.per_device_train_batch_size == 0, (
-                        f"local_batch_size[{lbs}] should be divisible by "
-                        f"per_device_train_batch_size[{self.per_device_train_batch_size}]"
-                    )
-                    assert (
-                        lbs // self.per_device_train_batch_size
-                        == sd_configs.accumulate_steps
-                    ), (
-                        f"local_batch_size[{lbs}] should be equal to "
-                        f"accumulate_steps[{sd_configs.accumulate_steps}] * "
-                        f"per_device_train_batch_size[{self.per_device_train_batch_size}]"
-                    )
-
 
 class AutoPretrainingTrainer(AutoTrainer):
 
@@ -374,6 +283,76 @@ class AutoPretrainingTrainer(AutoTrainer):
         self.model_numel = numel_tensor.item() // self.args.dataset_world_size
 
         self.pop_callback(PrinterCallback)
+        if self.args.pipeline_parallel_degree > 1:
+            if self.criterion is None:
+                self.criterion = self.model.criterion
+            self.pp_schedule = get_pipeline_schedule(
+                model,
+                self.args.gradient_accumulation_steps,
+                self.criterion,
+                self.args.pipeline_schedule_mode,
+                self.args.pipeline_parallel_degree,
+                self.comm_group_in_pp,
+            )
+            self.args.per_device_train_batch_size = (
+                self.args.per_device_train_batch_size
+                * self.args.gradient_accumulation_steps
+            )
+            self.args.gradient_accumulation_steps = 1
+
+    def compute_pipeline_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+        Subclass and override for custom behavior.
+        """
+        if self.criterion is not None:
+            if "labels" in inputs:
+                labels = inputs.pop("labels")
+            elif "start_positions" in inputs and "end_positions" in inputs:
+                labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+            elif self.args.label_names is not None:
+                labels = []
+                for label in self.label_names:
+                    labels.append(inputs.pop(label))
+                labels = tuple(labels)
+            elif "generator_labels" in inputs:
+                labels = inputs["generator_labels"]
+        else:
+            labels = None
+
+        pp_rank = self.comm_group_in_pp.rank
+        losses = []
+        if pp_rank == 0:
+            self.pp_schedule.step(**inputs)
+        elif pp_rank == self.args.pipeline_parallel_degree - 1:
+            self.pp_schedule.step(target=labels, losses=losses)
+        else:
+            self.pp_schedule.step()
+
+        final_loss = None
+        if len(losses) != 0:
+            final_loss = paddle.stack(losses).mean()
+
+        return final_loss
+
+    def dynamic_auto_parallel_pipeline_training(
+        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
+    ) -> paddle.Tensor:
+        assert (
+            self.args.pipeline_parallel_degree > 1
+        ), "pipeline_parallel_degree must be greater than 1."
+        with self.autocast_smart_context_manager():
+            loss = self.compute_pipeline_loss(model, inputs)
+
+        return loss
+
+    def dynamic_training(
+        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
+    ) -> paddle.Tensor:
+        if self.args.pipeline_parallel_degree > 1:
+            return self.dynamic_auto_parallel_pipeline_training(model, inputs)
+        else:
+            return super().dynamic_training(model, inputs)
 
     def autocast_smart_context_manager(self):
 
@@ -460,55 +439,23 @@ class AutoPretrainingTrainer(AutoTrainer):
         loss_avg = loss * self.model_wrapped.accumulate_steps / num_tokens
         return loss_avg, loss, labels
 
-    def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
-        return PaddleNLPDistributedBatchSampler(
-            self.train_dataset,
-            batch_size=self.args.per_device_train_batch_size,
-            shuffle=False,
-            num_replicas=self.args.dataset_world_size,
-            rank=self.args.dataset_rank,
-            drop_last=self.args.dataloader_drop_last,
-        )
-
     def get_train_dataloader(self):
 
         if self.args.need_data and self.train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
-        _DataLoader = partial(
-            DistDataLoaderAuto,
-            need_data=self.args.need_data,
-            pp_broadcast=True,
-        )
 
         train_dataset = self.train_dataset
-        if self._is_iterable_dataset(train_dataset):
-            return DataLoader(
-                train_dataset,
-                batch_size=None,
-                collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-                use_shared_memory=True,
-                prefetch_factor=self.args.prefetch_factor,
-            )
         if self.args.need_data:
             train_sampler = self._get_train_sampler()
         else:
             train_sampler = None
-        return _DataLoader(
+        return DistDataLoaderAuto(
             train_dataset,
             batch_sampler=train_sampler,
             collate_fn=self.data_collator,
             num_workers=self.args.dataloader_num_workers,
             prefetch_factor=self.args.prefetch_factor,
         )
-
-    def _maybe_log_save_evaluate(
-        self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs
-    ):
-        super()._maybe_log_save_evaluate(
-            tr_loss, model, epoch, ignore_keys_for_eval, **kwargs
-        )
-        return
 
     def create_scheduler(self, num_training_steps):
 
@@ -536,11 +483,6 @@ class AutoPretrainingTrainer(AutoTrainer):
         if self.optimizer is None:
 
             def need_decay(name):
-                if (
-                    name == "ernie.norm.weight"
-                    and self.args.pipeline_parallel_degree > 1
-                ):
-                    return True
                 return not any(nd in name for nd in ["bias", "norm"])
 
             decay_parameters = [
@@ -554,45 +496,13 @@ class AutoPretrainingTrainer(AutoTrainer):
                 self.args
             )
 
-            if (
-                self.args.use_moe
-                and not self.args.use_hybrid_parallel
-                and not self.args.enable_auto_parallel
-            ):
-                logger.info("using moe Global clip")
-
-                def expert_fn(p):
-                    return getattr(p, "no_sync", False)
-
-                grad_clip = ClipGradForMOEByGlobalNormAuto(
-                    self.args.max_grad_norm,
-                    is_expert_param_func=expert_fn,
-                    moe_group=_get_global_group(),
-                    local_clip=False,
-                )
-            else:
-                grad_clip = (
-                    nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                    if self.args.max_grad_norm > 0
-                    else None
-                )
-
-            self.static_name_to_dyg_name = {
-                p.name: n for n, p in self.model.state_dict().items()
-            }
-            gate_pattern = re.compile(r"ernie\.layers\.0\.mlp\.gate\.weight")
+            grad_clip = (
+                nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
+                if self.args.max_grad_norm > 0
+                else None
+            )
 
             def lr_ratio_fn(param):
-                if param.name in self.static_name_to_dyg_name.keys():
-                    name = self.static_name_to_dyg_name[param.name]
-                    if self.args.moe_gate_lr_ratio is not None and gate_pattern.match(
-                        name
-                    ):
-                        logger.info(
-                            f"apply moe_gate_lr_ratio to {name}, ratio={self.args.moe_gate_lr_ratio}"
-                        )
-                        return float(self.args.moe_gate_lr_ratio)
-
                 return 1.0
 
             self.optimizer = optimizer_cls(
@@ -610,47 +520,15 @@ class AutoPretrainingTrainer(AutoTrainer):
                 **optimizer_kwargs,
             )
 
-        self.static_name_to_dyg_name = {
-            p.name: n for n, p in self.model.named_parameters()
-        }
-
         return self.optimizer
 
-    def save_model(self, output_dir=None):
-
-        super().save_model(output_dir)
-        if self.args.should_save:
-            with open(
-                os.path.join(output_dir, "static_name_to_dyg_name.json"), "w"
-            ) as of:
-                of.write(json.dumps(self.static_name_to_dyg_name))
-
-    def _get_meshes_for_loader(self):
-        def _get_mesh(pp_idx=0):
-            return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]
-
-        meshes = []
-        if self.args.pipeline_parallel_degree > 1:
-            # input_ids
-            meshes.append(
-                [
-                    _get_mesh(0),
-                    _get_mesh(-1),
-                ]
-            )
-            # labels
-            meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
-        else:
-            meshes.append(_get_mesh(0))
-        return meshes
-
-    def _wrap_for_dist_loader(self, train_dataloader):
-        self.dense_tensor_idx = None
+    def _wrap_for_dist_loader(self, train_dataloader, dense_tensor_idx=None):
+        self.dense_tensor_idx = dense_tensor_idx
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
             meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
+            dense_tensor_idx=dense_tensor_idx,
             is_dataset_splitted=True,
         )
-        dist_loader._input_keys = ["input_ids", "labels"]
         return dist_loader

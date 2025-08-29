@@ -110,6 +110,7 @@ class Ernie4_5_Config(PretrainedConfig):
         use_fused_head_and_loss_fn=False,
         token_balance_loss=False,
         token_balance_seqlen=False,  # calculated based on batchsize and seqlen
+        loss_subbatch_seqlen=32768,
         cachekv_quant: bool = False,
         pp_seg_method="layer:Ernie4_5_DecoderLayer|EmptyLayer",
         **kwargs,
@@ -159,6 +160,7 @@ class Ernie4_5_Config(PretrainedConfig):
             use_fused_head_and_loss_fn (bool): Whether to use fused head and loss function
             token_balance_loss (bool): Whether to balance loss by token count
             token_balance_seqlen (bool): Whether to balance sequence lengths
+            loss_subbatch_seqlen (int): Sub-batch size for loss computation
             cachekv_quant (bool): Whether to quantize key-value cache
             pp_seg_method (str): Method for pipeline parallel segmentation
             **kwargs: Additional keyword arguments passed to parent class
@@ -241,6 +243,7 @@ class Ernie4_5_Config(PretrainedConfig):
         self.use_fused_head_and_loss_fn = use_fused_head_and_loss_fn
         self.token_balance_loss = token_balance_loss
         self.token_balance_seqlen = token_balance_seqlen
+        self.loss_subbatch_seqlen = loss_subbatch_seqlen
         self.cachekv_quant = cachekv_quant
         self.pp_seg_method = pp_seg_method
 
@@ -257,6 +260,7 @@ class Ernie4_5_Config(PretrainedConfig):
                 "use_sparse_flash_attn",
                 "use_var_len_flash_attn",
                 "use_sparse_head_and_loss_fn",
+                "loss_subbatch_seqlen",
                 "micro_batch_size",
                 "fuse_softmax_mask",
                 "cachekv_quant",

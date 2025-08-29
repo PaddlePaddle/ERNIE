@@ -139,7 +139,7 @@ class TensorBoardCallback(TrainerCallback):
             total_tokens_per_step = (
                 args.train_batch_size
                 * args.gradient_accumulation_steps
-                * args.reeao_dataset_world_size
+                * args.dataset_world_size
                 * args.max_seq_length
             )
 

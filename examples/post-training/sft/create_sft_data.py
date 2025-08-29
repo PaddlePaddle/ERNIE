@@ -64,19 +64,31 @@ def main():
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
 
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
+    try:
+        from paddleformers.utils.download import (
+            DownloadSource,
+        )  # test if paddleformers is the newest
+    except Exception:
+        DownloadSource = None
+
+    download_source_kwargs = {}
+    if DownloadSource is None:
+        if model_args.download_hub == "huggingface":
+            download_source_kwargs["from_hf_hub"] = True
+        elif model_args.download_hub == "aistudio":
+            download_source_kwargs["from_aistudio"] = True
+        elif model_args.download_hub == "modelscope":
+            download_source_kwargs["from_modelscope"] = True
+    else:
+        download_source_kwargs["download_hub"] = model_args.download_hub
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
         convert_from_torch=False,
+        **download_source_kwargs,
     )
     if tokenizer.vocab_size < 2**16 - 1:
         save_dtype = np.uint16

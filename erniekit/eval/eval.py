@@ -219,21 +219,33 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
 
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
+    try:
+        from paddleformers.utils.download import (
+            DownloadSource,
+        )  # test if paddleformers is the newest
+    except Exception:
+        DownloadSource = None
+
+    download_source_kwargs = {}
+    if DownloadSource is None:
+        if model_args.download_hub == "huggingface":
+            download_source_kwargs["from_hf_hub"] = True
+        elif model_args.download_hub == "aistudio":
+            download_source_kwargs["from_aistudio"] = True
+        elif model_args.download_hub == "modelscope":
+            download_source_kwargs["from_modelscope"] = True
+    else:
+        download_source_kwargs["download_hub"] = model_args.download_hub
 
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
         convert_from_torch=False,
+        **download_source_kwargs,
     )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = finetuning_args.tensor_parallel_rank
@@ -288,17 +300,15 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
             convert_from_torch=False,
+            **download_source_kwargs,
         )
     else:
         model = model_class.from_config(
             model_config,
             dtype=dtype,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
             convert_from_torch=False,
+            **download_source_kwargs,
         )
 
     if model.config.head_dim is None:
@@ -320,9 +330,8 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
         convert_from_torch=False,
+        **download_source_kwargs,
     )
 
     logger.info("Start to create dataset ...")

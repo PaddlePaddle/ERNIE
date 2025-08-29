@@ -41,8 +41,8 @@ trainer_args:
     adam_epsilon: 1e-8
     learning_rate: 2.2e-4
     min_lr: 2.2e-5
-    global_batch_size: 2
-    gradient_accumulation_steps: 1
+    global_batch_size: 4
+    gradient_accumulation_steps: 2
     per_device_train_batch_size: 2
     per_device_eval_batch_size: 1
     lr_scheduler: wsd:231084
@@ -67,11 +67,8 @@ trainer_args:
 
     tensor_parallel_degree: 4
     pipeline_parallel_degree: 2
-    virtual_pp_degree: 1
-
-    n_microbatches: 2
+    virtual_pp_degree: 2
     pipeline_schedule_mode: "VPP"
-    model_type: "ernie_pp"
 
     data_parallel_degree: 1
     sharding: "stage1"
@@ -90,7 +87,7 @@ trainer_args:
     ignore_load_lr_and_optim: False
     metrics_output_path: ./output/paddle_distributed_logs/
 
-    use_moe: true
+    use_moe: True
     moe_group: mp
     log_global_grad_norm: True
     enable_optimizer_timer: False

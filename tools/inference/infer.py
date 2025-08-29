@@ -123,9 +123,7 @@ def get_parser():
         default=None,
         help="weight_only_int8",
     )
-    parser.add_argument("--from_hf_hub", type=bool, default=False)
-    parser.add_argument("--from_aistudio", type=bool, default=False)
-    parser.add_argument("--from_modelscope", type=bool, default=False)
+    parser.add_argument("--download_hub", type=str, default=None)
     parser.add_argument(
         "--input_file", type=str, default="./examples/inference/data/query-demo.jsonl"
     )
@@ -166,13 +164,8 @@ class Predictor:
         """
         args.model_name_or_path = check_download_repo(
             args.model_name_or_path,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
-            from_modelscope=args.from_modelscope,
+            download_hub=args.download_hub,
         )
-
-        if getattr(args, "from_modelscope", False):
-            os.environ["from_modelscope"] = "True"
 
         self.runtime_timer = RuntimeTimer("Predictor")
         self.num_input_tokens = 0
@@ -194,12 +187,27 @@ class Predictor:
             hcg = fleet.get_hybrid_communicate_group()
             self.tensor_parallel_rank = hcg.get_model_parallel_rank()
 
+        try:
+            from paddleformers.utils.download import (
+                DownloadSource,
+            )  # test if paddleformers is the newest
+        except Exception:
+            DownloadSource = None
+
+        download_source_kwargs = {}
+        if DownloadSource is None:
+            if args.download_hub == "huggingface":
+                download_source_kwargs["from_hf_hub"] = True
+            elif args.download_hub == "aistudio":
+                download_source_kwargs["from_aistudio"] = True
+            elif args.download_hub == "modelscope":
+                download_source_kwargs["from_modelscope"] = True
+        else:
+            download_source_kwargs["download_hub"] = args.download_hub
+
         # init model & tokenizer
         self.tokenizer = Ernie4_5_Tokenizer.from_pretrained(
-            args.model_name_or_path,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
-            convert_from_torch=False,
+            args.model_name_or_path, convert_from_torch=False, **download_source_kwargs
         )
         self.tokenizer.padding_side = "left"
         paddle.set_default_dtype(self.args.dtype)
@@ -222,16 +230,14 @@ class Predictor:
             use_flash_attention=True,
             moe_group="dummy",
             num_nextn_predict_layers=0,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
             convert_from_torch=False,
+            **download_source_kwargs,
         )
         self.model = Ernie4_5_MoeForCausalLM.from_pretrained(
             args.model_name_or_path,
             config=self.config,
-            from_hf_hub=args.from_hf_hub,
-            from_aistudio=args.from_aistudio,
             convert_from_torch=False,
+            **download_source_kwargs,
         )
         gc.collect()
         paddle.device.cuda.empty_cache()
