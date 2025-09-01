@@ -47,6 +47,7 @@ from paddleformers.transformers.model_utils import PretrainedModel, register_bas
 
 from models.moe_layer_auto import (
     MOELayerAuto,
+    MoEStatics,
 )
 from models.configuration_auto import ErnieMoEConfig
 from models.moe_utils_auto import get_mesh
@@ -477,7 +478,11 @@ def get_gate(
             )
             experts[i].ep_group_id = ep_group_id
 
-    return gate, experts, lm_gate, lm_experts
+    if config.moe_use_aux_free:
+        moe_statics = MoEStatics(config, layer_idx)
+    else:
+        moe_statics = None
+    return gate, experts, lm_gate, lm_experts, moe_statics
 
 
 class RMSNorm(nn.Layer):
@@ -1213,7 +1218,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 fc = [(_ex_cfg.moe_num_experts, fc_cls(_ex_cfg))]
         else:
             fc = [(_ex_cfg.moe_num_experts, fc_cls(_ex_cfg))]
-        gate, experts, lm_gate, lm_experts = get_gate(
+        gate, experts, lm_gate, lm_experts, moe_statics = get_gate(
             self.config, fc, layer_idx, self.ipp
         )
         _sh_cfg = deepcopy(self.config)
@@ -1254,6 +1259,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 k=self.config.moe_k,
                 all_to_all_dropout=self.config.moe_all_to_all_dropout,
                 group_experts=self.config.moe_group_experts,
+                moe_statics=moe_statics,
                 config=self.config,
                 ipp=self.ipp,
             )

@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from typing import Tuple, List, Optional
 import logging
 from contextlib import contextmanager
@@ -33,6 +34,55 @@ from models.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
 from models.moe_utils_auto import get_flatten_mesh, get_mesh, _reshard
 
 logger = logging.getLogger(__name__)
+
+
+class MoEStatics(nn.Layer):
+    """
+    Stores MoE (Mixture of Experts) statistics
+    and expert usage information.
+    """
+
+    def __init__(self, config, layer_idx):
+        """
+        Initialize MoE statistics tracking.
+        Args:
+            config: Model configuration containing MoE parameters
+            layer_idx: Index of the MoE layer in the model
+        """
+        super().__init__()
+        self._cast_to_low_precision = False
+        self._cast_to_low_precison = False
+        num_experts = (
+            config.moe_num_experts[0]
+            if config.multimodel_experts
+            else config.moe_num_experts
+        )
+        if config.multimodel_experts:
+            assert (
+                len(set(config.moe_num_experts)) == 1
+            ), f"assume expert group has same size, got: {config.moe_num_experts}"
+
+        with paddle.utils.unique_name.guard(f"mm_layer_{layer_idx}_"):
+            num_experts_groups = (
+                len(config.moe_num_experts) if config.multimodel_experts else 1
+            )
+            p = self.create_parameter(
+                shape=[num_experts_groups, num_experts],
+                dtype="float32",
+                is_bias=True,
+                attr=paddle.ParamAttr(
+                    name=paddle.utils.unique_name.generate("corr_bias")
+                ),
+            )
+            p.stop_gradient = True
+            self.e_score_correction_bias = p
+            self.e_score_correction_bias.is_distributed = True
+            p = paddle.zeros(
+                shape=[num_experts_groups, num_experts],
+                dtype="int64",
+            )
+            p.stop_gradient = True
+            self.expert_usage = p
 
 
 @contextmanager
@@ -191,6 +241,7 @@ class MOELayerAuto(MOELayer):
         k=2,
         all_to_all_dropout=0,
         group_experts=False,
+        moe_statics=None,
         config=None,
         ipp=0,
     ):
@@ -251,6 +302,8 @@ class MOELayerAuto(MOELayer):
 
         self.input_preprocess = self.output_postprocess = None
         self.group_experts = group_experts
+        self.use_correction_bias = moe_statics is not None
+        self.moe_statics = moe_statics
 
     def fused_gate_logits_process(
         self, gate_logits, token_type_ids, offload_helper=None
@@ -529,13 +582,34 @@ class MOELayerAuto(MOELayer):
                 prob, max_prob = self.fused_gate_logits_process(
                     gate_logits, token_type_ids
                 )
+                if "corr_bias" in inspect.signature(moe_gate_dispatch).parameters:
+                    if self.use_correction_bias:
+                        compat_args = (self.moe_statics.e_score_correction_bias[0],)
+                    else:
+                        compat_args = (None,)
+                else:
+                    assert (
+                        not self.use_correction_bias
+                    ), "correction bias not supported, rebuild moe-ops"
+                    compat_args = ()
                 (
                     dispatched_input,
                     combine_weights_unnorm,
                     scatter_index,
                     dispatch_mask,
                     _,
-                ) = moe_gate_dispatch(input, prob, None, k, local_capacity, True)
+                ) = moe_gate_dispatch(
+                    input, prob, *compat_args, k, local_capacity, True
+                )
+                dispatch_mask = paddle.diff(F.pad(dispatch_mask, (1, 0)))
+                if self.use_correction_bias:
+                    if self.gate.config.multimodel_experts:
+                        for i in range(len(self.moe_statics.expert_usage)):
+                            self.moe_statics.expert_usage[i] += dispatch_mask[
+                                self.gate.experts_type_mask[i]
+                            ].detach()
+                    else:
+                        self.moe_statics.expert_usage[0] += dispatch_mask.detach()
                 dispatched_input.stop_gradient = False
                 combine_weights_unnorm.stop_gradient = False
                 dispatch_mask.stop_gradient = True

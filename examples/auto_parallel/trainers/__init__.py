@@ -18,6 +18,7 @@ from .callbacks_auto import (
     LoggingCallback,
     GlobalRNGCallback,
     StopperCallback,
+    MoECorrectionBiasAdjustCallback,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "LoggingCallback",
     "GlobalRNGCallback",
     "StopperCallback",
+    "MoECorrectionBiasAdjustCallback",
 ]

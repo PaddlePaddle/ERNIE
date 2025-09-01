@@ -36,7 +36,11 @@ from models.configuration_auto import (
     ErnieConfig,
     ErnieMoEConfig,
 )
-from trainers import AutoPretrainingTrainer, AutoPreTrainingArguments
+from trainers import (
+    AutoPretrainingTrainer,
+    AutoPreTrainingArguments,
+    MoECorrectionBiasAdjustCallback,
+)
 
 from utils_auto import setup_logger_output_file, logger
 from utils_auto.misc import global_training_logs
@@ -522,6 +526,14 @@ def main():
     )
 
     # 6. prepare for train/eval
+    callbacks = []
+    if getattr(cfg, "moe_use_aux_free", False):
+        logger.info("Adding aux free callback")
+        callbacks += [
+            MoECorrectionBiasAdjustCallback(
+                args.moe_use_aux_free_update_coef, args.sequence_parallel
+            )
+        ]
     init_parameters(model)
 
     trainer = AutoPretrainingTrainer(
@@ -532,6 +544,7 @@ def main():
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
         compute_metrics=lambda p: compute_metrics(p, tokenizer),
+        callbacks=callbacks,
     )
 
     global_training_logs.accumulate = args.gradient_accumulation_steps

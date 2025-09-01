@@ -180,9 +180,9 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         default="ernie",
         metadata={"help": "Only support for ernie pre-training for now."},
     )
-    n_microbatches: int = field(
-        default=1,
-        metadata={"help": "Control the num of microbatches in one pp step."},
+    moe_use_aux_free_update_coef: float = field(
+        default=1.0e-3,
+        metadata={"help": "moe aux free update coef"},
     )
 
     @property
