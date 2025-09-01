@@ -25,6 +25,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
+from paddle.distributed import fleet
 from paddle import nn
 from paddle.distributed.fleet.utils import recompute
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
@@ -1856,9 +1857,13 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
             chunk_size = (
                 config.num_hidden_layers // pp_degree // config.virtual_pp_degree
             )
+            current_rank = (
+                fleet.get_hybrid_communicate_group().get_pipe_parallel_group().rank
+                % pp_degree
+            )
             for idx in range(config.num_hidden_layers):
                 target_stage = (idx // chunk_size) % pp_degree
-                if target_stage == config.current_pp_rank:
+                if target_stage == current_rank:
                     stage_id = (idx // chunk_size) % pp_degree
                     self.layers.append(ErnieModelAutoPP(config, idx, stage_id))
                 else:

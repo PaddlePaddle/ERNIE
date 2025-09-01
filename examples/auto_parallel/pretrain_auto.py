@@ -462,44 +462,13 @@ def set_moe_config(config):
                 f"disable FFN tensor model parallel, moe-group={config.moe_group}"
             )
             config.disable_ffn_model_parallel = True
-        if config.moe_group in {"mp", "model", "tp", "mpdp"}:
-            assert config.sequence_parallel
-            logger.info(
-                f"disable FFN tensor model parallel, moe-group={config.moe_group}"
-            )
-            config.disable_ffn_model_parallel = True
 
-    def _parse_moe_group(moe_group: str):
-        moe_group = moe_group.lower()
-        assert moe_group in {
-            "dp",
-            "mp",
-            "none",
-        }, f"moe-group not supported, got: {moe_group}"
-        logger.info(f"using moe-group: {moe_group}")
-
-        return moe_group
-
-    config.moe_group = _parse_moe_group(config.moe_group)
-    if config.moe_group in paddle.distributed.fleet.auto.get_mesh().dim_names:
-        config.moe_world_size = paddle.distributed.fleet.auto.get_mesh().get_dim_size(
-            config.moe_group
-        )
-        if config.moe_world_size < 0:
-            config.moe_world_size = 1
-    else:
         config.moe_world_size = 1
-
-
-def set_current_pp_rank(config):
-    if config.pipeline_parallel_degree > 1:
-        pp_degree = config.pipeline_parallel_degree
-        config.current_pp_rank = (
-            fleet.get_hybrid_communicate_group().get_pipe_parallel_group().rank
-            % pp_degree
-        )
-    else:
-        config.current_pp_rank = 0
+        if config.moe_group in fleet.auto.get_mesh().dim_names:
+            config.moe_world_size = max(
+                config.moe_world_size,
+                fleet.auto.get_mesh().get_dim_size(config.moe_group),
+            )
 
 
 def main():
@@ -560,7 +529,6 @@ def main():
         replace_cross_entropy()
 
     set_moe_config(cfg)
-    set_current_pp_rank(cfg)
 
     tokenizer = setup_tokenizer(args, cfg)
 
