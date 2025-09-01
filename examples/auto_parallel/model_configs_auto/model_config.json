@@ -7,7 +7,6 @@
   "hidden_act": "silu",
   "hidden_size": 8192,
   "intermediate_size": 28672,
-  "initializer_range": 0.00482174,
   "max_sequence_length": 4096,
   "max_position_embeddings": 4096,
   "model_type": "ernie",

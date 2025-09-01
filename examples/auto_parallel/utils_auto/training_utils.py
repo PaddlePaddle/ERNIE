@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import logging
+import paddle.distributed as dist
+from paddle.distributed import fleet
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,3 +44,26 @@ def reset_per_device_batch_size(
             f"dp_worldsize={dataset_world_size}, accumulate_steps={gradient_accumulation_steps} "
         )
     return per_device_train_batch_size, gradient_accumulation_steps
+
+
+def get_flatten_mesh(mesh):
+    return dist.ProcessMesh(mesh.process_ids)
+
+
+def is_pp_enable():
+    mesh = fleet.auto.get_mesh()
+    return "pp" in mesh.dim_names
+
+
+def get_mesh(pp_idx=None):
+    mesh = fleet.auto.get_mesh()
+    if is_pp_enable():
+        mesh = mesh.get_mesh_with_dim("pp", pp_idx)
+    return mesh
+
+
+def _reshard(tensor, mesh, placements):
+    dst_tensor = dist.auto_parallel.moe_utils._dist_reshape(
+        tensor, tensor.shape, mesh, placements
+    )
+    return dst_tensor

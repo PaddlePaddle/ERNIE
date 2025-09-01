@@ -32,7 +32,6 @@ __all__ = [
 ERNIE_PRETRAINED_INIT_CONFIGURATION = {
     "ernie/tiny-random-ernie": {
         "hidden_size": 768,
-        "initializer_range": 0.02,
         "intermediate_size": 11008,
         "max_position_embeddings": 2048,
         "model_type": "ernie",
@@ -72,8 +71,6 @@ class ErnieConfig(PretrainedConfig):
             Number of attention heads for each attention layer in the Transformer encoder.
         hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
             The non-linear activation function (function or string) in the decoder.
-        initializer_range (`float`, *optional*, defaults to 0.02):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         rms_norm_eps (`float`, *optional*, defaults to 1e-12):
             The epsilon used by the rms normalization layers.
         use_cache (`bool`, *optional*, defaults to `True`):
@@ -115,11 +112,9 @@ class ErnieConfig(PretrainedConfig):
         num_hidden_layers=2,
         num_attention_heads=2,
         head_dim=None,
-        initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=False,
         use_flash_attn=True,
-        use_mem_eff_attn=False,
         use_flash_attn_with_mask=False,
         use_recompute=False,
         use_recompute_attn=False,
@@ -157,7 +152,6 @@ class ErnieConfig(PretrainedConfig):
         submatrix_parallel=False,
         submatrix_parallel_low_memory=True,
         use_sparse_head_and_loss_fn=False,
-        using_dynamic_sequence_length=False,
         micro_batch_size=-1,
         using_precision_check=False,
         use_qk_norm=False,
@@ -205,7 +199,6 @@ class ErnieConfig(PretrainedConfig):
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
         self.head_dim = head_dim
-        self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
         self.use_recompute_attn = use_recompute_attn
@@ -220,7 +213,6 @@ class ErnieConfig(PretrainedConfig):
         )
         self.use_flash_attn = use_flash_attn
         self.recompute_use_reentrant = recompute_use_reentrant
-        self.use_mem_eff_attn = use_mem_eff_attn
         self.use_flash_attn_with_mask = use_flash_attn_with_mask
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
@@ -229,11 +221,6 @@ class ErnieConfig(PretrainedConfig):
         self.fuse_swiglu = fuse_swiglu
         self.fuse_rms_norm = fuse_rms_norm
         self.use_rmsnorm = use_rmsnorm
-        self.using_dynamic_sequence_length = using_dynamic_sequence_length
-        if using_dynamic_sequence_length:
-            assert (
-                micro_batch_size > 0
-            ), "micro_batch_size should be set when using_dynamic_sequence_length"
         self.micro_batch_size = micro_batch_size
         self.using_precision_check = using_precision_check
         self.use_qk_norm = use_qk_norm
@@ -341,9 +328,7 @@ class ErnieConfig(PretrainedConfig):
         self.moe_layer_feed_fake_token = moe_layer_feed_fake_token
 
         if self.sequence_parallel:
-            assert (
-                self.using_dynamic_sequence_length or self.seqlen
-            ), "seqlen not provided in sequence-parallel when not using dygramic sequence length"
+            assert self.seqlen, "seqlen not provided in sequence-parallel"
 
             assert (
                 self.tensor_parallel_degree > 1
@@ -400,8 +385,6 @@ class ErnieMoEConfig(ErnieConfig):
             Number of attention heads for each attention layer in the Transformer encoder.
         hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
             The non-linear activation function (function or string) in the decoder.
-        initializer_range (`float`, *optional*, defaults to 0.02):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         rms_norm_eps (`float`, *optional*, defaults to 1e-12):
             The epsilon used by the rms normalization layers.
         use_cache (`bool`, *optional*, defaults to `True`):
@@ -445,7 +428,6 @@ class ErnieMoEConfig(ErnieConfig):
         moe_layer_end_index: Union[int, list] = -1,
         moe_aux_loss_lambda=1e-2,
         moe_orthogonal_loss_lambda=1e-2,
-        moe_use_size_all2all=False,
         sinkhorn_2gate=True,
         sinkhorn_temp=3e-2,
         global_aux_loss=False,
@@ -531,7 +513,6 @@ class ErnieMoEConfig(ErnieConfig):
         self.moe_group = moe_group
         self.moe_gate = moe_gate
         self.moe_num_attn_experts = moe_num_attn_experts
-        self.moe_use_size_all2all = moe_use_size_all2all
         self.moe_logging = moe_logging
         self.num_experts_per_tok = num_experts_per_tok
         self.moe_num_shared_experts = moe_num_shared_experts
@@ -678,19 +659,6 @@ class ErnieMoEConfig(ErnieConfig):
         return (
             isinstance(self.moe_num_experts, (tuple, list))
             and len(self.moe_num_experts) > 1
-        )
-
-    @property
-    def use_moe(self) -> bool:
-        """_summary_
-
-        Returns:
-            bool: _description_
-        """
-        return (
-            sum(self.moe_num_experts) > 0
-            if self.multimodel_experts
-            else self.moe_num_experts > 0
         )
 
     def __setattr__(self, name: str, value):
