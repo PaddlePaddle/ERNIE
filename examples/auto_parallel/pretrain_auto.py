@@ -454,6 +454,23 @@ def get_checkpoint(args, output_dir):
     return args.resume_from_checkpoint or last_checkpoint
 
 
+def set_moe_config(config):
+    if hasattr(config, "use_moe") and config.use_moe:
+        if config.moe_group in {"mp", "model", "tp", "mpdp"}:
+            assert config.sequence_parallel
+            logger.info(
+                f"disable FFN tensor model parallel, moe-group={config.moe_group}"
+            )
+            config.disable_ffn_model_parallel = True
+
+        config.moe_world_size = 1
+        if config.moe_group in fleet.auto.get_mesh().dim_names:
+            config.moe_world_size = max(
+                config.moe_world_size,
+                fleet.auto.get_mesh().get_dim_size(config.moe_group),
+            )
+
+
 def main():
     # 1. init config and parse arg
     config = get_config(verbose=True)
@@ -510,6 +527,8 @@ def main():
         and cfg.tensor_parallel_degree > 1
     ):
         replace_cross_entropy()
+
+    set_moe_config(cfg)
 
     tokenizer = setup_tokenizer(args, cfg)
 

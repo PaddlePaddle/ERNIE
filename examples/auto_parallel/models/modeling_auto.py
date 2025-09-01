@@ -25,17 +25,13 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
-from paddle import nn
 from paddle.distributed import fleet
+from paddle import nn
 from paddle.distributed.fleet.utils import recompute
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
-from paddle.incubate.nn.memory_efficient_attention import (
-    memory_efficient_attention,
-    BlockDiagonalCausalMask,
-)
 from paddle.distributed import in_auto_parallel_align_mode
 
-from models.top2_gate_auto import Top2Gate, TopKGateFusedAuto
+from models.top2_gate_auto import TopKGateFusedAuto
 
 
 from paddleformers.transformers.model_outputs import (
@@ -50,14 +46,12 @@ from models.moe_layer_auto import (
     MoEStatics,
 )
 from models.configuration_auto import ErnieMoEConfig
-from models.moe_utils_auto import get_mesh
+from utils_auto.training_utils import get_mesh
 
-from paddle.nn.functional.flash_attention import (
-    scaled_dot_product_attention as flash_attention_with_mask,
-)
+
 from paddle.nn.functional.flash_attention import flash_attention
-
-from to_block_diag_causal_mask import to_block_diag_causal_mask
+from paddle.incubate.nn.functional import fused_rotary_position_embedding as fused_rope
+from paddle.incubate.nn.functional import swiglu as fused_swiglu
 
 
 @dataclass
@@ -74,23 +68,7 @@ class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
 logger = logging.getLogger(__name__)
 
 
-try:
-    from paddle.incubate.nn.functional import (
-        fused_rotary_position_embedding as fused_rope,
-    )
-except (ImportError, ModuleNotFoundError):
-    logger.warning("fused_rotary_position_embedding not found")
-    fused_rope = None
-
-try:
-    from paddle.incubate.nn.functional import swiglu as fused_swiglu
-except (ImportError, ModuleNotFoundError):
-    fused_swiglu = None
-
-
 __all__ = [
-    "ErnieModelAuto",
-    "ErniePretrainedModelAuto",
     "ErnieForCausalLMAuto",
 ]
 
@@ -109,14 +87,6 @@ class FusedDropoutImpl(nn.Layer):
         output = x + y
 
         return output
-
-
-def global_mesh_starts_with_pp():
-    mesh = fleet.auto.get_mesh()
-    if "pp" in mesh.dim_names:
-        return mesh.get_mesh_with_dim("pp")
-    else:
-        return mesh
 
 
 def get_triangle_upper_mask(x, mask=None):
@@ -158,17 +128,9 @@ def calc_lm_head_logits(
             )
         # [S, B, H] to [B, S, H]
         hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
-        if not config.using_dynamic_sequence_length:
-            hidden_states = hidden_states.reshape(
-                [-1, config.seqlen, hidden_states.shape[-1]]
-            )
-        else:
-            assert (
-                config.micro_batch_size
-            ), "micro_batch_size should be set when using dygramic sequence length."
-            hidden_states = hidden_states.reshape(
-                [config.micro_batch_size, -1, hidden_states.shape[-1]]
-            )
+        hidden_states = hidden_states.reshape(
+            [-1, config.seqlen, hidden_states.shape[-1]]
+        )
     if tensor_parallel_output is None:
         tensor_parallel_output = config.tensor_parallel_output
 
@@ -189,47 +151,6 @@ def masked_fill(x, mask, value):
     return paddle.where(mask, y, x)
 
 
-def mem_eff_attn(
-    query, key, value, pack_offset, drop_prob=0.0, dtype=paddle.bfloat16, training=True
-):
-    pack_offset = pack_offset.numpy()
-    shape = pack_offset.shape
-    assert len(shape) == 2, len(shape)
-    assert shape[0] == 1, shape[0]
-    n = pack_offset.size
-    pack_offset = pack_offset.flatten()
-    seqlens = []
-    assert pack_offset[0] == 0, pack_offset[0]
-    for i in range(1, n):
-        if pack_offset[i] < 0:
-            break
-        cur = pack_offset[i] - pack_offset[i - 1]
-        assert cur > 0
-        seqlens.append(cur)
-
-    assert drop_prob == 0.0, drop_prob
-    assert dtype == paddle.bfloat16, dtype
-
-    def cast(x):
-        return x.astype(dtype) if x.dtype != dtype else x
-
-    if len(seqlens) == 1:
-        out, _ = flash_attention(
-            query, key, value, drop_prob, causal=True, training=training
-        )
-    else:
-        mask = BlockDiagonalCausalMask.from_seqlens(seqlens)
-        out = memory_efficient_attention(
-            cast(query),
-            cast(key),
-            cast(value),
-            attn_bias=mask,
-            p=drop_prob,
-            training=training,
-        )
-    return out
-
-
 def scaled_dot_product_attention(
     query_states,
     key_states,
@@ -238,7 +159,6 @@ def scaled_dot_product_attention(
     output_attentions,
     config,
     is_causal=True,
-    rr_flash_attn=None,
     inbatch_pack_offset=None,
     training=True,
 ):
@@ -247,7 +167,19 @@ def scaled_dot_product_attention(
 
     can_use_fa = config.use_flash_attn
 
-    if not can_use_fa:
+    if can_use_fa:
+        attn_output, attn_weights = flash_attention(
+            query_states,
+            key_states,
+            value_states,
+            dropout=config.attention_probs_dropout_prob,
+            causal=is_causal and query_states.shape[1] != 1,
+            return_softmax=output_attentions,
+        )
+
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        return attn_output, attn_weights
+    else:
         if query_states.shape[-2] != key_states.shape[-2]:
             key_states = key_states.repeat_interleave(
                 num_heads // num_key_value_heads, axis=-2
@@ -256,56 +188,6 @@ def scaled_dot_product_attention(
             value_states = value_states.repeat_interleave(
                 num_heads // num_key_value_heads, axis=-2
             )
-
-    if can_use_fa:
-        if rr_flash_attn is not None:
-            attn_output, attn_weights = rr_flash_attn(
-                query_states,
-                key_states,
-                value_states,
-                dropout=config.attention_probs_dropout_prob,
-                causal=is_causal and query_states.shape[1] != 1,
-                return_softmax=output_attentions,
-            )
-        else:
-            attn_output, attn_weights = flash_attention(
-                query_states,
-                key_states,
-                value_states,
-                dropout=config.attention_probs_dropout_prob,
-                causal=is_causal and query_states.shape[1] != 1,
-                return_softmax=output_attentions,
-            )
-
-        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return attn_output, attn_weights
-    elif config.use_mem_eff_attn and inbatch_pack_offset is not None:
-        assert (
-            not output_attentions
-        ), "output_attentions should be False when use_mem_eff_attn=True"
-        if config.use_flash_attn_with_mask:
-
-            attn_mask = to_block_diag_causal_mask(
-                inbatch_pack_offset, q_len, float("-inf"), "bfloat16"
-            )
-            attn_output = flash_attention_with_mask(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask,
-                config.attention_probs_dropout_prob,
-            )
-        else:
-            attn_output = mem_eff_attn(
-                query_states,
-                key_states,
-                value_states,
-                inbatch_pack_offset,
-                drop_prob=config.attention_probs_dropout_prob,
-            )
-        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return attn_output, None
-    else:
         query_states = paddle.transpose(query_states, [0, 2, 1, 3]) / math.sqrt(
             head_dim
         )
@@ -1242,27 +1124,20 @@ class ErnieDecoderLayerAuto(nn.Layer):
         else:
             shared_experts = None
 
-        is_moe_infer = self.config.get("is_moe_infer", False)
-        if is_moe_infer:
-            raise NotImplementedError
-        elif self.config.moe_use_size_all2all:
-            raise NotImplementedError
-        else:
-            logger.info(f"moe-logging:{self.config.moe_logging}")
-            self.mlp = MOELayerAuto(
-                gate,
-                experts,
-                layer_idx=layer_idx,
-                shared_experts=shared_experts,
-                group=self.config.moe_group,
-                recompute=self.config.use_recompute_moe,
-                k=self.config.moe_k,
-                all_to_all_dropout=self.config.moe_all_to_all_dropout,
-                group_experts=self.config.moe_group_experts,
-                moe_statics=moe_statics,
-                config=self.config,
-                ipp=self.ipp,
-            )
+        logger.info(f"moe-logging:{self.config.moe_logging}")
+        self.mlp = MOELayerAuto(
+            gate,
+            experts,
+            layer_idx=layer_idx,
+            shared_experts=shared_experts,
+            group=self.config.moe_group,
+            recompute=self.config.use_recompute_moe,
+            k=self.config.moe_k,
+            all_to_all_dropout=self.config.moe_all_to_all_dropout,
+            group_experts=self.config.moe_group_experts,
+            config=self.config,
+            ipp=self.ipp,
+        )
 
     def forward(
         self,
@@ -1424,7 +1299,7 @@ class ErniePretrainedModelAuto(PretrainedModel):
                         f' type={type(layer)},norm={layer.weight.astype("float32").norm()}'
                     )
 
-        elif isinstance(layer, Top2Gate):
+        elif isinstance(layer, TopKGateFusedAuto):
             if not hasattr(layer, "weight"):
                 return
             with rng_tracker("model_parallel_rng"):
@@ -1472,23 +1347,6 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
     """
 
     def __init__(self, config: ErnieMoEConfig, pp_layer_idx=None):
-        if hasattr(config, "use_moe") and config.use_moe:
-            if config.moe_group in {"mp", "model", "tp", "mpdp"}:
-                assert config.sequence_parallel
-                logger.info(
-                    f"disable FFN tensor model parallel, moe-group={config.moe_group}"
-                )
-                config.disable_ffn_model_parallel = True
-
-            if config.moe_group in fleet.auto.get_mesh().dim_names:
-                config.moe_world_size = fleet.auto.get_mesh().get_dim_size(
-                    config.moe_group
-                )
-                if config.moe_world_size < 0:
-                    config.moe_world_size = 1
-            else:
-                config.moe_world_size = 1
-
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.config = config
@@ -1506,7 +1364,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 if not in_auto_parallel_align_mode():
                     self.embed_tokens.weight = dist.shard_tensor(
                         self.embed_tokens.weight,
-                        get_mesh(),
+                        get_mesh(pp_idx=0),
                         [dist.Replicate(), dist.Shard(1)],
                     )
         if config.pipeline_parallel_degree <= 1:
@@ -1637,7 +1495,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 self.embed_tokens.weight.dtype
             )
 
-        global_mesh = global_mesh_starts_with_pp()
+        global_mesh = get_mesh(pp_idx=None)
         if self.config.sequence_parallel:
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
 
@@ -1648,10 +1506,8 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
         can_use_fa = self.config.use_flash_attn and flash_attention is not None
-        can_mem_eff_attn = (
-            self.config.use_mem_eff_attn and self.inbatch_pack_offset is not None
-        )
-        if can_use_fa or can_mem_eff_attn:
+
+        if can_use_fa:
             if attention_mask is not None:
                 attention_mask = None
 
@@ -1834,9 +1690,6 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         self.ignored_index = getattr(config, "ignored_index", -100)
         self.config = config
         self.return_tuple = return_tuple
-        self.enable_parallel_cross_entropy = (
-            config.tensor_parallel_degree > 1 and config.tensor_parallel_output
-        )
 
         self.loss_func = paddle.nn.CrossEntropyLoss(
             reduction="none",
@@ -1857,15 +1710,11 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
             return loss
         return loss, loss_sum
 
-    def loss_impl(self, prediction_scores, masked_lm_labels):
-        masked_lm_loss = self.loss_func(
-            prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(-1)
-        )
-        return masked_lm_loss
-
     def forward_impl(self, prediction_scores, masked_lm_labels):
         with paddle.amp.auto_cast(False):
-            masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
+            masked_lm_loss = self.loss_func(
+                prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(-1)
+            )
             lossmask = masked_lm_labels != self.ignored_index
 
             if (~lossmask).all():
@@ -1897,12 +1746,11 @@ class ErnieLMHead(nn.Layer):
     def __init__(self, config):
         super(ErnieLMHead, self).__init__()
         self.config = config
-        vocab_size = config.vocab_size
         self.weight = self.create_parameter(
             shape=(
-                [vocab_size, config.hidden_size]
+                [config.vocab_size, config.hidden_size]
                 if config.tie_word_embeddings
-                else [config.hidden_size, vocab_size]
+                else [config.hidden_size, config.vocab_size]
             ),
             dtype=paddle.get_default_dtype(),
         )
@@ -1916,13 +1764,14 @@ class ErnieLMHead(nn.Layer):
                 get_mesh(-1),
                 [dist.Replicate(), dist.Shard(1)],
             )
+        self.weight.is_distributed = False
 
         logger.info(
             f"output-weight:{self.weight.shape} config.tie_word_embeddings={config.tie_word_embeddings}"
         )
         if config.weight_share_add_bias and config.use_bias:
             self.bias = self.create_parameter(
-                shape=[vocab_size],
+                shape=[config.vocab_size],
                 dtype=paddle.get_default_dtype(),
                 attr=paddle.ParamAttr(
                     initializer=paddle.nn.initializer.constant.Constant(0.0)
@@ -1937,25 +1786,9 @@ class ErnieLMHead(nn.Layer):
                     get_mesh(-1),
                     [dist.Replicate(), dist.Shard(0)],
                 )
+            self.bias.is_distributed = False
         else:
             self.bias = None
-
-        self.weight.is_distributed = (
-            True if (vocab_size != config.vocab_size) else False
-        )
-        if config.weight_share_add_bias and config.use_bias:
-            self.bias.is_distributed = (
-                True if (vocab_size != config.vocab_size) else False
-            )
-
-        if self.weight.is_distributed:
-            self.weight.split_axis = 1
-        if (
-            config.weight_share_add_bias
-            and config.use_bias
-            and self.bias.is_distributed
-        ):
-            self.bias.split_axis = 0
 
         if self.config.use_recompute_loss_fn:
             logger.info(
@@ -2011,37 +1844,13 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
 
     def __init__(self, config):
         super().__init__(config)
-
-        if config.sequence_parallel:
-            logger.info(f"using sequence_parallel, input seqlen={config.seqlen}")
-            if config.using_dynamic_sequence_length:
-                assert (
-                    not config.micro_batch_size
-                ), "sequence-parallel needs micro_batch_size setting when using dygramic_sequnence_length"
-            else:
-                assert config.seqlen is not None
-
-            assert (
-                config.tensor_parallel_degree > 1
-            ), f"sequence-parallel needs mp>1, got mp={config.tensor_parallel_degree}"
-
-        new_initializer_range = math.sqrt(0.3333 / config.hidden_size)
-        logger.info(
-            f"change initializer-range from {config.initializer_range} to {new_initializer_range}"
-        )
-        config.initializer_range = new_initializer_range
+        config.initializer_range = math.sqrt(0.3333 / config.hidden_size)
+        logger.info(f"Initializer-range is {config.initializer_range}")
         self.config = config
         self.criterion = ErniePretrainingCriterion(config, False)
 
         self.tie_weights()
 
-        if self.config.use_rmsnorm:
-            if self.config.fuse_rms_norm:
-                logger.info("Use fusedRMSNorm")
-            else:
-                logger.info("Use normal RMSNorm")
-        else:
-            logger.info("Use normal LayerNorm")
         if config.pipeline_parallel_degree > 1:
             self.layers = nn.LayerList()
             pp_degree = config.pipeline_parallel_degree
@@ -2123,40 +1932,6 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
 
-    def set_decoder(self, decoder):
-        self.ernie = decoder
-
-    def get_decoder(self):
-        return self.ernie
-
-    def prepare_inputs_for_generation(
-        self,
-        input_ids,
-        use_cache=False,
-        past_key_values=None,
-        inputs_embeds=None,
-        **kwargs,
-    ):
-        if past_key_values:
-            input_ids = input_ids[:, -1:]
-
-        attention_mask = kwargs.get("attention_mask", None)
-
-        if inputs_embeds is not None and past_key_values is None:
-            model_inputs = {"inputs_embeds": inputs_embeds}
-        else:
-            model_inputs = {"input_ids": input_ids}
-
-        model_inputs.update(
-            {
-                "past_key_values": past_key_values,
-                "use_cache": True,
-                "attention_mask": attention_mask,
-                "return_dict": True,
-            }
-        )
-        return model_inputs
-
     def forward(
         self,
         input_ids,
@@ -2206,9 +1981,7 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
 
         hidden_states = outputs.last_hidden_state
 
-        logits = self.lm_head(
-            hidden_states,
-        )
+        logits = self.lm_head(hidden_states)
 
         if return_dict:
             if labels is not None:
