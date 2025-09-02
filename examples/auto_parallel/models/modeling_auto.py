@@ -1099,6 +1099,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
             k=self.config.moe_k,
             all_to_all_dropout=self.config.moe_all_to_all_dropout,
             group_experts=self.config.moe_group_experts,
+            moe_statics=moe_statics,
             config=self.config,
             ipp=self.ipp,
         )

@@ -131,7 +131,7 @@ class MOELayerAuto(nn.Layer):
         config=None,
         ipp=0,
     ):
-        super().__init__(self)
+        super().__init__()
         self.config = config
         self.gate = gate
         self.layer_idx = layer_idx

@@ -22,6 +22,7 @@ import numpy as np
 import paddle
 from omegaconf import ListConfig, DictConfig
 from paddle.distributed.fleet import fleet
+from paddle.distributed.auto_parallel import get_mesh
 from paddleformers.data import Stack
 from paddleformers.data.causal_dataset import (
     build_train_valid_test_datasets,
@@ -464,10 +465,10 @@ def set_moe_config(config):
             config.disable_ffn_model_parallel = True
 
         config.moe_world_size = 1
-        if config.moe_group in fleet.auto.get_mesh().dim_names:
+        if config.moe_group in get_mesh().dim_names:
             config.moe_world_size = max(
                 config.moe_world_size,
-                fleet.auto.get_mesh().get_dim_size(config.moe_group),
+                get_mesh().get_dim_size(config.moe_group),
             )
 
 
