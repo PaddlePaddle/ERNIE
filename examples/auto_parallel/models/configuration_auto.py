@@ -117,7 +117,6 @@ class ErnieConfig(PretrainedConfig):
         use_flash_attn=True,
         use_flash_attn_with_mask=False,
         use_recompute=False,
-        use_recompute_attn=False,
         recompute_use_reentrant=False,
         use_rmsnorm=True,
         fuse_rms_norm=False,
@@ -202,10 +201,6 @@ class ErnieConfig(PretrainedConfig):
         self.head_dim = head_dim
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
-        self.use_recompute_attn = use_recompute_attn
-        if use_recompute_attn:
-            logger.warning("set `use_recompute_attn`=True, disabling `use_recompute`")
-            use_recompute = False
         self.use_recompute = use_recompute
         self.recompute_num_layers = (
             recompute_num_layers
@@ -339,7 +334,6 @@ class ErnieConfig(PretrainedConfig):
         self.register_nonsaveable_keys("use_recompute")
         self.register_nonsaveable_keys("recompute_use_reentrant")
         self.register_nonsaveable_keys("refined_recompute")
-        self.register_nonsaveable_keys("use_recompute_attn")
         self.register_nonsaveable_keys("use_recompute_lm_head")
         self.register_nonsaveable_keys("use_recompute_mtp")
         self.register_nonsaveable_keys("use_recompute_dnd")
