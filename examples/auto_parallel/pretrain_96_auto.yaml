@@ -4,7 +4,7 @@ env:
 
 # ---------------------------model args-------------------------------------------------#
 model_args:
-    model_name_or_path: model_configs_auto/
+    model_name_or_path: ../pre-training/model_configs/ERNIE-4p5-300B-A47B/
     tokenizer_name: ../pre-training/ernie/src/tokenizers/tokenizer_model
     output_dir: ./output/
     data_load_process_num: 40
@@ -19,6 +19,15 @@ model_args:
         multi_token_pred_depth: 0
         moe_logging: True
         moe_use_aux_free: true
+        num_hidden_layers: 4
+        use_cache: False
+        use_fast_ln: True
+        fuse_gate_detach_matmul: False
+        moe_group_orthogonal_loss: True
+        moe_orthogonal_loss_lambda: 0.0
+        moe_use_all2all: True
+        tie_word_embeddings: False
+
 
 # ---------------------------trainer args-------------------------------------------------#
 trainer_args:

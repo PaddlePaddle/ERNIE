@@ -38,6 +38,8 @@ export FLAGS_enable_moe_utils=true
 
 export PYTHONPATH=../../:$PYTHONPATH
 
+log_dir=output/paddle_distributed_logs
+
 python -m paddle.distributed.launch \
     --log_dir ${log_dir} \
     pretrain_auto.py  \

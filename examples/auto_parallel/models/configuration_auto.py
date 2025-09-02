@@ -182,6 +182,7 @@ class ErnieConfig(PretrainedConfig):
         use_combine_before_a2a=False,
         use_quant_before_a2a=False,
         rope_yarn_config={},
+        moe_use_all2all=False,
         **kwargs,
     ):
         if "tie_word_embeddings" not in kwargs:
@@ -267,6 +268,7 @@ class ErnieConfig(PretrainedConfig):
         self.decoderlayer_act_offload_settings = decoderlayer_act_offload_settings
         self.loss_subbatch_seqlen = loss_subbatch_seqlen
         self.gate_force_zero_padding_grad = gate_force_zero_padding_grad
+        self.moe_use_all2all = moe_use_all2all
 
         default_fp8_configs = {
             "quant_scheme": "DelayedScaling",
