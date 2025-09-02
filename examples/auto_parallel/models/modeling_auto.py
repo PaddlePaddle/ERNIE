@@ -31,7 +31,9 @@ from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 
 from models.top2_gate_auto import TopKGateFusedAuto
 
-
+from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
+    PrepareLayerInput,
+)
 from paddleformers.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions as _BaseModelOutput,
 )
@@ -96,27 +98,39 @@ def calc_lm_head_logits(
     tensor_parallel_output=None,
 ):
     """the core function to calc lm head"""
-    if config.sequence_parallel:
-        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
-        dp_rank = hcg.get_data_parallel_rank()
-        sharding_rank = hcg.get_sharding_parallel_rank()
-        if dp_rank <= 1 and sharding_rank <= 1:
-            hidden_states = dist.reshard(
-                hidden_states,
-                get_mesh(-1),
-                [dist.Replicate(), dist.Replicate()],
-            )
-        else:
-            hidden_states = dist.reshard(
-                hidden_states,
-                get_mesh(-1),
-                [dist.Shard(1), dist.Replicate()],
-            )
-        # [S, B, H] to [B, S, H]
-        hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
-        hidden_states = hidden_states.reshape(
-            [-1, config.seqlen, hidden_states.shape[-1]]
-        )
+    # if config.sequence_parallel:
+    #     assert (
+    #         not config.use_sparse_head_and_loss_fn
+    #     ), "use_sparse_head_and_loss_fn is not supported now."
+
+    #     hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+    #     dp_rank = hcg.get_data_parallel_rank()
+    #     sharding_rank = hcg.get_sharding_parallel_rank()
+    #     if dp_rank <= 1 and sharding_rank <= 1:
+    #         hidden_states = dist.reshard(
+    #             hidden_states,
+    #             get_mesh(-1),
+    #             [dist.Replicate(), dist.Replicate()],
+    #         )
+    #     else:
+    #         hidden_states = dist.reshard(
+    #             hidden_states,
+    #             get_mesh(-1),
+    #             [dist.Shard(1), dist.Replicate()],
+    #         )
+    #     # [S, B, H] to [B, S, H]
+    #     hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+    #     if not config.using_dynamic_sequence_length:
+    #         hidden_states = hidden_states.reshape(
+    #             [-1, config.seqlen, hidden_states.shape[-1]]
+    #         )
+    #     else:
+    #         assert (
+    #             config.micro_batch_size
+    #         ), "micro_batch_size should be set when using dygramic sequence length."
+    #         hidden_states = hidden_states.reshape(
+    #             [config.micro_batch_size, -1, hidden_states.shape[-1]]
+    #         )
     if tensor_parallel_output is None:
         tensor_parallel_output = config.tensor_parallel_output
 
@@ -383,13 +397,13 @@ class LayerNorm(nn.LayerNorm):
         super().__init__(config.hidden_size, epsilon=config.rms_norm_eps)
         self.use_fast_ln = config.use_fast_ln
         self.ipp = ipp
-        if config.pipeline_parallel_degree > 1:
-            self.weight = dist.shard_tensor(
-                self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
-            )
-            self.bias = dist.shard_tensor(
-                self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
-            )
+        # if config.pipeline_parallel_degree > 1:
+        #     self.weight = dist.shard_tensor(
+        #         self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
+        #     )
+        #     self.bias = dist.shard_tensor(
+        #         self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
+        #     )
 
 
 class RotaryEmbedding(nn.Layer):
@@ -543,42 +557,42 @@ class ErnieMLP(nn.Layer):
             self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
         )
 
-        if do_shard_tensor and (
-            self.config.tensor_parallel_degree > 1
-            or self.config.pipeline_parallel_degree > 1
-        ):
-            self.gate_proj.weight = dist.shard_tensor(
-                self.gate_proj.weight,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
-            )
-            self.up_proj.weight = dist.shard_tensor(
-                self.up_proj.weight,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
-            )
-            if config.use_bias:
-                self.gate_proj.bias = dist.shard_tensor(
-                    self.gate_proj.bias,
-                    get_mesh(self.ipp),
-                    [dist.Replicate(), dist.Shard(0)],
-                )
-                self.up_proj.bias = dist.shard_tensor(
-                    self.up_proj.bias,
-                    get_mesh(self.ipp),
-                    [dist.Replicate(), dist.Shard(0)],
-                )
-            self.down_proj.weight = dist.shard_tensor(
-                self.down_proj.weight,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(0)],
-            )
-            if config.use_bias:
-                self.down_proj.bias = dist.shard_tensor(
-                    self.down_proj.bias,
-                    get_mesh(self.ipp),
-                    [dist.Replicate(), dist.Replicate()],
-                )
+        # if do_shard_tensor and (
+        #     self.config.tensor_parallel_degree > 1
+        #     or self.config.pipeline_parallel_degree > 1
+        # ):
+        #     self.gate_proj.weight = dist.shard_tensor(
+        #         self.gate_proj.weight,
+        #         get_mesh(self.ipp),
+        #         [dist.Replicate(), dist.Shard(1)],
+        #     )
+        #     self.up_proj.weight = dist.shard_tensor(
+        #         self.up_proj.weight,
+        #         get_mesh(self.ipp),
+        #         [dist.Replicate(), dist.Shard(1)],
+        #     )
+        #     if config.use_bias:
+        #         self.gate_proj.bias = dist.shard_tensor(
+        #             self.gate_proj.bias,
+        #             get_mesh(self.ipp),
+        #             [dist.Replicate(), dist.Shard(0)],
+        #         )
+        #         self.up_proj.bias = dist.shard_tensor(
+        #             self.up_proj.bias,
+        #             get_mesh(self.ipp),
+        #             [dist.Replicate(), dist.Shard(0)],
+        #         )
+        #     self.down_proj.weight = dist.shard_tensor(
+        #         self.down_proj.weight,
+        #         get_mesh(self.ipp),
+        #         [dist.Replicate(), dist.Shard(0)],
+        #     )
+        #     if config.use_bias:
+        #         self.down_proj.bias = dist.shard_tensor(
+        #             self.down_proj.bias,
+        #             get_mesh(self.ipp),
+        #             [dist.Replicate(), dist.Replicate()],
+        #         )
 
         self.fuse_swiglu = config.fuse_swiglu
 
@@ -589,8 +603,8 @@ class ErnieMLP(nn.Layer):
             x = F.silu(self.gate_proj(x)) * self.up_proj(x)
 
         out = self.down_proj(x)
-        if self.config.sequence_parallel:
-            out = dist.reshard(out, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)])
+        # if self.config.sequence_parallel:
+        #     out = dist.reshard(out, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)])
         return out
 
 
@@ -654,43 +668,47 @@ class ErnieAttentionAuto(nn.Layer):
             )
 
         self.config = config
-
-        self.q_proj.weight = dist.shard_tensor(
-            self.q_proj.weight,
-            get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(1)],
-        )
-        self.k_proj.weight = dist.shard_tensor(
-            self.k_proj.weight,
-            get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(1)],
-        )
-        self.v_proj.weight = dist.shard_tensor(
-            self.v_proj.weight,
-            get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(1)],
-        )
-        if config.use_bias:
-            self.q_proj.bias = dist.shard_tensor(
-                self.q_proj.bias,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(0)],
-            )
-            self.k_proj.bias = dist.shard_tensor(
-                self.k_proj.bias,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(0)],
-            )
-            self.v_proj.bias = dist.shard_tensor(
-                self.v_proj.bias,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(0)],
-            )
-        self.o_proj.weight = dist.shard_tensor(
-            self.o_proj.weight,
-            get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(0)],
-        )
+        self.reshard_row_and_col = ReshardLayer()
+        # if (
+        #     self.config.tensor_parallel_degree > 1
+        #     or self.config.pipeline_parallel_degree > 1
+        # ):
+        #     self.q_proj.weight = dist.shard_tensor(
+        #         self.q_proj.weight,
+        #         get_mesh(self.ipp),
+        #         [dist.Replicate(), dist.Shard(1)],
+        #     )
+        #     self.k_proj.weight = dist.shard_tensor(
+        #         self.k_proj.weight,
+        #         get_mesh(self.ipp),
+        #         [dist.Replicate(), dist.Shard(1)],
+        #     )
+        #     self.v_proj.weight = dist.shard_tensor(
+        #         self.v_proj.weight,
+        #         get_mesh(self.ipp),
+        #         [dist.Replicate(), dist.Shard(1)],
+        #     )
+        #     if config.use_bias:
+        #         self.q_proj.bias = dist.shard_tensor(
+        #             self.q_proj.bias,
+        #             get_mesh(self.ipp),
+        #             [dist.Replicate(), dist.Shard(0)],
+        #         )
+        #         self.k_proj.bias = dist.shard_tensor(
+        #             self.k_proj.bias,
+        #             get_mesh(self.ipp),
+        #             [dist.Replicate(), dist.Shard(0)],
+        #         )
+        #         self.v_proj.bias = dist.shard_tensor(
+        #             self.v_proj.bias,
+        #             get_mesh(self.ipp),
+        #             [dist.Replicate(), dist.Shard(0)],
+        #         )
+        #     self.o_proj.weight = dist.shard_tensor(
+        #         self.o_proj.weight,
+        #         get_mesh(self.ipp),
+        #         [dist.Replicate(), dist.Shard(0)],
+        #     )
 
     def forward(
         self,
@@ -702,10 +720,10 @@ class ErnieAttentionAuto(nn.Layer):
         use_cache: bool = False,
         inbatch_pack_offset: Optional[Tuple[paddle.Tensor]] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
-        if self.config.sequence_parallel:
-            hidden_states = dist.reshard(
-                hidden_states, get_mesh(self.ipp), [dist.Shard(1), dist.Replicate()]
-            )
+        # if self.config.sequence_parallel:
+        #     hidden_states = dist.reshard(
+        #         hidden_states, get_mesh(self.ipp), [dist.Shard(1), dist.Replicate()]
+        #     )
 
         query_states = self.q_proj(hidden_states).reshape(
             shape=[0, 0, self.num_heads, self.head_dim]
@@ -727,10 +745,10 @@ class ErnieAttentionAuto(nn.Layer):
             ]
         )
 
-        if self.config.sequence_parallel:
-            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
-            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
-            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
+        # if self.config.sequence_parallel:
+        #     query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+        #     key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+        #     value_states = paddle.transpose(value_states, [1, 0, 2, 3])
 
         if self.use_recompute_attn:
             assert past_key_value is None, "do not use kv cache in recompute"
@@ -751,25 +769,26 @@ class ErnieAttentionAuto(nn.Layer):
             )
         else:
             attn_output, attn_weights, past_key_value = self.rope_attn(
-                mix_layer=None,
-                query_states=query_states,
-                key_states=key_states,
-                value_states=value_states,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                output_attentions=output_attentions,
-                past_key_value=past_key_value,
-                use_cache=use_cache,
-                inbatch_pack_offset=inbatch_pack_offset,
+                None,
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                position_ids,
+                output_attentions,
+                past_key_value,
+                use_cache,
+                inbatch_pack_offset,
             )
 
-        if self.config.sequence_parallel:
-            attn_output = self.o_proj(paddle.transpose(attn_output, [1, 0, 2]))
-            attn_output = dist.reshard(
-                attn_output, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)]
-            )
-        else:
-            attn_output = self.o_proj(attn_output)
+        # if self.config.sequence_parallel:
+        #     attn_output = self.o_proj(paddle.transpose(attn_output, [1, 0, 2]))
+        #     attn_output = dist.reshard(
+        #         attn_output, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)]
+        #     )
+        # else:
+        attn_output = self.o_proj(attn_output)
+        attn_output = self.reshard_row_and_col(attn_output)
 
         if not output_attentions:
             attn_weights = None
@@ -1018,6 +1037,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
         self.residual_add2 = FusedDropoutImpl(
             config.hidden_dropout_prob, mode="upscale_in_train"
         )
+        self.reshard_col = ReshardLayer()
 
     def create_moe_mlp_layer(self, layer_idx, ipp):
         _ex_cfg = deepcopy(self.config)
@@ -1092,15 +1112,15 @@ class ErnieDecoderLayerAuto(nn.Layer):
         self.mlp = MOELayerAuto(
             gate,
             experts,
-            layer_idx=layer_idx,
-            shared_experts=shared_experts,
-            group=self.config.moe_group,
-            recompute=self.config.use_recompute_moe,
-            k=self.config.moe_k,
-            all_to_all_dropout=self.config.moe_all_to_all_dropout,
-            group_experts=self.config.moe_group_experts,
-            config=self.config,
-            ipp=self.ipp,
+            layer_idx,
+            shared_experts,
+            self.config.moe_group,
+            self.config.use_recompute_moe,
+            self.config.moe_k,
+            self.config.moe_all_to_all_dropout,
+            self.config.moe_group_experts,
+            self.config,
+            self.ipp,
         )
 
     def forward(
@@ -1134,13 +1154,13 @@ class ErnieDecoderLayerAuto(nn.Layer):
 
         (hidden_states, self_attn_weights, present_key_value, *router_loss_attn) = (
             self.self_attn(
-                hidden_states=hidden_states,
-                past_key_value=past_key_value,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                output_attentions=output_attentions,
-                use_cache=use_cache,
-                inbatch_pack_offset=inbatch_pack_offset,
+                hidden_states,
+                past_key_value,
+                attention_mask,
+                position_ids,
+                output_attentions,
+                use_cache,
+                inbatch_pack_offset,
             )
         )
 
@@ -1167,12 +1187,13 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 hidden_states, token_type_ids
             )
         else:
-            if self.config.sequence_parallel:
-                hidden_states = dist.reshard(
-                    hidden_states,
-                    get_mesh(self.ipp),
-                    [dist.Shard(1), dist.Replicate()],
-                )
+            # if self.config.sequence_parallel:
+            #     hidden_states = dist.reshard(
+            #         hidden_states,
+            #         get_mesh(self.ipp),
+            #         [dist.Shard(1), dist.Replicate()],
+            #     )
+            hidden_states = self.reshard_col(hidden_states)
             hidden_states = self.mlp(hidden_states)
             gate_logits = None
 
@@ -1320,11 +1341,11 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 self.vocab_size,
                 self.hidden_size,
             )
-            self.embed_tokens.weight = dist.shard_tensor(
-                self.embed_tokens.weight,
-                get_mesh(pp_idx=0),
-                [dist.Replicate(), dist.Shard(1)],
-            )
+            # self.embed_tokens.weight = dist.shard_tensor(
+            #     self.embed_tokens.weight,
+            #     get_mesh(pp_idx=0),
+            #     [dist.Replicate(), dist.Shard(1)],
+            # )
         if config.pipeline_parallel_degree <= 1:
             self.layers = nn.LayerList()
             for idx in range(
@@ -1343,11 +1364,11 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
 
         self.gradient_checkpointing = False
 
-        self.placements = (
-            [dist.Shard(1), dist.Shard(0)]
-            if self.config.sequence_parallel
-            else [dist.Shard(0), dist.Replicate()]
-        )
+        # self.placements = (
+        #     [dist.Shard(1), dist.Shard(0)]
+        #     if self.config.sequence_parallel
+        #     else [dist.Shard(0), dist.Replicate()]
+        # )
         self.all_gate_logits = () if hasattr(self.config, "use_moe") else None
         self.inbatch_pack_offset = None
         self.token_type_ids = None
@@ -1454,8 +1475,8 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
             )
 
         global_mesh = get_mesh(pp_idx=None)
-        if self.config.sequence_parallel:
-            inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
+        # if self.config.sequence_parallel:
+        #     inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
 
         if position_ids is not None:
             position_ids = dist.shard_tensor(
@@ -1711,15 +1732,15 @@ class ErnieLMHead(nn.Layer):
             dtype=paddle.get_default_dtype(),
         )
 
-        if (
-            self.config.tensor_parallel_degree > 1
-            or self.config.pipeline_parallel_degree > 1
-        ):
-            self.weight = dist.shard_tensor(
-                self.weight,
-                get_mesh(-1),
-                [dist.Replicate(), dist.Shard(1)],
-            )
+        # if (
+        #     self.config.tensor_parallel_degree > 1
+        #     or self.config.pipeline_parallel_degree > 1
+        # ):
+        #     self.weight = dist.shard_tensor(
+        #         self.weight,
+        #         get_mesh(-1),
+        #         [dist.Replicate(), dist.Shard(1)],
+        #     )
         self.weight.is_distributed = False
 
         logger.info(
@@ -1733,15 +1754,15 @@ class ErnieLMHead(nn.Layer):
                     initializer=paddle.nn.initializer.constant.Constant(0.0)
                 ),
             )
-            if (
-                self.config.tensor_parallel_degree > 1
-                or self.config.pipeline_parallel_degree > 1
-            ):
-                self.bias = dist.shard_tensor(
-                    self.bias,
-                    get_mesh(-1),
-                    [dist.Replicate(), dist.Shard(0)],
-                )
+            # if (
+            #     self.config.tensor_parallel_degree > 1
+            #     or self.config.pipeline_parallel_degree > 1
+            # ):
+            #     self.bias = dist.shard_tensor(
+            #         self.bias,
+            #         get_mesh(-1),
+            #         [dist.Replicate(), dist.Shard(0)],
+            #     )
             self.bias.is_distributed = False
         else:
             self.bias = None
@@ -1960,3 +1981,104 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
             else None
         )
         return self.criterion(logits, labels, router_loss)
+
+    def auto_dist_config(self, prefix=""):
+        if prefix != "":
+            assert prefix.endswith(".")
+        config = {
+            "sp_config": {
+                "parallelize_plan": {
+                    f"{prefix}embed_tokens": [
+                        dist.ColWiseParallel(),
+                        dist.SequenceParallelBegin(),
+                    ],
+                    f"{prefix}layers.*.self_attn": dist.SequenceParallelDisable(),
+                    f"{prefix}layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}layers.*.self_attn.k_proj": dist.ColWiseParallel(),
+                    f"{prefix}layers.*.self_attn.v_proj": dist.ColWiseParallel(),
+                    f"{prefix}layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                    f"{prefix}layers.*.self_attn.reshard_row_and_col": PrepareLayerInput(
+                        layer_input_reshard_row_and_col_hook
+                    ),
+                    f"{prefix}layers.*.reshard_col": PrepareLayerInput(
+                        layer_input_reshard_col_hook
+                    ),
+                    f"{prefix}layers.*.mlp": dist.SequenceParallelDisable(
+                        need_transpose=False
+                    ),
+                    f"{prefix}layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),  # has diff
+                    f"{prefix}lm_head": dist.SequenceParallelEnd(),
+                }
+            },
+            "mp_config": {
+                "parallelize_plan": {
+                    f"{prefix}ernie.embed_tokens": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.v_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                    f"{prefix}ernie.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),
+                }
+            },
+            "pp_config": {
+                "split_spec": f"{prefix}layers",
+            },
+        }
+        return config
+
+
+class ReshardLayer(paddle.nn.Layer):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input):
+        return input
+
+
+def layer_input_reshard_row_and_col_hook(process_mesh):
+    def hook(layer, inputs, output=None):
+        print(process_mesh)
+        res_inputs = []
+        print(inputs)
+        for input in inputs:
+            if not input.is_dist():
+                x = dist.shard_tensor(
+                    input, process_mesh, [dist.Shard(0), dist.Shard(1)]
+                )
+                res_inputs.append(
+                    dist.reshard(x, process_mesh, [dist.Shard(0), dist.Shard(1)])
+                )
+            else:
+                res_inputs.append(
+                    dist.reshard(input, process_mesh, [dist.Shard(0), dist.Shard(1)])
+                )
+        print(res_inputs)
+        return tuple(res_inputs)
+
+    return hook
+
+
+def layer_input_reshard_col_hook(process_mesh):
+    def hook(layer, inputs, output=None):
+        res_inputs = []
+        for input in inputs:
+            if not input.is_dist():
+                x = dist.shard_tensor(
+                    input, process_mesh, [dist.Shard(1), dist.Replicate()]
+                )
+                res_inputs.append(
+                    dist.reshard(x, process_mesh, [dist.Shard(1), dist.Replicate()])
+                )
+            else:
+                res_inputs.append(
+                    dist.reshard(input, process_mesh, [dist.Shard(1), dist.Replicate()])
+                )
+        return tuple(res_inputs)
+
+    return hook
