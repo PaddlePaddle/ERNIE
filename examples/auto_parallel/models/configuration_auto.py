@@ -663,6 +663,14 @@ class ErnieMoEConfig(ErnieConfig):
             and len(self.moe_num_experts) > 1
         )
 
+    @property
+    def use_moe(self) -> bool:
+        return (
+            sum(self.moe_num_experts) > 0
+            if self.multimodel_experts
+            else self.moe_num_experts > 0
+        )
+
     def __setattr__(self, name: str, value):
         super().__setattr__(name, value)
         if getattr(self, "use_recompute", False):
