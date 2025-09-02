@@ -27,6 +27,7 @@ import paddle.nn.functional as F
 from paddle.distributed import fleet
 from paddle import nn
 from paddle.distributed.fleet.utils import recompute
+from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 
 from models.top2_gate_auto import TopKGateFusedAuto
@@ -69,22 +70,6 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "ErnieForCausalLMAuto",
 ]
-
-
-class FusedDropoutImpl(nn.Layer):
-    def __init__(self, prob, mode):
-        super().__init__()
-        self.prob = prob
-        self.mode = mode
-
-        self.dropout = nn.Dropout(p=prob, mode=mode)
-
-    def forward(self, x, y):
-        if self.prob > 0:
-            x = self.dropout(x)
-        output = x + y
-
-        return output
 
 
 def calc_lm_head_logits(
@@ -1012,10 +997,10 @@ class ErnieDecoderLayerAuto(nn.Layer):
         Norm = RMSNorm if config.use_rmsnorm else LayerNorm
         self.input_layernorm = Norm(config, ipp)
         self.post_attention_layernorm = Norm(config, ipp)
-        self.residual_add1 = FusedDropoutImpl(
+        self.residual_add1 = FusedDropoutAdd(
             config.hidden_dropout_prob, mode="upscale_in_train"
         )
-        self.residual_add2 = FusedDropoutImpl(
+        self.residual_add2 = FusedDropoutAdd(
             config.hidden_dropout_prob, mode="upscale_in_train"
         )
 
