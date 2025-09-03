@@ -30,7 +30,7 @@ from paddle.distributed.fleet.utils import recompute
 from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 
-from models.top2_gate_auto import TopKGateFusedAuto
+from models.top2_gate_auto import TopKGateFused
 
 
 from paddleformers.transformers.model_outputs import (
@@ -309,7 +309,7 @@ def get_gate(
         logger.info("MOE-GATE:-hard-gate")
     else:
         logger.info(f"MOE-GATE:-{config.moe_gate}")
-        gate = TopKGateFusedAuto(
+        gate = TopKGateFused(
             config, layer_idx=layer_idx, group=config.moe_group, ipp=ipp
         )
 
@@ -1249,7 +1249,7 @@ class ErniePretrainedModelAuto(PretrainedModel):
                         f' type={type(layer)},norm={layer.weight.astype("float32").norm()}'
                     )
 
-        elif isinstance(layer, TopKGateFusedAuto):
+        elif isinstance(layer, TopKGateFused):
             if not hasattr(layer, "weight"):
                 return
             with rng_tracker("model_parallel_rng"):

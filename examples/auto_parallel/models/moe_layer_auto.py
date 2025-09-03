@@ -31,7 +31,7 @@ from paddle.incubate.nn.functional import moe_combine, moe_gate_dispatch
 
 from paddleformers.trainer.plugins.timer import get_timers
 from paddleformers.transformers.moe_layer_auto import dispatching, combining
-from models.top2_gate_auto import TopKGateFused, TopKGateFusedAuto
+from models.top2_gate_auto import TopKGateFused
 from utils_auto.training_utils import get_flatten_mesh, get_mesh, _reshard
 
 logger = logging.getLogger(__name__)
@@ -444,7 +444,7 @@ class MOELayerAuto(nn.Layer):
             if token_type_ids is not None:
                 token_type_ids = token_type_ids.reshape([-1])
                 args = (token_type_ids,)
-            use_fuse = isinstance(self.gate, (TopKGateFusedAuto))
+            use_fuse = isinstance(self.gate, (TopKGateFused))
             if use_fuse:
                 (gate_logits, capacity, router_loss, local_capacity) = self.gate(
                     input, *args
@@ -573,7 +573,7 @@ class MOELayerAuto(nn.Layer):
                         get_mesh(self.ipp),
                         [dist.Shard(0), dist.Replicate()],
                     )
-            use_fuse = isinstance(self.gate, (TopKGateFusedAuto))
+            use_fuse = isinstance(self.gate, (TopKGateFused))
             combine_fn = combining_fused_auto if use_fuse else combining
             combine_weights = (
                 combine_weights if use_fuse else combine_weights.unsqueeze(1)

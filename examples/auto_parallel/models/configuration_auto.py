@@ -430,8 +430,6 @@ class ErnieMoEConfig(ErnieConfig):
         moe_layer_end_index: Union[int, list] = -1,
         moe_aux_loss_lambda=1e-2,
         moe_orthogonal_loss_lambda=1e-2,
-        sinkhorn_2gate=True,
-        sinkhorn_temp=3e-2,
         global_aux_loss=False,
         moe_dropout_prob=0.0,
         moe_group="world",
@@ -508,8 +506,6 @@ class ErnieMoEConfig(ErnieConfig):
         self.moe_aux_loss_lambda = moe_aux_loss_lambda
         self.moe_orthogonal_loss_lambda = moe_orthogonal_loss_lambda
         self.global_aux_loss = global_aux_loss
-        self.sinkhorn_2gate = sinkhorn_2gate
-        self.sinkhorn_temp = sinkhorn_temp
         self.moe_layer_interval = moe_layer_interval
         self.moe_dropout_prob = moe_dropout_prob
         self.moe_group = moe_group

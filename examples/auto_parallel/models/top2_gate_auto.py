@@ -27,12 +27,6 @@ from paddle.utils import unique_name
 from paddle.distributed import fleet
 from utils_auto.training_utils import get_mesh, get_flatten_mesh
 
-try:
-    from custom_setup_ops import matmul_bwd
-except ImportError:
-    matmul_bwd = None
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -89,57 +83,21 @@ def cal_aux_loss_func(
     return l_aux
 
 
-def cast_if_needed(x, dtype):
-
-    return x.cast(dtype) if x.dtype != dtype else x
-
-
-class FusedGateDetachMatmul(paddle.autograd.PyLayer):
-
-    @staticmethod
-    def forward(ctx, x, w):
-
-        ctx.dtype = paddle.float32
-        ctx.save_for_backward(x, w)
-        return F.linear(cast_if_needed(x, ctx.dtype), cast_if_needed(w, ctx.dtype))
-
-    @staticmethod
-    def backward(ctx, y_grad):
-
-        x, w = ctx.saved_tensor()
-        assert ctx.dtype == y_grad.dtype, "dtype not match"
-        x_g, w_g = matmul_bwd(
-            cast_if_needed(x, ctx.dtype),
-            cast_if_needed(w, ctx.dtype),
-            y_grad,
-            False,
-            False,
-        )
-        return cast_if_needed(x_g, x.dtype), cast_if_needed(w_g, w.dtype)
-
-
-def gate_detach_matmul(x, weight, use_fuse, use_fake_gate=False):
-
-    if use_fuse:
-        score = FusedGateDetachMatmul.apply(x, weight)
-    else:
-        x = cast_if_needed(x, paddle.float32)
-        score = F.linear(x, weight)
+def gate_detach_matmul(x, weight, use_fake_gate=False):
+    x = x.cast(paddle.float32) if x.dtype != paddle.float32 else x
+    score = F.linear(x, weight)
 
     if use_fake_gate:
         score = paddle.randn(score.shape).astype(score.dtype) + score - score
     return score
 
 
-class Top2Gate(nn.Layer):
+class TopKGateFused(nn.Layer):
 
-    def __init__(self, config, layer_idx: int, group, gate_weight=None) -> None:
-
+    def __init__(self, config, layer_idx: int, group, ipp=0) -> None:
         super().__init__()
         self.config = config
-        self.fuse_gate_detach_matmul = config.fuse_gate_detach_matmul
-        if self.fuse_gate_detach_matmul:
-            assert matmul_bwd is not None, "matmul_bwd is not supported"
+        assert not config.fuse_gate_detach_matmul, "matmul_bwd is not supported"
 
         self.use_fake_gate = config.use_fake_gate
         if self.use_fake_gate:
@@ -163,8 +121,6 @@ class Top2Gate(nn.Layer):
         if self.global_aux_loss:
             self.rank = dist.get_rank(self.group)
 
-        self.sinkhorn_2gate = config.sinkhorn_2gate
-        self.sinkhorn_temp = config.sinkhorn_temp
         self.use_token_type_bias = config.moe_use_token_type_bias
         self.use_correction_bias = config.moe_use_aux_free
 
@@ -174,22 +130,17 @@ class Top2Gate(nn.Layer):
             self.act = F.sigmoid
         else:
             raise ValueError(f"{config.moe_gate_act} is not supported.")
-        self.no_jitter = True
-        self.expert_drop = False
-        self.eye_matrix = None
-        self.eye_matrix_size = None
-        self.norm_gate_logits = config.moe_norm_gate_logits
-        self.one = paddle.ones([], dtype="float32")
 
         self.moe_aux_loss_lambda = paddle.to_tensor(
             config.moe_aux_loss_lambda, dtype="float32"
         )
 
+        if self.moe_aux_loss_lambda.ndim == 0:
+            self.moe_aux_loss_lambda = self.moe_aux_loss_lambda.unsqueeze(0)
+
         self.moe_orthogonal_loss_lambda = paddle.to_tensor(
             config.moe_orthogonal_loss_lambda, dtype="float32"
         )
-        if self.moe_aux_loss_lambda.ndim == 0:
-            self.moe_aux_loss_lambda = self.moe_aux_loss_lambda.unsqueeze(0)
 
         if self.moe_orthogonal_loss_lambda.ndim == 0:
             self.moe_orthogonal_loss_lambda = self.moe_orthogonal_loss_lambda.unsqueeze(
@@ -236,20 +187,15 @@ class Top2Gate(nn.Layer):
                 ), "group_experts must use hard_gate when multimodel_experts is True"
         else:
             self.num_experts_list = [self.num_experts]
-        if gate_weight is not None:
-            self.weight = gate_weight
-            assert (
-                not self.config.moe_use_token_type_bias
-            ), "gate_weights is from outside, token_type_bias can't be used"
-            logger.info("moe use gate_weight from outside")
-            self._cast_to_low_precision = False
-            self._cast_to_low_precison = False
-        else:
-            self._create_gate_parameter()
+        self._create_gate_parameter()
         logger.info(
             f"{config.moe_gate}: w/ capacity: {self.cap} experts:{self.num_experts} "
             f"use_token_type_bias:{self.use_token_type_bias} gate_act:{config.moe_gate_act} "
-            f"norm_gate_logits={self.norm_gate_logits} use_correction_bias={self.use_correction_bias}"
+        )
+
+        self.ipp = ipp
+        self.weight = dist.shard_tensor(
+            self.weight, get_flatten_mesh(get_mesh(self.ipp)), [dist.Replicate()]
         )
 
     def _create_gate_parameter(self):
@@ -350,37 +296,6 @@ class Top2Gate(nn.Layer):
 
         return weight
 
-    def forward(
-        self,
-        input: Tensor,
-        token_type_ids: Tensor = None,
-        transform_weight: bool = True,
-        correction_bias: Tensor = None,
-    ):
-        pass
-
-    def get_capacity(self, num_tokens, cap_factor=None):
-
-        num_experts = (
-            sum(self.num_experts)
-            if self.config.multimodel_experts
-            else self.num_experts
-        )
-        if cap_factor is not None:
-            cap = cap_factor
-        else:
-            if self.training:
-                cap = self.cap[0]
-            elif num_tokens < num_experts:
-                cap = self.cap[2]
-            else:
-                cap = self.cap[1]
-        capacity = int(cap * num_tokens // num_experts)
-        assert (
-            capacity > 0
-        ), f"requires capacity to >= 0. cap={cap}, num_tokens={num_tokens}"
-        return capacity
-
     def _cal_aux_loss(
         self,
         gate_prob,
@@ -438,50 +353,11 @@ class Top2Gate(nn.Layer):
             self.group if self.global_aux_loss else None,
         )
 
-
-class TopKGateFused(Top2Gate):
-
     def forward(
         self,
         input: Tensor,
         token_type_ids=None,
         transform_weight=True,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-
-        capacity = self.get_capacity(input.shape[0])
-        weight = self.get_gate_weight(transform_weight)
-        with paddle.amp.auto_cast(False):
-
-            logits = gate_detach_matmul(
-                input, weight, self.fuse_gate_detach_matmul, self.use_fake_gate
-            )
-            if self.use_token_type_bias:
-                assert token_type_ids is not None
-                assert (
-                    token_type_ids.max() < self.bias.shape[0]
-                ), f"token_type_ids {token_type_ids.max()} >= bias shape {self.bias.shape[0]}"
-                bias = self.bias[token_type_ids]
-                logits = logits + bias
-            router_loss = paddle.zeros([1], dtype="float32")
-            router_loss.stop_gradient = False
-
-        return logits, capacity, router_loss
-
-
-class TopKGateFusedAuto(TopKGateFused):
-    """doc"""
-
-    def __init__(self, config, layer_idx: int, group, gate_weight=None, ipp=0) -> None:
-        super().__init__(config, layer_idx, group, gate_weight)
-        self.ipp = ipp
-        self.weight = dist.shard_tensor(
-            self.weight, get_flatten_mesh(get_mesh(self.ipp)), [dist.Replicate()]
-        )
-
-    def forward(
-        self,
-        input: Tensor,
-        token_type_ids=None,
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """
         Args:
@@ -507,6 +383,17 @@ class TopKGateFusedAuto(TopKGateFused):
         local_num_tokens = input._local_shape[0]
         local_capacity = int(cap * local_num_tokens // num_experts)
 
-        logits, _, router_loss = super().forward(input, token_type_ids)
+        weight = self.get_gate_weight(transform_weight)
+        with paddle.amp.auto_cast(False):
+            logits = gate_detach_matmul(input, weight, self.use_fake_gate)
+            if self.use_token_type_bias:
+                assert token_type_ids is not None
+                assert (
+                    token_type_ids.max() < self.bias.shape[0]
+                ), f"token_type_ids {token_type_ids.max()} >= bias shape {self.bias.shape[0]}"
+                bias = self.bias[token_type_ids]
+                logits = logits + bias
+            router_loss = paddle.zeros([1], dtype="float32")
+            router_loss.stop_gradient = False
 
         return logits, global_capacity, router_loss, local_capacity
