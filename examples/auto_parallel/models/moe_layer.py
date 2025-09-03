@@ -30,9 +30,9 @@ from paddle import Tensor
 from paddle.incubate.nn.functional import moe_combine, moe_gate_dispatch
 
 from paddleformers.trainer.plugins.timer import get_timers
-from paddleformers.transformers.moe_layer_auto import dispatching, combining
-from models.top2_gate_auto import TopKGateFused
-from utils_auto.training_utils import get_flatten_mesh, get_mesh, _reshard
+from paddleformers.transformers.moe_layer import dispatching, combining
+from models.top2_gate import TopKGateFused
+from utils.training_utils import get_flatten_mesh, get_mesh, _reshard
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def profile(name):
         get_timers()(name).stop()
 
 
-def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
+def combining_fused(x, combine_weights, scatter_index, hard_gate=False):
     """
     Args:
         x: Tensor[seq, dim]
@@ -115,7 +115,7 @@ def combining_fused_auto(x, combine_weights, scatter_index, hard_gate=False):
     return ret
 
 
-class MOELayerAuto(nn.Layer):
+class MOELayer(nn.Layer):
     def __init__(
         self,
         gate: nn.Layer,
@@ -574,7 +574,7 @@ class MOELayerAuto(nn.Layer):
                         [dist.Shard(0), dist.Replicate()],
                     )
             use_fuse = isinstance(self.gate, (TopKGateFused))
-            combine_fn = combining_fused_auto if use_fuse else combining
+            combine_fn = combining_fused if use_fuse else combining
             combine_weights = (
                 combine_weights if use_fuse else combine_weights.unsqueeze(1)
             )

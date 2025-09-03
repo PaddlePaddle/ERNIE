@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .dist_data_loader import DistDataLoaderAuto
+from .dist_data_loader import DistDataLoaderErnie
 
 __all__ = [
-    "DistDataLoaderAuto",
+    "DistDataLoaderErnie",
 ]

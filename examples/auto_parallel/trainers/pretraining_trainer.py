@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""AutoPretrainingTrainer"""
+"""PretrainingTrainer"""
 
 __all__ = [
-    "AutoPretrainingTrainer",
+    "PretrainingTrainer",
 ]
 
 
@@ -46,7 +46,7 @@ from paddle.distributed import fleet
 from paddle.distributed.auto_parallel.pipelining.schedules import get_pipeline_schedule
 from typing import Any, Dict, Union
 import paddle.distributed as dist
-from .callbacks_auto import TensorBoardCallback
+from .callbacks import TensorBoardCallback
 from ernie.utils.training_utils import reset_per_device_batch_size
 from ernie.callbacks import (
     LoggingCallback,
@@ -56,7 +56,7 @@ from ernie.lr_schedulers import (
     get_cosine_schedule_with_warmup,
     get_wsd_schedule_with_warmup,
 )
-from datasets import DistDataLoaderAuto
+from datasets import DistDataLoaderErnie
 
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 @add_start_docstrings(AutoTrainingArguments.__doc__)
-class AutoPreTrainingArguments(AutoTrainingArguments):
+class PreTrainingArguments(AutoTrainingArguments):
 
     multimodal: bool = field(
         default=False, metadata={"help": "whether training with multimodal"}
@@ -189,7 +189,7 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
         metadata={"help": "The pipeline schedule mode, support 1F1B and VPP"},
     )
     virtual_pipeline_seg_method: str = field(
-        default="ErnieDecoderLayerAuto",
+        default="ErnieDecoderLayer",
         metadata={"help": "The seg method of spliting pp layer for virtual pipeline."},
     )
 
@@ -268,7 +268,7 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
             logger.warn(f"eval_batch_size set to {self.per_device_eval_batch_size}")
 
 
-class AutoPretrainingTrainer(AutoTrainer):
+class PretrainingTrainer(AutoTrainer):
 
     def __init__(self, args=None, model=None, callbacks=[], **kwargs):
         callbacks = [
@@ -350,7 +350,7 @@ class AutoPretrainingTrainer(AutoTrainer):
 
         return final_loss
 
-    def dynamic_auto_parallel_pipeline_training(
+    def dynamic_pipeline_training(
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
     ) -> paddle.Tensor:
         assert (
@@ -365,7 +365,7 @@ class AutoPretrainingTrainer(AutoTrainer):
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
     ) -> paddle.Tensor:
         if self.args.pipeline_parallel_degree > 1:
-            return self.dynamic_auto_parallel_pipeline_training(model, inputs)
+            return self.dynamic_pipeline_training(model, inputs)
         else:
             return super().dynamic_training(model, inputs)
 
@@ -464,7 +464,7 @@ class AutoPretrainingTrainer(AutoTrainer):
             train_sampler = self._get_train_sampler()
         else:
             train_sampler = None
-        return DistDataLoaderAuto(
+        return DistDataLoaderErnie(
             train_dataset,
             batch_sampler=train_sampler,
             collate_fn=self.data_collator,

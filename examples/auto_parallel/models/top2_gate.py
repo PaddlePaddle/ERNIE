@@ -25,7 +25,7 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.utils import unique_name
 from paddle.distributed import fleet
-from utils_auto.training_utils import get_mesh, get_flatten_mesh
+from utils.training_utils import get_mesh, get_flatten_mesh
 
 logger = logging.getLogger(__name__)
 

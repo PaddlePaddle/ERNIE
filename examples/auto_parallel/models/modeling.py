@@ -30,7 +30,7 @@ from paddle.distributed.fleet.utils import recompute
 from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 
-from models.top2_gate_auto import TopKGateFused
+from models.top2_gate import TopKGateFused
 
 
 from paddleformers.transformers.model_outputs import (
@@ -40,12 +40,12 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 
 from paddleformers.transformers.model_utils import PretrainedModel
 
-from models.moe_layer_auto import (
-    MOELayerAuto,
+from models.moe_layer import (
+    MOELayer,
     MoEStatics,
 )
-from models.configuration_auto import ErnieMoEConfig
-from utils_auto.training_utils import get_mesh
+from models.configuration import ErnieMoEConfig
+from utils.training_utils import get_mesh
 
 
 from paddle.nn.functional.flash_attention import flash_attention
@@ -61,7 +61,7 @@ class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
 
 
 @dataclass
-class CausalLMOutputWithCrossAttentionsAuto(CausalLMOutputWithCrossAttentions):
+class CausalLMOutputWithCrossAttentionsErnie(CausalLMOutputWithCrossAttentions):
     router_loss: Optional[paddle.Tensor] = None
 
 
@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = [
-    "ErnieForCausalLMAuto",
+    "ErnieForCausalLM",
 ]
 
 
@@ -574,7 +574,7 @@ class ErnieMLP(nn.Layer):
         return out
 
 
-class ErnieAttentionAuto(nn.Layer):
+class ErnieAttention(nn.Layer):
     def __init__(self, config, ipp: Optional[int] = None):
         super().__init__()
         self.ipp = ipp
@@ -927,9 +927,9 @@ class ErnieMoeMLPFused(nn.Layer):
         return x
 
 
-class ErnieDecoderLayerAuto(nn.Layer):
+class ErnieDecoderLayer(nn.Layer):
     """
-    ErnieDecoderLayerAuto is a decoder layer in Ernie model.
+    ErnieDecoderLayer is a decoder layer in Ernie model.
     It is composed of self-attention, cross-attention and feedforward layers.
     """
 
@@ -947,7 +947,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
         self.layer_idx = layer_idx
         self.ipp = ipp
         self.hidden_size = config.hidden_size
-        self.self_attn = ErnieAttentionAuto(config, ipp)
+        self.self_attn = ErnieAttention(config, ipp)
         self.use_moe = config.use_moe if hasattr(config, "use_moe") else False
         if self.use_moe:
             moe_layer_start_index = (
@@ -1050,7 +1050,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
             shared_experts = None
 
         logger.info(f"moe-logging:{self.config.moe_logging}")
-        self.mlp = MOELayerAuto(
+        self.mlp = MOELayer(
             gate,
             experts,
             layer_idx=layer_idx,
@@ -1123,7 +1123,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
 
         if isinstance(
             self.mlp,
-            (MOELayerAuto),
+            (MOELayer),
         ):
             hidden_states, _, router_loss, gate_logits = self.mlp(
                 hidden_states, token_type_ids
@@ -1163,7 +1163,7 @@ class ErnieDecoderLayerAuto(nn.Layer):
                 router_loss_attn = router_loss_attn[0]
                 router_loss = router_loss + router_loss_attn
 
-            if isinstance(self.mlp, (MOELayerAuto)):
+            if isinstance(self.mlp, (MOELayer)):
                 outputs += (router_loss,)
             else:
                 outputs += (paddle.zeros([1], dtype=paddle.float32),)
@@ -1176,9 +1176,9 @@ class ErnieDecoderLayerAuto(nn.Layer):
         return outputs
 
 
-class ErniePretrainedModelAuto(PretrainedModel):
+class ErniePretrainedModel(PretrainedModel):
     """
-    ErniePretrainedModelAuto is a pretrained model class for Ernie model.
+    ErniePretrainedModel is a pretrained model class for Ernie model.
     It is composed of a encoder and a decoder.
     """
 
@@ -1264,9 +1264,9 @@ class ErniePretrainedModelAuto(PretrainedModel):
                 )
 
 
-class ErnieModelAuto(ErniePretrainedModelAuto):
+class ErnieModel(ErniePretrainedModel):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`ErnieDecoderLayerAuto`]
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`ErnieDecoderLayer`]
     Args:
         config: ErnieMoEConfig
     """
@@ -1294,7 +1294,7 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
                 if config.remove_tail_layer
                 else config.num_hidden_layers
             ):
-                self.layers.append(ErnieDecoderLayerAuto(config, idx))
+                self.layers.append(ErnieDecoderLayer(config, idx))
         if (
             config.pipeline_parallel_degree <= 1
             or pp_layer_idx == self.config.num_hidden_layers - 1
@@ -1922,10 +1922,10 @@ class ErnieLMHead(nn.Layer):
         )
 
 
-class ErnieModelAutoPP(ErnieModelAuto):
+class ErnieModelPP(ErnieModel):
     def __init__(self, config, layer_idx=0, ipp=0):
         super().__init__(config, layer_idx)
-        self.layer = ErnieDecoderLayerAuto(config, layer_idx, ipp)
+        self.layer = ErnieDecoderLayer(config, layer_idx, ipp)
 
     def forward(self, args):
         attention_mask, position_ids = None, None
@@ -1985,9 +1985,9 @@ class ErnieModelAutoPP(ErnieModelAuto):
                 return hidden_states
 
 
-class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
+class ErnieForCausalLM(ErniePretrainedModel):
     """
-    ErnieForCausalLMAuto is the model class for causal language modeling.
+    ErnieForCausalLM is the model class for causal language modeling.
     """
 
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
@@ -2015,11 +2015,11 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                 target_stage = (idx // chunk_size) % pp_degree
                 if target_stage == current_rank:
                     stage_id = (idx // chunk_size) % pp_degree
-                    self.layers.append(ErnieModelAutoPP(config, idx, stage_id))
+                    self.layers.append(ErnieModelPP(config, idx, stage_id))
                 else:
                     self.layers.append(nn.Identity())
         else:
-            self.ernie = ErnieModelAuto(config)
+            self.ernie = ErnieModel(config)
             self.lm_head = ErnieLMHead(config)
 
     def _post_init(self, original_init, *args, **kwargs):
@@ -2037,7 +2037,7 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
         if self.config.pipeline_parallel_degree > 1:
             decoder_layers = []
             for layer in self.layers:
-                if isinstance(layer, ErnieModelAutoPP):
+                if isinstance(layer, ErnieModelPP):
                     decoder_layers.append(layer.layer)
             layers = decoder_layers
         else:
@@ -2047,7 +2047,7 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                 for left in layers:
                     if isinstance(
                         left.self_attn.o_proj,
-                        (MOELayerAuto),
+                        (MOELayer),
                     ):
                         for e in left.self_attn.o_proj.experts:
                             if isinstance(e, ErnieMoeMLP):
@@ -2057,7 +2057,7 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
 
                     if isinstance(
                         left.mlp,
-                        (MOELayerAuto),
+                        (MOELayer),
                     ):
                         for e in left.mlp.experts:
                             if isinstance(e, ErnieMoeMLP):
@@ -2143,7 +2143,7 @@ class ErnieForCausalLMAuto(ErniePretrainedModelAuto):
                 loss, _ = self.criterion(logits, labels)
             else:
                 loss = None
-            return CausalLMOutputWithCrossAttentionsAuto(
+            return CausalLMOutputWithCrossAttentionsErnie(
                 loss=loss,
                 logits=logits,
                 past_key_values=outputs.past_key_values,

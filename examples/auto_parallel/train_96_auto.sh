@@ -42,5 +42,5 @@ log_dir=output/paddle_distributed_logs
 
 python -m paddle.distributed.launch \
     --log_dir ${log_dir} \
-    pretrain_auto.py  \
+    pretrain.py  \
     --config pretrain_96_auto.yaml

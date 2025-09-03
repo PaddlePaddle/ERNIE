@@ -23,7 +23,7 @@ from paddle.utils.layers_utils import flatten, map_structure, pack_sequence_as
 from paddleformers.data import DistDataLoader
 
 
-class DistDataLoaderAuto(DistDataLoader):
+class DistDataLoaderErnie(DistDataLoader):
     def __init__(
         self,
         dataset,
