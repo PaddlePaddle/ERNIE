@@ -208,7 +208,7 @@ class MMDataloader(paddle.io.DataLoader):
             num_workers=num_workers,
             use_buffer_reader=use_buffer_reader,
             prefetch_factor=prefetch_factor,
-            use_shared_memor=use_shared_memory,
+            use_shared_memory=use_shared_memory,
             timeout=timeout,
             worker_init_fn=worker_init_fn,
             persistent_workers=persistent_workers,
