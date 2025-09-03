@@ -1540,14 +1540,13 @@ class ErnieModelAuto(ErniePretrainedModelAuto):
 
         if self.config.multi_token_pred_depth > 0:
             return (
-                hidden_states,
+                inputs_embeds,
                 attention_mask,
                 position_ids,
                 self.inputs_embeds_cur_depth_list,
             )
         else:
-            return hidden_states, attention_mask, position_ids
-
+            return inputs_embeds, attention_mask, position_ids
 
     def decode_layer(
         self,
