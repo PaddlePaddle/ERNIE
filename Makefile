@@ -21,7 +21,8 @@ lint:
 .PHONY: install
 install:
 	pip uninstall paddlepaddle-gpu -y
-	pip install paddlepaddle-gpu==3.1.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
+	pip install https://paddle-qa.bj.bcebos.com/paddle-pipeline/Release-TagBuild-Training-Linux-Gpu-Cuda12.6-Cudnn9.5-Trt10.5-Mkl-Avx-Gcc11-SelfBuiltPypiUse/latest/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
+	pip instal https://paddle-qa.bj.bcebos.com/paddle-pipeline/FastDeploy_ActionCE/SM80_90/release/2.2/latest/fastdeploy_gpu-0.0.0-py3-none-any.whl
 	pip install -r requirements/gpu/requirements.txt
 	pip install pytest
 	pip install allure-pytest
