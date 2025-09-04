@@ -32,7 +32,7 @@ from paddle.distributed.fleet.meta_parallel.pipeline_parallel import PipelinePar
 from paddleformers.trainer.trainer_utils import get_last_checkpoint
 
 from data_processor.utils.argparser import PdArgumentParser, get_config
-from models import ErnieForCausalLM
+
 from models.configuration import (
     ErnieConfig,
     ErnieMoEConfig,
@@ -55,6 +55,20 @@ from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed import collective
 from paddle.tensor.manipulation import reshape
 from typing import Literal, TypeAlias
+
+use_intermediate_api = os.environ.get("USE_INTERMEDIATE_API", "0")
+if use_intermediate_api == "1":
+    from models.modeling import ErnieForCausalLM
+
+    logger.info("Training with the intermediate API.")
+elif use_intermediate_api == "0":
+    from models.modeling_vpp import ErnieForCausalLM
+
+    logger.info("Training VPP parallelism with the basic API")
+else:
+    raise ValueError(
+        f"Invalid environment args USE_INTERMEDIATE_API={use_intermediate_api}"
+    )
 
 _ReduceMode: TypeAlias = Literal["mean", "sum", "none"]
 

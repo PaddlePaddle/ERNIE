@@ -40,7 +40,7 @@ export PYTHONPATH=../../:$PYTHONPATH
 
 log_dir=output/paddle_distributed_logs
 
-export USE_INTERMEDIATE_API=1
+export USE_INTERMEDIATE_API=0
 
 python -m paddle.distributed.launch \
     --log_dir ${log_dir} \
@@ -49,7 +49,7 @@ python -m paddle.distributed.launch \
     --rank <current_rank> \
     --run_mode=collective \
     pretrain.py  \
-    --config pretrain_4p5_300B_A47B.yaml
+    --config pretrain_4p5_300B_A47B_vpp.yaml \
 
 # # Here is an example of the configuration and method for running scripts in a 7-machine cluster.
 # nnodes=7
@@ -77,7 +77,7 @@ python -m paddle.distributed.launch \
 #     --rank $rank \
 #     --run_mode=collective \
 #     pretrain.py  \
-#     --config pretrain_4p5_300B_A47B.yaml
+#     --config pretrain_4p5_300B_A47B_vpp.yaml
 
 # # Running scripts in a cluster using the mpirun method.
-# mpirun bash train_4p5_300B_A47B.sh
+# mpirun bash train_4p5_300B_A47B_vpp.sh

@@ -13,5 +13,4 @@
 # limitations under the License.
 
 
-from .modeling import *  # noqa
 from .top2_gate import *  # noqa
