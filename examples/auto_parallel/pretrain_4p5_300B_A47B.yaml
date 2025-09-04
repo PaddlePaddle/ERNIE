@@ -52,6 +52,7 @@ trainer_args:
     gradient_accumulation_steps: 7
     per_device_train_batch_size: 7
     per_device_eval_batch_size: 1
+    lr_scheduler: wsd:231084
     decay_function: 1-sqrt
     max_grad_norm: 1.0
 
