@@ -17,6 +17,8 @@
 ## 环境准备
 `mpirun python -m pip install -r requirements.txt --force-reinstall`
 
+注意：paddlepaddle-gpu 需要使用 3.2 版本，安装可使用[参考](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined)
+
 ## 开始训练
 在准备好环境后。您可以通过执行以下命令来进行56卡预训练：
 `mpirun bash train_4p5_300B_A47B.sh`，
@@ -24,3 +26,7 @@
 - 注意，您需要将 `train_4p5_300B_A47B.sh` 中的 `master_ip` 与 `port` 根据您的环境进行替换。
 
 该工具包提供了使用自动并行完成 ERNIE-4.5 预训练的方法，包括多维混合并行训练策略，更多的优化点和功能会基于此版本持续更新。
+
+现在自动并行中层API存在一些局限性，正在进一步支持：
+- 对 MOE 的支持不完备
+- 对流水线并行中的 VPP 优化支持不完备（脚本中默认 USE_VPP=0；当设置 USE_VPP=1 时，采用基础API完成组网）

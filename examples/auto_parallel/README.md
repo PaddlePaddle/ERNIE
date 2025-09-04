@@ -17,6 +17,8 @@ The CUDA driver on your machine should be ‌≥525.60.13, and the CUDA toolkit 
 ## Runtime Environment Preparation
 `mpirun python -m pip install -r requirements.txt --force-reinstall`
 
+Note: paddlepaddle-gpu version requirement: 3.2.0 or later. [install Paddle](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined)
+
 ## Start Pre-Training
 After the environment is ready, pre-training on 56 GPUs can be launched by:
 `mpirun bash train_4p5_300B_A47B.sh`，
@@ -26,3 +28,9 @@ should be replaced according to the real environment.
 
 
 The toolkit provides an auto-parallel solution for ERNIE-4.5 pre-training, including the hybrid parallelism training strategy. More advanced optimizations are on the way.
+
+
+Currently, the auto-parallel intermediate API has some limitations under ongoing development:
+
+- Limited support for MOE
+- Limited support for VPP in pipeline parallelism (default USE_VPP=0 in scripts; when USE_VPP=1, basic API are used for modeling)
