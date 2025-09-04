@@ -1315,7 +1315,7 @@ class ErnieModel(ErniePretrainedModel):
             Norm = RMSNorm if config.use_rmsnorm else LayerNorm
             self.mtp_block = nn.LayerList(
                 [
-                    ErnieDecoderLayerAuto(config, layer_idx, -1)
+                    ErnieDecoderLayer(config, layer_idx, -1)
                     for layer_idx in range(self.config.multi_token_pred_depth)
                 ]
             )
