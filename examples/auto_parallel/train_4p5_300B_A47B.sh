@@ -40,7 +40,7 @@ export PYTHONPATH=../../:$PYTHONPATH
 
 log_dir=output/paddle_distributed_logs
 
-export USE_VPP=0
+export USE_VPP=1
 
 python -m paddle.distributed.launch \
     --log_dir ${log_dir} \

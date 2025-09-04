@@ -1,4 +1,4 @@
-# -----------environment args----------------------#
+# -----------环境变量----------------------#
 env:
     HOME: null
 
@@ -97,4 +97,5 @@ trainer_args:
     gc_interval: 100000
 
     enable_auto_parallel: 1
+    use_intermediate_api: False
     to_static: 0

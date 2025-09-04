@@ -57,11 +57,11 @@ from paddle.tensor.manipulation import reshape
 from typing import Literal, TypeAlias
 
 use_vpp = os.environ.get("USE_VPP", "0")
-if use_vpp == "1":
+if use_vpp == "0":
     from models.modeling import ErnieForCausalLM
 
-    logger.info("Training with the intermediate API.")
-elif use_vpp == "0":
+    logger.info("Training with the intermediate API. Do not support VPP.")
+elif use_vpp == "1":
     from models.modeling_vpp import ErnieForCausalLM
 
     logger.info("Training VPP parallelism with the basic API")
