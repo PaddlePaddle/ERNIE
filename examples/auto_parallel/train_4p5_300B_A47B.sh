@@ -42,5 +42,8 @@ log_dir=output/paddle_distributed_logs
 
 python -m paddle.distributed.launch \
     --log_dir ${log_dir} \
+    --master <master_ip>:<port> \
+    --nnodes 7 \
+    --run_mode=collective \
     pretrain.py  \
     --config pretrain_4p5_300B_A47B.yaml
