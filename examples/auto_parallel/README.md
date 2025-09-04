@@ -8,7 +8,7 @@ This document introduce how to using auto-parallel pre-train the ERNIE-4.5-300B-
 Auto Parallel provides a unified abstraction for distributed computing tasks. With single-card modeling and simple distributed config, Auto Parallel enables large-scale distributed training for massive models, significantly lowering the development barrier for distributed training. For details, see [Auto Parallel](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/paddle_v3_features/auto_parallel_cn.html#zidongbingxingxunlian).
 
 ## Data Preparation
-This repository provide a demo dataset on the path `./demo_data` for quick start. If other dataset or user defined dataset are needed,
+This repository provide a demo dataset on the path `examples/pre-training/demo_data` for quick start. If other dataset or user defined dataset are needed,
 please reference this document [Pretrain dataset](https://paddlenlp.readthedocs.io/en/latest/llm/dataset.html).
 
 ## Docker Image Preparation

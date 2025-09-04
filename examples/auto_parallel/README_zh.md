@@ -1,13 +1,13 @@
 [English](README.md) | 简体中文
 
 # ERNIE-4.5 自动并行预训练
-本文档介绍如何使用自动并行进行 ERNIE-4.5 预训练，运行训练至少需要7卡NVIDIA H800 80G。
+本文档介绍如何使用自动并行进行 ERNIE-4.5 预训练，运行训练至少需要56卡NVIDIA H800 80G。
 
 ## 自动并行
-自动并行提供了对分布式计算任务的统一抽象，可以仅用单卡组网+简单的分布式配置就可以实现大规模的大模型分布式训练任务，极大地降低了分布式策略的开发门槛。具体可以参考 [自动并行](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/paddle_v3_features/auto_parallel_cn.html#zidongbingxingxunlian)。
+自动并行提供了对分布式计算任务的统一抽象，可以仅用单卡组网+简单的分布式配置就可以实现大规模的大模型分布式训练任务，极大地降低了分布式训练的开发门槛。具体可以参考 [自动并行](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/paddle_v3_features/auto_parallel_cn.html#zidongbingxingxunlian)。
 
 ## 数据准备
-本repo为您准备了demo数据集以方便您进行测试，demo数据放在了 `./demo_data` 路径下。如果您想使用其他数据集或使用自定义数据集，
+本repo为您准备了demo数据集以方便您进行测试，demo数据放在了 `examples/pre-training/demo_data` 路径下。如果您想使用其他数据集或使用自定义数据集，
 请参考 [Pretrain 数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html) 中的内容。
 
 ## 镜像准备
