@@ -1915,6 +1915,10 @@ class ErnieLMHead(nn.Layer):
     def forward(self, hidden_states):
         return calc_lm_head_logits(
             self.config,
+            hidden_states,
+            self.weight,
+            self.bias,
+            None,
         )
 
 
