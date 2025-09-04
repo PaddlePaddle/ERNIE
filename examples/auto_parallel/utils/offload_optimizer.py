@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import paddle
 import paddle.distributed as dist
 from paddle import _C_ops
@@ -51,7 +50,7 @@ def reload(tensor):
     assert new_tensor is tensor, "to_device must be inplace operation"
 
 
-def hack_offload_optimizer():
+def mock_offload_optimizer():
     # Step 0: mock _create_master_weight
     def new_create_master_weight(self, param):
         if param.name in self._master_weights:
@@ -160,12 +159,3 @@ def hack_offload_optimizer():
         return ret
 
     setattr(opt_type, "_insert_sync", new_insert_sync)
-
-
-def mock_offload_optimizer():
-    need_hack_offload_optimizer = os.getenv("HACK_OFFLOAD_OPTIMIZER", "0").lower() in [
-        "true",
-        "1",
-    ]
-    if need_hack_offload_optimizer:
-        hack_offload_optimizer()

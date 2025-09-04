@@ -201,6 +201,12 @@ class PreTrainingArguments(AutoTrainingArguments):
         default=1.0e-3,
         metadata={"help": "moe aux free update coef"},
     )
+    offload_optimizer: bool = field(
+        default=False,
+        metadata={
+            "help": "Offload optimizer states to CPU, and reload them during optimizer update"
+        },
+    )
 
     @property
     def need_data(self):

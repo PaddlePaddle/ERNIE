@@ -89,6 +89,7 @@ trainer_args:
     save_sharded_model: True
     ignore_load_lr_and_optim: False
     metrics_output_path: ./output/paddle_distributed_logs/
+    offload_optimizer: True
 
     use_moe: True
     moe_group: mp
