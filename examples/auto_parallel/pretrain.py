@@ -56,6 +56,8 @@ from paddle.distributed import collective
 from paddle.tensor.manipulation import reshape
 from typing import Literal, TypeAlias
 
+# USE_VPP=0: Implement parallelism using the intermediate API.
+# USE_VPP=1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
 use_vpp = os.environ.get("USE_VPP", "0")
 if use_vpp == "0":
     from models.modeling import ErnieForCausalLM
