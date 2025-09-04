@@ -43,7 +43,7 @@ from trainers import (
     MoECorrectionBiasAdjustCallback,
 )
 
-from utils import setup_logger_output_file, logger
+from utils import setup_logger_output_file, logger, mock_offload_optimizer
 from utils.misc import global_training_logs
 
 from tokenization import ErnieTokenizer
