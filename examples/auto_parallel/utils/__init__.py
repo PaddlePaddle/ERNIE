@@ -13,5 +13,6 @@
 # limitations under the License.
 
 from .logging import logger, setup_logger_output_file
+from .offload_optimizer import mock_offload_optimizer
 
-__all__ = ["logger", "setup_logger_output_file"]
+__all__ = ["logger", "setup_logger_output_file", "mock_offload_optimizer"]
