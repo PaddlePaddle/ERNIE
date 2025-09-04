@@ -43,4 +43,4 @@ log_dir=output/paddle_distributed_logs
 python -m paddle.distributed.launch \
     --log_dir ${log_dir} \
     pretrain.py  \
-    --config pretrain.yaml
+    --config pretrain_4p5_300B_A47B.yaml
