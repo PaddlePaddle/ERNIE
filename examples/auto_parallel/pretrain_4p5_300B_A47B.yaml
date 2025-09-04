@@ -67,6 +67,7 @@ trainer_args:
     seed: 666
     use_train_part_sharding: 1
     # pre_alloc_memory: 60
+    offload_optimizer: True
 
     tensor_parallel_degree: 8
     pipeline_parallel_degree: 7
@@ -89,7 +90,6 @@ trainer_args:
     save_sharded_model: True
     ignore_load_lr_and_optim: False
     metrics_output_path: ./output/paddle_distributed_logs/
-    offload_optimizer: False
 
     use_moe: True
     moe_group: mp
