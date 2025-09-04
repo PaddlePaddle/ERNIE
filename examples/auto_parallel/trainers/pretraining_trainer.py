@@ -299,21 +299,26 @@ class PretrainingTrainer(AutoTrainer):
 
         self.pop_callback(PrinterCallback)
         if self.args.pipeline_parallel_degree > 1:
-            if self.criterion is None:
-                self.criterion = self.model.criterion
-            self.pp_schedule = get_pipeline_schedule(
-                model,
-                self.args.gradient_accumulation_steps,
-                self.criterion,
-                self.args.pipeline_schedule_mode,
-                self.args.pipeline_parallel_degree,
-                self.comm_group_in_pp,
-            )
-            self.args.per_device_train_batch_size = (
-                self.args.per_device_train_batch_size
-                * self.args.gradient_accumulation_steps
-            )
-            self.args.gradient_accumulation_steps = 1
+            # NOTE: 1F1B version pipeline use intermediate_api instead of pp_schedule, however intermediate_api only support FThenB for now, VPP and 1F1B still need using pp_schedule
+            if not (
+                self.args.use_intermediate_api
+                and self.args.pipeline_schedule_mode == "FThenB"
+            ):
+                if self.criterion is None:
+                    self.criterion = self.model.criterion
+                self.pp_schedule = get_pipeline_schedule(
+                    model,
+                    self.args.gradient_accumulation_steps,
+                    self.criterion,
+                    self.args.pipeline_schedule_mode,
+                    self.args.pipeline_parallel_degree,
+                    self.comm_group_in_pp,
+                )
+                self.args.per_device_train_batch_size = (
+                    self.args.per_device_train_batch_size
+                    * self.args.gradient_accumulation_steps
+                )
+                self.args.gradient_accumulation_steps = 1
 
     def compute_pipeline_loss(self, model, inputs, return_outputs=False):
         """
@@ -365,7 +370,13 @@ class PretrainingTrainer(AutoTrainer):
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
     ) -> paddle.Tensor:
         if self.args.pipeline_parallel_degree > 1:
-            return self.dynamic_pipeline_training(model, inputs)
+            if not (
+                self.args.use_intermediate_api
+                and self.args.pipeline_schedule_mode == "FThenB"
+            ):
+                return self.dynamic_pipeline_training(model, inputs)
+            else:
+                return super().dynamic_training(model, inputs)
         else:
             return super().dynamic_training(model, inputs)
 

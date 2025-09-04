@@ -526,6 +526,7 @@ def main():
     if (
         "replace_with_parallel_cross_entropy" in args.tensor_parallel_config
         and cfg.tensor_parallel_degree > 1
+        and not (args.use_intermediate_api and args.pipeline_schedule_mode == "FThenB")
     ):
         replace_cross_entropy()
 
