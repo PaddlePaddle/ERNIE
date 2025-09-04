@@ -1,2 +1,5 @@
 paddlepaddle-gpu
 paddleformers
+tensorboardX
+decord
+moviepy
