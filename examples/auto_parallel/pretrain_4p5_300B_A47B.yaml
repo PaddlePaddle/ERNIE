@@ -67,6 +67,7 @@ trainer_args:
     seed: 666
     use_train_part_sharding: 1
     # pre_alloc_memory: 60
+    offload_optimizer: True
 
     tensor_parallel_degree: 8
     pipeline_parallel_degree: 7
