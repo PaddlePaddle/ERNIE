@@ -29,7 +29,6 @@ logger.handlers = [hdl]
 bce_log = logging.getLogger("baidubce")
 bce_log.handlers = []
 bce_log.propagate = False
-logger.setLevel(10)
 
 bce_bns_proxy_log = logging.getLogger("bce_bns_proxy.wrapper")
 bce_bns_proxy_log.disabled = True
