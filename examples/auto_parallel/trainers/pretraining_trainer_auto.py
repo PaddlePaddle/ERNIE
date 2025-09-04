@@ -43,8 +43,6 @@ from paddleformers.trainer import AutoTrainingArguments
 from paddleformers.trainer.utils import add_start_docstrings
 from paddleformers.trainer.trainer_callback import PrinterCallback
 from paddleformers.trainer.trainer_utils import get_cosine_schedule_with_warmup
-from paddle.distributed import fleet
-from paddle.distributed.auto_parallel.pipelining.schedules import get_pipeline_schedule
 from typing import Any, Dict, Union
 import paddle.distributed as dist
 from .callbacks_auto import TensorBoardCallback
@@ -232,23 +230,23 @@ class AutoPreTrainingArguments(AutoTrainingArguments):
 
         self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
 
-        if self.pipeline_parallel_degree > 1:
-            self.per_device_eval_batch_size = (
-                self.per_device_train_batch_size * self.gradient_accumulation_steps
-            )
-            logger.warn(
-                f"eval_batch_size set to {self.per_device_eval_batch_size} in Pipeline Parallel!"
-            )
-            user_defined_strategy = fleet.fleet._user_defined_strategy
-            user_defined_strategy.strategy.pipeline_configs.accumulate_steps = (
-                self.gradient_accumulation_steps
-            )
+        # if self.pipeline_parallel_degree > 1:
+        #     self.per_device_eval_batch_size = (
+        #         self.per_device_train_batch_size * self.gradient_accumulation_steps
+        #     )
+        #     logger.warn(
+        #         f"eval_batch_size set to {self.per_device_eval_batch_size} in Pipeline Parallel!"
+        #     )
+        #     user_defined_strategy = fleet.fleet._user_defined_strategy
+        #     user_defined_strategy.strategy.pipeline_configs.accumulate_steps = (
+        #         self.gradient_accumulation_steps
+        #     )
 
-            self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
-            logger.info(f"fixing pp configs: {user_defined_strategy.pipeline_configs}")
-        else:
-            self.per_device_eval_batch_size = self.per_device_train_batch_size
-            logger.warn(f"eval_batch_size set to {self.per_device_eval_batch_size}")
+        #     self.max_gradient_accumulation_steps = self.gradient_accumulation_steps
+        #     logger.info(f"fixing pp configs: {user_defined_strategy.pipeline_configs}")
+        # else:
+        self.per_device_eval_batch_size = self.per_device_train_batch_size
+        logger.warn(f"eval_batch_size set to {self.per_device_eval_batch_size}")
 
 
 class AutoPretrainingTrainer(AutoTrainer):
@@ -281,22 +279,22 @@ class AutoPretrainingTrainer(AutoTrainer):
         self.model_numel = numel_tensor.item() // self.args.dataset_world_size
 
         self.pop_callback(PrinterCallback)
-        if self.args.pipeline_parallel_degree > 1:
-            if self.criterion is None:
-                self.criterion = self.model.criterion
-            self.pp_schedule = get_pipeline_schedule(
-                model,
-                self.args.gradient_accumulation_steps,
-                self.criterion,
-                self.args.pipeline_schedule_mode,
-                self.args.pipeline_parallel_degree,
-                self.comm_group_in_pp,
-            )
-            self.args.per_device_train_batch_size = (
-                self.args.per_device_train_batch_size
-                * self.args.gradient_accumulation_steps
-            )
-            self.args.gradient_accumulation_steps = 1
+        # if self.args.pipeline_parallel_degree > 1:
+        #     if self.criterion is None:
+        #         self.criterion = self.model.criterion
+        #     self.pp_schedule = get_pipeline_schedule(
+        #         model,
+        #         self.args.gradient_accumulation_steps,
+        #         self.criterion,
+        #         self.args.pipeline_schedule_mode,
+        #         self.args.pipeline_parallel_degree,
+        #         self.comm_group_in_pp,
+        #     )
+        #     self.args.per_device_train_batch_size = (
+        #         self.args.per_device_train_batch_size
+        #         * self.args.gradient_accumulation_steps
+        #     )
+        #     self.args.gradient_accumulation_steps = 1
 
     def compute_pipeline_loss(self, model, inputs, return_outputs=False):
         """
@@ -347,10 +345,10 @@ class AutoPretrainingTrainer(AutoTrainer):
     def dynamic_training(
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]
     ) -> paddle.Tensor:
-        if self.args.pipeline_parallel_degree > 1:
-            return self.dynamic_auto_parallel_pipeline_training(model, inputs)
-        else:
-            return super().dynamic_training(model, inputs)
+        # if self.args.pipeline_parallel_degree > 1:
+        #     return self.dynamic_auto_parallel_pipeline_training(model, inputs)
+        # else:
+        return super().dynamic_training(model, inputs)
 
     def autocast_smart_context_manager(self):
 
