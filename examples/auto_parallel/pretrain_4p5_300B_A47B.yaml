@@ -18,8 +18,7 @@ model_args:
     model_config:
         multi_token_pred_depth: 0
         moe_logging: True
-        moe_use_aux_free: False
-        num_hidden_layers: 4
+        moe_use_aux_free: true
         use_cache: False
         use_fast_ln: True
         fuse_gate_detach_matmul: False
@@ -49,9 +48,9 @@ trainer_args:
     adam_epsilon: 1e-8
     learning_rate: 2.2e-4
     min_lr: 2.2e-5
-    global_batch_size: 4
-    gradient_accumulation_steps: 2
-    per_device_train_batch_size: 2
+    global_batch_size: 49
+    gradient_accumulation_steps: 7
+    per_device_train_batch_size: 7
     per_device_eval_batch_size: 1
     lr_scheduler: wsd:231084
     decay_function: 1-sqrt
@@ -68,15 +67,11 @@ trainer_args:
     seed: 666
     use_train_part_sharding: 1
     # pre_alloc_memory: 60
-    offload_optimizer: True
 
-    tensor_parallel_degree: 4
-    pipeline_parallel_degree: 2
-    # virtual_pp_degree: 2
-    pipeline_schedule_mode: "FThenB"
-
-    # tensor_parallel_degree: 8
-    # pipeline_parallel_degree: 1
+    tensor_parallel_degree: 8
+    pipeline_parallel_degree: 7
+    virtual_pp_degree: 8
+    pipeline_schedule_mode: "VPP"
 
     data_parallel_degree: 1
     sharding: "stage1"
@@ -102,5 +97,4 @@ trainer_args:
     gc_interval: 100000
 
     enable_auto_parallel: 1
-    use_intermediate_api: True
     to_static: 0
