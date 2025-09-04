@@ -18,7 +18,7 @@ model_args:
     model_config:
         multi_token_pred_depth: 0
         moe_logging: True
-        moe_use_aux_free: true
+        moe_use_aux_free: True
         use_cache: False
         use_fast_ln: True
         fuse_gate_detach_matmul: False
@@ -31,7 +31,7 @@ model_args:
 trainer_args:
     input_dir: "0.4 ../pre-training/demo_data/data-1-part0 0.6 ../pre-training/demo_data/data-1-part0"
     split: "998,1,1"
-    use_sp_callback: true
+    use_sp_callback: True
     moe_gate_lr_ratio: 0.01
     do_train: True
     dataloader_num_workers: 8
