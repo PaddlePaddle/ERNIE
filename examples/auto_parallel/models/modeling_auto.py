@@ -79,7 +79,6 @@ def calc_lm_head_logits(
     weight,
     bias,
     sparse_label_idx=None,
-    tensor_parallel_output=None,
 ):
     """the core function to calc lm head"""
     if config.sequence_parallel:
@@ -103,17 +102,12 @@ def calc_lm_head_logits(
         hidden_states = hidden_states.reshape(
             [-1, config.seqlen, hidden_states.shape[-1]]
         )
-    if tensor_parallel_output is None:
-        tensor_parallel_output = config.tensor_parallel_output
 
     logits = paddle.matmul(
         hidden_states, weight, transpose_y=config.tie_word_embeddings
     )
     if bias is not None:
         logits += bias
-
-    if config.tensor_parallel_degree > 1 and not tensor_parallel_output:
-        logits = dist.reshard(logits, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
 
     return logits
 
@@ -1918,14 +1912,9 @@ class ErnieLMHead(nn.Layer):
                 "loss_fn for memory optimization"
             )
 
-    def forward(self, hidden_states, tensor_parallel_output=None):
+    def forward(self, hidden_states):
         return calc_lm_head_logits(
             self.config,
-            hidden_states,
-            self.weight,
-            self.bias,
-            None,
-            tensor_parallel_output,
         )
 
 
