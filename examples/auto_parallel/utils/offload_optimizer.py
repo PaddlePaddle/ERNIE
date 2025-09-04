@@ -58,9 +58,10 @@ def mock_offload_optimizer():
         else:
             var_name = self._gen_master_weight_var_name(param)
             if param._is_initialized():
-                param_cpu = param._copy_to(paddle.CUDAPinnedPlace(), True)
-                var = paddle.cast(param_cpu, "float32")
+                param_cpu = param._copy_to(paddle.CPUPlace(), True)
+                var = paddle.cast(param_cpu, 'float32')
                 var.name = var_name
+                var.stop_gradient = param.stop_gradient
             else:
                 var = paddle.cast(param, "float32")
                 var.name = var_name
