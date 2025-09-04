@@ -181,7 +181,7 @@ class ErnieConfig(PretrainedConfig):
         use_combine_before_a2a=False,
         use_quant_before_a2a=False,
         rope_yarn_config={},
-        moe_use_all2all=False,
+        moe_use_all2all=True,
         **kwargs,
     ):
         if "tie_word_embeddings" not in kwargs:

@@ -560,19 +560,6 @@ class MOELayer(nn.Layer):
             else:
                 expert_output = expert_output.reshape([-1, expert_output.shape[-1]])
 
-            if not self.config.moe_use_all2all:
-                if self.config.moe_group == "mp":
-                    expert_output = dist.reshard(
-                        expert_output,
-                        get_mesh(self.ipp),
-                        [dist.Replicate(), dist.Replicate()],
-                    )
-                else:
-                    expert_output = dist.reshard(
-                        expert_output,
-                        get_mesh(self.ipp),
-                        [dist.Shard(0), dist.Replicate()],
-                    )
             use_fuse = isinstance(self.gate, (TopKGateFused))
             combine_fn = combining_fused if use_fuse else combining
             combine_weights = (
@@ -621,8 +608,6 @@ class MOELayer(nn.Layer):
                     get_flatten_mesh(get_mesh(self.ipp)),
                     [dist.Shard(0)],
                 )
-            else:
-                input = input.reshape([-1, input.shape[-1]])
         else:
             orig_shape = None
         assert (
@@ -718,9 +703,5 @@ class MOELayer(nn.Layer):
                     router_loss2,
                     get_mesh(self.ipp),
                     [dist.Replicate(), dist.Replicate()],
-                )
-            else:
-                combined_output = combined_output.reshape(
-                    orig_shape[:-1] + [combined_output.shape[-1]]
                 )
         return combined_output, combine_weights, router_loss2, gate_logits
