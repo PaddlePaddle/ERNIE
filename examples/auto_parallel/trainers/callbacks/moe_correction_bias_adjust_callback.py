@@ -28,7 +28,6 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
         self.use_sp = use_sp
 
     def on_optimizer_end(self, args, state, control, **kwargs):
-        # print("xxx ------- enter on_optimizer_end")
         model = kwargs["model"]
 
         usages = {}
