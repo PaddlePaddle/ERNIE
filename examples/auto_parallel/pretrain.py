@@ -30,8 +30,9 @@ from paddleformers.data.causal_dataset import (
 )
 from paddle.distributed.fleet.meta_parallel.pipeline_parallel import PipelineParallel
 from paddleformers.trainer.trainer_utils import get_last_checkpoint
+from paddleformers.trainer import PdArgumentParser
 
-from data_processor.utils.argparser import PdArgumentParser, get_config
+from utils.training_utils import get_config
 
 from models.configuration import (
     ErnieConfig,

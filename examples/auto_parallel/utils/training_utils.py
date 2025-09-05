@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+import os
+import yaml
 import logging
+import argparse
+from omegaconf import OmegaConf
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
@@ -44,6 +49,36 @@ def reset_per_device_batch_size(
             f"dp_worldsize={dataset_world_size}, accumulate_steps={gradient_accumulation_steps} "
         )
     return per_device_train_batch_size, gradient_accumulation_steps
+
+
+def get_config(verbose=False):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--configs", action="store", nargs="+", required=True, help="config files"
+    )
+    parser.add_argument(
+        "--kwargs", action="store", nargs="+", default=[], help="extra k-v configs"
+    )
+    opt = parser.parse_args()
+    configs = [OmegaConf.load(p) for p in opt.configs]
+    configs.append(OmegaConf.from_dotlist(opt.kwargs))
+    config = OmegaConf.merge(*configs)
+
+    if "env" in config:
+        for key, value in OmegaConf.to_object(config.env).items():
+            config.env[key] = os.environ.get(key, value)
+    OmegaConf.resolve(config)
+    if verbose:
+        print(
+            yaml.dump(
+                OmegaConf.to_object(config),
+                default_flow_style=False,
+                indent=4,
+                width=9999,
+                allow_unicode=True,
+            )
+        )
+    return config
 
 
 def get_flatten_mesh(mesh):
