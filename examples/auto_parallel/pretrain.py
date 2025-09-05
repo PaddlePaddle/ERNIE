@@ -541,11 +541,11 @@ def main():
     # vpp_degree>1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
     assert vpp_degree >= 1, "vpp_degree must be greater than or equal to 1."
     if vpp_degree == 1:
-        from models.modeling import ErnieForCausalLM
+        from models.modeling import ErnieForCausalLM, ErnieDecoderLayer
 
         logger.info("Training with the intermediate API. Do not support VPP.")
     elif vpp_degree > 1:
-        from models.modeling_vpp import ErnieForCausalLM
+        from models.modeling_vpp import ErnieForCausalLM, ErnieDecoderLayer
 
         logger.info("Training VPP parallelism with the basic API")
     print("xxx --------- vpp_degree: ", vpp_degree)
@@ -567,7 +567,9 @@ def main():
         logger.info("Adding aux free callback")
         callbacks += [
             MoECorrectionBiasAdjustCallback(
-                args.moe_use_aux_free_update_coef, args.sequence_parallel
+                args.moe_use_aux_free_update_coef,
+                args.sequence_parallel,
+                ErnieDecoderLayer,
             )
         ]
     init_parameters(model)
