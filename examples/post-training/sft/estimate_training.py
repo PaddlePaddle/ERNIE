@@ -17,6 +17,7 @@ import json
 import numpy as np
 from paddleformers.trainer.argparser import strtobool
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from paddleformers.datasets.finetuning import create_dataset
 from ernie.tokenizer import Ernie4_5_Tokenizer
@@ -214,8 +215,13 @@ def estimate_training(args):
     else:
         download_source_kwargs["download_hub"] = args.download_hub
 
+    convert_from_kwargs = {
+        (
+            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+        ): False
+    }
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
-        args.model_name_or_path, convert_from_torch=False, **download_source_kwargs
+        args.model_name_or_path, **convert_from_kwargs, **download_source_kwargs
     )
     logger.info("Start to estimate max training steps...")
     dataset_config = {

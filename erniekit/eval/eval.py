@@ -28,6 +28,7 @@ from paddleformers.trainer import (
 )
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from ernie.configuration import Ernie4_5_MoeConfig
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
@@ -240,11 +241,16 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    convert_from_kwargs = {
+        (
+            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+        ): False
+    }
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
-        convert_from_torch=False,
+        **convert_from_kwargs,
         **download_source_kwargs,
     )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
@@ -300,14 +306,14 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            convert_from_torch=False,
+            **convert_from_kwargs,
             **download_source_kwargs,
         )
     else:
         model = model_class.from_config(
             model_config,
             dtype=dtype,
-            convert_from_torch=False,
+            **convert_from_kwargs,
             **download_source_kwargs,
         )
 
@@ -330,7 +336,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        convert_from_torch=False,
+        **convert_from_kwargs,
         **download_source_kwargs,
     )
 

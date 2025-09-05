@@ -266,7 +266,6 @@ class VLSFTTrainingArguments(PreTrainingArguments):
     factor: int = field(
         default=20, metadata={"help": "Pretrained model name or path to local model."}
     )
-    pseudo_strategy: int = field(default=0, metadata={"help": "."})
     example_from_same_task_prob: float = field(default=0.0, metadata={"help": "."})
     pseudo_sampling_prob: float = field(default=0.5, metadata={"help": "."})
     trigger_data_prob: float = field(default=0.5, metadata={"help": "."})

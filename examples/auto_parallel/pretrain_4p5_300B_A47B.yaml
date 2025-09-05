@@ -1,11 +1,11 @@
-# -----------环境变量----------------------#
+# -----------environment args----------------------#
 env:
     HOME: null
 
 # ---------------------------model args-------------------------------------------------#
 model_args:
-    model_name_or_path: model_configs_auto/
-    tokenizer_name: ./ernie/src/tokenizers/tokenizer_model
+    model_name_or_path: ../pre-training/model_configs/ERNIE-4p5-300B-A47B/
+    tokenizer_name: ../pre-training/ernie/src/tokenizers/tokenizer_model
     output_dir: ./output/
     data_load_process_num: 40
     max_seq_length: 4096
@@ -18,13 +18,20 @@ model_args:
     model_config:
         multi_token_pred_depth: 0
         moe_logging: True
-        moe_use_aux_free: true
+        moe_use_aux_free: True
+        use_cache: False
+        use_fast_ln: True
+        fuse_gate_detach_matmul: False
+        moe_group_orthogonal_loss: True
+        moe_orthogonal_loss_lambda: 0.0
+        moe_use_all2all: True
+
 
 # ---------------------------trainer args-------------------------------------------------#
 trainer_args:
-    input_dir: "0.4 ./demo_data/data-1-part0 0.6 ./demo_data/data-1-part0"
+    input_dir: "0.4 ../pre-training/demo_data/data-1-part0 0.6 ../pre-training/demo_data/data-1-part0"
     split: "998,1,1"
-    use_sp_callback: true
+    use_sp_callback: True
     moe_gate_lr_ratio: 0.01
     do_train: True
     dataloader_num_workers: 8
@@ -41,18 +48,14 @@ trainer_args:
     adam_epsilon: 1e-8
     learning_rate: 2.2e-4
     min_lr: 2.2e-5
-    global_batch_size: 4
-    gradient_accumulation_steps: 2
-    per_device_train_batch_size: 2
+    global_batch_size: 49
+    gradient_accumulation_steps: 7
+    per_device_train_batch_size: 7
     per_device_eval_batch_size: 1
     lr_scheduler: wsd:231084
     decay_function: 1-sqrt
     max_grad_norm: 1.0
 
-    adaptive_norm_clip: 0
-    adaptive_norm_clip_ratio: 1.2
-    adaptive_norm_force_clear_state: 0
-    adaptive_norm_enable_record: 1
     use_async_save: True
 
     weight_decay: 0.1
@@ -63,11 +66,12 @@ trainer_args:
     scale_loss: 4096
     seed: 666
     use_train_part_sharding: 1
-    pre_alloc_memory: 60
+    # pre_alloc_memory: 60
+    offload_optimizer: True
 
-    tensor_parallel_degree: 4
-    pipeline_parallel_degree: 2
-    virtual_pp_degree: 2
+    tensor_parallel_degree: 8
+    pipeline_parallel_degree: 7
+    virtual_pp_degree: 8
     pipeline_schedule_mode: "VPP"
 
     data_parallel_degree: 1
@@ -94,4 +98,5 @@ trainer_args:
     gc_interval: 100000
 
     enable_auto_parallel: 1
+    use_intermediate_api: False
     to_static: 0

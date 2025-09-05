@@ -117,7 +117,7 @@ def run_vl_sft(
     preprocess_args.batch_size = finetuning_args.batch_size
     finetuning_args.max_seq_len = data_args.max_seq_len
     finetuning_args.max_seq_length = data_args.max_seq_len
-    if data_args.max_seq_len <= 8192:
+    if data_args.max_seq_len < 32768:
         model_args.use_sparse_head_and_loss_fn = False
         model_args.use_recompute_loss_fn = False
     else:
@@ -433,6 +433,8 @@ def run_vl_sft(
     cfg.recompute_granularity = model_args.recompute_granularity
     cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
     cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
+    cfg.loss_subbatch_seqlen = model_args.loss_subbatch_seqlen
+    cfg.pp_seg_method = model_args.pp_seg_method
     cfg.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
     cfg.moe_multimodal_dispatch_use_allgather = (
         model_args.moe_multimodal_dispatch_use_allgather
@@ -637,7 +639,6 @@ def run_vl_sft(
                 "in_tokens": True,  # True for Text SFT
                 "tokenizer": tokenizer,
                 "number_of_samples_each_epoch": data_args.num_samples_each_epoch,
-                "pseudo_strategy": finetuning_args.pseudo_strategy,
                 "example_from_same_task_prob": finetuning_args.example_from_same_task_prob,
                 "pseudo_sampling_prob": finetuning_args.pseudo_sampling_prob,
                 "trigger_data_prob": finetuning_args.trigger_data_prob,

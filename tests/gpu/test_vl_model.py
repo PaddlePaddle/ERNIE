@@ -260,23 +260,55 @@ def test_sft():
     assert_loss(base_loss)
 
 
-# def test_sft_eval():
-#     yaml_path = os.path.join(CONFIG_PATH, "run_eval.yaml")
-#     config = default_args(yaml_path).copy()
-#     config["model_name_or_path"] = "./output/checkpoint-2"
+def test_sft_fd_server():
+    kill_process_on_port()
+    yaml_path = os.path.join(CONFIG_PATH, "run_chat.yaml")
+    config = default_args(yaml_path).copy()
+    config["model_name_or_path"] = "./output/checkpoint-2"
+    config["max_new_tokens"] = 10
+    config["tensor_parallel_degree"] = 1
 
-#     ret_code, err_log = run_update_config_training(config, steps="eval")
-#     attach_log_file()
-#     assert_result(ret_code, err_log)
+    process_server = run_update_config_training(config, steps="server")
+    process_chat = run_update_config_training(config, steps="chat")
+    run_check_fastdeploy_infer(process_server, process_chat)
 
 
-# def test_sft_fd_server():
-#     kill_process_on_port()
-#     yaml_path = os.path.join(CONFIG_PATH, "run_chat.yaml")
-#     config = default_args(yaml_path).copy()
-#     config["model_name_or_path"] = "./output/checkpoint-2"
-#     config["max_new_tokens"] = 10
+def test_sft_lora():
+    clean_output_dir()
+    yaml_path = os.path.join(SFT_CONFIG_PATH, "run_sft_lora_8k.yaml")
+    config = default_args(yaml_path).copy()
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
+    config["virtual_pp_degree"] = 1
+    config["max_seq_len"] = 32768
 
-#     process_server = run_update_config_training(config, steps="server")
-#     process_chat = run_update_config_training(config, steps="chat")
-#     run_check_fastdeploy_infer(process_server, process_chat)
+    ret_code, err_log = run_update_config_training(config)
+    attach_log_file()
+    assert_result(ret_code, err_log)
+
+    base_loss = 11.546802
+    assert_loss(base_loss)
+
+
+def test_sft_lora_merge():
+    yaml_path = os.path.join(CONFIG_PATH, "run_export.yaml")
+    config = default_args(yaml_path).copy()
+    config["model_name_or_path"] = MODEL_PATH
+
+    ret_code, err_log = run_update_config_training(config, steps="export")
+    attach_log_file()
+    assert_result(ret_code, err_log)
+
+
+def test_sft_lora_fd_server():
+    kill_process_on_port()
+    yaml_path = os.path.join(CONFIG_PATH, "run_chat.yaml")
+    config = default_args(yaml_path).copy()
+    config["model_name_or_path"] = "./output/export"
+    config["max_new_tokens"] = 10
+    config["tensor_parallel_degree"] = 1
+
+    process_server = run_update_config_training(config, steps="server")
+    process_chat = run_update_config_training(config, steps="chat")
+    run_check_fastdeploy_infer(process_server, process_chat)

@@ -22,6 +22,7 @@ import numpy as np
 import paddle
 from paddleformers.trainer import PdArgumentParser
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 # isort: off
 # fmt: off
@@ -225,10 +226,11 @@ if __name__ == "__main__":
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    convert_from_kwargs = {"convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch": False}
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(model_args.model_name_or_path,
-                                                convert_from_torch=False,
+                                                **convert_from_kwargs,
                                                 **download_source_kwargs)
     config = Ernie4_5_MoeConfig.from_pretrained(model_args.model_name_or_path,
-                                                convert_from_torch=False,
+                                                **convert_from_kwargs,
                                                 **download_source_kwargs)
     dpo_estimate_training(tokenizer, data_args, training_args, config)

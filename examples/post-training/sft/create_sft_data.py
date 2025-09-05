@@ -20,6 +20,7 @@ import numpy as np
 from paddleformers.data.indexed_dataset import SFTMMapIndexedDatasetBuilder
 from paddleformers.trainer import PdArgumentParser, RuntimeTimer
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 from sft_utils import BuildDataArgument, BuildSFTTrainingArguments, DataGenerator
 from train import ModelArgument
 
@@ -85,9 +86,14 @@ def main():
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    convert_from_kwargs = {
+        (
+            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+        ): False
+    }
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        convert_from_torch=False,
+        **convert_from_kwargs,
         **download_source_kwargs,
     )
     if tokenizer.vocab_size < 2**16 - 1:

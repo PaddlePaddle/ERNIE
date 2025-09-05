@@ -26,7 +26,6 @@ export FLAGS_use_paddle_recall_error=0
 export FLAGS_tcp_max_syn_backlog=16384
 export FLAGS_call_stack_level=2
 
-
 SM=`nvidia-smi --query-gpu=compute_cap --format=csv | tail -n 1 | sed 's/\.//g'`
 if [ $SM -eq 90 ]
 then
@@ -35,14 +34,52 @@ else
     export FLAGS_flash_attn_version=2
 fi
 
-
 export FLAGS_enable_moe_utils=true
 
+export PYTHONPATH=../../:$PYTHONPATH
 
-export PYTHONPATH=$PYTHONPATH:./ernie
+log_dir=output/paddle_distributed_logs
+
+# USE_VPP=0: Implement parallelism using the intermediate API.
+# USE_VPP=1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
+export USE_VPP=1
 
 python -m paddle.distributed.launch \
-    --log_dir output/paddle_distributed_logs \
+    --log_dir ${log_dir} \
+    --master <master_ip>:<port> \
+    --nnodes 7 \
+    --rank <current_rank> \
     --run_mode=collective \
-    ${script:-ernie/pretrain_auto.py}  \
-    --config yamls/pretrain_96_auto.yaml
+    pretrain.py  \
+    --config pretrain_4p5_300B_A47B.yaml
+
+# # Here is an example of the configuration and method for running scripts in a 7-machine cluster.
+# nnodes=7
+# START_RANK=0
+# END_RANK=$nnodes
+# # The current rank can be obtained through the preset environment variables in the cluster.
+# rank=$CURRENT_TRAINER_ID_FLAG
+
+# if [[ $rank -lt $START_RANK ]]; then
+#     exit 0
+# fi
+
+# if [[ $rank -ge $END_RANK ]]; then
+#     exit 0
+# fi
+# rank=$(($rank-$START_RANK))
+# # Typically, rank 0 is selected as the master of the cluster.
+# master=$RANK_0_IP
+# port=36677
+
+# python -m paddle.distributed.launch \
+#     --log_dir ${log_dir} \
+#     --master $master:$port \
+#     --nnodes $nnodes \
+#     --rank $rank \
+#     --run_mode=collective \
+#     pretrain.py  \
+#     --config pretrain_4p5_300B_A47B.yaml
+
+# # Running scripts in a cluster using the mpirun method.
+# mpirun bash train_4p5_300B_A47B.sh

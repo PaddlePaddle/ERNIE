@@ -240,8 +240,100 @@ class ExampleSet:
                 self.exs = [json.loads(line) for line in fin]
         else:
             raise ValueError(f"Unsupported file type: {self._file_name}")
+
+        def trans_query_response_type(ex):
+            text_idx, image_idx, video_idx = 0, 0, 0
+            text_info = []
+            image_info = []
+            video_info = []
+            order_type = []
+            order_index = []
+            order_mask = []
+
+            system = ex.get("system", "")
+            query = ex.get("query", "")
+            response = ex.get("response", "")
+            images = ex.get("images", [])
+            videos = ex.get("videos", [])
+            history = ex.get("history", [])
+            history.append([query, response])
+
+            new_ex = {}
+            if system:
+                new_ex["system"] = system
+
+            for q_r in history:
+                mask_flag = True
+                assert (
+                    len(q_r) == 2
+                ), f"query and response must be a pair, but got {q_r}"
+                for text in q_r:
+                    parts = re.split(r"(<image>|<video>)", text)
+                    for part in parts:
+                        if part == "<image>":
+                            try:
+                                image_info.append(
+                                    {
+                                        "matched_text_index": text_idx,
+                                        "image_url": images[image_idx],
+                                    }
+                                )
+                            except Exception:
+                                raise ValueError(
+                                    "number of <image> token should match len(images)"
+                                )
+                            order_type.append("image")
+                            order_index.append(image_idx)
+                            order_mask.append(int(mask_flag))
+                            image_idx += 1
+                        elif part == "<video>":
+                            try:
+                                video_info.append(
+                                    {
+                                        "matched_text_index": text_idx,
+                                        "video_url": videos[video_idx],
+                                    }
+                                )
+                            except Exception:
+                                raise ValueError(
+                                    "number of <video> token should match len(videos)"
+                                )
+                            order_type.append("video")
+                            order_index.append(video_idx)
+                            order_mask.append(int(mask_flag))
+                            video_idx += 1
+                        elif part:
+                            text_info.append(
+                                {
+                                    "text": part,
+                                    "tag": "mask" if mask_flag else "no_mask",
+                                }
+                            )
+                            order_type.append("text")
+                            order_index.append(text_idx)
+                            order_mask.append(int(mask_flag))
+                            text_idx += 1
+                    mask_flag = not mask_flag
+            new_ex["text_info"] = text_info
+            if image_info:
+                new_ex["image_info"] = image_info
+            if video_info:
+                new_ex["video_info"] = video_info
+            new_ex["order"] = {
+                "type": order_type,
+                "index": order_index,
+                "mask": order_mask,
+            }
+
+            return new_ex
+
         new_exs = []
         for ex in self.exs:
+            if "text_info" not in ex:
+                if "query" in ex and "response" in ex:
+                    ex = trans_query_response_type(ex)
+                else:
+                    raise ValueError(f"Unsupported data format: {self._file_name}")
             for key in ["image_info", "video_info"]:
                 if key not in ex:
                     continue

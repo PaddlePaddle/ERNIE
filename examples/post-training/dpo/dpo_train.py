@@ -42,6 +42,7 @@ from paddleformers.trainer import (
 )
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from ernie.callbacks import LayerwiseDropoutCallback
 from ernie.configuration import Ernie4_5_MoeConfig
@@ -290,6 +291,11 @@ def main():
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    convert_from_kwargs = {
+        (
+            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+        ): False
+    }
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": False})
     config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
@@ -317,7 +323,7 @@ def main():
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=config,
-            convert_from_torch=False,
+            **convert_from_kwargs,
             **download_source_kwargs,
         )
     else:
@@ -386,7 +392,7 @@ def main():
 
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        convert_from_torch=False,
+        **convert_from_kwargs,
         **download_source_kwargs,
     )
     logger.info("Loading model & tokenizer successfully !")

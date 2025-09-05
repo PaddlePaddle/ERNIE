@@ -14,6 +14,7 @@
 
 """ Ernie4_5_VLMoeForConditionalGenerationPipe """
 
+import ast
 import contextlib
 import functools
 import heapq
@@ -1875,20 +1876,24 @@ class Ernie4_5_VLMoeForConditionalGenerationPipe(
             )
         recompute_interval = 0
 
-        if 0:  # self.config.pp_first_stage_layers:
-            assert self.config.pp_first_stage_layers >= 2
-            _num_layers = len(self.get_sequential_layers())
-            _num_stages = get_hcg().topology().get_dim_size("pipe")
-            part_size = (_num_layers - self.config.pp_first_stage_layers) // (
-                _num_stages - 1
-            )
-            seg_method = [0, self.config.pp_first_stage_layers] + [
-                part_size for i in range(_num_stages - 1)
-            ]
-            seg_method = list(accumulate(seg_method))
-            seg_method[-1] = _num_layers
-        else:
-            seg_method = "layer:ErnieDecoderLayer|EmptyLayer"
+        seg_method = (
+            config.pp_seg_method
+            if hasattr(config, "pp_seg_method")
+            else "layer:Ernie4_5_DecoderLayer|ErnieDecoderLayer|EmptyLayer"
+        )
+        try:
+            result = ast.literal_eval(seg_method)
+            if isinstance(result, list):
+                seg_method = result
+        except Exception:
+            pass
+        if (
+            seg_method == "layer:Ernie4_5_DecoderLayer|ErnieDecoderLayer|EmptyLayer"
+            and (config.num_hidden_layers + config.add_tail_layers)
+            % get_hcg().topology().get_dim_size("pipe")
+            != 0
+        ):
+            seg_method = "uniform"
         logger.info(
             f"using recompute_interval={recompute_interval}, seg_method={seg_method}"
         )

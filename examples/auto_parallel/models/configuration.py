@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Ernie model configuration"""
+"""Ernie model configuration"""
 import logging
 import json
 from typing import Union
@@ -32,7 +32,6 @@ __all__ = [
 ERNIE_PRETRAINED_INIT_CONFIGURATION = {
     "ernie/tiny-random-ernie": {
         "hidden_size": 768,
-        "initializer_range": 0.02,
         "intermediate_size": 11008,
         "max_position_embeddings": 2048,
         "model_type": "ernie",
@@ -72,8 +71,6 @@ class ErnieConfig(PretrainedConfig):
             Number of attention heads for each attention layer in the Transformer encoder.
         hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
             The non-linear activation function (function or string) in the decoder.
-        initializer_range (`float`, *optional*, defaults to 0.02):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         rms_norm_eps (`float`, *optional*, defaults to 1e-12):
             The epsilon used by the rms normalization layers.
         use_cache (`bool`, *optional*, defaults to `True`):
@@ -115,14 +112,11 @@ class ErnieConfig(PretrainedConfig):
         num_hidden_layers=2,
         num_attention_heads=2,
         head_dim=None,
-        initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=False,
         use_flash_attn=True,
-        use_mem_eff_attn=False,
         use_flash_attn_with_mask=False,
         use_recompute=False,
-        use_recompute_attn=False,
         recompute_use_reentrant=False,
         use_rmsnorm=True,
         fuse_rms_norm=False,
@@ -157,7 +151,6 @@ class ErnieConfig(PretrainedConfig):
         submatrix_parallel=False,
         submatrix_parallel_low_memory=True,
         use_sparse_head_and_loss_fn=False,
-        using_dynamic_sequence_length=False,
         micro_batch_size=-1,
         using_precision_check=False,
         use_qk_norm=False,
@@ -188,6 +181,7 @@ class ErnieConfig(PretrainedConfig):
         use_combine_before_a2a=False,
         use_quant_before_a2a=False,
         rope_yarn_config={},
+        moe_use_all2all=True,
         **kwargs,
     ):
         if "tie_word_embeddings" not in kwargs:
@@ -205,13 +199,8 @@ class ErnieConfig(PretrainedConfig):
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
         self.head_dim = head_dim
-        self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
-        self.use_recompute_attn = use_recompute_attn
-        if use_recompute_attn:
-            logger.warning("set `use_recompute_attn`=True, disabling `use_recompute`")
-            use_recompute = False
         self.use_recompute = use_recompute
         self.recompute_num_layers = (
             recompute_num_layers
@@ -220,7 +209,6 @@ class ErnieConfig(PretrainedConfig):
         )
         self.use_flash_attn = use_flash_attn
         self.recompute_use_reentrant = recompute_use_reentrant
-        self.use_mem_eff_attn = use_mem_eff_attn
         self.use_flash_attn_with_mask = use_flash_attn_with_mask
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
@@ -229,11 +217,6 @@ class ErnieConfig(PretrainedConfig):
         self.fuse_swiglu = fuse_swiglu
         self.fuse_rms_norm = fuse_rms_norm
         self.use_rmsnorm = use_rmsnorm
-        self.using_dynamic_sequence_length = using_dynamic_sequence_length
-        if using_dynamic_sequence_length:
-            assert (
-                micro_batch_size > 0
-            ), "micro_batch_size should be set when using_dynamic_sequence_length"
         self.micro_batch_size = micro_batch_size
         self.using_precision_check = using_precision_check
         self.use_qk_norm = use_qk_norm
@@ -280,6 +263,7 @@ class ErnieConfig(PretrainedConfig):
         self.decoderlayer_act_offload_settings = decoderlayer_act_offload_settings
         self.loss_subbatch_seqlen = loss_subbatch_seqlen
         self.gate_force_zero_padding_grad = gate_force_zero_padding_grad
+        self.moe_use_all2all = moe_use_all2all
 
         default_fp8_configs = {
             "quant_scheme": "DelayedScaling",
@@ -341,9 +325,7 @@ class ErnieConfig(PretrainedConfig):
         self.moe_layer_feed_fake_token = moe_layer_feed_fake_token
 
         if self.sequence_parallel:
-            assert (
-                self.using_dynamic_sequence_length or self.seqlen
-            ), "seqlen not provided in sequence-parallel when not using dygramic sequence length"
+            assert self.seqlen, "seqlen not provided in sequence-parallel"
 
             assert (
                 self.tensor_parallel_degree > 1
@@ -352,7 +334,6 @@ class ErnieConfig(PretrainedConfig):
         self.register_nonsaveable_keys("use_recompute")
         self.register_nonsaveable_keys("recompute_use_reentrant")
         self.register_nonsaveable_keys("refined_recompute")
-        self.register_nonsaveable_keys("use_recompute_attn")
         self.register_nonsaveable_keys("use_recompute_lm_head")
         self.register_nonsaveable_keys("use_recompute_mtp")
         self.register_nonsaveable_keys("use_recompute_dnd")
@@ -400,8 +381,6 @@ class ErnieMoEConfig(ErnieConfig):
             Number of attention heads for each attention layer in the Transformer encoder.
         hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
             The non-linear activation function (function or string) in the decoder.
-        initializer_range (`float`, *optional*, defaults to 0.02):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         rms_norm_eps (`float`, *optional*, defaults to 1e-12):
             The epsilon used by the rms normalization layers.
         use_cache (`bool`, *optional*, defaults to `True`):
@@ -445,9 +424,6 @@ class ErnieMoEConfig(ErnieConfig):
         moe_layer_end_index: Union[int, list] = -1,
         moe_aux_loss_lambda=1e-2,
         moe_orthogonal_loss_lambda=1e-2,
-        moe_use_size_all2all=False,
-        sinkhorn_2gate=True,
-        sinkhorn_temp=3e-2,
         global_aux_loss=False,
         moe_dropout_prob=0.0,
         moe_group="world",
@@ -524,14 +500,11 @@ class ErnieMoEConfig(ErnieConfig):
         self.moe_aux_loss_lambda = moe_aux_loss_lambda
         self.moe_orthogonal_loss_lambda = moe_orthogonal_loss_lambda
         self.global_aux_loss = global_aux_loss
-        self.sinkhorn_2gate = sinkhorn_2gate
-        self.sinkhorn_temp = sinkhorn_temp
         self.moe_layer_interval = moe_layer_interval
         self.moe_dropout_prob = moe_dropout_prob
         self.moe_group = moe_group
         self.moe_gate = moe_gate
         self.moe_num_attn_experts = moe_num_attn_experts
-        self.moe_use_size_all2all = moe_use_size_all2all
         self.moe_logging = moe_logging
         self.num_experts_per_tok = num_experts_per_tok
         self.moe_num_shared_experts = moe_num_shared_experts
@@ -682,11 +655,6 @@ class ErnieMoEConfig(ErnieConfig):
 
     @property
     def use_moe(self) -> bool:
-        """_summary_
-
-        Returns:
-            bool: _description_
-        """
         return (
             sum(self.moe_num_experts) > 0
             if self.multimodel_experts

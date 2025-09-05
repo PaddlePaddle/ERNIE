@@ -42,6 +42,7 @@ from paddleformers.trainer import (
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.transformers.model_utils import unwrap_model
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from ernie.callbacks import LayerwiseDropoutCallback
 from ernie.configuration import Ernie4_5_MoeConfig
@@ -286,11 +287,16 @@ def run_sft(
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    convert_from_kwargs = {
+        (
+            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+        ): False
+    }
     model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         quantization_config=quantization_config,
-        convert_from_torch=False,
+        **convert_from_kwargs,
         **download_source_kwargs,
     )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
@@ -356,7 +362,7 @@ def run_sft(
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            convert_from_torch=False,
+            **convert_from_kwargs,
             **download_source_kwargs,
         )
     else:
@@ -371,7 +377,7 @@ def run_sft(
     logger.info(f"{runtime_timer.log()}")
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        convert_from_torch=False,
+        **convert_from_kwargs,
         **download_source_kwargs,
     )
 

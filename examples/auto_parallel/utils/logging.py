@@ -19,7 +19,12 @@ from pathlib import Path
 from paddleformers.utils.log import logger as paddlenlp_logger
 
 hdl = logging.StreamHandler(sys.stderr)
+formatter = logging.Formatter(
+    fmt="[%(levelname)s] %(asctime)s [%(filename)12s:%(lineno)5d]:    %(message)s"
+)
+hdl.setFormatter(formatter)
 logger = logging.getLogger()
+logger.handlers = [hdl]
 
 bce_log = logging.getLogger("baidubce")
 bce_log.handlers = []
