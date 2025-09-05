@@ -15,17 +15,17 @@
 
 import paddle
 import paddle.distributed as dist
-from models.modeling import ErnieDecoderLayer
 from models.moe_layer import MOELayer
 from paddle.distributed.fleet import fleet
 from paddleformers.trainer.trainer_callback import TrainerCallback
 
 
 class MoECorrectionBiasAdjustCallback(TrainerCallback):
-    def __init__(self, lr, use_sp):
+    def __init__(self, lr, use_sp, model_class):
         super().__init__()
         self.update_lr = float(lr)
         self.use_sp = use_sp
+        self.model_class = model_class
 
     def on_optimizer_end(self, args, state, control, **kwargs):
         model = kwargs["model"]
@@ -35,7 +35,7 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
 
         def get_stat(layer):
             nonlocal usages, biases
-            if isinstance(layer, ErnieDecoderLayer):
+            if isinstance(layer, self.model_class):
                 if not isinstance(layer.mlp, (MOELayer)):
                     return
                 assert hasattr(
@@ -69,7 +69,7 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
 
         def update_bias(layer):
             nonlocal usages, biases
-            if isinstance(layer, ErnieDecoderLayer):
+            if isinstance(layer, self.model_class):
                 if not isinstance(layer.mlp, MOELayer):
                     return
                 with paddle.no_grad():
