@@ -548,7 +548,7 @@ def main():
         from models.modeling_vpp import ErnieForCausalLM, ErnieDecoderLayer
 
         logger.info("Training VPP parallelism with the basic API")
-    print("xxx --------- vpp_degree: ", vpp_degree)
+
     with paddle.LazyGuard():
         model = ErnieForCausalLM(cfg)
 
