@@ -16,11 +16,9 @@
 import math
 import logging
 from typing import Optional, Tuple
-import contextlib
 
 
 from copy import deepcopy
-from dataclasses import dataclass
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
@@ -30,19 +28,25 @@ from paddle.distributed.fleet.utils import recompute
 from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 
-from models.top2_gate import TopKGateFused
-
-
-from paddleformers.transformers.model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions as _BaseModelOutput,
+from .modeling import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithCrossAttentionsErnie,
+    _make_causal_mask,
+    _expand_mask,
+    get_gate,
+    RMSNorm,
+    RotaryEmbedding,
+    RopeEmbedding,
+    ErnieMoeMLP,
+    ErnieMoeMLPFused,
+    ErniePretrainedModel,
+    ErnieLMHead,
 )
-from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAttentions
 
-from paddleformers.transformers.model_utils import PretrainedModel
+
 
 from models.moe_layer import (
     MOELayer,
-    MoEStatics,
 )
 from models.configuration import ErnieMoEConfig
 from utils.training_utils import get_mesh
@@ -51,19 +55,6 @@ from utils.training_utils import get_mesh
 from paddle.nn.functional.flash_attention import flash_attention
 from paddle.incubate.nn.functional import fused_rotary_position_embedding as fused_rope
 from paddle.incubate.nn.functional import swiglu
-
-
-@dataclass
-class BaseModelOutputWithPastAndCrossAttentions(_BaseModelOutput):
-    router_loss: Optional[paddle.Tensor] = None
-    gate_logits: Optional[Tuple[paddle.Tensor]] = None
-    mtp_outputs: Optional[paddle.Tensor] = None
-
-
-@dataclass
-class CausalLMOutputWithCrossAttentionsErnie(CausalLMOutputWithCrossAttentions):
-    router_loss: Optional[paddle.Tensor] = None
-
 
 logger = logging.getLogger(__name__)
 
@@ -110,11 +101,6 @@ def calc_lm_head_logits(
         logits += bias
 
     return logits
-
-
-def masked_fill(x, mask, value):
-    y = paddle.full(x.shape, value, x.dtype)
-    return paddle.where(mask, y, x)
 
 
 def scaled_dot_product_attention(
@@ -222,141 +208,6 @@ def scaled_dot_product_attention(
         return attn_output, None
 
 
-def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
-    batch_size, target_length = input_ids_shape
-
-    mask = paddle.full((target_length, target_length), float(paddle.finfo(dtype).min))
-
-    mask_cond = paddle.arange(mask.shape[-1])
-    mask = masked_fill(
-        mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0
-    )
-
-    if past_key_values_length > 0:
-        mask = paddle.concat(
-            [paddle.zeros([target_length, past_key_values_length]), mask], axis=-1
-        )
-
-    return mask[None, None, :, :].expand(
-        [batch_size, 1, target_length, target_length + past_key_values_length]
-    )
-
-
-def _expand_mask(mask, dtype, tgt_length):
-    if mask.ndim == 4:
-        expanded_mask = mask
-    elif mask.ndim == 3:
-        expanded_mask = mask[:, None, :, :]
-    else:
-        batch_size, src_length = mask.shape[0], mask.shape[-1]
-        tgt_length = tgt_length if tgt_length is not None else src_length
-
-        expanded_mask = mask[:, None, None, :].expand(
-            [batch_size, 1, tgt_length, src_length]
-        )
-
-    inverted_mask = 1.0 - expanded_mask
-    return masked_fill(
-        inverted_mask, inverted_mask.cast("bool"), float(paddle.finfo(dtype).min)
-    )
-
-
-def get_gate(
-    config: ErnieMoEConfig,
-    expert: Tuple[Tuple[int, nn.Layer]],
-    layer_idx: int,
-    ipp: int = 0,
-) -> Tuple[nn.Layer, nn.LayerList]:
-    moe_num_experts = config.moe_num_experts
-    assert (
-        moe_num_experts >= config.moe_world_size
-    ), f"expert moe_num_experts={moe_num_experts} >= moe_world_size={config.moe_world_size}"
-    assert (
-        moe_num_experts % config.moe_world_size == 0
-    ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={config.moe_world_size} == 0"
-    moe_num_experts_per_device = moe_num_experts // config.moe_world_size
-    experts = nn.LayerList([])
-    for expert_id, (experts_num, fc) in enumerate(expert):
-        assert experts_num % config.moe_world_size == 0
-        experts_to_append = []
-        if not hasattr(fc, "__len__"):
-            experts_to_append.append(fc)
-            if expert_id == 1:
-                with paddle.utils.unique_name.guard("_mm_deepcopy"):
-                    for _ in range(experts_num - 1):
-                        experts_to_append.append(deepcopy(fc))
-            else:
-                for _ in range(experts_num - 1):
-                    experts_to_append.append(deepcopy(fc))
-        else:
-            experts_to_append = fc
-        for ex in experts_to_append:
-            for p in ex.parameters():
-                p.expert_type = f"expert_type_{expert_id}"
-        experts.extend(experts_to_append)
-
-    logger.info(
-        f"using moe-world-size: {config.moe_world_size} "
-        f"expert-per-device: {moe_num_experts_per_device} "
-    )
-    if config.moe_use_hard_gate and moe_num_experts <= 2:
-        gate = None
-        logger.info("MOE-GATE:-hard-gate")
-    else:
-        logger.info(f"MOE-GATE:-{config.moe_gate}")
-        gate = TopKGateFused(
-            config, layer_idx=layer_idx, group=config.moe_group, ipp=ipp
-        )
-
-    lm_gate, lm_experts = None, None
-    logger.info(f"LM-experts-{lm_experts} -- experts-{experts}")
-
-    index = 0 if config.moe_group == "dp" else 1
-    ep_sub_meshes = dist.auto_parallel.api.split_mesh(get_mesh(ipp), index)
-
-    for i, expert in enumerate(experts):
-        ep_group_id = i // moe_num_experts_per_device
-        if isinstance(expert, (ErnieMoeMLPFused, ErnieMoeMLP)):
-            experts[i].redistribute_expert(
-                ep_sub_meshes[ep_group_id], [dist.Replicate(), dist.Replicate()]
-            )
-            experts[i].ep_group_id = ep_group_id
-
-    if config.moe_use_aux_free:
-        moe_statics = MoEStatics(config, layer_idx)
-    else:
-        moe_statics = None
-    return gate, experts, lm_gate, lm_experts, moe_statics
-
-
-class RMSNorm(nn.Layer):
-    def __init__(self, config, ipp=0):
-        super().__init__()
-        self.hidden_size = config.hidden_size
-        self.weight = paddle.create_parameter(
-            shape=[self.hidden_size],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=nn.initializer.Constant(1.0),
-        )
-        self.variance_epsilon = config.rms_norm_eps
-        self.config = config
-
-    def forward(self, hidden_states):
-        if self.config.fuse_rms_norm:
-            return paddle.incubate.nn.functional.fused_rms_norm_ext(
-                hidden_states, self.weight, self.variance_epsilon
-            )[0]
-        with paddle.amp.auto_cast(False):
-            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = (
-                paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
-            )
-
-        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
-            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-        return hidden_states * self.weight
-
-
 class LayerNorm(nn.LayerNorm):
 
     def __init__(self, config, ipp=0):
@@ -370,139 +221,6 @@ class LayerNorm(nn.LayerNorm):
             self.bias = dist.shard_tensor(
                 self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
             )
-
-
-class RotaryEmbedding(nn.Layer):
-
-    def __init__(self, dim, max_position_embeddings=4096, base=10000):
-        super().__init__()
-        self.base = base
-        self.max_position_embeddings = max_position_embeddings
-        inv_freq = 1.0 / (
-            base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim)
-        )
-
-        t = paddle.arange(max_position_embeddings, dtype="float32")
-        freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
-        emb = paddle.concat([freqs, freqs], axis=-1)
-
-        self.cos_cached = emb.cos()
-        self.sin_cached = emb.sin()
-
-        self._cast_to_low_precision = False
-        self._cast_to_low_precison = False
-
-    def forward(self, x, seq_len=None):
-        return (
-            self.cos_cached[:seq_len, :],
-            self.sin_cached[:seq_len, :],
-        )
-
-    @classmethod
-    def rotate_half(cls, x):
-        x1 = x[..., : x.shape[-1] // 2]
-        x2 = x[..., x.shape[-1] // 2 :]
-        return paddle.concat([-x2, x1], axis=-1)
-
-    @classmethod
-    def apply_rotary_pos_emb(cls, q, k, cos, sin, offset: int = 0, position_ids=None):
-        if position_ids is not None:
-            assert offset == 0, offset
-            cos = F.embedding(position_ids, cos)
-            sin = F.embedding(position_ids, sin)
-        else:
-            cos = cos.unsqueeze(0)
-            sin = sin.unsqueeze(0)
-        cos = cos[:, offset : q.shape[1] + offset, None, :]
-        sin = sin[:, offset : q.shape[1] + offset, None, :]
-
-        q_embed = paddle.add(
-            paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin)
-        )
-        k_embed = paddle.add(
-            paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin)
-        )
-        q_embed = q_embed.astype(q.dtype)
-        k_embed = k_embed.astype(k.dtype)
-        return q_embed, k_embed
-
-
-class RopeEmbedding(nn.Layer):
-    def __init__(self, head_dim, compression_ratio=1.0, base=10000):
-        super().__init__()
-        self.head_dim = head_dim
-        self.compression_ratio = compression_ratio
-        self.base = base
-
-    def forward(self, seq_length, position_ids=None):
-        indices = paddle.arange(0, self.head_dim, 2, dtype="float32")
-        indices = 1 / self.base ** (indices / self.head_dim)
-        if position_ids is None:
-            position_ids = paddle.arange(0, seq_length, 1, dtype="float32").unsqueeze(1)
-            position_ids = position_ids / self.compression_ratio
-            sinusoid_inp = position_ids * indices.unsqueeze(0)
-        else:
-            position_ids = position_ids / self.compression_ratio
-            seq_length = position_ids.shape[-1]
-            sinusoid_inp = position_ids.unsqueeze(-1).astype(
-                "float32"
-            ) * indices.unsqueeze(0)
-        pos_emb = paddle.concat(
-            [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1
-        )
-        pos_emb = paddle.reshape(pos_emb, (-1, 1, seq_length, self.head_dim))
-        pos_emb.stop_gradient = True
-        return pos_emb
-
-    def apply_rotary(self, rp, q, k):
-        sin, cos = paddle.chunk(rp, 2, axis=-1)
-        sin_pos = paddle.reshape(paddle.stack([sin, sin], axis=-1), rp.shape)
-        cos_pos = paddle.reshape(paddle.stack([cos, cos], axis=-1), rp.shape)
-        rotate_half_q = paddle.reshape(
-            paddle.stack([-q[:, :, :, 1::2], q[:, :, :, 0::2]], axis=-1),
-            paddle.shape(q),
-        )
-        query = paddle.add(
-            paddle.multiply(q.astype("float32"), cos_pos),
-            paddle.multiply(rotate_half_q.astype("float32"), sin_pos),
-        )
-        rotate_half_k = paddle.reshape(
-            paddle.stack([-k[:, :, :, 1::2], k[:, :, :, 0::2]], axis=-1),
-            paddle.shape(k),
-        )
-        key = paddle.add(
-            paddle.multiply(k.astype("float32"), cos_pos),
-            paddle.multiply(rotate_half_k.astype("float32"), sin_pos),
-        )
-        return query, key
-
-    def forward_single(self, position_ids):
-        batch_size, seq_length = position_ids.shape[:2]
-        rope_emb = paddle.zeros(
-            (2, batch_size, seq_length, 1, self.head_dim), dtype="float32"
-        )
-        inv_freq = self.base ** (
-            -paddle.arange(0, self.head_dim, 2, dtype="float32") / self.head_dim
-        )
-        position_ids = position_ids.cast("float32")
-        position_ids = position_ids / self.compression_ratio
-        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
-        emb = paddle.stack([freqs, freqs], axis=-1).reshape(
-            (batch_size, seq_length, self.head_dim)
-        )
-        emb = paddle.unsqueeze(emb, 2)
-
-        rope_emb[0] = paddle.cos(emb)
-        rope_emb[1] = paddle.sin(emb)
-        return rope_emb
-
-    @staticmethod
-    def apply_rotary_single(x, rope_emb):
-        rotate_half_x = paddle.reshape(
-            paddle.stack([-x[:, :, :, 1::2], x[:, :, :, 0::2]], axis=-1),
-            paddle.shape(x),
-        )
-        return x * rope_emb[0] + rotate_half_x * rope_emb[1]
 
 
 class ErnieMLP(nn.Layer):
@@ -814,119 +532,6 @@ class ErnieAttention(nn.Layer):
         return attn_output, attn_weights, past_key_value
 
 
-class ErnieMoeMLP(ErnieMLP):
-    """_summary_
-
-    Args:
-        ErnieMoeMLP (_type_): _description_
-    """
-
-    def __init__(self, config, ipp=0):
-        """
-        doc
-        """
-        disable_ffn_model_parallel = getattr(
-            config, "disable_ffn_model_parallel", False
-        )
-        if disable_ffn_model_parallel:
-            config = deepcopy(config)
-            config.tensor_parallel_degree = 1
-            config.sequence_parallel = False
-
-        super().__init__(config, ipp, do_shard_tensor=not disable_ffn_model_parallel)
-        self.moe_dropout_prob = config.moe_dropout_prob
-        self.fuse_swiglu = config.fuse_swiglu
-
-    def redistribute_expert(self, mesh, placements):
-        """
-        Place the experts on different devices.
-        """
-        self.gate_proj.weight = dist.shard_tensor(
-            self.gate_proj.weight, mesh, placements
-        )
-        self.up_proj.weight = dist.shard_tensor(self.up_proj.weight, mesh, placements)
-        self.down_proj.weight = dist.shard_tensor(
-            self.down_proj.weight, mesh, placements
-        )
-        if self.config.use_bias:
-            self.gate_proj.bias = dist.shard_tensor(
-                self.gate_proj.bias, mesh, placements
-            )
-            self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
-            self.down_proj.bias = dist.shard_tensor(
-                self.down_proj.bias, mesh, placements
-            )
-
-    def forward(self, x):
-        if self.fuse_swiglu:
-            x = swiglu(self.gate_proj(x), self.up_proj(x))
-        else:
-            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
-        if self.moe_dropout_prob > 0:
-            with get_rng_state_tracker().rng_state("local_seed"):
-                x = F.dropout(x=x, p=self.moe_dropout_prob)
-        ret = self.down_proj(x)
-        return ret
-
-
-class BMMLinear(nn.Layer):
-    def __init__(self, experts, d_in, d_out, use_bias=False):
-        super().__init__()
-        self.weight = self.create_parameter(
-            [experts, d_in, d_out], dtype=paddle.get_default_dtype()
-        )
-        if use_bias:
-            self.bias = self.create_parameter(
-                [experts, d_out], dtype=paddle.get_default_dtype(), is_bias=True
-            )
-        else:
-            self.bias = None
-
-    def forward(self, x):
-        """x: [num_experts, Seq, dim]"""
-        if self.bias is not None:
-            return paddle.bmm(x, self.weight) + self.bias
-        return paddle.bmm(x, self.weight)
-
-
-class ErnieMoeMLPFused(nn.Layer):
-    def __init__(self, config):
-        assert (
-            hasattr(config, "disable_ffn_model_parallel")
-            or config.tensor_parallel_degree == 1
-        ), f"fused mlp only suport mp-moe, mp={config.tensor_parallel_degree}"
-        assert config.fuse_attn_ffn, "fused mlp only support fuse_attn_ffn"
-        super().__init__()
-        self.moe_dropout_prob = config.moe_dropout_prob
-        self.num_local_experts = config.moe_num_experts // config.moe_world_size
-        logger.info(
-            f"fused-expert-weight-shape: {[self.num_local_experts, config.hidden_size, config.intermediate_size]}"
-        )
-
-        self.up_gate_proj = BMMLinear(
-            self.num_local_experts, config.hidden_size, config.intermediate_size * 2
-        )
-        self.down_proj = BMMLinear(
-            self.num_local_experts, config.intermediate_size, config.hidden_size
-        )
-        self.fuse_swiglu = config.fuse_swiglu
-
-    def __len__(self):
-        return self.num_local_experts
-
-    def __iter__(self):
-        return (self for _ in range(1))
-
-    def forward(self, x):
-        if self.fuse_swiglu:
-            x = swiglu(self.up_gate_proj(x))
-        else:
-            gate, x = self.up_gate_proj(x).chunk(2, axis=-1)
-            x = F.silu(gate) * x
-        x = self.down_proj(x)
-        return x
-
-
 class ErnieDecoderLayer(nn.Layer):
     """
     ErnieDecoderLayer is a decoder layer in Ernie model.
@@ -1174,94 +779,6 @@ class ErnieDecoderLayer(nn.Layer):
         if type(outputs) is tuple and len(outputs) == 1:
             outputs = outputs[0]
         return outputs
-
-
-class ErniePretrainedModel(PretrainedModel):
-    """
-    ErniePretrainedModel is a pretrained model class for Ernie model.
-    It is composed of a encoder and a decoder.
-    """
-
-    config_class = ErnieMoEConfig
-    base_model_prefix = "ernie"
-
-    def init_weights(self, layer):
-        """Initialization hook"""
-        if self.config.tensor_parallel_degree > 1:
-            rng_tracker = get_rng_state_tracker().rng_state
-        else:
-            rng_tracker = contextlib.nullcontext
-
-        if isinstance(
-            layer,
-            (
-                ErnieLMHead,
-                nn.Embedding,
-                nn.Linear,
-                paddle.incubate.nn.FusedLinear,
-            ),
-        ):
-
-            with rng_tracker():
-                dtype = paddle.get_default_dtype()
-                paddle.set_default_dtype("float32")
-                if layer.weight._is_initialized():
-                    if layer.weight.is_dist():
-                        layer.weight._local_value().set_value(
-                            paddle.randn(
-                                layer.weight._local_shape, dtype=layer.weight.dtype
-                            ).scale(self.config.initializer_range)
-                        )
-                    else:
-                        layer.weight.set_value(
-                            paddle.randn(
-                                layer.weight.shape, dtype=layer.weight.dtype
-                            ).scale(self.config.initializer_range)
-                        )
-                    paddle.set_default_dtype(dtype)
-                    logger.info(
-                        f"dist-init-fc: shape={layer.weight.shape}, "
-                        f" range={self.config.initializer_range},"
-                        f' type={type(layer)},norm={layer.weight.astype("float32").norm()}'
-                    )
-
-        elif isinstance(layer, TopKGateFused):
-            if not hasattr(layer, "weight"):
-                return
-            with rng_tracker("model_parallel_rng"):
-                dtype = paddle.get_default_dtype()
-                paddle.set_default_dtype("float32")
-                if self.config.moe_group_experts:
-                    if layer.weight._is_initialized():
-                        layer.weight.set_value(
-                            paddle.randn(
-                                layer.weight.shape, dtype=layer.weight.dtype
-                            ).scale(self.config.initializer_range)
-                        )
-                else:
-                    if layer.weight._is_initialized():
-                        granularity = (
-                            1
-                            if self.config.moe_intermediate_size == 0
-                            else self.config.intermediate_size
-                            // self.config.moe_intermediate_size
-                        )
-                        layer.weight.set_value(
-                            paddle.randn(
-                                [
-                                    self.config.hidden_size,
-                                    self.config.moe_num_experts // granularity,
-                                ],
-                                dtype="float32",
-                            )
-                            .scale(self.config.initializer_range)
-                            .repeat_interleave(granularity, axis=-1)
-                        )
-                logger.info(
-                    f"dist-init-moe_gate: shape={layer.weight.shape}, dtype={layer.weight.dtype} "
-                    f"range={self.config.initializer_range},type={type(layer)}, "
-                    f'norm={layer.weight.astype("float32").norm()}'
-                )
 
 
 class ErnieModel(ErniePretrainedModel):

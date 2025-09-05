@@ -56,20 +56,6 @@ from paddle.distributed import collective
 from paddle.tensor.manipulation import reshape
 from typing import Literal, TypeAlias
 
-# USE_VPP=0: Implement parallelism using the intermediate API.
-# USE_VPP=1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
-use_vpp = os.environ.get("USE_VPP", "0")
-if use_vpp == "0":
-    from models.modeling import ErnieForCausalLM
-
-    logger.info("Training with the intermediate API. Do not support VPP.")
-elif use_vpp == "1":
-    from models.modeling_vpp import ErnieForCausalLM
-
-    logger.info("Training VPP parallelism with the basic API")
-else:
-    raise ValueError(f"Invalid environment args USE_VPP={use_vpp}")
-
 _ReduceMode: TypeAlias = Literal["mean", "sum", "none"]
 
 
@@ -550,6 +536,19 @@ def main():
 
     tokenizer = setup_tokenizer(args, cfg)
 
+    vpp_degree = cfg.virtual_pp_degree
+    # vpp_degree==1: Implement parallelism using the intermediate API.
+    # vpp_degree>1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
+    assert vpp_degree >= 1, "vpp_degree must be greater than or equal to 1."
+    if vpp_degree == 1:
+        from models.modeling import ErnieForCausalLM
+
+        logger.info("Training with the intermediate API. Do not support VPP.")
+    elif vpp_degree > 1:
+        from models.modeling_vpp import ErnieForCausalLM
+
+        logger.info("Training VPP parallelism with the basic API")
+    print("xxx --------- vpp_degree: ", vpp_degree)
     with paddle.LazyGuard():
         model = ErnieForCausalLM(cfg)
 

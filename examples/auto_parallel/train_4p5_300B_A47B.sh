@@ -40,10 +40,6 @@ export PYTHONPATH=../../:$PYTHONPATH
 
 log_dir=output/paddle_distributed_logs
 
-# USE_VPP=0: Implement parallelism using the intermediate API.
-# USE_VPP=1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
-export USE_VPP=1
-
 python -m paddle.distributed.launch \
     --log_dir ${log_dir} \
     --master <master_ip>:<port> \
