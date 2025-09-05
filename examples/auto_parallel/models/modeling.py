@@ -16,7 +16,6 @@
 import math
 import logging
 from typing import Optional, Tuple
-import contextlib
 
 
 from copy import deepcopy
@@ -178,15 +177,7 @@ def scaled_dot_product_attention(
             attn_weights = F.softmax_(attn_weights, axis=-1).astype(query_states.dtype)
 
         if config.attention_probs_dropout_prob > 0.0:
-            if config.tensor_parallel_degree > 1:
-                with get_rng_state_tracker().rng_state("local_seed"):
-                    attn_weights = F.dropout(
-                        attn_weights,
-                        config.attention_probs_dropout_prob,
-                        training=training,
-                        mode="upscale_in_train",
-                    )
-            else:
+            with get_rng_state_tracker().rng_state("local_seed"):
                 attn_weights = F.dropout(
                     attn_weights,
                     config.attention_probs_dropout_prob,
@@ -710,10 +701,7 @@ class ErnieMoeMLP(ErnieMLP):
         disable_ffn_model_parallel = getattr(
             config, "disable_ffn_model_parallel", False
         )
-        if disable_ffn_model_parallel:
-            config = deepcopy(config)
-            config.tensor_parallel_degree = 1
-            config.sequence_parallel = False
+        config = deepcopy(config)
 
         super().__init__(config, ipp, do_shard_tensor=not disable_ffn_model_parallel)
         self.moe_dropout_prob = config.moe_dropout_prob
@@ -773,10 +761,6 @@ class BMMLinear(nn.Layer):
 
 class ErnieMoeMLPFused(nn.Layer):
     def __init__(self, config):
-        assert (
-            hasattr(config, "disable_ffn_model_parallel")
-            or config.tensor_parallel_degree == 1
-        ), f"fused mlp only suport mp-moe, mp={config.tensor_parallel_degree}"
         assert config.fuse_attn_ffn, "fused mlp only support fuse_attn_ffn"
         super().__init__()
         self.moe_dropout_prob = config.moe_dropout_prob
@@ -990,14 +974,8 @@ class ErnieDecoderLayer(nn.Layer):
             )
         )
 
-        if (
-            self.config.tensor_parallel_degree > 1
-            and self.config.hidden_dropout_prob > 0.0
-        ):
-            current_seed = (
-                "local_seed" if self.config.sequence_parallel else "global_seed"
-            )
-            with get_rng_state_tracker().rng_state(current_seed):
+        if self.config.hidden_dropout_prob > 0.0:
+            with get_rng_state_tracker().rng_state("local_seed"):
                 hidden_states = self.residual_add1(hidden_states, residual)
         else:
             hidden_states = self.residual_add1(hidden_states, residual)
@@ -1017,14 +995,8 @@ class ErnieDecoderLayer(nn.Layer):
             hidden_states = self.mlp(hidden_states)
             gate_logits = None
 
-        if (
-            self.config.tensor_parallel_degree > 1
-            and self.config.hidden_dropout_prob > 0.0
-        ):
-            current_seed = (
-                "local_seed" if self.config.sequence_parallel else "global_seed"
-            )
-            with get_rng_state_tracker().rng_state(current_seed):
+        if self.config.hidden_dropout_prob > 0.0:
+            with get_rng_state_tracker().rng_state("local_seed"):
                 hidden_states = self.residual_add2(hidden_states, residual)
         else:
             hidden_states = self.residual_add2(hidden_states, residual)
@@ -1069,10 +1041,7 @@ class ErniePretrainedModel(PretrainedModel):
 
     def init_weights(self, layer):
         """Initialization hook"""
-        if self.config.tensor_parallel_degree > 1:
-            rng_tracker = get_rng_state_tracker().rng_state
-        else:
-            rng_tracker = contextlib.nullcontext
+        rng_tracker = get_rng_state_tracker().rng_state
 
         if isinstance(
             layer,
@@ -1893,14 +1862,8 @@ class ErnieForCausalLM(ErniePretrainedModel):
     def auto_dist_config(self, prefix=""):
         if prefix != "":
             assert prefix.endswith(".")
-        # if self.config.pipeline_parallel_degree <= 1:
-        # print(f"ernie use_intermediate_api:{self.config.use_intermediate_api}")
-        # print(f"ernie pp mode:{self.config.pipeline_schedule_mode}")
         ernie_prefix = prefix + "ernie."
         layers_prefix = ""
-        # else:
-        #     ernie_prefix = prefix
-        #     layers_prefix="layers.*."
         config = {
             "sp_config": {
                 "parallelize_plan": {
