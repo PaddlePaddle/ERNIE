@@ -36,8 +36,6 @@ fi
 
 export FLAGS_enable_moe_utils=true
 
-export PYTHONPATH=../../:$PYTHONPATH
-
 log_dir=output/paddle_distributed_logs
 
 # USE_VPP=0: Implement parallelism using the intermediate API.
