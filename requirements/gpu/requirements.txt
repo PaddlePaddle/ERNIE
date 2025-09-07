@@ -1,4 +1,4 @@
-paddleformers
+paddleformers==0.1
 setuptools==79.0.1
 decord
 moviepy
