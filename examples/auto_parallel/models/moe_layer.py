@@ -1020,6 +1020,8 @@ class TopKGateFused(nn.Layer):
         self.use_token_type_bias = config.moe_use_token_type_bias
         self.use_correction_bias = config.moe_use_aux_free
 
+        self.ipp = ipp
+
         if config.moe_gate_act == "softmax":
             self.act = partial(F.softmax, axis=-1)
         elif config.moe_gate_act == "sigmoid":
@@ -1087,11 +1089,6 @@ class TopKGateFused(nn.Layer):
         logger.info(
             f"{config.moe_gate}: w/ capacity: {self.cap} experts:{self.num_experts} "
             f"use_token_type_bias:{self.use_token_type_bias} gate_act:{config.moe_gate_act} "
-        )
-
-        self.ipp = ipp
-        self.weight = dist.shard_tensor(
-            self.weight, get_flatten_mesh(get_mesh(self.ipp)), [dist.Replicate()]
         )
 
     def _create_gate_parameter(self):
@@ -1281,7 +1278,13 @@ class TopKGateFused(nn.Layer):
 
         weight = self.get_gate_weight(transform_weight)
         with paddle.amp.auto_cast(False):
+            input = _reshard(
+                input, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
+            )
             logits = gate_detach_matmul(input, weight, self.use_fake_gate)
+            logits = _reshard(
+                logits, get_flatten_mesh(get_mesh(self.ipp)), [dist.Shard(0)]
+            )
             if self.use_token_type_bias:
                 assert token_type_ids is not None
                 assert (
