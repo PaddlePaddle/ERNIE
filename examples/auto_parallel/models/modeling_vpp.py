@@ -18,17 +18,14 @@ import logging
 from typing import Optional, Tuple
 
 
-from copy import deepcopy
 import paddle
 import paddle.distributed as dist
-import paddle.nn.functional as F
 from paddle.distributed import fleet
 from paddle import nn
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 
 from .modeling import (
     RMSNorm,
-    ErnieMoeMLPFused,
     ErniePretrainedModel,
     ErnieModel,
     ErniePretrainingCriterion,
@@ -36,15 +33,13 @@ from .modeling import (
     ErnieLMHead,
     ErnieDecoderLayer,
     ErnieAttention,
-    ErnieMLP,
     ErnieForCausalLM,
 )
 
 
-from models.moe_layer import MOELayer
+from models.moe_layer import MOELayer, ErnieMLP
 from models.configuration import ErnieMoEConfig
 from utils.training_utils import get_mesh
-from paddle.incubate.nn.functional import swiglu
 
 logger = logging.getLogger(__name__)
 
@@ -73,89 +68,47 @@ class ErnieMLPVPP(ErnieMLP):
             self.config.tensor_parallel_degree > 1
             or self.config.pipeline_parallel_degree > 1
         ):
-            self.gate_proj.weight = dist.shard_tensor(
-                self.gate_proj.weight,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
-            )
-            self.up_proj.weight = dist.shard_tensor(
-                self.up_proj.weight,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
-            )
-            if config.use_bias:
-                self.gate_proj.bias = dist.shard_tensor(
-                    self.gate_proj.bias,
-                    get_mesh(self.ipp),
-                    [dist.Replicate(), dist.Shard(0)],
-                )
-                self.up_proj.bias = dist.shard_tensor(
-                    self.up_proj.bias,
-                    get_mesh(self.ipp),
-                    [dist.Replicate(), dist.Shard(0)],
-                )
-            self.down_proj.weight = dist.shard_tensor(
-                self.down_proj.weight,
+            self._shard_weights_and_biases()
+
+    def _shard_weights_and_biases(self):
+        self.gate_proj.weight = dist.shard_tensor(
+            self.gate_proj.weight,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Shard(1)],
+        )
+        self.up_proj.weight = dist.shard_tensor(
+            self.up_proj.weight,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Shard(1)],
+        )
+        if self.config.use_bias:
+            self.gate_proj.bias = dist.shard_tensor(
+                self.gate_proj.bias,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(0)],
             )
-            if config.use_bias:
-                self.down_proj.bias = dist.shard_tensor(
-                    self.down_proj.bias,
-                    get_mesh(self.ipp),
-                    [dist.Replicate(), dist.Replicate()],
-                )
+            self.up_proj.bias = dist.shard_tensor(
+                self.up_proj.bias,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(0)],
+            )
+        self.down_proj.weight = dist.shard_tensor(
+            self.down_proj.weight,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Shard(0)],
+        )
+        if self.config.use_bias:
+            self.down_proj.bias = dist.shard_tensor(
+                self.down_proj.bias,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Replicate()],
+            )
 
     def forward(self, x):
         out = super().forward(x)
         if self.config.sequence_parallel:
             out = dist.reshard(out, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)])
         return out
-
-
-class ErnieMoeMLP(ErnieMLPVPP):
-
-    def __init__(self, config, ipp=0):
-
-        disable_ffn_model_parallel = getattr(
-            config, "disable_ffn_model_parallel", False
-        )
-        if disable_ffn_model_parallel:
-            config = deepcopy(config)
-            config.tensor_parallel_degree = 1
-            config.sequence_parallel = False
-
-        super().__init__(config, ipp, do_shard_tensor=not disable_ffn_model_parallel)
-        self.moe_dropout_prob = config.moe_dropout_prob
-        self.fuse_swiglu = config.fuse_swiglu
-
-    def redistribute_expert(self, mesh, placements):
-        self.gate_proj.weight = dist.shard_tensor(
-            self.gate_proj.weight, mesh, placements
-        )
-        self.up_proj.weight = dist.shard_tensor(self.up_proj.weight, mesh, placements)
-        self.down_proj.weight = dist.shard_tensor(
-            self.down_proj.weight, mesh, placements
-        )
-        if self.config.use_bias:
-            self.gate_proj.bias = dist.shard_tensor(
-                self.gate_proj.bias, mesh, placements
-            )
-            self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
-            self.down_proj.bias = dist.shard_tensor(
-                self.down_proj.bias, mesh, placements
-            )
-
-    def forward(self, x):
-        if self.fuse_swiglu:
-            x = swiglu(self.gate_proj(x), self.up_proj(x))
-        else:
-            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
-        if self.moe_dropout_prob > 0:
-            with get_rng_state_tracker().rng_state("local_seed"):
-                x = F.dropout(x=x, p=self.moe_dropout_prob)
-        ret = self.down_proj(x)
-        return ret
 
 
 class ErnieAttentionVPP(ErnieAttention):
@@ -273,26 +226,7 @@ class ErnieDecoderLayerVPP(ErnieDecoderLayer):
     def __init__(self, config, layer_idx=0, ipp=0):
         super().__init__(config, layer_idx, ipp)
         self.self_attn = ErnieAttentionVPP(config, ipp)
-        self.fc_cls = ErnieMoeMLPFused if config.moe_fuse_experts else ErnieMoeMLP
-        if self.use_moe:
-            moe_layer_start_index = (
-                min(config.moe_layer_start_index)
-                if isinstance(config.moe_layer_start_index, (tuple, list))
-                else config.moe_layer_start_index
-            )
-            moe_layer_end_index = (
-                max(config.moe_layer_end_index)
-                if isinstance(config.moe_layer_end_index, (tuple, list))
-                else config.moe_layer_end_index
-            )
-        if (
-            self.use_moe
-            and ((layer_idx + 1) % config.moe_layer_interval == 0)
-            and layer_idx >= moe_layer_start_index
-            and layer_idx <= moe_layer_end_index
-        ):
-            self.create_moe_mlp_layer(layer_idx, ipp)
-        else:
+        if isinstance(config.mlp, ErnieMLP):
             self.mlp = ErnieMLPVPP(config, ipp)
 
     def forward(
