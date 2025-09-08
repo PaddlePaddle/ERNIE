@@ -226,7 +226,7 @@ class ErnieDecoderLayerVPP(ErnieDecoderLayer):
     def __init__(self, config, layer_idx=0, ipp=0):
         super().__init__(config, layer_idx, ipp)
         self.self_attn = ErnieAttentionVPP(config, ipp)
-        if isinstance(config.mlp, ErnieMLP):
+        if isinstance(self.mlp, ErnieMLP):
             self.mlp = ErnieMLPVPP(config, ipp)
 
     def forward(
@@ -351,7 +351,7 @@ class ErnieModelVPP(ErnieModel):
             )
         if pp_layer_idx == self.config.num_hidden_layers - 1:
             Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-            self.norm = Norm(config, -1)
+            self.norm = Norm(config)
             self.lm_head = ErnieLMHeadVPP(config)
 
         self.gradient_checkpointing = False
