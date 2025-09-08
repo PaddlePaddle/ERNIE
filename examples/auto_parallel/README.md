@@ -28,10 +28,3 @@ should be replaced according to the real environment.
 
 
 The toolkit provides an auto-parallel solution for ERNIE-4.5 pre-training, including the hybrid parallelism training strategy. More advanced optimizations are on the way.
-
-
-Currently, the auto-parallel intermediate API has some limitations under ongoing development:
-
-- Limited support for MOE
-- Limited support for VPP in pipeline parallelism (The intermediate API does not currently support VPP optimization. When `virtual_pp_degree=1`, the intermediate API is used for modeling; the default value of virtual_pp_degree in the script is 8, and when `virtual_pp_degree>1`, the basic API is adopted for modeling.
-)
