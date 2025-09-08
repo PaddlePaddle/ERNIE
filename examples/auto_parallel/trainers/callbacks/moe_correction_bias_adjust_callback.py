@@ -75,7 +75,7 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
                 with paddle.no_grad():
                     if layer.mlp.gate.weight.stop_gradient:
                         update_dict[layer.layer_idx][0, :] = 0
-                    biases[layer.layer_idx].add_(update_dict[layer.layer_idx])
+                    biases[layer.layer_idx].add_(update_dict[layer.layer_idx].flatten())
                     usages[layer.layer_idx].data.zero_()
 
         model.apply(update_bias)

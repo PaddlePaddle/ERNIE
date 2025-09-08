@@ -117,7 +117,6 @@ class InputIdsMassageProcessor(ProcessorBase):
         if len(text_info) == 0:
             text_info = [{"text": "", "tag": "mask"}]
 
-        all_item_list = []
         if text_info[0]["tag"] != "mask":
             raise ValueError("first text must be mask")
 

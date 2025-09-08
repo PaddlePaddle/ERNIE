@@ -68,7 +68,7 @@ class MoEStatics(nn.Layer):
                 len(config.moe_num_experts) if config.multimodel_experts else 1
             )
             p = self.create_parameter(
-                shape=[num_experts_groups, num_experts],
+                shape=[num_experts_groups * num_experts],
                 dtype="float32",
                 is_bias=True,
                 attr=paddle.ParamAttr(
@@ -470,7 +470,14 @@ class MOELayer(nn.Layer):
                 )
                 if "corr_bias" in inspect.signature(moe_gate_dispatch).parameters:
                     if self.use_correction_bias:
-                        compat_args = (self.moe_statics.e_score_correction_bias[0],)
+                        num_experts = (
+                            self.config.moe_num_experts[0]
+                            if self.config.multimodel_experts
+                            else self.config.moe_num_experts
+                        )
+                        compat_args = (
+                            self.moe_statics.e_score_correction_bias[:num_experts],
+                        )
                     else:
                         compat_args = (None,)
                 else:
