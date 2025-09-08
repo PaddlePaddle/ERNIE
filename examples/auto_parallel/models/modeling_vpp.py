@@ -68,41 +68,38 @@ class ErnieMLPVPP(ErnieMLP):
             self.config.tensor_parallel_degree > 1
             or self.config.pipeline_parallel_degree > 1
         ):
-            self._shard_weights_and_biases()
-
-    def _shard_weights_and_biases(self):
-        self.gate_proj.weight = dist.shard_tensor(
-            self.gate_proj.weight,
-            get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(1)],
-        )
-        self.up_proj.weight = dist.shard_tensor(
-            self.up_proj.weight,
-            get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(1)],
-        )
-        if self.config.use_bias:
-            self.gate_proj.bias = dist.shard_tensor(
-                self.gate_proj.bias,
+            self.gate_proj.weight = dist.shard_tensor(
+                self.gate_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+            self.up_proj.weight = dist.shard_tensor(
+                self.up_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(1)],
+            )
+            if config.use_bias:
+                self.gate_proj.bias = dist.shard_tensor(
+                    self.gate_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+                self.up_proj.bias = dist.shard_tensor(
+                    self.up_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(0)],
+                )
+            self.down_proj.weight = dist.shard_tensor(
+                self.down_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(0)],
             )
-            self.up_proj.bias = dist.shard_tensor(
-                self.up_proj.bias,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(0)],
-            )
-        self.down_proj.weight = dist.shard_tensor(
-            self.down_proj.weight,
-            get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(0)],
-        )
-        if self.config.use_bias:
-            self.down_proj.bias = dist.shard_tensor(
-                self.down_proj.bias,
-                get_mesh(self.ipp),
-                [dist.Replicate(), dist.Replicate()],
-            )
+            if config.use_bias:
+                self.down_proj.bias = dist.shard_tensor(
+                    self.down_proj.bias,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Replicate()],
+                )
 
     def forward(self, x):
         out = super().forward(x)
