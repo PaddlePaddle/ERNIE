@@ -205,7 +205,9 @@ def estimate_training(args):
 
     convert_from_kwargs = {
         (
-            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+            "convert_from_hf"
+            if paddleformers_version >= "0.3"
+            else "convert_from_torch"
         ): False
     }
     tokenizer = Ernie4_5_Tokenizer.from_pretrained(
