@@ -16,6 +16,9 @@ basic:
   sharding_parallel_degree: 1
   pipeline_parallel_config: disable_partial_send_recv enable_clear_every_step_cache
   pp_seg_method: layer:Ernie4_5_DecoderLayer|EmptyLayer
+  pp_need_data: false
+  pp_need_data_degree: 0
+  virtual_pp_degree: 1
   use_sp_callback: False
   sharding: stage1
   moe_group: mp
