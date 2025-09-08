@@ -28,8 +28,6 @@ from paddle.distributed.fleet.utils import recompute
 from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 
-from models.top2_gate import TopKGateFused
-
 from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
     PrepareLayerInput,
 )
@@ -41,16 +39,18 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 from paddleformers.transformers.model_utils import PretrainedModel
 
 from models.moe_layer import (
+    get_gate,
     MOELayer,
-    MoEStatics,
+    ErnieMLP,
+    ErnieMoeMLP,
+    ErnieMoeMLPFused,
+    TopKGateFused,
 )
 from models.configuration import ErnieMoEConfig
-from utils.training_utils import get_mesh
 
 
 from paddle.nn.functional.flash_attention import flash_attention
 from paddle.incubate.nn.functional import fused_rotary_position_embedding as fused_rope
-from paddle.incubate.nn.functional import swiglu
 
 
 @dataclass
@@ -232,74 +232,6 @@ def _expand_mask(mask, dtype, tgt_length):
     )
 
 
-def get_gate(
-    config: ErnieMoEConfig,
-    expert: Tuple[Tuple[int, nn.Layer]],
-    layer_idx: int,
-    ipp: int = 0,
-) -> Tuple[nn.Layer, nn.LayerList]:
-    moe_num_experts = config.moe_num_experts
-    assert (
-        moe_num_experts >= config.moe_world_size
-    ), f"expert moe_num_experts={moe_num_experts} >= moe_world_size={config.moe_world_size}"
-    assert (
-        moe_num_experts % config.moe_world_size == 0
-    ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={config.moe_world_size} == 0"
-    moe_num_experts_per_device = moe_num_experts // config.moe_world_size
-    experts = nn.LayerList([])
-    for expert_id, (experts_num, fc) in enumerate(expert):
-        assert experts_num % config.moe_world_size == 0
-        experts_to_append = []
-        if not hasattr(fc, "__len__"):
-            experts_to_append.append(fc)
-            if expert_id == 1:
-                with paddle.utils.unique_name.guard("_mm_deepcopy"):
-                    for _ in range(experts_num - 1):
-                        experts_to_append.append(deepcopy(fc))
-            else:
-                for _ in range(experts_num - 1):
-                    experts_to_append.append(deepcopy(fc))
-        else:
-            experts_to_append = fc
-        for ex in experts_to_append:
-            for p in ex.parameters():
-                p.expert_type = f"expert_type_{expert_id}"
-        experts.extend(experts_to_append)
-
-    logger.info(
-        f"using moe-world-size: {config.moe_world_size} "
-        f"expert-per-device: {moe_num_experts_per_device} "
-    )
-    if config.moe_use_hard_gate and moe_num_experts <= 2:
-        gate = None
-        logger.info("MOE-GATE:-hard-gate")
-    else:
-        logger.info(f"MOE-GATE:-{config.moe_gate}")
-        gate = TopKGateFused(
-            config, layer_idx=layer_idx, group=config.moe_group, ipp=ipp
-        )
-
-    lm_gate, lm_experts = None, None
-    logger.info(f"LM-experts-{lm_experts} -- experts-{experts}")
-
-    index = 0 if config.moe_group == "dp" else 1
-    ep_sub_meshes = dist.auto_parallel.api.split_mesh(get_mesh(ipp), index)
-
-    for i, expert in enumerate(experts):
-        ep_group_id = i // moe_num_experts_per_device
-        if isinstance(expert, (ErnieMoeMLPFused, ErnieMoeMLP)):
-            experts[i].redistribute_expert(
-                ep_sub_meshes[ep_group_id], [dist.Replicate(), dist.Replicate()]
-            )
-            experts[i].ep_group_id = ep_group_id
-
-    if config.moe_use_aux_free:
-        moe_statics = MoEStatics(config, layer_idx)
-    else:
-        moe_statics = None
-    return gate, experts, lm_gate, lm_experts, moe_statics
-
-
 class RMSNorm(nn.Layer):
     def __init__(self, config, ipp=0):
         super().__init__()
@@ -465,36 +397,6 @@ class RopeEmbedding(nn.Layer):
             paddle.shape(x),
         )
         return x * rope_emb[0] + rotate_half_x * rope_emb[1]
-
-
-class ErnieMLP(nn.Layer):
-    def __init__(self, config, ipp=None, do_shard_tensor=True):
-        super().__init__()
-        self.config = config
-        self.ipp = ipp
-        self.hidden_size = config.hidden_size
-        self.intermediate_size = config.intermediate_size
-
-        self.gate_proj = nn.Linear(
-            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
-        )
-        self.up_proj = nn.Linear(
-            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
-        )
-        self.down_proj = nn.Linear(
-            self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
-        )
-
-        self.fuse_swiglu = config.fuse_swiglu
-
-    def forward(self, x):
-        if self.fuse_swiglu:
-            x = swiglu(self.gate_proj(x), self.up_proj(x))
-        else:
-            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
-
-        out = self.down_proj(x)
-        return out
 
 
 class ErnieAttention(nn.Layer):
@@ -687,115 +589,6 @@ class ErnieAttention(nn.Layer):
         return attn_output, attn_weights, past_key_value
 
 
-class ErnieMoeMLP(ErnieMLP):
-    """_summary_
-
-    Args:
-        ErnieMoeMLP (_type_): _description_
-    """
-
-    def __init__(self, config, ipp=0):
-        """
-        doc
-        """
-        disable_ffn_model_parallel = getattr(
-            config, "disable_ffn_model_parallel", False
-        )
-        if disable_ffn_model_parallel:
-            config = deepcopy(config)
-            config.tensor_parallel_degree = 1
-            config.sequence_parallel = False
-
-        super().__init__(config, ipp, do_shard_tensor=not disable_ffn_model_parallel)
-        self.moe_dropout_prob = config.moe_dropout_prob
-        self.fuse_swiglu = config.fuse_swiglu
-
-    def redistribute_expert(self, mesh, placements):
-        """
-        Place the experts on different devices.
-        """
-        self.gate_proj.weight = dist.shard_tensor(
-            self.gate_proj.weight, mesh, placements
-        )
-        self.up_proj.weight = dist.shard_tensor(self.up_proj.weight, mesh, placements)
-        self.down_proj.weight = dist.shard_tensor(
-            self.down_proj.weight, mesh, placements
-        )
-        if self.config.use_bias:
-            self.gate_proj.bias = dist.shard_tensor(
-                self.gate_proj.bias, mesh, placements
-            )
-            self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
-            self.down_proj.bias = dist.shard_tensor(
-                self.down_proj.bias, mesh, placements
-            )
-
-    def forward(self, x):
-        if self.fuse_swiglu:
-            x = swiglu(self.gate_proj(x), self.up_proj(x))
-        else:
-            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
-        if self.moe_dropout_prob > 0:
-            with get_rng_state_tracker().rng_state("local_seed"):
-                x = F.dropout(x=x, p=self.moe_dropout_prob)
-        ret = self.down_proj(x)
-        return ret
-
-
-class BMMLinear(nn.Layer):
-    def __init__(self, experts, d_in, d_out, use_bias=False):
-        super().__init__()
-        self.weight = self.create_parameter(
-            [experts, d_in, d_out], dtype=paddle.get_default_dtype()
-        )
-        if use_bias:
-            self.bias = self.create_parameter(
-                [experts, d_out], dtype=paddle.get_default_dtype(), is_bias=True
-            )
-        else:
-            self.bias = None
-
-    def forward(self, x):
-        """x: [num_experts, Seq, dim]"""
-        if self.bias is not None:
-            return paddle.bmm(x, self.weight) + self.bias
-        return paddle.bmm(x, self.weight)
-
-
-class ErnieMoeMLPFused(nn.Layer):
-    def __init__(self, config):
-        assert config.fuse_attn_ffn, "fused mlp only support fuse_attn_ffn"
-        super().__init__()
-        self.moe_dropout_prob = config.moe_dropout_prob
-        self.num_local_experts = config.moe_num_experts // config.moe_world_size
-        logger.info(
-            f"fused-expert-weight-shape: {[self.num_local_experts, config.hidden_size, config.intermediate_size]}"
-        )
-
-        self.up_gate_proj = BMMLinear(
-            self.num_local_experts, config.hidden_size, config.intermediate_size * 2
-        )
-        self.down_proj = BMMLinear(
-            self.num_local_experts, config.intermediate_size, config.hidden_size
-        )
-        self.fuse_swiglu = config.fuse_swiglu
-
-    def __len__(self):
-        return self.num_local_experts
-
-    def __iter__(self):
-        return (self for _ in range(1))
-
-    def forward(self, x):
-        if self.fuse_swiglu:
-            x = swiglu(self.up_gate_proj(x))
-        else:
-            gate, x = self.up_gate_proj(x).chunk(2, axis=-1)
-            x = F.silu(gate) * x
-        x = self.down_proj(x)
-        return x
-
-
 class ErnieDecoderLayer(nn.Layer):
     """
     ErnieDecoderLayer is a decoder layer in Ernie model.
@@ -977,16 +770,7 @@ class ErnieDecoderLayer(nn.Layer):
             )
         )
 
-        if (
-            self.config.tensor_parallel_degree > 1
-            and self.config.hidden_dropout_prob > 0.0
-        ):
-            current_seed = (
-                "local_seed" if self.config.sequence_parallel else "global_seed"
-            )
-            with get_rng_state_tracker().rng_state(current_seed):
-                hidden_states = self.residual_add1(hidden_states, residual)
-        else:
+        with get_rng_state_tracker().rng_state("local_seed"):
             hidden_states = self.residual_add1(hidden_states, residual)
 
         residual = hidden_states
@@ -1004,16 +788,7 @@ class ErnieDecoderLayer(nn.Layer):
             hidden_states = self.mlp(hidden_states)
             gate_logits = None
 
-        if (
-            self.config.tensor_parallel_degree > 1
-            and self.config.hidden_dropout_prob > 0.0
-        ):
-            current_seed = (
-                "local_seed" if self.config.sequence_parallel else "global_seed"
-            )
-            with get_rng_state_tracker().rng_state(current_seed):
-                hidden_states = self.residual_add2(hidden_states, residual)
-        else:
+        with get_rng_state_tracker().rng_state("local_seed"):
             hidden_states = self.residual_add2(hidden_states, residual)
 
         outputs = (hidden_states,)

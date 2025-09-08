@@ -15,24 +15,29 @@
 # limitations under the License.
 
 import inspect
-from typing import Tuple, List, Optional
 import logging
+import numpy as np
 from contextlib import contextmanager
+from typing import Tuple, List, Optional
+from functools import partial
+from copy import deepcopy
 
 import paddle
-from paddle import nn
 import paddle.nn.functional as F
-
+import paddle.distributed as dist
+from paddle import nn
+from paddle.incubate.nn.functional import swiglu
 from paddle.distributed.communication.group import Group
 from paddle.distributed import fleet
-import paddle.distributed as dist
 from paddle import Tensor
 from paddle.incubate.nn.functional import moe_combine, moe_gate_dispatch
-
+from paddle.utils import unique_name
+from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 from paddleformers.trainer.plugins.timer import get_timers
 from paddleformers.transformers.moe_layer import dispatching, combining
-from models.top2_gate import TopKGateFused
+
 from utils.training_utils import get_flatten_mesh, get_mesh, _reshard
+from models.configuration import ErnieMoEConfig
 
 logger = logging.getLogger(__name__)
 
@@ -705,3 +710,582 @@ class MOELayer(nn.Layer):
                     [dist.Replicate(), dist.Replicate()],
                 )
         return combined_output, combine_weights, router_loss2, gate_logits
+
+
+def get_gate(
+    config: ErnieMoEConfig,
+    expert: Tuple[Tuple[int, nn.Layer]],
+    layer_idx: int,
+    ipp: int = 0,
+) -> Tuple[nn.Layer, nn.LayerList]:
+    moe_num_experts = config.moe_num_experts
+    assert (
+        moe_num_experts >= config.moe_world_size
+    ), f"expert moe_num_experts={moe_num_experts} >= moe_world_size={config.moe_world_size}"
+    assert (
+        moe_num_experts % config.moe_world_size == 0
+    ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={config.moe_world_size} == 0"
+    moe_num_experts_per_device = moe_num_experts // config.moe_world_size
+    experts = nn.LayerList([])
+    for expert_id, (experts_num, fc) in enumerate(expert):
+        assert experts_num % config.moe_world_size == 0
+        experts_to_append = []
+        if not hasattr(fc, "__len__"):
+            experts_to_append.append(fc)
+            if expert_id == 1:
+                with paddle.utils.unique_name.guard("_mm_deepcopy"):
+                    for _ in range(experts_num - 1):
+                        experts_to_append.append(deepcopy(fc))
+            else:
+                for _ in range(experts_num - 1):
+                    experts_to_append.append(deepcopy(fc))
+        else:
+            experts_to_append = fc
+        for ex in experts_to_append:
+            for p in ex.parameters():
+                p.expert_type = f"expert_type_{expert_id}"
+        experts.extend(experts_to_append)
+
+    logger.info(
+        f"using moe-world-size: {config.moe_world_size} "
+        f"expert-per-device: {moe_num_experts_per_device} "
+    )
+    if config.moe_use_hard_gate and moe_num_experts <= 2:
+        gate = None
+        logger.info("MOE-GATE:-hard-gate")
+    else:
+        logger.info(f"MOE-GATE:-{config.moe_gate}")
+        gate = TopKGateFused(
+            config, layer_idx=layer_idx, group=config.moe_group, ipp=ipp
+        )
+
+    lm_gate, lm_experts = None, None
+    logger.info(f"LM-experts-{lm_experts} -- experts-{experts}")
+
+    index = 0 if config.moe_group == "dp" else 1
+    ep_sub_meshes = dist.auto_parallel.api.split_mesh(get_mesh(ipp), index)
+
+    for i, expert in enumerate(experts):
+        ep_group_id = i // moe_num_experts_per_device
+        if isinstance(expert, (ErnieMoeMLPFused, ErnieMoeMLP)):
+            experts[i].redistribute_expert(
+                ep_sub_meshes[ep_group_id], [dist.Replicate(), dist.Replicate()]
+            )
+            experts[i].ep_group_id = ep_group_id
+
+    if config.moe_use_aux_free:
+        moe_statics = MoEStatics(config, layer_idx)
+    else:
+        moe_statics = None
+    return gate, experts, lm_gate, lm_experts, moe_statics
+
+
+class ErnieMLP(nn.Layer):
+    def __init__(self, config, ipp=None, do_shard_tensor=True):
+        super().__init__()
+        self.config = config
+        self.ipp = ipp
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+
+        self.gate_proj = nn.Linear(
+            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+        )
+        self.up_proj = nn.Linear(
+            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+        )
+        self.down_proj = nn.Linear(
+            self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
+        )
+
+        self.fuse_swiglu = config.fuse_swiglu
+
+    def forward(self, x):
+        if self.fuse_swiglu:
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        else:
+            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
+
+        out = self.down_proj(x)
+        return out
+
+
+class ErnieMoeMLP(ErnieMLP):
+    """_summary_
+
+    Args:
+        ErnieMoeMLP (_type_): _description_
+    """
+
+    def __init__(self, config, ipp=0):
+        """
+        doc
+        """
+        disable_ffn_model_parallel = getattr(
+            config, "disable_ffn_model_parallel", False
+        )
+        if disable_ffn_model_parallel:
+            config = deepcopy(config)
+            config.tensor_parallel_degree = 1
+            config.sequence_parallel = False
+
+        super().__init__(config, ipp, do_shard_tensor=not disable_ffn_model_parallel)
+        self.moe_dropout_prob = config.moe_dropout_prob
+        self.fuse_swiglu = config.fuse_swiglu
+
+    def redistribute_expert(self, mesh, placements):
+        """
+        Place the experts on different devices.
+        """
+        self.gate_proj.weight = dist.shard_tensor(
+            self.gate_proj.weight, mesh, placements
+        )
+        self.up_proj.weight = dist.shard_tensor(self.up_proj.weight, mesh, placements)
+        self.down_proj.weight = dist.shard_tensor(
+            self.down_proj.weight, mesh, placements
+        )
+        if self.config.use_bias:
+            self.gate_proj.bias = dist.shard_tensor(
+                self.gate_proj.bias, mesh, placements
+            )
+            self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
+            self.down_proj.bias = dist.shard_tensor(
+                self.down_proj.bias, mesh, placements
+            )
+
+    def forward(self, x):
+        if self.fuse_swiglu:
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        else:
+            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
+        if self.moe_dropout_prob > 0:
+            with get_rng_state_tracker().rng_state("local_seed"):
+                x = F.dropout(x=x, p=self.moe_dropout_prob)
+        ret = self.down_proj(x)
+        return ret
+
+
+class BMMLinear(nn.Layer):
+    def __init__(self, experts, d_in, d_out, use_bias=False):
+        super().__init__()
+        self.weight = self.create_parameter(
+            [experts, d_in, d_out], dtype=paddle.get_default_dtype()
+        )
+        if use_bias:
+            self.bias = self.create_parameter(
+                [experts, d_out], dtype=paddle.get_default_dtype(), is_bias=True
+            )
+        else:
+            self.bias = None
+
+    def forward(self, x):
+        """x: [num_experts, Seq, dim]"""
+        if self.bias is not None:
+            return paddle.bmm(x, self.weight) + self.bias
+        return paddle.bmm(x, self.weight)
+
+
+class ErnieMoeMLPFused(nn.Layer):
+    def __init__(self, config):
+        assert config.fuse_attn_ffn, "fused mlp only support fuse_attn_ffn"
+        super().__init__()
+        self.moe_dropout_prob = config.moe_dropout_prob
+        self.num_local_experts = config.moe_num_experts // config.moe_world_size
+        logger.info(
+            f"fused-expert-weight-shape: {[self.num_local_experts, config.hidden_size, config.intermediate_size]}"
+        )
+
+        self.up_gate_proj = BMMLinear(
+            self.num_local_experts, config.hidden_size, config.intermediate_size * 2
+        )
+        self.down_proj = BMMLinear(
+            self.num_local_experts, config.intermediate_size, config.hidden_size
+        )
+        self.fuse_swiglu = config.fuse_swiglu
+
+    def __len__(self):
+        return self.num_local_experts
+
+    def __iter__(self):
+        return (self for _ in range(1))
+
+    def forward(self, x):
+        if self.fuse_swiglu:
+            x = swiglu(self.up_gate_proj(x))
+        else:
+            gate, x = self.up_gate_proj(x).chunk(2, axis=-1)
+            x = F.silu(gate) * x
+        x = self.down_proj(x)
+        return x
+
+
+def cal_aux_loss_func(
+    gate_prob,
+    dispatch_mask,
+    tokens_mask,
+    dispatch_tokens_mask,
+    num_experts,
+    use_group,
+    moe_k,
+    global_aux_loss=False,
+    rank=None,
+    group=None,
+):
+    if tokens_mask is not None and tokens_mask.dtype != gate_prob.dtype:
+        tokens_mask = tokens_mask.astype(gate_prob.dtype)
+
+    scale = None
+    if dispatch_tokens_mask is not None:
+        seqlen_float = dispatch_tokens_mask.astype(gate_prob.dtype).sum()
+        if (
+            tokens_mask is not None
+            and gate_prob.shape[0] != dispatch_tokens_mask.shape[0]
+        ):
+            scale = seqlen_float / paddle.clip(tokens_mask.sum(), min=1e-6)
+    elif tokens_mask is not None:
+        seqlen_float = tokens_mask.sum()
+    else:
+        seqlen_float = gate_prob.numel().astype(gate_prob.dtype) / num_experts
+    seqlen_float = paddle.clip(seqlen_float, min=1e-6)
+
+    if len(dispatch_mask.shape) == 2:
+        dispatch_mask = dispatch_mask.sum(0)
+    ce = dispatch_mask.astype(gate_prob.dtype).detach() / seqlen_float
+    me = paddle.sum(gate_prob, axis=0) / seqlen_float
+    if global_aux_loss:
+        me_list, ce_list = [], []
+        dist.all_gather(me_list, me, group=group)
+        dist.all_gather(ce_list, ce, group=group)
+
+        me_list[rank] = me
+        ce_list[rank] = ce
+        me = paddle.stack(me_list).mean(0)
+        ce = paddle.stack(ce_list).mean(0)
+
+    l_aux = paddle.sum(me * ce) * num_experts
+    if use_group:
+        l_aux = l_aux / moe_k
+
+    if scale is not None:
+        l_aux = l_aux + (scale - 1) * l_aux.detach()
+
+    return l_aux
+
+
+def gate_detach_matmul(x, weight, use_fake_gate=False):
+    x = x.cast(paddle.float32) if x.dtype != paddle.float32 else x
+    score = F.linear(x, weight)
+
+    if use_fake_gate:
+        score = paddle.randn(score.shape).astype(score.dtype) + score - score
+    return score
+
+
+class TopKGateFused(nn.Layer):
+
+    def __init__(self, config, layer_idx: int, group, ipp=0) -> None:
+        super().__init__()
+        self.config = config
+        assert not config.fuse_gate_detach_matmul, "matmul_bwd is not supported"
+
+        self.use_fake_gate = config.use_fake_gate
+        if self.use_fake_gate:
+            logging.warning(
+                "You are use fake_gate, which is just for test, not for real training."
+            )
+
+        self.model_dim = config.hidden_size
+        self.num_experts = config.moe_num_experts
+        self.num_experts_tensor = (
+            sum(config.moe_num_experts)
+            if config.multimodel_experts
+            else config.moe_num_experts
+        )
+
+        self.cap = config.moe_capacity
+        self.group = group
+
+        self.layer_idx = layer_idx
+        self.global_aux_loss = config.global_aux_loss
+        if self.global_aux_loss:
+            self.rank = dist.get_rank(self.group)
+
+        self.use_token_type_bias = config.moe_use_token_type_bias
+        self.use_correction_bias = config.moe_use_aux_free
+
+        self.ipp = ipp
+
+        if config.moe_gate_act == "softmax":
+            self.act = partial(F.softmax, axis=-1)
+        elif config.moe_gate_act == "sigmoid":
+            self.act = F.sigmoid
+        else:
+            raise ValueError(f"{config.moe_gate_act} is not supported.")
+
+        self.moe_aux_loss_lambda = paddle.to_tensor(
+            config.moe_aux_loss_lambda, dtype="float32"
+        )
+
+        if self.moe_aux_loss_lambda.ndim == 0:
+            self.moe_aux_loss_lambda = self.moe_aux_loss_lambda.unsqueeze(0)
+
+        self.moe_orthogonal_loss_lambda = paddle.to_tensor(
+            config.moe_orthogonal_loss_lambda, dtype="float32"
+        )
+
+        if self.moe_orthogonal_loss_lambda.ndim == 0:
+            self.moe_orthogonal_loss_lambda = self.moe_orthogonal_loss_lambda.unsqueeze(
+                0
+            )
+
+        self.experts_type_ids = None
+        if config.moe_orthogonal_loss_lambda:
+            if hasattr(fleet.fleet, "_user_defined_strategy"):
+                strategy = fleet.fleet._user_defined_strategy
+                sharding_configs = strategy.hybrid_configs["sharding_configs"]
+                pp_config = strategy.hybrid_configs["pp_configs"]
+                assert (
+                    not sharding_configs.comm_overlap
+                    and not pp_config.sharding_comm_overlap
+                ), "orthogonal loss will cause twice gradient accumulate, will break pp/sharding overlap"
+
+        self.eps = paddle.to_tensor([1e-12], dtype="float32")
+        if config.multimodel_experts:
+            if config.moe_use_hard_gate:
+                self.num_experts_list = []
+                self.experts_type_mask = []
+                experts_ids = paddle.zeros(
+                    [sum(self.num_experts)], dtype="int64"
+                ).reshape([config.moe_world_size, -1])
+                offset = 0
+                for i, expert_num in enumerate(self.num_experts):
+                    experts_ids[
+                        :, offset : offset + expert_num // config.moe_world_size
+                    ] = i
+                    offset += expert_num // config.moe_world_size
+                self.experts_type_ids = experts_ids.reshape([-1])
+                logger.info(
+                    f"use moe_use_hard_gate, experts_ids: {self.experts_type_ids}"
+                )
+                for i, expert_num in enumerate(self.num_experts):
+                    self.experts_type_mask.append(
+                        self.experts_type_ids == i,
+                    )
+                    self.num_experts_list.append(expert_num)
+            else:
+                assert (
+                    not config.moe_group_experts
+                ), "group_experts must use hard_gate when multimodel_experts is True"
+        else:
+            self.num_experts_list = [self.num_experts]
+        self._create_gate_parameter()
+        logger.info(
+            f"{config.moe_gate}: w/ capacity: {self.cap} experts:{self.num_experts} "
+            f"use_token_type_bias:{self.use_token_type_bias} gate_act:{config.moe_gate_act} "
+        )
+
+    def _create_gate_parameter(self):
+
+        if self.config.multimodel_experts:
+
+            self.moe_aux_loss_lambda = self.moe_aux_loss_lambda.expand(
+                len(self.num_experts)
+            )
+            self.moe_orthogonal_loss_lambda = self.moe_orthogonal_loss_lambda.expand(
+                len(self.num_experts)
+            )
+
+            for i, num_experts in enumerate(self.num_experts):
+                if i == 1:
+                    with paddle.utils.unique_name.guard(f"mm_gate_{self.layer_idx}_"):
+                        p = self.create_parameter(
+                            shape=[self.model_dim, num_experts],
+                            dtype="float32",
+                            attr=paddle.ParamAttr(
+                                name=unique_name.generate("moe_gate")
+                            ),
+                        )
+                else:
+                    p = self.create_parameter(
+                        shape=[self.model_dim, num_experts],
+                        dtype="float32",
+                        attr=paddle.ParamAttr(name=unique_name.generate("moe_gate")),
+                    )
+                p.expert_type = f"expert_type_{i}"
+                self.add_parameter(
+                    ("weight" if i == 0 else f"weight_{i}"),
+                    p,
+                )
+        else:
+            self.weight = self.create_parameter(
+                shape=[self.model_dim, self.num_experts],
+                dtype="float32",
+                attr=paddle.ParamAttr(name=unique_name.generate("moe_gate")),
+            )
+            logger.info(f"moe-Gate, {self.weight}")
+
+        if self.use_token_type_bias:
+            if self.config.multimodel_experts:
+                assert (
+                    not self.config.moe_use_hard_gate
+                ), "multimodel_experts with hard_gate is not support token_type_bias."
+            num_experts = (
+                sum(self.num_experts)
+                if self.config.multimodel_experts
+                else self.num_experts
+            )
+            bias_type_num = (
+                len(self.num_experts) if self.config.multimodel_experts else 1
+            )
+            self.bias = self.create_parameter(
+                shape=[bias_type_num, num_experts],
+                dtype="float32",
+                attr=paddle.ParamAttr(
+                    name=unique_name.generate("moe_gate_bias"),
+                    initializer=paddle.nn.initializer.Assign(
+                        np.zeros([bias_type_num, num_experts])
+                    ),
+                ),
+            )
+            logger.info(f"using token type bias, bias: {self.bias},")
+        self._cast_to_low_precision = False
+        self._cast_to_low_precison = False
+
+    def get_gate_weight(self, transform_weight):
+        if not self.config.multimodel_experts:
+            return self.weight
+        if not transform_weight:
+            return paddle.concat(
+                [
+                    getattr(self, "weight" if i == 0 else f"weight_{i}")
+                    for i in range(len(self.num_experts))
+                ],
+                -1,
+            )
+        weight = paddle.zeros(
+            [
+                self.model_dim,
+                self.config.moe_world_size,
+                sum(self.num_experts) // self.config.moe_world_size,
+            ],
+            dtype="float32",
+        )
+        offset = 0
+        for i, num_experts in enumerate(self.num_experts):
+            weight[
+                :, :, offset : offset + num_experts // self.config.moe_world_size
+            ] = getattr(self, "weight" if i == 0 else f"weight_{i}").reshape(
+                [self.model_dim, self.config.moe_world_size, -1]
+            )
+            offset += num_experts // self.config.moe_world_size
+        weight = weight.reshape([self.model_dim, -1])
+
+        return weight
+
+    def _cal_aux_loss(
+        self,
+        gate_prob,
+        dispatch_mask,
+        num_experts=None,
+        use_group=None,
+        tokens_mask=None,
+        dispatch_tokens_mask=None,
+    ):
+
+        if self.act is F.sigmoid:
+            gate_prob = gate_prob / gate_prob.sum(-1, keepdim=True)
+
+        if self.use_correction_bias:
+            if tokens_mask is not None:
+                gate_prob_this_modality = gate_prob[tokens_mask.astype("bool")]
+                if gate_prob_this_modality.shape[0]:
+                    _, top_idx = gate_prob_this_modality.topk(
+                        k=self.config.moe_k, axis=-1
+                    )
+                    mask = paddle.zeros_like(gate_prob_this_modality).put_along_axis(
+                        top_idx, paddle.to_tensor(1.0), axis=1
+                    )
+                    dispatch_mask = paddle.sum(mask.cast(paddle.int64), axis=0)
+                else:
+                    dispatch_mask = paddle.zeros(gate_prob.shape[-1], dtype="int64")
+                dist.stream.all_reduce(
+                    dispatch_mask,
+                    group=self.group,
+                    use_calc_stream=True,
+                )
+            else:
+                _, top_idx = gate_prob.topk(k=self.config.moe_k, axis=-1)
+
+                mask = paddle.zeros_like(gate_prob).put_along_axis(
+                    top_idx, paddle.to_tensor(1.0), axis=1
+                )
+                dispatch_mask = paddle.sum(mask.cast(paddle.int64), axis=0)
+
+        if num_experts is None:
+            num_experts = self.num_experts_tensor
+        if use_group is None:
+            use_group = self.config.moe_group_experts
+
+        return cal_aux_loss_func(
+            gate_prob,
+            dispatch_mask,
+            tokens_mask,
+            dispatch_tokens_mask,
+            num_experts,
+            use_group,
+            self.config.moe_k,
+            self.global_aux_loss,
+            self.rank if self.global_aux_loss else None,
+            self.group if self.global_aux_loss else None,
+        )
+
+    def forward(
+        self,
+        input: Tensor,
+        token_type_ids=None,
+        transform_weight=True,
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """
+        Args:
+            input: paddle.Tensor, hidden-states of layer
+        Retruns:
+            paddle.Tensor [Seq, Expert, Capacity]: float32, combine weights
+            paddle.Tensor [Seq, Expert, Capacity]: bool, dispatch mask
+            Tuple[paddle.Tensor]: `GateOutput`
+        """
+        num_experts = (
+            sum(self.num_experts)
+            if self.config.multimodel_experts
+            else self.num_experts
+        )
+        if self.training:
+            cap = self.cap[0]
+        elif input.shape[0] < num_experts:
+            cap = self.cap[2]
+        else:
+            cap = self.cap[1]
+        num_tokens = input.shape[0]
+        global_capacity = int(cap * num_tokens // num_experts)
+        local_num_tokens = input._local_shape[0]
+        local_capacity = int(cap * local_num_tokens // num_experts)
+
+        weight = self.get_gate_weight(transform_weight)
+        with paddle.amp.auto_cast(False):
+            input = _reshard(
+                input, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
+            )
+            logits = gate_detach_matmul(input, weight, self.use_fake_gate)
+            logits = _reshard(
+                logits, get_flatten_mesh(get_mesh(self.ipp)), [dist.Shard(0)]
+            )
+            if self.use_token_type_bias:
+                assert token_type_ids is not None
+                assert (
+                    token_type_ids.max() < self.bias.shape[0]
+                ), f"token_type_ids {token_type_ids.max()} >= bias shape {self.bias.shape[0]}"
+                bias = self.bias[token_type_ids]
+                logits = logits + bias
+            router_loss = paddle.zeros([1], dtype="float32")
+            router_loss.stop_gradient = False
+
+        return logits, global_capacity, router_loss, local_capacity
