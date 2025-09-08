@@ -544,13 +544,15 @@ def main():
         from models.modeling import ErnieForCausalLM, ErnieDecoderLayer
 
         logger.info("Training with the intermediate API. Do not support VPP.")
+        modle_class = ErnieForCausalLM
     elif vpp_degree > 1:
-        from models.modeling_vpp import ErnieForCausalLM, ErnieDecoderLayer
+        from models.modeling_vpp import ErnieForCausalLMVPP, ErnieDecoderLayer
 
         logger.info("Training VPP parallelism with the basic API")
+        modle_class = ErnieForCausalLMVPP
 
     with paddle.LazyGuard():
-        model = ErnieForCausalLM(cfg)
+        model = modle_class(cfg)
 
     logger.info(f"Using model: {type(model)}, config: {model.config}")
     paddle.set_default_dtype("float32")
