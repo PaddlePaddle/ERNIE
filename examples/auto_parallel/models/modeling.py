@@ -1899,13 +1899,10 @@ class ErnieForCausalLM(ErniePretrainedModel):
         if prefix != "":
             assert prefix.endswith(".")
 
-        ernie_prefix = prefix + "ernie."
-        layers_prefix = ""
-
         config = {
             "sp_config": {
                 "parallelize_plan": {
-                    f"{ernie_prefix}{layers_prefix}embed_tokens": [
+                    f"{prefix}ernie.embed_tokens": [
                         dist.ColWiseParallel(),
                         dist.SequenceParallelBegin(),
                     ],
