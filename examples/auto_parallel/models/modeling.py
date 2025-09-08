@@ -818,6 +818,7 @@ class ErnieDecoderLayer(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = ErnieAttention(config, ipp)
         self.use_moe = config.use_moe if hasattr(config, "use_moe") else False
+        self.fc_cls = ErnieMoeMLPFused if config.moe_fuse_experts else ErnieMoeMLP
         if self.use_moe:
             moe_layer_start_index = (
                 min(config.moe_layer_start_index)
@@ -853,7 +854,6 @@ class ErnieDecoderLayer(nn.Layer):
 
     def create_moe_mlp_layer(self, layer_idx, ipp):
         _ex_cfg = deepcopy(self.config)
-        fc_cls = ErnieMoeMLPFused if _ex_cfg.moe_fuse_experts else ErnieMoeMLP
         if _ex_cfg.moe_intermediate_size:
             if isinstance(_ex_cfg.moe_intermediate_size, (tuple, list)):
                 assert isinstance(_ex_cfg.moe_num_experts, (tuple, list)) and len(
@@ -883,9 +883,9 @@ class ErnieDecoderLayer(nn.Layer):
                             with paddle.utils.unique_name.guard(
                                 f"mm_expert_{layer_idx}_"
                             ):
-                                fc.append((num_experts, fc_cls(_ex_cfg_real)))
+                                fc.append((num_experts, self.fc_cls(_ex_cfg_real)))
                         else:
-                            fc.append((num_experts, fc_cls(_ex_cfg_real)))
+                            fc.append((num_experts, self.fc_cls(_ex_cfg_real)))
                     else:
                         logger.info(
                             f"moe multimodal experts use Identity layer_idx: {layer_idx}"
@@ -893,9 +893,9 @@ class ErnieDecoderLayer(nn.Layer):
                         fc.append((num_experts, nn.Identity()))
             else:
                 _ex_cfg.intermediate_size = _ex_cfg.moe_intermediate_size
-                fc = [(_ex_cfg.moe_num_experts, fc_cls(_ex_cfg))]
+                fc = [(_ex_cfg.moe_num_experts, self.fc_cls(_ex_cfg))]
         else:
-            fc = [(_ex_cfg.moe_num_experts, fc_cls(_ex_cfg))]
+            fc = [(_ex_cfg.moe_num_experts, self.fc_cls(_ex_cfg))]
         gate, experts, lm_gate, lm_experts, moe_statics = get_gate(
             self.config, fc, layer_idx, self.ipp
         )
