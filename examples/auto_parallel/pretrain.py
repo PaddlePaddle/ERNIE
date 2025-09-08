@@ -545,11 +545,13 @@ def main():
 
         logger.info("Training with the intermediate API. Do not support VPP.")
         modle_class = ErnieForCausalLM
+        aux_free_class = ErnieDecoderLayer
     elif vpp_degree > 1:
-        from models.modeling_vpp import ErnieForCausalLMVPP, ErnieDecoderLayer
+        from models.modeling_vpp import ErnieForCausalLMVPP, ErnieDecoderLayerVPP
 
         logger.info("Training VPP parallelism with the basic API")
         modle_class = ErnieForCausalLMVPP
+        aux_free_class = ErnieDecoderLayerVPP
 
     with paddle.LazyGuard():
         model = modle_class(cfg)
@@ -571,7 +573,7 @@ def main():
             MoECorrectionBiasAdjustCallback(
                 args.moe_use_aux_free_update_coef,
                 args.sequence_parallel,
-                ErnieDecoderLayer,
+                aux_free_class,
             )
         ]
     init_parameters(model)
