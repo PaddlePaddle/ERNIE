@@ -310,7 +310,7 @@ def get_gate(
 
 
 class RMSNorm(nn.Layer):
-    def __init__(self, config, ipp=0):
+    def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
@@ -339,7 +339,7 @@ class RMSNorm(nn.Layer):
 
 class LayerNorm(nn.LayerNorm):
 
-    def __init__(self, config, ipp=0):
+    def __init__(self, config):
         super().__init__(config.hidden_size, epsilon=config.rms_norm_eps)
 
 
@@ -849,12 +849,17 @@ class ErnieDecoderLayer(nn.Layer):
             and layer_idx >= moe_layer_start_index
             and layer_idx <= moe_layer_end_index
         ):
-            self.create_moe_mlp_layer(layer_idx, ipp)
+            pp_degree = config.pipeline_parallel_degree
+            chunk_size = (
+                config.num_hidden_layers // pp_degree // config.virtual_pp_degree
+            )
+            stage_id = (layer_idx // chunk_size) % pp_degree
+            self.create_moe_mlp_layer(layer_idx, stage_id)
         else:
             self.mlp = ErnieMLP(config, ipp)
         Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-        self.input_layernorm = Norm(config, ipp)
-        self.post_attention_layernorm = Norm(config, ipp)
+        self.input_layernorm = Norm(config)
+        self.post_attention_layernorm = Norm(config)
         self.residual_add1 = FusedDropoutAdd(
             config.hidden_dropout_prob, mode="upscale_in_train"
         )
@@ -910,7 +915,7 @@ class ErnieDecoderLayer(nn.Layer):
         else:
             fc = [(_ex_cfg.moe_num_experts, fc_cls(_ex_cfg))]
         gate, experts, lm_gate, lm_experts, moe_statics = get_gate(
-            self.config, fc, layer_idx, self.ipp
+            self.config, fc, layer_idx, ipp
         )
         _sh_cfg = deepcopy(self.config)
 
@@ -946,7 +951,7 @@ class ErnieDecoderLayer(nn.Layer):
             self.config.moe_group_experts,
             moe_statics,
             self.config,
-            self.ipp,
+            ipp,
         )
 
     def forward(
@@ -1173,7 +1178,7 @@ class ErnieModel(ErniePretrainedModel):
             self.layers.append(ErnieDecoderLayer(config, idx))
 
         Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-        self.norm = Norm(config, -1)
+        self.norm = Norm(config)
         self.lm_head = ErnieLMHead(config)
 
         self.gradient_checkpointing = False
@@ -1187,10 +1192,10 @@ class ErnieModel(ErniePretrainedModel):
                 ]
             )
             self.mtp_hidden_norm = nn.LayerList(
-                [Norm(config, -1) for _ in range(self.config.multi_token_pred_depth)]
+                [Norm(config) for _ in range(self.config.multi_token_pred_depth)]
             )
             self.mtp_emb_norm = nn.LayerList(
-                [Norm(config, -1) for _ in range(self.config.multi_token_pred_depth)]
+                [Norm(config) for _ in range(self.config.multi_token_pred_depth)]
             )
 
             LinearFN = (
@@ -1893,14 +1898,10 @@ class ErnieForCausalLM(ErniePretrainedModel):
     def auto_dist_config(self, prefix=""):
         if prefix != "":
             assert prefix.endswith(".")
-        # if self.config.pipeline_parallel_degree <= 1:
-        # print(f"ernie use_intermediate_api:{self.config.use_intermediate_api}")
-        # print(f"ernie pp mode:{self.config.pipeline_schedule_mode}")
+
         ernie_prefix = prefix + "ernie."
         layers_prefix = ""
-        # else:
-        #     ernie_prefix = prefix
-        #     layers_prefix="layers.*."
+
         config = {
             "sp_config": {
                 "parallelize_plan": {
@@ -1908,54 +1909,54 @@ class ErnieForCausalLM(ErniePretrainedModel):
                         dist.ColWiseParallel(),
                         dist.SequenceParallelBegin(),
                     ],
-                    f"{ernie_prefix}layers.*.self_attn": dist.SequenceParallelDisable(),
-                    f"{ernie_prefix}layers.*.self_attn.q_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.k_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.v_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.o_proj": dist.RowWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.reshard_row_and_col": PrepareLayerInput(
+                    f"{prefix}ernie.layers.*.self_attn": dist.SequenceParallelDisable(),
+                    f"{prefix}ernie.ayers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.v_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.reshard_row_and_col": PrepareLayerInput(
                         layer_input_reshard_row_and_col_hook
                     ),
-                    f"{ernie_prefix}layers.*.reshard_col": PrepareLayerInput(
+                    f"{prefix}ernie.layers.*.reshard_col": PrepareLayerInput(
                         layer_input_reshard_col_hook
                     ),
-                    f"{ernie_prefix}layers.*.reshard_replicate": PrepareLayerInput(
+                    f"{prefix}ernie.layers.*.reshard_replicate": PrepareLayerInput(
                         layer_input_reshard_replicate_hook
                     ),
-                    f"{ernie_prefix}layers.*.mlp": dist.SequenceParallelDisable(
+                    f"{prefix}ernie.layers.*.mlp": dist.SequenceParallelDisable(
                         need_transpose=False
                     ),
-                    f"{ernie_prefix}layers.*.mlp.gate_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.mlp.up_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.mlp.down_proj": dist.RowWiseParallel(),
-                    f"{ernie_prefix}reshard_replicate": PrepareLayerInput(
+                    f"{prefix}ernie.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}ernie.reshard_replicate": PrepareLayerInput(
                         layer_input_reshard_replicate_hook
                     ),
-                    f"{prefix}{layers_prefix}lm_head.weight": dist.ColWiseParallel(),
-                    f"{prefix}{layers_prefix}lm_head": dist.SequenceParallelEnd(),
+                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),
+                    f"{prefix}lm_head": dist.SequenceParallelEnd(),
                 }
             },
             "mp_config": {
                 "parallelize_plan": {
-                    f"{ernie_prefix}{layers_prefix}embed_tokens": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.q_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.k_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.v_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.self_attn.o_proj": dist.RowWiseParallel(),
-                    f"{ernie_prefix}layers.*.reshard_replicate": PrepareLayerInput(
+                    f"{prefix}ernie.embed_tokens": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.v_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                    f"{prefix}ernie.layers.*.reshard_replicate": PrepareLayerInput(
                         layer_input_reshard_replicate_hook
                     ),
-                    f"{ernie_prefix}layers.*.mlp.gate_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.mlp.up_proj": dist.ColWiseParallel(),
-                    f"{ernie_prefix}layers.*.mlp.down_proj": dist.RowWiseParallel(),
-                    f"{ernie_prefix}reshard_replicate": PrepareLayerInput(
+                    f"{prefix}ernie.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}ernie.reshard_replicate": PrepareLayerInput(
                         layer_input_reshard_replicate_hook
                     ),
-                    f"{prefix}{layers_prefix}lm_head.weight": dist.ColWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),
                 }
             },
             "pp_config": {
-                "split_spec": f"{ernie_prefix}layers",
+                "split_spec": f"{prefix}ernie.layers",
             },
         }
         return config
