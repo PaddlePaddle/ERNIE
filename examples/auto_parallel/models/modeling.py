@@ -701,7 +701,10 @@ class ErnieMoeMLP(ErnieMLP):
         disable_ffn_model_parallel = getattr(
             config, "disable_ffn_model_parallel", False
         )
-        config = deepcopy(config)
+        if disable_ffn_model_parallel:
+            config = deepcopy(config)
+            config.tensor_parallel_degree = 1
+            config.sequence_parallel = False
 
         super().__init__(config, ipp, do_shard_tensor=not disable_ffn_model_parallel)
         self.moe_dropout_prob = config.moe_dropout_prob
@@ -974,8 +977,14 @@ class ErnieDecoderLayer(nn.Layer):
             )
         )
 
-        if self.config.hidden_dropout_prob > 0.0:
-            with get_rng_state_tracker().rng_state("local_seed"):
+        if (
+            self.config.tensor_parallel_degree > 1
+            and self.config.hidden_dropout_prob > 0.0
+        ):
+            current_seed = (
+                "local_seed" if self.config.sequence_parallel else "global_seed"
+            )
+            with get_rng_state_tracker().rng_state(current_seed):
                 hidden_states = self.residual_add1(hidden_states, residual)
         else:
             hidden_states = self.residual_add1(hidden_states, residual)
@@ -995,8 +1004,14 @@ class ErnieDecoderLayer(nn.Layer):
             hidden_states = self.mlp(hidden_states)
             gate_logits = None
 
-        if self.config.hidden_dropout_prob > 0.0:
-            with get_rng_state_tracker().rng_state("local_seed"):
+        if (
+            self.config.tensor_parallel_degree > 1
+            and self.config.hidden_dropout_prob > 0.0
+        ):
+            current_seed = (
+                "local_seed" if self.config.sequence_parallel else "global_seed"
+            )
+            with get_rng_state_tracker().rng_state(current_seed):
                 hidden_states = self.residual_add2(hidden_states, residual)
         else:
             hidden_states = self.residual_add2(hidden_states, residual)

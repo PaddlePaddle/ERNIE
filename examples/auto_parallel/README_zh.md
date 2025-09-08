@@ -29,4 +29,4 @@
 
 现在自动并行中层API存在一些局限性，正在进一步支持：
 - 对 MOE 的支持不完备
-- 对流水线并行中的 VPP 优化支持不完备（脚本中默认 virtual_pp_degree=8；当设置 virtual_pp_degree>1 时，采用基础API完成组网）
+- 对流水线并行中的 VPP 优化支持不完备（中层 API 目前暂不支持 VPP 优化，当 virtual_pp_degree=1 时，采用中层 API 完成组网；脚本中默认 virtual_pp_degree=8，当设置 virtual_pp_degree>1 时，采用基础API完成组网）
