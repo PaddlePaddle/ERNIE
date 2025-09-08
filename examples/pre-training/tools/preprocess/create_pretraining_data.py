@@ -23,6 +23,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 
+
 from src.tokenizers.tokenization_eb_v2 import ErnieBotTokenizer
 
 from paddleformers.data import indexed_dataset
@@ -100,7 +101,7 @@ def get_args():
     group.add_argument(
         "--cn_splited",
         action="store_true",
-        help="Is chinese corpus is split in to words.",
+        help="Is chinese corpus is splited in to words.",
     )
     group.add_argument(
         "--cn_split_dimer",
@@ -392,7 +393,7 @@ def main():
         elif file_path.endswith(".jsonl"):
             text = open(file_path, "r", encoding="utf-8")
         else:
-            print("Unexpected data format, skipped %s" % file_path)
+            print("Unexpected data format, skiped %s" % file_path)
             continue
 
         encoded_docs = pool.imap(convert.encode, text, 256)
