@@ -74,7 +74,7 @@ class MoEStatics(nn.Layer):
                 len(config.moe_num_experts) if config.multimodel_experts else 1
             )
             p = self.create_parameter(
-                shape=[num_experts_groups, num_experts],
+                shape=[num_experts_groups * num_experts],
                 dtype="float32",
                 is_bias=True,
                 attr=paddle.ParamAttr(
