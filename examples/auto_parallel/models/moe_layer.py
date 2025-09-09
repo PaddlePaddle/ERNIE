@@ -38,6 +38,7 @@ from paddleformers.transformers.moe_layer import dispatching, combining
 
 from utils.training_utils import get_flatten_mesh, get_mesh, _reshard
 from models.configuration import ErnieMoEConfig
+from models.modeling import ErnieMLP
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class MoEStatics(nn.Layer):
                 len(config.moe_num_experts) if config.multimodel_experts else 1
             )
             p = self.create_parameter(
-                shape=[num_experts_groups * num_experts],
+                shape=[num_experts_groups, num_experts],
                 dtype="float32",
                 is_bias=True,
                 attr=paddle.ParamAttr(
@@ -475,14 +476,7 @@ class MOELayer(nn.Layer):
                 )
                 if "corr_bias" in inspect.signature(moe_gate_dispatch).parameters:
                     if self.use_correction_bias:
-                        num_experts = (
-                            self.config.moe_num_experts[0]
-                            if self.config.multimodel_experts
-                            else self.config.moe_num_experts
-                        )
-                        compat_args = (
-                            self.moe_statics.e_score_correction_bias[:num_experts],
-                        )
+                        compat_args = (self.moe_statics.e_score_correction_bias[0],)
                     else:
                         compat_args = (None,)
                 else:
@@ -785,36 +779,6 @@ def get_gate(
     else:
         moe_statics = None
     return gate, experts, lm_gate, lm_experts, moe_statics
-
-
-class ErnieMLP(nn.Layer):
-    def __init__(self, config, ipp=None, do_shard_tensor=True):
-        super().__init__()
-        self.config = config
-        self.ipp = ipp
-        self.hidden_size = config.hidden_size
-        self.intermediate_size = config.intermediate_size
-
-        self.gate_proj = nn.Linear(
-            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
-        )
-        self.up_proj = nn.Linear(
-            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
-        )
-        self.down_proj = nn.Linear(
-            self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
-        )
-
-        self.fuse_swiglu = config.fuse_swiglu
-
-    def forward(self, x):
-        if self.fuse_swiglu:
-            x = swiglu(self.gate_proj(x), self.up_proj(x))
-        else:
-            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
-
-        out = self.down_proj(x)
-        return out
 
 
 class ErnieMoeMLP(ErnieMLP):
