@@ -1694,7 +1694,7 @@ class ErnieForCausalLM(ErniePretrainedModel):
                         dist.SequenceParallelBegin(),
                     ],
                     f"{prefix}ernie.layers.*.self_attn": dist.SequenceParallelDisable(),
-                    f"{prefix}ernie.ayers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}ernie.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
                     f"{prefix}ernie.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
                     f"{prefix}ernie.layers.*.self_attn.v_proj": dist.ColWiseParallel(),
                     f"{prefix}ernie.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
