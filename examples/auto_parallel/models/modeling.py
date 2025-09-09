@@ -38,14 +38,6 @@ from paddleformers.transformers.model_outputs import CausalLMOutputWithCrossAtte
 
 from paddleformers.transformers.model_utils import PretrainedModel
 
-from models.moe_layer import (
-    get_gate,
-    MOELayer,
-    ErnieMLP,
-    ErnieMoeMLP,
-    ErnieMoeMLPFused,
-    TopKGateFused,
-)
 from models.configuration import ErnieMoEConfig
 
 
@@ -264,6 +256,38 @@ class LayerNorm(nn.LayerNorm):
 
     def __init__(self, config):
         super().__init__(config.hidden_size, epsilon=config.rms_norm_eps)
+
+
+class ErnieMLP(nn.Layer):
+    def __init__(self, config, ipp=None, do_shard_tensor=True):
+        super().__init__()
+        self.config = config
+        self.ipp = ipp
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+
+        self.gate_proj = nn.Linear(
+            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+        )
+        self.up_proj = nn.Linear(
+            self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+        )
+        self.down_proj = nn.Linear(
+            self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
+        )
+
+        self.fuse_swiglu = config.fuse_swiglu
+
+    def forward(self, x):
+        from paddle.incubate.nn.functional import swiglu
+
+        if self.fuse_swiglu:
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        else:
+            x = F.silu(self.gate_proj(x)) * self.up_proj(x)
+
+        out = self.down_proj(x)
+        return out
 
 
 class RotaryEmbedding(nn.Layer):
@@ -651,6 +675,8 @@ class ErnieDecoderLayer(nn.Layer):
 
     def create_moe_mlp_layer(self, layer_idx, ipp):
         _ex_cfg = deepcopy(self.config)
+        from .moe_layer import ErnieMoeMLP, MOELayer, ErnieMoeMLPFused, get_gate
+
         fc_cls = ErnieMoeMLPFused if _ex_cfg.moe_fuse_experts else ErnieMoeMLP
         if _ex_cfg.moe_intermediate_size:
             if isinstance(_ex_cfg.moe_intermediate_size, (tuple, list)):
@@ -780,6 +806,7 @@ class ErnieDecoderLayer(nn.Layer):
 
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
+        from .moe_layer import MOELayer
 
         if isinstance(
             self.mlp,
@@ -837,6 +864,7 @@ class ErniePretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         """Initialization hook"""
         rng_tracker = get_rng_state_tracker().rng_state
+        from .moe_layer import TopKGateFused
 
         if isinstance(
             layer,
@@ -847,7 +875,6 @@ class ErniePretrainedModel(PretrainedModel):
                 paddle.incubate.nn.FusedLinear,
             ),
         ):
-
             with rng_tracker():
                 dtype = paddle.get_default_dtype()
                 paddle.set_default_dtype("float32")
@@ -870,7 +897,6 @@ class ErniePretrainedModel(PretrainedModel):
                         f" range={self.config.initializer_range},"
                         f' type={type(layer)},norm={layer.weight.astype("float32").norm()}'
                     )
-
         elif isinstance(layer, TopKGateFused):
             if not hasattr(layer, "weight"):
                 return
@@ -1534,6 +1560,8 @@ class ErnieForCausalLM(ErniePretrainedModel):
         def scale_by_factor_if_valid(w):
             if w.is_dist() and w._is_initialized():
                 w.scale_(factor)
+
+        from .moe_layer import MOELayer, ErnieMoeMLP
 
         layers = self.ernie.layers
         if hasattr(self.config, "use_moe") and self.config.use_moe:
