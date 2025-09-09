@@ -24,7 +24,7 @@ def parse_ranks(ranks_strs):
     # Just Python code, return any nodes you want!
     
     # !!!!! need set
-    return [1]
+    return [7]
     if not ranks_strs:
         return None
 

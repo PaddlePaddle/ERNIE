@@ -43,7 +43,6 @@ from models.ernie.modeling import (
 from models.ernie.modeling import (
     ErniePretrainingCriterion as ErniePretrainingCriterionBase,
 )
-from models.fp8_linear import Fp8FusedMlpFunc, MemEfficientFp8FusedMlpFunc
 from models.moe.moe_layer import (
     MOELayer,
     MoEStatics,
@@ -506,15 +505,6 @@ class ErnieMoeMLP(ErnieMLP):
         self.shared_expert_mem_efficient = self.config.fp8_mem_configs["shared_expert"]
 
     def forward(self, x, use_comm=True):
-        if (
-            self.config.tensor_parallel_degree <= 1
-            and self.fuse_ffn
-            and self.config.use_fp8_mlp
-            and not self.config.use_bias
-        ):
-            if self.is_shared_expert and self.shared_expert_mem_efficient:
-                return MemEfficientFp8FusedMlpFunc.apply(x, self.up_gate_proj.weight, self.down_proj.weight)
-            return Fp8FusedMlpFunc.apply(x, self.up_gate_proj.weight, self.down_proj.weight)
 
         if self.fuse_ffn:
             up_gate_proj = (

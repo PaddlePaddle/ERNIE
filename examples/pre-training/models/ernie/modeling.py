@@ -25,7 +25,6 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
 from models.comm_utils import subbatch
-from models.fp8_linear import MemEfficientFp8FusedMlpFunc
 from models.sequence_parallel_utils import (
     AllGatherVarlenOp,
     ColumnSequenceParallelLinear,
@@ -793,13 +792,6 @@ class ErnieMLP(nn.Layer):
             assert fused_swiglu is not None, "fused_swiglu operator is not found."
 
     def forward(self, x):
-        if (
-            self.config.tensor_parallel_degree <= 1
-            and self.fuse_ffn
-            and self.config.use_fp8_mlp
-            and not self.config.use_bias
-        ):
-            return MemEfficientFp8FusedMlpFunc.apply(x, self.up_gate_proj.weight, self.down_proj.weight)
 
         if self.fuse_swiglu:
             if self.fuse_ffn:

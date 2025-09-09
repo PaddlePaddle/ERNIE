@@ -21,11 +21,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
 from models.comm_utils import profile
-from models.moe.token_dispatcher.fp8_utils import (
-    ExpertsGroupGemmContiguousNode,
-    ExpertsGroupGemmNode,
-    ExpertsGroupGemmWLCHNode,
-)
+
 from models.moe.token_dispatcher.moe_utils import (
     UnZipNode,
     ZipNode,
@@ -202,36 +198,6 @@ class GateCombine(PyLayer):
         )
         grad_combine_weight = grad_combine_weight_helper.sum(-1)
         return grad_x, grad_combine_weight.reshape(ctx.combine_weights.shape), None
-
-
-class FusionFP8Expert(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(ctx, hidden_states, custom_map):
-        ctx.node = ExpertsGroupGemmNode(None, custom_map)
-
-        t1 = hidden_states.transpose([1, 0, 2, 3]).contiguous()
-        expert_num = t1.shape[0]
-        tokens_num = t1.shape[1] * t1.shape[2]
-        tokens_per_expert = paddle.full([expert_num], fill_value=tokens_num, dtype="int32")
-
-        t1 = t1.reshape([-1, hidden_states.shape[-1]])
-        out = ctx.node.forward_no_prob(t1, tokens_per_expert)
-
-        expert_output = out.reshape(hidden_states.shape).transpose([1, 0, 2, 3]).contiguous()
-
-        ctx.save_for_backward(tokens_per_expert)
-        return expert_output
-
-    @staticmethod
-    def backward(ctx, output_grad):
-        (tokens_per_expert,) = ctx.saved_tensor()
-
-        t1 = output_grad.transpose([1, 0, 2, 3]).contiguous()
-        t1 = t1.reshape([-1, output_grad.shape[-1]])
-
-        dx = ctx.node.backward_no_prob(t1, tokens_per_expert)
-        dx = dx.reshape(output_grad.shape).transpose([1, 0, 2, 3]).contiguous()
-        return dx
 
 
 class AlltoAll(PyLayer):
@@ -521,18 +487,15 @@ class MOELayer(nn.Layer):
             )
             expert_outputs = []
             if isinstance(self.experts, nn.LayerList):
-                if self.config.use_fp8_fuse_node:
-                    expert_output = FusionFP8Expert.apply(dispatched_input, self)
-                else:
-                    chunks = dispatched_input.transpose([1, 0, 2, 3]).contiguous().unbind(0)
-                    assert len(chunks) == len(self.experts), (
-                        len(chunks),
-                        len(self.experts),
-                    )
-                    for chunk, expert in zip(chunks, self.experts):
-                        expert_outputs += [expert(chunk)]
+                chunks = dispatched_input.transpose([1, 0, 2, 3]).contiguous().unbind(0)
+                assert len(chunks) == len(self.experts), (
+                    len(chunks),
+                    len(self.experts),
+                )
+                for chunk, expert in zip(chunks, self.experts):
+                    expert_outputs += [expert(chunk)]
 
-                    expert_output = paddle.stack(expert_outputs, axis=1)
+                expert_output = paddle.stack(expert_outputs, axis=1)
 
             else:
                 dispatched_input = dispatched_input.transpose([1, 0, 2, 3])
@@ -956,7 +919,6 @@ class MOELayer(nn.Layer):
         if not self.config.use_ep_comm_overlap:
             if use_quant_before_a2a:
                 # To enable backward pass overlap, the all-to-all (a2a) operation is performed inside
-                # FP8FusedWLCHFunc, eliminating the need for external a2a. However, be careful not
                 # to skip the computation of shared_experts.
                 shared_out = self.shared_experts(input) if self.shared_experts is not None else None
             else:
@@ -972,30 +934,17 @@ class MOELayer(nn.Layer):
                     else:
                         dispatched_input = AlltoAll.apply(dispatched_input, self.group)
 
-            if use_fp8_fuse_node:
-                expert_out = FP8FusedWLCHFunc.apply(
-                    dispatched_input,
-                    token_combine_weights,
-                    self,
-                    recompute_fwd_gate_up=recompute_fwd_gate_up_func(self.config, self.layer_idx),
-                    dequant_input=("dequant_input" in self.config.fp8_mem_configs)
-                    and self.config.fp8_mem_configs["dequant_input"],
-                    quant_before_a2a=use_quant_before_a2a,
-                    is_first_fwd=not framework._dygraph_tracer()._has_grad,
-                    group=self.group,
-                    fp8_dispatched_handle=fp8_dispatched_handle,
-                )
-            else:
+         
 
-                expert_out = (
-                    recompute(self.forward_experts, dispatched_input)
-                    if self.recompute and self.training
-                    else self.forward_experts(dispatched_input)
-                )
+            expert_out = (
+                recompute(self.forward_experts, dispatched_input)
+                if self.recompute and self.training
+                else self.forward_experts(dispatched_input)
+            )
 
-                if self.config.use_combine_before_a2a:
-                    token_combine_weights = token_combine_weights.clone().reshape(expert_out.shape[:-1] + [1])
-                    expert_out = expert_out * token_combine_weights
+            if self.config.use_combine_before_a2a:
+                token_combine_weights = token_combine_weights.clone().reshape(expert_out.shape[:-1] + [1])
+                expert_out = expert_out * token_combine_weights
         else:
             assert (
                 len(dispatched_input.shape) == 4
@@ -1049,184 +998,3 @@ class MOELayer(nn.Layer):
             combined_output = combined_output.clone().reshape(orig_shape[:-1] + [combined_output.shape[-1]])
         return combined_output, combine_weights, router_loss2, gate_logits
 
-
-class FP8FusedWLCHFunc(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(
-        ctx,
-        hidden_states,
-        dispatched_probs,
-        custom_map,
-        recompute_fwd_gate_up=False,
-        dequant_input=False,
-        quant_before_a2a=False,
-        is_first_fwd=False,
-        group=None,
-        fp8_dispatched_handle=None,
-    ):
-        ctx.node = ExpertsGroupGemmWLCHNode(
-            custom_map,
-            recompute_fwd_gate_up=recompute_fwd_gate_up,
-            dequant_input=dequant_input,
-            group=group,
-        )
-        ctx.group = group
-        ctx.quant_before_a2a = quant_before_a2a
-        num_local_experts = custom_map.num_local_experts
-        
-        def a2a_fn(input_fp8, input_scale):
-            return AlltoAll.apply(input_fp8, group), AlltoAll.apply(input_scale, group)
-
-        if quant_before_a2a:
-            assert fp8_dispatched_handle is not None
-            assert hidden_states.dtype == paddle.float8_e4m3fn
-            hidden_states, scale = a2a_fn(hidden_states, fp8_dispatched_handle["scale"])
-            scale = scale.reshape([-1, scale.shape[-1]])
-        else:
-            scale = None
-
-        hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
-        dispatched_probs = dispatched_probs.reshape([-1, dispatched_probs.shape[-1]])
-        tokens_per_expert = [np.prod(hidden_states.shape[:-1]) // num_local_experts] * num_local_experts
-
-        out = ctx.node.forward(hidden_states, dispatched_probs, tokens_per_expert, tokens_per_expert, scale=scale)
-
-        if is_first_fwd:
-            ctx.node.reset_status()
-
-        return out
-
-    @staticmethod
-    def backward(ctx, output_grad):
-        def a2a_async_fn(input):
-            return AlltoAll.apply(input, ctx.group, sync_op=False)
-
-        if ctx.quant_before_a2a:
-            return ctx.node.backward(output_grad, a2a_async_fn=a2a_async_fn)
-        else:
-            return ctx.node.backward(output_grad, a2a_async_fn=None)
-
-
-class MlpNode:
-    def __init__(self, custom_map, max_topk, recompute_fwd_gate_up=False, dequant_input=False):
-        self.token_dispatcher = custom_map.dispatcher
-        self.experts = custom_map.experts
-        self.experts_group_gemm_node = ExpertsGroupGemmContiguousNode(
-            custom_map,
-            recompute_fwd_gate_up=recompute_fwd_gate_up,
-            dequant_input=dequant_input,
-        )
-        self.unzip_node = UnZipNode(self.token_dispatcher)
-        self.zip_node = ZipNode(self.token_dispatcher)
-        self.dispatched_indices = None
-        self.dispatched_probs = None
-        self.tokens_per_expert = self.token_dispatcher._comm_manager.tokens_per_expert_list
-        self.router_topk = max_topk
-
-    def reset_status(self):
-        self.dispatched_indices = None
-        self.dispatched_probs = None
-        self.tokens_per_expert = None
-        self.router_topk = None
-        self.experts_group_gemm_node.reset_status()
-        self.experts_group_gemm_node = None
-
-    def release_mem(self):
-        self.experts_group_gemm_node.reset_status()
-        self.experts_group_gemm_node = None
-
-    @paddle.no_grad()
-    def forward(self, hs_2d_dispatched, dispatched_indices, dispatched_probs):
-        num_experts = len(self.tokens_per_expert)
-
-        self.dispatched_indices = dispatched_indices.to(paddle.int32)
-        (unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs) = self.unzip_node.forward(
-            hs_2d_dispatched,
-            self.dispatched_indices,
-            dispatched_probs,
-            topk=self.router_topk,
-            num_experts=num_experts,
-            tokens_per_expert=self.tokens_per_expert,
-        )
-        hs_2d_dispatched._record_stream()
-        dispatched_indices._record_stream()
-        dispatched_probs._record_stream()
-
-        padding_token_per_experts = [(x + 127) // 128 * 128 for x in self.tokens_per_expert]
-        expert_out = self.experts_group_gemm_node.forward(
-            unzipped_tokens,
-            unzipped_probs,
-            padding_token_per_experts,
-            self.tokens_per_expert,
-        )
-
-        expert_out_tmp = expert_out.reshape([-1, expert_out.shape[-1]])
-
-        expert_out_zipped = self.zip_node.forward(
-            expert_out_tmp,
-            zipped_expertwise_rowmap,
-            self.dispatched_indices,
-            unzipped_probs,
-            total_zipped_tokens=hs_2d_dispatched.shape[0],
-            num_experts=num_experts,
-        )
-
-        self.dispatched_probs = dispatched_probs
-        expert_out_zipped.stop_gradient = False
-
-        return expert_out_zipped
-
-    @paddle.no_grad()
-    def backward(self, hidden_states_out_grad):
-        unzipped_grad = self.zip_node.backward(
-            hidden_states_out_grad,
-            self.dispatched_indices,
-            self.dispatched_probs,
-            top_k=self.router_topk,
-            num_experts=len(self.tokens_per_expert),
-            tokens_per_expert=self.tokens_per_expert,
-        )
-        hidden_states_out_grad._record_stream()
-
-        expert_out, probs_grad = self.experts_group_gemm_node.backward(unzipped_grad)
-
-        hs_fp8_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
-            expert_out,
-            hidden_states_out_grad,
-            probs_grad,
-            self.dispatched_indices,
-            num_experts=len(self.tokens_per_expert),
-        )
-        self.reset_status()
-        return hs_fp8_dispatched_grad, dispatched_probs_grad
-
-
-class Fp8FusedMoeFunc(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(
-        ctx,
-        hidden_states,
-        dispatched_probs,
-        dispatched_indices,
-        custom_map,
-        max_topk,
-        recompute_fwd_gate_up=False,
-        dequant_input=False,
-        is_first_fwd=False,
-    ):
-        ctx.node = MlpNode(
-            custom_map,
-            max_topk,
-            recompute_fwd_gate_up=recompute_fwd_gate_up,
-            dequant_input=dequant_input,
-        )
-        out = ctx.node.forward(hidden_states, dispatched_indices, dispatched_probs)
-
-        if is_first_fwd:
-            ctx.node.release_mem()
-        return out
-
-    @staticmethod
-    def backward(ctx, output_grad):
-        hidden_states_grad, dispatched_probs_grad = ctx.node.backward(output_grad)
-        return hidden_states_grad, dispatched_probs_grad, None

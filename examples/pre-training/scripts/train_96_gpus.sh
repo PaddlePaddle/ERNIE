@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export PADDLE_XCCL_BACKEND=iluvatar_gpu
+export PADDLE_DISTRI_BACKEND=xccl
+#export CUDA_VISIBLE_DEVICES=2,3,4,5
+#export FLAGCX_SOCKET_IFNAME=ens22f0,ens11f0np0
+export FLAGCX_DEBUG=TRACE
+export FLAGCX_DEBUG_SUBSYS=INIT
+
 export NNODES=1
 export PADDLE_TRAINERS_NUM=1
 
@@ -32,18 +39,18 @@ export FLAGS_call_stack_level=2
 
 
 # 屏蔽平台预设的环境变量，因为框架采用兼容升级，检测到这些配置会使用原方式启动
-unset PADDLE_ELASTIC_JOB_ID
-unset PADDLE_TRAINER_ENDPOINTS
-unset DISTRIBUTED_TRAINER_ENDPOINTS
-unset FLAGS_START_PORT
-unset PADDLE_ELASTIC_TIMEOUT
-nnodes=$PADDLE_TRAINERS_NUM
-rank=$PADDLE_TRAINER_ID
+# unset PADDLE_ELASTIC_JOB_ID
+# unset PADDLE_TRAINER_ENDPOINTS
+# unset DISTRIBUTED_TRAINER_ENDPOINTS
+# unset FLAGS_START_PORT
+# unset PADDLE_ELASTIC_TIMEOUT
+# nnodes=$PADDLE_TRAINERS_NUM
+# rank=$PADDLE_TRAINER_ID
 
-LAUNCH_CMD=`python scripts/selective_launch.py 36677`
-if [[ -z "$LAUNCH_CMD" ]]; then
-    exit 0
-fi
+# LAUNCH_CMD=`python scripts/selective_launch.py 36677`
+# if [[ -z "$LAUNCH_CMD" ]]; then
+#     exit 0
+# fi
 
 
 SM=`nvidia-smi --query-gpu=compute_cap --format=csv | tail -n 1 | sed 's/\.//g'`
@@ -56,6 +63,7 @@ fi
 
 export PYTHONPATH=$PYTHONPATH:./ernie
 
+
 LOG_DIR=output/paddle_distributed_logs
 
 rm -rf output
@@ -63,7 +71,7 @@ rm -rf core.*
 
 python -m paddle.distributed.launch \
     --log_dir $LOG_DIR \
-    $LAUNCH_CMD \
     --run_mode=collective \
     ${script:-ernie/pretrain.py}  \
     --config yamls/pretrain_96_gpus.yaml
+    # $LAUNCH_CMD \
