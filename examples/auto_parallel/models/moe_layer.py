@@ -476,7 +476,13 @@ class MOELayer(nn.Layer):
                 )
                 if "corr_bias" in inspect.signature(moe_gate_dispatch).parameters:
                     if self.use_correction_bias:
-                        compat_args = (self.moe_statics.e_score_correction_bias[0],)
+                        compat_args = (
+                            _reshard(
+                                self.moe_statics.e_score_correction_bias[0],
+                                get_flatten_mesh(get_mesh(self.ipp)),
+                                [dist.Replicate()],
+                            ),
+                        )
                     else:
                         compat_args = (None,)
                 else:
@@ -501,7 +507,15 @@ class MOELayer(nn.Layer):
                                 self.gate.experts_type_mask[i]
                             ].detach()
                     else:
-                        self.moe_statics.expert_usage[0] += dispatch_mask.detach()
+                        reshard_dispatch_mask = _reshard(
+                            dispatch_mask.detach(),
+                            get_mesh(self.ipp),
+                            [
+                                dist.Replicate()
+                                for _ in range(len(get_mesh(self.ipp).shape))
+                            ],
+                        )
+                        self.moe_statics.expert_usage[0] += reshard_dispatch_mask
                 dispatched_input.stop_gradient = False
                 combine_weights_unnorm.stop_gradient = False
                 dispatch_mask.stop_gradient = True
