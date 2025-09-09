@@ -34,10 +34,11 @@ from .modeling import (
     ErnieDecoderLayer,
     ErnieAttention,
     ErnieForCausalLM,
+    ErnieMLP,
 )
 
 
-from models.moe_layer import MOELayer, ErnieMLP
+from models.moe_layer import MOELayer
 from models.configuration import ErnieMoEConfig
 from utils.training_utils import get_mesh
 
