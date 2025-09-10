@@ -668,7 +668,6 @@ class ErnieDecoderLayer(nn.Layer):
         self.residual_add2 = FusedDropoutAdd(
             config.hidden_dropout_prob, mode="upscale_in_train"
         )
-        self.router_loss_default = paddle.zeros([1], dtype=paddle.float32)
         self.reshard_replicate = ReshardLayer()
 
     def create_moe_mlp_layer(self, layer_idx, ipp):
