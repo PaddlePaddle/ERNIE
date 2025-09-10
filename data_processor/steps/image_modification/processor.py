@@ -65,9 +65,6 @@ VisionExample = namedtuple(
     ],
 )
 
-Example = namedtuple("Example", ["src", "ids", "lossmask", "token_type_ids"])
-
-
 logger = logging.getLogger(__name__)
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
@@ -641,51 +638,10 @@ class ImageModificationProcessor(ProcessorBase):
 
             return ret
 
-        def _text_key_formatting(data):
-            ret = {}
-            ret["ids"] = data["ids"] if "ids" in data else data["ds16"]
-            ret["src"] = data.get("part", -1)  # dummy
-            ret["lossmask"] = (
-                data["lossmask"] if "lossmask" in data else data["ds16_lossmask"]
-            )
-            ret["token_type_ids"] = (
-                data["token_type_ids"]
-                if "token_type_ids" in data
-                else data["ds16_tokenwise_type_id"]
-            )
-
-            return ret
-
-        # def _lm_key_formatting(data):
         assert isinstance(data, dict)
-        if "image_type_ids" in data or "ds16_imagewise_type_id" in data:
-            data = _vision_key_formatting(data)
-            ExampleClass = VisionExample
-        else:
-            # TODO: fix this
-            # assert 0, f"not support yet"
-            data = _text_key_formatting(data)
-            ExampleClass = Example
+        data = _vision_key_formatting(data)
 
-        return ExampleClass(**data)
-
-    def get_data_type(self, data):
-        """
-        放回这个数据的datatype
-        """
-        if isinstance(data, dict):
-            if "data_type" in data:
-                return data["data_type"]
-            elif "ds16_imagewise_type_id" in data:
-                return DATATYPE_2_ID["mm"]
-            else:
-                return DATATYPE_2_ID["lm"]
-        elif isinstance(data, Example):
-            return DATATYPE_2_ID["lm"]
-        elif isinstance(data, VisionExample):
-            return DATATYPE_2_ID["mm"]
-        else:
-            return getattr(data, "data_type", DATATYPE_2_ID["lm"])
+        return VisionExample(**data)
 
     def process(self, data, **kwargs):
         """

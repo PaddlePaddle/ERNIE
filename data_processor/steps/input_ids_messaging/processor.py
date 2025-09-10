@@ -62,13 +62,11 @@ class InputIdsMassageProcessor(ProcessorBase):
 
         self.example_to_feature = ExampleToFeature(
             self.tokenizer,
-            args.data_filelist,
             args.corpus_name,
             im_prefix_length=args.im_prefix_length,
             max_seq_length=args.max_seq_length,
             special_tokens_info=special_tokens_info,
             loc_coordinate_num=coor_num,
-            prompt_dir=args.prompt_dir,
             one_sample_in_one_seq=args.one_sample_in_one_seq,
             variable_resolution=1,
             spatial_conv_size=args.spatial_conv_size,
