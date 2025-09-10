@@ -1692,12 +1692,6 @@ class ErnieForCausalLM(ErniePretrainedModel):
                     f"{prefix}ernie.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
                     f"{prefix}ernie.layers.*.self_attn.v_proj": dist.ColWiseParallel(),
                     f"{prefix}ernie.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
-                    f"{prefix}ernie.layers.*.self_attn.reshard_row_and_col": PrepareLayerInput(
-                        layer_input_reshard_row_and_col_hook
-                    ),
-                    f"{prefix}ernie.layers.*.reshard_col": PrepareLayerInput(
-                        layer_input_reshard_col_hook
-                    ),
                     f"{prefix}ernie.layers.*.reshard_replicate": PrepareLayerInput(
                         layer_input_reshard_replicate_hook
                     ),
@@ -1746,46 +1740,6 @@ class ReshardLayer(paddle.nn.Layer):
 
     def forward(self, input):
         return input
-
-
-def layer_input_reshard_row_and_col_hook(process_mesh):
-    def hook(layer, inputs, output=None):
-        res_inputs = []
-        for input in inputs:
-            if not input.is_dist():
-                x = dist.shard_tensor(
-                    input, process_mesh, [dist.Shard(0), dist.Shard(1)]
-                )
-                res_inputs.append(
-                    dist.reshard(x, process_mesh, [dist.Shard(0), dist.Shard(1)])
-                )
-            else:
-                res_inputs.append(
-                    dist.reshard(input, process_mesh, [dist.Shard(0), dist.Shard(1)])
-                )
-        return tuple(res_inputs)
-
-    return hook
-
-
-def layer_input_reshard_col_hook(process_mesh):
-    def hook(layer, inputs, output=None):
-        res_inputs = []
-        for input in inputs:
-            if not input.is_dist():
-                x = dist.shard_tensor(
-                    input, process_mesh, [dist.Shard(1), dist.Replicate()]
-                )
-                res_inputs.append(
-                    dist.reshard(x, process_mesh, [dist.Shard(1), dist.Replicate()])
-                )
-            else:
-                res_inputs.append(
-                    dist.reshard(input, process_mesh, [dist.Shard(1), dist.Replicate()])
-                )
-        return tuple(res_inputs)
-
-    return hook
 
 
 def layer_input_reshard_replicate_hook(process_mesh):
