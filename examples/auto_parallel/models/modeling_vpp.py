@@ -29,7 +29,6 @@ from .modeling import (
     ErniePretrainedModel,
     ErnieModel,
     ErniePretrainingCriterion,
-    ReshardLayer,
     ErnieLMHead,
     ErnieDecoderLayer,
     ErnieAttention,
@@ -401,7 +400,6 @@ class ErnieModelVPP(ErnieModel):
         self.all_self_attns = None
         self.next_decoder_cache = None
         self.inputs_embeds_cur_depth_list = None
-        self.reshard_replicate = ReshardLayer()
 
     def mtp_layer(
         self, hidden_states, inputs_embeds_cur_depth_list, attention_mask, position_ids

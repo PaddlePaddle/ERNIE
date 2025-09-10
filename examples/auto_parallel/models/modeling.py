@@ -482,7 +482,6 @@ class ErnieAttention(nn.Layer):
             )
 
         self.config = config
-        self.reshard_row_and_col = ReshardLayer()
 
     def forward(
         self,
@@ -529,7 +528,6 @@ class ErnieAttention(nn.Layer):
         )
 
         attn_output = self.o_proj(attn_output)
-        attn_output = self.reshard_row_and_col(attn_output)
 
         if not output_attentions:
             attn_weights = None
@@ -670,7 +668,7 @@ class ErnieDecoderLayer(nn.Layer):
         self.residual_add2 = FusedDropoutAdd(
             config.hidden_dropout_prob, mode="upscale_in_train"
         )
-        self.reshard_col = ReshardLayer()
+        self.router_loss_default = paddle.zeros([1], dtype=paddle.float32)
         self.reshard_replicate = ReshardLayer()
 
     def create_moe_mlp_layer(self, layer_idx, ipp):
@@ -816,7 +814,6 @@ class ErnieDecoderLayer(nn.Layer):
                 hidden_states, token_type_ids
             )
         else:
-            hidden_states = self.reshard_col(hidden_states)
             hidden_states = self.mlp(hidden_states)
             gate_logits = None
 
@@ -1003,7 +1000,6 @@ class ErnieModel(ErniePretrainedModel):
         self.inbatch_pack_offset = None
         self.token_type_ids = None
         self.past_key_values = None
-        self.inbatch_pack_offset = None
         self.inputs_embeds = None
         self.all_hidden_states = None
         self.all_self_attns = None
@@ -1287,7 +1283,6 @@ class ErnieModel(ErniePretrainedModel):
         self.past_key_values = past_key_values
         self.inbatch_pack_offset = inbatch_pack_offset
         self.token_type_ids = token_type_ids
-        self.inbatch_pack_offset = inbatch_pack_offset
         if use_cache is not None:
             self.config.use_cache = use_cache
         if return_dict is not None:
