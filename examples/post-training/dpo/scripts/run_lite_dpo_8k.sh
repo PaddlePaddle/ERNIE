@@ -85,7 +85,7 @@ python -m paddle.distributed.launch \
     --sft_loss_ratio 0.0 \
     --ref_model_update_steps -1 \
     --sequence_parallel 1 \
-    --use_attn_mask_start_row_indices 1 \
+    --use_attn_mask_startend_row_indices 1 \
     --tensor_parallel_output 1 \
     --reference_free 0 \
     --simpo_gamma 0.5 \

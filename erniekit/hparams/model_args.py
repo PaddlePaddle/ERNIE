@@ -83,7 +83,7 @@ class ModelArguments:
     use_flash_attn_with_mask: Optional[bool] = field(
         default=True, metadata={"help": "use use_flash_attn_with_mask"}
     )
-    use_attn_mask_start_row_indices: bool = field(
+    use_attn_mask_startend_row_indices: bool = field(
         default=True,
         metadata={
             "help": "Whether to use attn_mask_start_row_indices in flash attention."

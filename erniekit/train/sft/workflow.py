@@ -390,6 +390,7 @@ def run_sft(
         "rank": finetuning_args.dataset_rank,
         "packing": data_args.packing,
         "mix_strategy": data_args.mix_strategy,
+        "encode_one_turn": data_args.encode_one_turn,
     }
     from paddleformers.datasets.finetuning import collate_fn
 

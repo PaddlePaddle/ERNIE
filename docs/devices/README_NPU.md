@@ -170,7 +170,7 @@ python -m paddle.distributed.launch \
         --amp_custom_black_list "reduce_sum" "softmax_with_cross_entropy" "c_softmax_with_cross_entropy" "elementwise_div" "sin" "cos" \
         --use_flash_attention 1 \
         --use_sparse_head_and_loss_fn 1 \
-        --use_attn_mask_start_row_indices 1 \
+        --use_attn_mask_startend_row_indices 1 \
         --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_batch_p2p_comm  disable_partial_send_recv" \
         --greedy_intokens 1 \
         --sequence_parallel 1 \
@@ -289,7 +289,7 @@ python -m paddle.distributed.launch \
         --distributed_dataloader 1 \
         --use_flash_attention 1 \
         --use_sparse_head_and_loss_fn 0 \
-        --use_attn_mask_start_row_indices 1 \
+        --use_attn_mask_startend_row_indices 1 \
         --pipeline_parallel_config "disable_partial_send_recv disable_batch_p2p_comm enable_clear_every_step_cache" \
         --greedy_intokens 1 \
         --lr_scheduler linear \

@@ -201,7 +201,7 @@ python3 -m paddle.distributed.launch \
     --distributed_dataloader 1 \
     --use_flash_attention 1 \
     --use_sparse_head_and_loss_fn 0 \
-    --use_attn_mask_start_row_indices 0 \
+    --use_attn_mask_startend_row_indices 0 \
     --use_sparse_flash_attn 0 \
     --tensor_parallel_output 0 \
     --pipeline_parallel_config "disable_partial_send_recv enable_clear_every_step_cache disable_batch_p2p_comm" \

@@ -346,7 +346,7 @@ class ModelArgument:
             "help": "Whether to use the fused gate-detach matmul implementation."
         },
     )
-    use_attn_mask_start_row_indices: bool = field(
+    use_attn_mask_startend_row_indices: bool = field(
         default=True,
         metadata={
             "help": "Whether to use attn_mask_start_row_indices in flash attention."

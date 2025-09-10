@@ -241,7 +241,7 @@ class ModelArgument:
             "help": "Under use attn_mask_start_row_indices=True, whether use sparse flash attention or not."
         },
     )
-    use_attn_mask_start_row_indices: bool = field(
+    use_attn_mask_startend_row_indices: bool = field(
         default=True,
         metadata={
             "help": "Whether to use attn_mask_start_row_indices in flash attention."

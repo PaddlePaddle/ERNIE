@@ -51,7 +51,7 @@ unified_checkpoint_config: async_save
 
 # device
 device: npu
-use_attn_mask_start_row_indices: true
+use_attn_mask_startend_row_indices: true
 moe_use_aux_free: false
 moe_multimodal_dispatch_use_allgather: ""
 fuse_rope: false

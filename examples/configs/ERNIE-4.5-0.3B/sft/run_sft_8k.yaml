@@ -7,7 +7,7 @@ eval_dataset_path: "./examples/data/sft-eval.jsonl"
 eval_dataset_prob: "1.0"
 max_seq_len: 8192
 num_samples_each_epoch: 6000000
-mix_strategy: random
+mix_strategy: concat
 packing: true
 
 ### model
@@ -26,7 +26,7 @@ distributed_dataloader: False
 dataloader_num_workers: 1
 batch_size: 1
 num_train_epochs: 1
-max_steps: 100
+max_steps: -1
 max_evaluate_steps: 10000
 eval_steps: 10000
 evaluation_strategy: steps
@@ -35,7 +35,7 @@ save_total_limit: 5
 save_strategy: steps
 logging_steps: 1
 release_grads: True
-gradient_accumulation_steps: 8
+gradient_accumulation_steps: 1
 logging_dir: ./vdl_log
 output_dir: ./output
 disable_tqdm: True

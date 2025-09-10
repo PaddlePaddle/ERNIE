@@ -409,7 +409,7 @@ def main():
         "random_shuffle": data_args.random_shuffle,
         "greedy_intokens": data_args.greedy_intokens,
         "buffer_size": data_args.buffer_size,
-        "use_attn_mask_start_row_indices": model_args.use_attn_mask_start_row_indices,
+        "use_attn_mask_startend_row_indices": model_args.use_attn_mask_startend_row_indices,
         "mask_out_eos_token": data_args.mask_out_eos_token,
         "packing": data_args.packing,
         "mix_strategy": data_args.mix_strategy,
