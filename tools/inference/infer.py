@@ -211,7 +211,7 @@ class Predictor:
         convert_from_kwargs = {
             (
                 "convert_from_hf"
-                if paddleformers_version > "0.2"
+                if paddleformers_version >= "0.3"
                 else "convert_from_torch"
             ): args.convert_from_hf
         }

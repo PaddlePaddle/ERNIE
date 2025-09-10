@@ -697,7 +697,9 @@ def main():
         download_source_kwargs["download_hub"] = model_args.download_hub
     convert_from_kwargs = {
         (
-            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+            "convert_from_hf"
+            if paddleformers_version >= "0.3"
+            else "convert_from_torch"
         ): training_args.convert_from_hf
         and training_args.use_huggingface_model
     }
