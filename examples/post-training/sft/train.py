@@ -14,6 +14,7 @@
 """Training Ernie Model."""
 
 import gc
+import json
 import importlib.util
 import math
 import os
@@ -35,6 +36,11 @@ if importlib.util.find_spec("triton") is not None:
         )
 
 import paddle
+from paddleformers.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+)
 from paddleformers.trainer import (
     IntervalStrategy,
     PdArgumentParser,
@@ -145,6 +151,12 @@ class SFTTrainingArguments(TrainingArguments):
         metadata={
             "help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."
         },
+    )
+
+    # Training PyTorch Models from HuggingFace
+    use_huggingface_model: bool = field(
+        default=False,
+        metadata={"help": "Whether to use huggingface model to finetune."},
     )
 
 
@@ -579,15 +591,35 @@ def main():
             dtype = "bfloat16"
 
     logger.info("Start to load model ...")
+    config_path = os.path.join(model_args.model_name_or_path, "config.json")
+    if not os.path.exists(config_path):
+        raise ValueError(
+            f"Config path {config_path} doesn't exist. Please make sure you have downloaded the correct model."
+        )
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_dict = json.load(f)
+
+    if "torch_dtype" in config_dict:
+        training_args.use_huggingface_model = True
+        training_args.convert_from_hf = True
+        training_args.save_to_hf = True
+        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
+
+        logger.info("loading model from HuggingFace")
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
         download_hub=model_args.download_hub,
     )
 
-    model_class = Ernie4_5_MoeForCausalLM
-    if training_args.pipeline_parallel_degree > 1:
-        model_class = Ernie4_5_MoeForCausalLMPipe
+    if training_args.use_huggingface_model:
+        model_class = AutoModelForCausalLM
+        if training_args.pipeline_parallel_degree > 1:
+            model_class = AutoModelForCausalLMPipe
+    else:
+        model_class = Ernie4_5_MoeForCausalLM
+        if training_args.pipeline_parallel_degree > 1:
+            model_class = Ernie4_5_MoeForCausalLMPipe
     if (
         model_args.moe_group.lower() in {"data", "dp"}
         and training_args.data_parallel_degree > 1
@@ -663,21 +695,40 @@ def main():
             download_source_kwargs["from_modelscope"] = True
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
-
     convert_from_kwargs = {
         (
-            "convert_from_hf"
-            if paddleformers_version >= "0.3"
-            else "convert_from_torch"
-        ): False
+            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+        ): training_args.convert_from_hf
+        and training_args.use_huggingface_model
     }
-    model_config = Ernie4_5_MoeConfig.from_pretrained(
-        model_args.model_name_or_path,
-        dtype=dtype,
-        quantization_config=quantization_config,
-        **convert_from_kwargs,
-        **download_source_kwargs,
-    )
+    if training_args.use_huggingface_model:
+        if (
+            model_args.use_attn_mask_start_row_indices
+            and model_args.use_sparse_flash_attn
+        ):
+            _attn_implementation = "flashmask"
+        else:
+            _attn_implementation = "sdpa"
+        model_config = AutoConfig.from_pretrained(
+            model_args.model_name_or_path,
+            dtype=dtype,
+            use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
+            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
+            loss_subbatch_sequence_length=32768,
+            num_nextn_predict_layers=model_args.num_nextn_predict_layers,
+            _attn_implementation=_attn_implementation,
+            quantization_config=quantization_config,
+            **convert_from_kwargs,
+            **download_source_kwargs,
+        )
+    else:
+        model_config = Ernie4_5_MoeConfig.from_pretrained(
+            model_args.model_name_or_path,
+            dtype=dtype,
+            quantization_config=quantization_config,
+            **convert_from_kwargs,
+            **download_source_kwargs,
+        )
     model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
     model_config.recompute = training_args.recompute
@@ -712,6 +763,7 @@ def main():
     model_config.moe_multimodal_dispatch_use_allgather = (
         model_args.moe_multimodal_dispatch_use_allgather
     )
+
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
     model_config.hidden_dropout_prob = training_args.hidden_dropout_prob
@@ -722,7 +774,10 @@ def main():
     model_config.num_nextn_predict_layers = model_args.num_nextn_predict_layers
     model_config.multi_token_pred_lambda = model_args.multi_token_pred_lambda
     model_config.use_recompute_mtp = model_args.use_recompute_mtp
-    if model_config.moe_num_experts is None or model_config.moe_num_experts == 0:
+    if (
+        model_config.get("moe_num_experts", None) is None
+        or model_config.get("moe_num_experts", 0) == 0
+    ):
         model_config.moe_group = (
             "dummy" if model_args.moe_group == "mp" else model_args.moe_group
         )
@@ -735,6 +790,15 @@ def main():
         raise NotImplementedError(
             "Quantization is not supported for models with tied lm_head and word_embedding \
             weights when using Pipeline Parallelism (PP)."
+        )
+
+    # (NOTE): ERNIEKit currently only support finetuning ernie4_5 and ernie4_5_moe models from huggingface
+    if training_args.use_huggingface_model and model_config.model_type not in (
+        "ernie4_5",
+        "ernie4_5_moe",
+    ):
+        raise ValueError(
+            f"Currently, only support ernie4_5 and ernie4_5_moe for HuggingFace model, but got {model_config.model_type}."
         )
 
     if model_args.continue_training or training_args.weight_quantize_algo is not None:

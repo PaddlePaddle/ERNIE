@@ -16,6 +16,7 @@
 
 import gc
 import importlib.util
+import json
 import os
 import sys
 import time
@@ -33,6 +34,11 @@ if importlib.util.find_spec("triton") is not None:
         )
 
 import paddle
+from paddleformers.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+)
 from paddleformers.peft import LoRAConfig, LoRAModel
 from paddleformers.trainer import (
     IntervalStrategy,
@@ -272,7 +278,6 @@ def main():
         num_nextn_predict_layers=0,
         download_hub=model_args.download_hub,
     )
-
     try:
         from paddleformers.utils.download import (
             DownloadSource,
@@ -291,16 +296,48 @@ def main():
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    config_path = os.path.join(model_args.model_name_or_path, "config.json")
+    if not os.path.exists(config_path):
+        raise ValueError(
+            f"Config path {config_path} doesn't exist. Please make sure you have downloaded the correct model."
+        )
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_dict = json.load(f)
+
+    if "torch_dtype" in config_dict:
+        training_args.use_huggingface_model = True
+        training_args.convert_from_hf = True
+        training_args.save_to_hf = True
+        training_args.layerwise_lr_decay_bound = 1.0
+        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
+        dpo_config.offset_alpha = 1.0
+        logger.info("loading model from HuggingFace")
+
     convert_from_kwargs = {
         (
-            "convert_from_hf"
-            if paddleformers_version >= "0.3"
-            else "convert_from_torch"
-        ): False
+            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+        ): training_args.convert_from_hf
+        and training_args.use_huggingface_model
     }
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": False})
-    config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+
+    if training_args.use_huggingface_model:
+        if (
+            model_args.use_attn_mask_start_row_indices
+            and model_args.use_sparse_flash_attn
+        ):
+            _attn_implementation = "flashmask"
+        else:
+            _attn_implementation = "sdpa"
+        config = AutoConfig.from_pretrained(
+            _attn_implementation=_attn_implementation,
+            loss_subbatch_sequence_length=327768,
+            **convert_from_kwargs,
+            **model_kwargs,
+        )
+    else:
+        config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
 
     if (
         training_args.pipeline_parallel_degree > 1
@@ -312,15 +349,32 @@ def main():
             weights when using Pipeline Parallelism (PP)."
         )
 
-    if config.moe_num_experts is None or config.moe_num_experts == 0:
+    if (
+        config.get("moe_num_experts", None) is None
+        or config.get("moe_num_experts", 0) == 0
+    ):
         config.moe_group = (
             "dummy" if model_args.moe_group == "mp" else model_args.moe_group
         )
 
-    if training_args.pipeline_parallel_degree > 1:
-        model_class = Ernie4_5_MoeForCausalLMPipe
+    if training_args.use_huggingface_model:
+        model_class = AutoModelForCausalLM
+        if training_args.pipeline_parallel_degree > 1:
+            model_class = AutoModelForCausalLMPipe
     else:
         model_class = Ernie4_5_MoeForCausalLM
+        if training_args.pipeline_parallel_degree > 1:
+            model_class = Ernie4_5_MoeForCausalLMPipe
+
+    # (NOTE): ERNIEKit currently only support finetuning ernie4_5 and ernie4_5_moe models from huggingface
+    if training_args.use_huggingface_model and config.model_type not in (
+        "ernie4_5",
+        "ernie4_5_moe",
+    ):
+        raise ValueError(
+            f"Currently, only support ernie4_5 and ernie4_5_moe for HuggingFace model, but got {config.model_type}."
+        )
+
     if model_args.continue_training:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
@@ -329,15 +383,30 @@ def main():
             **download_source_kwargs,
         )
     else:
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
 
     if not dpo_config.reference_free and not dpo_config.lora:
-        ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-        if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
-            ref_config.moe_group = (
-                "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        if training_args.use_huggingface_model:
+            ref_config = AutoConfig.from_pretrained(
+                _attn_implementation=_attn_implementation, **model_kwargs
             )
-        ref_model = model_class._from_config(ref_config, dtype=dtype)
+            if (
+                ref_config.get("moe_num_experts", None) is None
+                or ref_config.get("moe_num_experts", 0) == 0
+            ):
+                ref_config.moe_group = (
+                    "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+                )
+        else:
+            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+            if (
+                ref_config.get("moe_num_experts", None) is None
+                or ref_config.get("moe_num_experts", 0) == 0
+            ):
+                ref_config.moe_group = (
+                    "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+                )
+        ref_model = model_class.from_config(ref_config, dtype=dtype)
         # make sure the state_dict is the same to get the same loss for first step
         ref_model.set_state_dict(model.state_dict())
     else:
@@ -355,7 +424,10 @@ def main():
         if model_args.lora_path is None:
             target_modules = [
                 ".*qkv_proj.*",
-                ".*out_proj.*",
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*o_proj.*" ".*out_proj.*",
                 ".*linear1.*",
                 ".*linear2.*",
             ]

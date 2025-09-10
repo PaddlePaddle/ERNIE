@@ -89,6 +89,12 @@ class DPOTrainingArguments(TrainingArguments):
         },
     )
 
+    # Training PyTorch Models from HuggingFace
+    use_huggingface_model: bool = field(
+        default=False,
+        metadata={"help": "Whether to use huggingface model to finetune."},
+    )
+
     def __post_init__(self):
         super().__post_init__()
         if self.dpo_benchmark:
