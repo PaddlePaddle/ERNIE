@@ -11,7 +11,7 @@
 请参考 [Pretrain 数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html) 中的内容。
 
 ## 镜像准备
-您的机器需要安装CUDA驱动（>= 525.60.13），并安装 CUDA toolkit 12.9。您可以使用镜像 `ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.1.0-gpu-cuda12.9-cudnn9.9` 来进行预训练任务，同时
+您的机器需要安装CUDA驱动（>= 525.60.13），并安装 CUDA toolkit 12.9。您可以使用镜像 `ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.2.0-gpu-cuda12.9-cudnn9.9` 来进行预训练任务，同时
 请确保您的集群中有 `mpi` 环境。
 
 ## 环境准备
