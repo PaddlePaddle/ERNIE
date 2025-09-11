@@ -350,7 +350,6 @@ def run_dpo(
         model_kwargs["moe_use_aux_free"] = True
         config = AutoConfig.from_pretrained(
             _attn_implementation=_attn_implementation,
-            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
             loss_subbatch_sequence_length=1024,
             **convert_from_kwargs,
             **model_kwargs,
