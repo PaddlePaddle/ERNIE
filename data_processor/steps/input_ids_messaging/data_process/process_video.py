@@ -27,7 +27,7 @@ from data_processor.steps.input_ids_messaging.data_process.process import Proces
 from data_processor.steps.input_ids_messaging.data_utils import get_uniq_id
 from data_processor.utils.io_utils import get_hashable, image_info_2_hash
 from data_processor.utils.logger_utils import logger
-from data_processor.utils.random_context import RandomSeedContext
+from data_processor.utils.image_enhance import RandomSeedContext
 from data_processor.utils.video_utils import group_frame_by_video
 from ernie.tokenizer_vl import (
     SFT_ASR_END_TOKEN,

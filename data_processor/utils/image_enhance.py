@@ -27,7 +27,7 @@ import imgaug.augmenters as iaa
 import numpy as np
 import PIL
 import yaml
-from PIL import Image, ImageDraw
+from PIL import Image
 
 
 class RandomSeedContext:
@@ -59,16 +59,6 @@ def read_config(path):
     with open(path, "r", encoding="utf-8") as fp:
         config = yaml.load(fp, Loader=yaml.SafeLoader)
     return config
-
-
-def draw_polygon_image(img: PIL.Image.Image, quads: List) -> PIL.Image.Image:
-    """draw polygon image"""
-    board_img = img.copy()
-    draw = ImageDraw.Draw(board_img)
-    for quad in quads:
-        quad = [tuple(_) for _ in quad]
-        draw.polygon(quad, outline="red")
-    return board_img
 
 
 def utils_to_bbox(quad):
@@ -278,11 +268,15 @@ class DocumentEffect:
         return new_quads, meta
 
     @classmethod
-    def perspective_meta(cls, pxs=None, percents=None, aligns=((-1, 1), (-1, 1), (-1, 1), (-1, 1))):
+    def perspective_meta(
+        cls, pxs=None, percents=None, aligns=((-1, 1), (-1, 1), (-1, 1), (-1, 1))
+    ):
         """generate perspective args"""
         meta = {
             "pxs": pxs,
-            "percents": tuple(np.random.uniform(percent[0], percent[1]) for percent in percents),
+            "percents": tuple(
+                np.random.uniform(percent[0], percent[1]) for percent in percents
+            ),
             "aligns": tuple(np.random.uniform(align[0], align[1]) for align in aligns),
         }
         return meta
@@ -543,7 +537,13 @@ class ImageEffect:
         return new_images, meta
 
     @classmethod
-    def cutout_meta(cls, nb_iterations=(1, 5), size=(0.01, 0.05), fill_mode="gaussian", fill_per_channel=True):
+    def cutout_meta(
+        cls,
+        nb_iterations=(1, 5),
+        size=(0.01, 0.05),
+        fill_mode="gaussian",
+        fill_per_channel=True,
+    ):
         """cutout_meta"""
         meta = {
             "nb_iterations": np.random.randint(nb_iterations[0], nb_iterations[1] + 1),
@@ -594,7 +594,9 @@ class EffectIterator:
     def sample(self) -> List[dict]:
         """sample one effect"""
         meta = []
-        for prob, funcs, sampler, args in zip(self.probs, self.functions, self.samplers, self.args):
+        for prob, funcs, sampler, args in zip(
+            self.probs, self.functions, self.samplers, self.args
+        ):
             if np.random.rand() < prob:
                 sub_meta = {}
                 if args["args"] is None:
@@ -657,7 +659,9 @@ def random_resize_image(img: PIL.Image.Image, random_resize_factor: int = 1):
     Returns:
         img: image after random resize
     """
-    assert random_resize_factor > 0, f'random_resize_factor = {random_resize_factor} =< 0 '
+    assert (
+        random_resize_factor > 0
+    ), f"random_resize_factor = {random_resize_factor} =< 0 "
 
     if random_resize_factor != 1:
         # Random ReSize
@@ -679,8 +683,12 @@ def init_document_effect(config: dict):
     ]
     doc_samplers = [
         # DocumentEffect.rotate_meta,
-        lambda weights, args: DocumentEffect.rotate_meta(**Selector.sample(args, weights)),
-        lambda weights, args: DocumentEffect.perspective_meta(**Selector.sample(args, weights)),
+        lambda weights, args: DocumentEffect.rotate_meta(
+            **Selector.sample(args, weights)
+        ),
+        lambda weights, args: DocumentEffect.perspective_meta(
+            **Selector.sample(args, weights)
+        ),
     ]
     document_effect = EffectIterator(config, doc_functions, doc_samplers)
     return document_effect
@@ -751,7 +759,9 @@ class ImageEnhance:
         return img_meta
 
     @staticmethod
-    def apply_effect(img: PIL.Image.Image, effect_augs: List[List], random_resize_factor=1):
+    def apply_effect(
+        img: PIL.Image.Image, effect_augs: List[List], random_resize_factor=1
+    ):
         """apply effect"""
 
         # random resize
@@ -770,7 +780,9 @@ class ImageEnhance:
                         img = np.array(img).astype(np.float32)
 
                     with RandomSeedContext(seed):
-                        img = getattr(eval(cls_name), func_name)([img], effect["args"])[0][0]
+                        img = getattr(eval(cls_name), func_name)([img], effect["args"])[
+                            0
+                        ][0]
 
             if isinstance(img, np.ndarray):
                 img = img.astype(np.uint8)
@@ -780,7 +792,10 @@ class ImageEnhance:
 
     def apply_transform(self, meta_info, transform_augs):
         """apply transform"""
-        w, h = meta_info["image_info"][0]["image_width"], meta_info["image_info"][0]["image_height"]
+        w, h = (
+            meta_info["image_info"][0]["image_width"],
+            meta_info["image_info"][0]["image_height"],
+        )
         init_quad = [(0, 0), (w, 0), (w, h), (0, h)]
         all_quad = [init_quad]
         for text_info in meta_info["text_info"]:
@@ -833,13 +848,17 @@ class ImageEnhance:
         ] + meta_info["image_info"][0]["image_enhance_augs"]
         return meta_info
 
-    def generate_augment_strategies(self, meta_info, dataset_type, random_seed, operator_types=None):
+    def generate_augment_strategies(
+        self, meta_info, dataset_type, random_seed, operator_types=None
+    ):
         """generate augment strategies"""
         if operator_types is None:
             operator_types = []
         with RandomSeedContext(random_seed):
             # Init effector
-            self.document_effect = init_document_effect(self.config["document"]["effect"])
+            self.document_effect = init_document_effect(
+                self.config["document"]["effect"]
+            )
             self.image_effect = init_image_effect(self.config["effect"])
             self.image_effect_ocr = init_image_effect(self.config["effect_ocr"])
 
@@ -847,7 +866,9 @@ class ImageEnhance:
             operator_types = copy.deepcopy(operator_types)
 
             if "transform" in operator_types:
-                assert dataset_type == "image-text_location-pair", "transform only support image-text_location-pair"
+                assert (
+                    dataset_type == "image-text_location-pair"
+                ), "transform only support image-text_location-pair"
                 assert (
                     len(meta_info["image_info"]) == 1
                 ), f"transform only support single image, now we have {len(meta_info['image_info'])} images"
@@ -856,10 +877,14 @@ class ImageEnhance:
             for image_info in meta_info["image_info"]:
                 augs = []
                 for operator_type in operator_types:
-                    assert operator_type in self.func_map, f"operator {operator_type} is not supported"
+                    assert (
+                        operator_type in self.func_map
+                    ), f"operator {operator_type} is not supported"
                     if operator_type == "transform":
 
-                        assert transform_augs is None, "one sample can only have one transform_augs"
+                        assert (
+                            transform_augs is None
+                        ), "one sample can only have one transform_augs"
                         transform_augs = self.func_map[operator_type]()
                     else:
                         augs.extend(self.func_map[operator_type]())

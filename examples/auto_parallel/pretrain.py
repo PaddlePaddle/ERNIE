@@ -56,20 +56,6 @@ from paddle.distributed import collective
 from paddle.tensor.manipulation import reshape
 from typing import Literal, TypeAlias
 
-# USE_VPP=0: Implement parallelism using the intermediate API.
-# USE_VPP=1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
-use_vpp = os.environ.get("USE_VPP", "0")
-if use_vpp == "0":
-    from models.modeling import ErnieForCausalLM
-
-    logger.info("Training with the intermediate API. Do not support VPP.")
-elif use_vpp == "1":
-    from models.modeling_vpp import ErnieForCausalLM
-
-    logger.info("Training VPP parallelism with the basic API")
-else:
-    raise ValueError(f"Invalid environment args USE_VPP={use_vpp}")
-
 _ReduceMode: TypeAlias = Literal["mean", "sum", "none"]
 
 
@@ -550,8 +536,25 @@ def main():
 
     tokenizer = setup_tokenizer(args, cfg)
 
+    vpp_degree = cfg.virtual_pp_degree
+    # vpp_degree==1: Implement parallelism using the intermediate API.
+    # vpp_degree>1: Implement parallelism using the basic API; the intermediate API does not support VPP for the time being.
+    assert vpp_degree >= 1, "vpp_degree must be greater than or equal to 1."
+    if vpp_degree == 1:
+        from models.modeling import ErnieForCausalLM, ErnieDecoderLayer
+
+        logger.info("Training with the intermediate API. Do not support VPP.")
+        modle_class = ErnieForCausalLM
+        aux_free_class = ErnieDecoderLayer
+    elif vpp_degree > 1:
+        from models.modeling_vpp import ErnieForCausalLMVPP, ErnieDecoderLayerVPP
+
+        logger.info("Training VPP parallelism with the basic API")
+        modle_class = ErnieForCausalLMVPP
+        aux_free_class = ErnieDecoderLayerVPP
+
     with paddle.LazyGuard():
-        model = ErnieForCausalLM(cfg)
+        model = modle_class(cfg)
 
     logger.info(f"Using model: {type(model)}, config: {model.config}")
     paddle.set_default_dtype("float32")
@@ -568,7 +571,9 @@ def main():
         logger.info("Adding aux free callback")
         callbacks += [
             MoECorrectionBiasAdjustCallback(
-                args.moe_use_aux_free_update_coef, args.sequence_parallel
+                args.moe_use_aux_free_update_coef,
+                args.sequence_parallel,
+                aux_free_class,
             )
         ]
     init_parameters(model)

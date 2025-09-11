@@ -243,7 +243,9 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     convert_from_kwargs = {
         (
-            "convert_from_hf" if paddleformers_version > "0.2" else "convert_from_torch"
+            "convert_from_hf"
+            if paddleformers_version >= "0.3"
+            else "convert_from_torch"
         ): False
     }
     model_config = Ernie4_5_MoeConfig.from_pretrained(

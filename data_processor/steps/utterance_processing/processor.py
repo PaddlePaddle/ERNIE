@@ -53,7 +53,6 @@ class UtteranceProcessor(ProcessorBase):
         self.eos_token = None
         self.cls_token = None
         self.sep_token = None
-        self.use_pic_id = True
         self.image_start_token = self.tokenizer.special_tokens_map.get(
             "image_start_id", "<|IMAGE_START|>"
         )
@@ -95,7 +94,6 @@ class UtteranceProcessor(ProcessorBase):
             return self.schema_correction(data)
         else:
             if not self.is_training:
-
                 data = self.utterance_2_schema(data, **kwargs)
             if not self.is_pretraining:
                 # Support for SFT-Data
@@ -115,7 +113,7 @@ class UtteranceProcessor(ProcessorBase):
         """
         schema_correction
         """
-        if schema.get("video_info"):
+        if len(schema.get("video_info", [])) > 0:
             video_info = schema["video_info"]
             text_info = schema["text_info"]
             matched_text_index_offset = 0
@@ -169,22 +167,14 @@ class UtteranceProcessor(ProcessorBase):
                         asr_one[1], asr_one[2] = float(asr_one[1]), float(asr_one[2])
 
                 if not self.is_pretraining:
-                    if self.use_pic_id:
-                        text_info = (
-                            text_info[:matched_text_index]
-                            + [
-                                {
-                                    "text": f"Video {vid_id}:",
-                                    "tag": "mask",
-                                }
-                            ]
-                            + text_info[matched_text_index:]
-                        )
-                        vid_id += 1
-                        matched_text_index += 1
-                        matched_text_index_offset += 1
                     text_info = (
                         text_info[:matched_text_index]
+                        + [
+                            {
+                                "text": f"Video {vid_id}:",
+                                "tag": "mask",
+                            }
+                        ]
                         + [
                             {
                                 "text": self.video_start_token,
@@ -201,8 +191,9 @@ class UtteranceProcessor(ProcessorBase):
                         ]
                         + text_info[matched_text_index:]
                     )
-                    matched_text_index += 1
-                    matched_text_index_offset += 2
+                    vid_id += 1
+                    matched_text_index += 2
+                    matched_text_index_offset += 3
                     ret["matched_text_index"] = matched_text_index
 
                 video_info[video_index] = ret
@@ -216,21 +207,14 @@ class UtteranceProcessor(ProcessorBase):
             if not self.is_pretraining:
                 vid_id = 1
                 matched_text_index = schema["image_info"][0]["matched_text_index"]
-                if self.use_pic_id:
-                    text_info = (
-                        text_info[:matched_text_index]
-                        + [
-                            {
-                                "text": f"Video {vid_id}:",
-                                "tag": "mask",
-                            }
-                        ]
-                        + text_info[matched_text_index:]
-                    )
-                    matched_text_index_offset += 1
-                    matched_text_index += 1
                 text_info = (
                     text_info[:matched_text_index]
+                    + [
+                        {
+                            "text": f"Video {vid_id}:",
+                            "tag": "mask",
+                        }
+                    ]
                     + [
                         {
                             "text": self.video_start_token,
@@ -240,8 +224,8 @@ class UtteranceProcessor(ProcessorBase):
                     ]
                     + text_info[matched_text_index:]
                 )
-                matched_text_index += 1
-                matched_text_index_offset += 1
+                matched_text_index += 2
+                matched_text_index_offset += 2
 
             uid = str(uuid.uuid4())
             ret_image_info = []
@@ -348,13 +332,12 @@ class UtteranceProcessor(ProcessorBase):
                         asr_one[1], asr_one[2] = float(asr_one[1]), float(asr_one[2])
 
                 if not self.is_pretraining:
-                    if self.use_pic_id:
-                        vid_id = len(schema_new["video_info"])
-                        element = {"text": f"Video {vid_id}:", "tag": "mask"}
-                        schema_new["text_info"].append(element)
-                        add_item_to_order(
-                            order_new, element, "text", len(schema_new["text_info"]) - 1
-                        )
+                    vid_id = len(schema_new["video_info"])
+                    element = {"text": f"Video {vid_id}:", "tag": "mask"}
+                    schema_new["text_info"].append(element)
+                    add_item_to_order(
+                        order_new, element, "text", len(schema_new["text_info"]) - 1
+                    )
 
                     # video start
                     element = {

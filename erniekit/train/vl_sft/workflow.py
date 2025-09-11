@@ -183,7 +183,6 @@ def run_vl_sft(
 
     # hacking data processor
     preprocess_args.max_seq_length = data_args.max_seq_len
-    preprocess_args.data_filelist = None
     preprocess_args.serialize_output = False
     logger.info(preprocess_args)
 
