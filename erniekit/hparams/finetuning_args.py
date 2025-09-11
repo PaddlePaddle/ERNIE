@@ -473,6 +473,12 @@ class FinetuningArguments(
         default=False, metadata={"help": "Whether to use recompute_mtp"}
     )
 
+    # training pytorch models from huggingFace
+    use_huggingface_model: bool = field(
+        default=False,
+        metadata={"help": "Whether to use huggingface model to finetune."},
+    )
+
     def __post_init__(self):
         self.bf16 = True
         if self.compute_type == "bf16":
