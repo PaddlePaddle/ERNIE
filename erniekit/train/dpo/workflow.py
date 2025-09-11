@@ -354,6 +354,7 @@ def run_dpo(
             **convert_from_kwargs,
             **model_kwargs,
         )
+        config.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
     else:
         config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
 
