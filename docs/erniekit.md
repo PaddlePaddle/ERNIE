@@ -37,6 +37,8 @@ Support NVDIA GPU, [Kunlunxin XPU](./devices/README_XPU.md) and [Ascend NPU](./d
 
 ### 2.2 Installing PaddlePaddle
 
+- Note: erniekit v1.0 only supports PaddlePaddle versions <= v3.1.
+
 **Docker-Based Installation (Recommended)**
 
 To ensure environment consistency across different hardware configurations, we recommend using our pre-configured Docker images. These images include CUDA, cuDNN, and NCCL dependencies with PaddlePaddle v3.1 pre-installed:
@@ -49,7 +51,7 @@ docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.1.0-gpu-c
 
 **Source Code Installation**
 
-If not using Docker, ensure your environment meets the prerequisites in 2.1. ERNIEKit requires PaddlePaddle v3.1+. See official [PaddlePaddle Installation Guide](https://www.paddlepaddle.org.cn/install/quick) for details.
+If not using Docker, ensure your environment meets the prerequisites in 2.1. ERNIEKit requires PaddlePaddle v3.1. See official [PaddlePaddle Installation Guide](https://www.paddlepaddle.org.cn/install/quick) for details.
 
 
 Verify installation with:
