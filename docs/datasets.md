@@ -249,3 +249,25 @@ Supports json and jsonl file formats:
 ### DPO Dataset
 
 (Coming soon)
+
+## query-response Format
+
+### SFT VL Dataset
+
+Supports json and jsonl file formats:
+
+* **json**: Each line contains one JSON object:
+```json
+{"query":"queryA", "response":"responseA", "history":[["history_queryA", "history_responseA"]], "images":["imgA_url"]}
+{"query":"queryB", "response":"responseB", "history":[["history_queryB", "history_responseB"]], "images":["imgB_url"]}
+{"query":"queryC", "response":"responseC", "history":[["history_queryC", "history_responseC"]], "images":["imgC_url"]}
+```
+
+* **jsonl**: All data in a single JSON array:
+```json
+[
+    {"query":"queryA", "response":"responseA", "history":[["history_queryA", "history_responseA"]], "images":["imgA_url"]}
+    {"query":"queryB", "response":"responseB", "history":[["history_queryB", "history_responseB"]], "images":["imgB_url"]},
+    {"query":"queryC", "response":"responseC", "history":[["history_queryC", "history_responseC"]], "images":["imgC_url"]},
+]
+```
