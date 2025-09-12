@@ -384,6 +384,7 @@ class ExampleToFeature(ProcessorBase):
 
             """[STEP 2] process"""
             metas = [meta]
+            processor = None
             if dataset_type in DATASET_TYPE_TO_PROCESS_FN:
                 obj_process = getattr(
                     data_process, DATASET_TYPE_TO_PROCESS_FN[dataset_type]
@@ -425,7 +426,10 @@ class ExampleToFeature(ProcessorBase):
                     continue
                 """[STEP 3] adaptive"""
                 meta = adaptiver.process(
-                    sample=meta, sample_grouped_info=processor.sample_grouped_info
+                    sample=meta,
+                    sample_grouped_info=(
+                        processor.sample_grouped_info if processor else None
+                    ),
                 )
 
                 """[STEP 4] text tokenizer & add placeholder"""
@@ -447,7 +451,7 @@ class ExampleToFeature(ProcessorBase):
                         dataset_name,
                         data_type,
                         adaptiver,
-                        processor.sample_grouped_info,
+                        processor.sample_grouped_info if processor else None,
                     ):
                         if one is not None:
                             assert len(one["ids_type"]) == len(

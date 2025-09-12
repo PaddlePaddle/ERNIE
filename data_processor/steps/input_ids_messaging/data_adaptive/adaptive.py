@@ -22,6 +22,7 @@ import numpy as np
 
 from data_processor.steps.input_ids_messaging.data_utils import get_text_token_num
 from data_processor.utils.logger_utils import logger
+from data_processor.utils.video_utils import group_frame_by_video
 
 
 class Adaptive:
@@ -151,7 +152,10 @@ class Adaptive:
         image_info = sample["image_info"]
         text_info = sample["text_info"]
         offset = 0
-        grouped_frames = sample_grouped_info
+        if sample_grouped_info:
+            grouped_frames = sample_grouped_info
+        else:
+            grouped_frames = group_frame_by_video(image_info)
 
         for frames in grouped_frames:
             if image_info[frames[0]]["image_type"] == "video":
@@ -235,7 +239,10 @@ class Adaptive:
         return the number of vision placeholder given the image_info
         """
         ret = []
-        grouped_frames = sample_grouped_info
+        if sample_grouped_info:
+            grouped_frames = sample_grouped_info
+        else:
+            grouped_frames = group_frame_by_video(image_info)
         for frames in grouped_frames:
             if image_info[frames[0]]["image_type"] == "video":
                 assert (
