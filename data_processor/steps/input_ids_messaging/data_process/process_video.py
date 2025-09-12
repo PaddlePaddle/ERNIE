@@ -53,6 +53,7 @@ class VideoProcess(Process):
         is_pretraining=False,
         variable_resolution=False,
         rope_3d=False,
+        sample_grouped_info=None,
         **kwargs,
     ):
         self.max_seq_len = max_seq_len
@@ -74,6 +75,7 @@ class VideoProcess(Process):
 
         self.variable_resolution = variable_resolution
         self.rope_3d = rope_3d
+        self.sample_grouped_info = sample_grouped_info
 
     def process(self, sample, **kwargs):
         """process"""
@@ -198,10 +200,6 @@ class VideoProcess(Process):
 
         return meta
 
-    def group_frame_by_video(self, schema):
-        """group by video"""
-        return group_frame_by_video(schema)
-
     def get_frame_indices_to_remove_for_one_video(
         self, meta, frames, num_frames_to_be_deleted
     ):
@@ -245,6 +243,7 @@ class VideoProcess(Process):
             """
             tmp_grouped_frames_details = self.adaptiver.get_images_token_num(
                 [i for i in meta["image_info"] if i["image_type"] == "video"],
+                self.sample_grouped_info,
                 min_pixels=tmp_video_min_pixels,
                 max_pixels=tmp_video_max_pixels,
                 return_detail=True,
@@ -525,30 +524,32 @@ class VideoProcess(Process):
         for idx in range(len(new_image_info)):
             new_image_info[idx]["is_padded_image"] = False
 
-        grouped_frames = self.group_frame_by_video(new_image_info)
+        grouped_frames = self.sample_grouped_info
 
         index_offset = 0
         for frames in grouped_frames:
-            if len(frames) % self.temporal_conv_size != 0:
+            len_frames = len(frames)
+            if len_frames % self.temporal_conv_size != 0:
                 roundup = (
-                    math.ceil(len(frames) / self.temporal_conv_size)
+                    math.ceil(len_frames / self.temporal_conv_size)
                     * self.temporal_conv_size
                 )
-                num_padded_images = roundup - len(frames)
+                num_padded_images = roundup - len_frames
                 tmp = []
                 for _ in range(num_padded_images):
                     padded_image = copy.deepcopy(image_info[frames[-1]])
                     padded_image["is_padded_image"] = True
                     tmp.append(padded_image)
                 new_image_info = (
-                    new_image_info[: index_offset + len(frames)]
+                    new_image_info[: index_offset + len_frames]
                     + tmp
-                    + new_image_info[index_offset + len(frames) :]
+                    + new_image_info[index_offset + len_frames :]
                 )
                 index_offset += len(tmp)
 
-            index_offset += len(frames)
+            index_offset += len_frames
 
+        self.sample_grouped_info = group_frame_by_video(new_image_info)
         return new_image_info, num_padded_images
 
     def video_pad(self, meta):
@@ -580,7 +581,7 @@ class VideoProcess(Process):
         appended_text_index = -1
 
         for idx, image in enumerate(images):
-            images_sliding_window.append(copy.deepcopy(image))
+            images_sliding_window.append(image)
             if len(images_sliding_window) >= conv_size:
                 match_indices = sorted(
                     [i["matched_text_index"] for i in images_sliding_window]

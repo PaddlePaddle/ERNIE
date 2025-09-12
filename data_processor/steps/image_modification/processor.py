@@ -551,12 +551,7 @@ class ImageModificationProcessor(ProcessorBase):
                 raise e
             if self.variable_resolution:
                 images = np.zeros(
-                    [
-                        4,
-                        3
-                        * (self.image_preprocess.patch_size**2)
-                        * self.image_preprocess.temporal_conv_size,
-                    ],
+                    [4, 3 * (self.image_preprocess.patch_size**2)],
                     dtype=self.image_dtype,
                 )
                 grid_thw = np.array([[1, 2, 2]])

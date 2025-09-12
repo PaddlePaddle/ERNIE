@@ -36,7 +36,7 @@ from data_processor.utils.relief import (
     omini_convert_schema_to_sequence,
     omini_convert_sequence_to_schema,
 )
-from data_processor.utils.video_utils import VideoReaderWrapper
+from decord import VideoReader, cpu
 
 
 class CoarseProcessor(ProcessorBase):
@@ -146,7 +146,7 @@ class CoarseProcessor(ProcessorBase):
             )
             video_frame_args = self.set_video_frame_args(video_frame_args, video_meta)
 
-            ret, frame_indices, time_stamps = read_frames_decord(
+            ret, time_stamps = read_frames_decord(
                 video_path,
                 video_reader,
                 video_meta,
@@ -232,12 +232,12 @@ class CoarseProcessor(ProcessorBase):
 def read_video_decord(video_path, save_to_disk):
     """get reader and meta by decord"""
     video_path = get_downloadable(video_path, save_to_disk=save_to_disk)
-    if isinstance(video_path, VideoReaderWrapper):
+    if isinstance(video_path, VideoReader):
         video_reader = video_path
     else:
         if isinstance(video_path, bytes):
             video_path = io.BytesIO(video_path)
-        video_reader = VideoReaderWrapper(video_path, num_threads=1)
+        video_reader = VideoReader(video_path, ctx=cpu(0), num_threads=1)
     vlen = len(video_reader)
     fps = video_reader.get_avg_fps()
     duration = vlen / float(fps)
@@ -349,57 +349,12 @@ def read_frames_decord(
         )
 
     frames = []
-    for frame_indice_index in range(0, len(frame_indices)):
-        frame_indice = frame_indices[frame_indice_index]
-        try:
-            frames.append(video_reader[frame_indice].asnumpy())  # (T, H, W, C)
-        except Exception as e:
-            logger.debug(f"encounter error when get frame: {frame_indice}, error: {e}")
-            previous_counter = 1
-            later_counter = 1
-            previous_after_flag = True
-            if frame_indice == 0 or frame_indice == len(video_reader) - 1:
-                cur_tol = tol * 2
-            else:
-                cur_tol = tol
-            while previous_counter < cur_tol or later_counter < cur_tol:
-                if previous_after_flag:
-                    if frame_indice - previous_counter < 0:
-                        previous_counter += 1
-                        previous_after_flag = not previous_after_flag
-                        continue
-                    try:
-                        frames.append(
-                            video_reader[frame_indice - previous_counter].asnumpy()
-                        )
-                        logger.info(
-                            f"replace {frame_indice}-th frame with {frame_indice-previous_counter}-th frame"
-                        )
-                        frame_indices[frame_indice_index] = (
-                            frame_indice - previous_counter
-                        )
-                        break
-                    except Exception as e:
-                        previous_counter += 1
-                else:
-                    if frame_indice + later_counter >= len(video_reader):
-                        later_counter += 1
-                        previous_after_flag = not previous_after_flag
-                        continue
-                    try:
-                        frames.append(
-                            video_reader[frame_indice + later_counter].asnumpy()
-                        )
-                        logger.info(
-                            f"replace {frame_indice}-th frame with {frame_indice+later_counter}-th frame"
-                        )
-                        frame_indices[frame_indice_index] = frame_indice + later_counter
-                        break
-                    except Exception:
-                        later_counter += 1
-                previous_after_flag = not previous_after_flag
+    try:
+        frames = video_reader.get_batch(frame_indices).asnumpy()
+        video_reader.seek(0)
+    except Exception as _:
+        logger.info(f"get {frame_indices} frames error in {video_path}")
 
-    frames = np.stack(frames, axis=0)
     assert len(frames) == len(
         frame_indices
     ), f"len(frames): {len(frames)} != len(frame_indices): {len(frame_indices)}"
@@ -422,4 +377,5 @@ def read_frames_decord(
         for frame_idx in frame_indices
     ]
 
-    return ret, frame_indices, time_stamps
+    del frame_indices
+    return ret, time_stamps

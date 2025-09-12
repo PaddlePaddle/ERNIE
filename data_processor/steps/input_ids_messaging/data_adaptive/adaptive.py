@@ -22,7 +22,6 @@ import numpy as np
 
 from data_processor.steps.input_ids_messaging.data_utils import get_text_token_num
 from data_processor.utils.logger_utils import logger
-from data_processor.utils.video_utils import group_frame_by_video
 
 
 class Adaptive:
@@ -145,14 +144,14 @@ class Adaptive:
                 f"encounter unsupported image_type: {img_one['image_type']}"
             )
 
-    def process(self, sample: dict):
+    def process(self, sample: dict, sample_grouped_info):
         """
         adaptiver
         """
         image_info = sample["image_info"]
         text_info = sample["text_info"]
         offset = 0
-        grouped_frames = group_frame_by_video(image_info)
+        grouped_frames = sample_grouped_info
 
         for frames in grouped_frames:
             if image_info[frames[0]]["image_type"] == "video":
@@ -225,13 +224,18 @@ class Adaptive:
         return sample
 
     def get_images_token_num(
-        self, image_info, min_pixels=None, max_pixels=None, return_detail=False
+        self,
+        image_info,
+        sample_grouped_info,
+        min_pixels=None,
+        max_pixels=None,
+        return_detail=False,
     ):
         """
         return the number of vision placeholder given the image_info
         """
         ret = []
-        grouped_frames = group_frame_by_video(image_info)
+        grouped_frames = sample_grouped_info
         for frames in grouped_frames:
             if image_info[frames[0]]["image_type"] == "video":
                 assert (
