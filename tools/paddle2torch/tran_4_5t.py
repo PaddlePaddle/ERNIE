@@ -26,7 +26,12 @@ import torch
 from safetensors.numpy import load_file
 from safetensors.torch import save_file
 
-NEED_TRANSPOSE_KEYS = {"down_proj.weight", "o_proj.weight", "gate.weight"}
+NEED_TRANSPOSE_KEYS = {
+    "down_proj.weight",
+    "o_proj.weight",
+    "gate.weight",
+    "mtp_linear_proj",
+}
 KEEP_FP32_KEYS = ("gate.weight", "moe_statics.e_score_correction_bias")
 
 
@@ -42,7 +47,9 @@ def check_if_transpose_needed(key: str) -> bool:
     return any(x in key for x in NEED_TRANSPOSE_KEYS)
 
 
-def convert_numpy_to_tensor(numpy_arr: np.ndarray, needs_transpose: bool) -> torch.Tensor:
+def convert_numpy_to_tensor(
+    numpy_arr: np.ndarray, needs_transpose: bool
+) -> torch.Tensor:
     """Convert PaddlePaddle tensor to PyTorch tensor with optional transpose.
 
     Args:
@@ -100,7 +107,9 @@ def process_qkv_proj(
         please check config.json"
 
     # split
-    q_proj, k_proj, v_proj = np.split(tensor, [hidden_size, hidden_size + kv_hidden_size], axis=-1)
+    q_proj, k_proj, v_proj = np.split(
+        tensor, [hidden_size, hidden_size + kv_hidden_size], axis=-1
+    )
 
     # Transpose into PyTorch format
     q_proj = convert_numpy_to_tensor(q_proj, needs_transpose=True)
@@ -168,12 +177,16 @@ def process_up_gate_proj(
     up_proj = convert_numpy_to_tensor(up_proj, True)
     gate_proj = convert_numpy_to_tensor(gate_proj, True)
 
-    up_dest_key = dest_key.replace("up_gate_proj", "up_proj")  # 若 dest_key 包含 "up_gate_proj"
+    up_dest_key = dest_key.replace(
+        "up_gate_proj", "up_proj"
+    )  # 若 dest_key 包含 "up_gate_proj"
     gate_dest_key = dest_key.replace("up_gate_proj", "gate_proj")
 
     processed_tensors.update({up_dest_key: up_proj, gate_dest_key: gate_proj})
 
-    processed_safetensors_index.update({up_dest_key: file_name, gate_dest_key: file_name})
+    processed_safetensors_index.update(
+        {up_dest_key: file_name, gate_dest_key: file_name}
+    )
 
 
 def update_config_files(args, dest_dir):
@@ -182,7 +195,7 @@ def update_config_files(args, dest_dir):
     use_moe = args.use_moe
     config_file_path = os.path.join(dest_dir, "config.json")
 
-    with open(config_file_path, 'r') as f:
+    with open(config_file_path, "r") as f:
         config_dict = json.load(f)
 
     pop_keys = [
@@ -211,20 +224,9 @@ def update_config_files(args, dest_dir):
 
     new_keys = {
         "model_type": "ernie4_5_moe" if use_moe else "ernie4_5",
-        "architectures": ["Ernie4_5_MoeForCausalLM"] if use_moe else ["Ernie4_5_ForCausalLM"],
-        "auto_map": {
-            "AutoConfig": (
-                "configuration_ernie4_5_moe.Ernie4_5_MoeConfig"
-                if use_moe
-                else "configuration_ernie4_5.Ernie4_5_Config"
-            ),
-            "AutoModel": "modeling_ernie4_5_moe.Ernie4_5_Model" if use_moe else "modeling_ernie4_5.Ernie4_5_Model",
-            "AutoModelForCausalLM": (
-                "modeling_ernie4_5_moe.Ernie4_5_MoeForCausalLM"
-                if use_moe
-                else "modeling_ernie4_5.Ernie4_5_ForCausalLM"
-            ),
-        },
+        "architectures": (
+            ["Ernie4_5_MoeForCausalLM"] if use_moe else ["Ernie4_5_ForCausalLM"]
+        ),
         "_attn_implementation": "eager",
         "use_cache": True,
     }
@@ -241,7 +243,7 @@ def update_config_files(args, dest_dir):
     config_dict.update(new_keys)
     config_dict = dict(sorted(config_dict.items()))
 
-    with open(config_file_path, 'w') as f:
+    with open(config_file_path, "w") as f:
         json.dump(config_dict, f, indent=4)
 
 
@@ -250,22 +252,21 @@ def update_tokenizer_config_files(dest_dir):
 
     config_file_path = os.path.join(dest_dir, "tokenizer_config.json")
 
-    with open(config_file_path, 'r') as f:
+    with open(config_file_path, "r") as f:
         config_dict = json.load(f)
 
     new_keys = {
-        "tokenizer_class": "Ernie4_5_Tokenizer",
-        "auto_map": {
-            "AutoTokenizer": ["tokenization_ernie4_5.Ernie4_5_Tokenizer", "tokenization_ernie4_5.Ernie4_5_Tokenizer"]
-        },
+        "tokenizer_class": "LlamaTokenizer",
     }
 
     config_dict.update(new_keys)
-    with open(config_file_path, 'w') as f:
+    with open(config_file_path, "w") as f:
         json.dump(config_dict, f, indent=4)
 
 
-def process_params_file(args, src_file_path: str, dest_file_path: str, src_prefix: str, dst_prefix: str) -> None:
+def process_params_file(
+    args, src_file_path: str, dest_file_path: str, src_prefix: str, dst_prefix: str
+) -> None:
     """Process a single safetensors file, converting PyTorch tensors to PaddlePaddle format.
 
     Args:
@@ -288,15 +289,17 @@ def process_params_file(args, src_file_path: str, dest_file_path: str, src_prefi
 
     # load configuration file
     config_file_path = os.path.join(args.src_dir, "config.json")
-    assert os.path.exists(config_file_path), f"Config file not found: {config_file_path}"
-    with open(config_file_path, 'r') as f:
+    assert os.path.exists(
+        config_file_path
+    ), f"Config file not found: {config_file_path}"
+    with open(config_file_path, "r") as f:
         config_dict = json.load(f)
 
-    num_attention_heads = config_dict.get('num_attention_heads', 64)
-    num_key_value_heads = config_dict.get('num_key_value_heads', 8)
-    tie_word_embeddings = config_dict.get('tie_word_embeddings', False)
-    hidden_size = config_dict.get('hidden_size', 8192)
-    head_dim = config_dict.get('head_dim', hidden_size // num_attention_heads)
+    num_attention_heads = config_dict.get("num_attention_heads", 64)
+    num_key_value_heads = config_dict.get("num_key_value_heads", 8)
+    tie_word_embeddings = config_dict.get("tie_word_embeddings", False)
+    hidden_size = config_dict.get("hidden_size", 8192)
+    head_dim = config_dict.get("head_dim", hidden_size // num_attention_heads)
 
     for key, tensor in pd_tensors.items():
         # skip keys
@@ -310,7 +313,7 @@ def process_params_file(args, src_file_path: str, dest_file_path: str, src_prefi
         weight_size = np.prod(tensor.shape) * tensor.dtype.itemsize
         new_total_size += weight_size
 
-        if 'qkv_proj' in key:
+        if "qkv_proj" in key:
             # split qkv_proj to q_proj, k_proj and v_proj
             process_qkv_proj(
                 dest_key,
@@ -324,13 +327,21 @@ def process_params_file(args, src_file_path: str, dest_file_path: str, src_prefi
             )
         elif "up_gate_proj" in key:
             # split up_gate_proj to up_proj and gate_proj
-            process_up_gate_proj(dest_key, tensor, processed_tensors, processed_safentensors_index, file_name)
+            process_up_gate_proj(
+                dest_key,
+                tensor,
+                processed_tensors,
+                processed_safentensors_index,
+                file_name,
+            )
         else:
             if "lm_head.weight" in key:
                 needs_transpose = not tie_word_embeddings
             else:
                 needs_transpose = check_if_transpose_needed(key)
-            print(f"Processing key: {key}, shape: {tensor.shape}, transpose: {needs_transpose}")
+            print(
+                f"Processing key: {key}, shape: {tensor.shape}, transpose: {needs_transpose}"
+            )
 
             torch_tensor = convert_numpy_to_tensor(tensor, needs_transpose)
             processed_tensors[dest_key] = torch_tensor
@@ -338,7 +349,9 @@ def process_params_file(args, src_file_path: str, dest_file_path: str, src_prefi
             # force keep fp32
             if any(s in key for s in KEEP_FP32_KEYS):
                 if processed_tensors[dest_key].dtype != torch.float32:
-                    print(f"Tensor {dest_key} should be float32, force set it to float32!")
+                    print(
+                        f"Tensor {dest_key} should be float32, force set it to float32!"
+                    )
                     processed_tensors[dest_key] = torch_tensor.float()
 
             print(
@@ -355,7 +368,12 @@ def process_params_file(args, src_file_path: str, dest_file_path: str, src_prefi
 
 
 def process_model_directory(
-    args, src_dir: str, dest_dir: str, src_prefix: str, dst_prefix: str, skip_config_update: bool = False
+    args,
+    src_dir: str,
+    dest_dir: str,
+    src_prefix: str,
+    dst_prefix: str,
+    skip_config_update: bool = False,
 ) -> None:
     """Process the entire model directory.
 
@@ -409,18 +427,20 @@ def process_model_directory(
                 print(f"File already exists: {dest_path}. Skip conversion.")
                 continue
             print(f"Processing params file: {file_name}")
-            processed_index, cur_size = process_params_file(args, src_path, dest_path, src_prefix, dst_prefix)
+            processed_index, cur_size = process_params_file(
+                args, src_path, dest_path, src_prefix, dst_prefix
+            )
             new_total_size += cur_size.item()
 
             if use_index_file:
-                dst_index['weight_map'].update(processed_index)
+                dst_index["weight_map"].update(processed_index)
         else:
             print(f"Copying non-tensor file: {file_name}")
             shutil.copy(src_path, dest_path)
 
         # Save updated index file
         if use_index_file:
-            dst_index['metadata']['total_size'] = new_total_size
+            dst_index["metadata"]["total_size"] = new_total_size
             with open(os.path.join(dest_dir, "model.safetensors.index.json"), "w") as f:
                 json.dump(dst_index, f, indent=4)
 
@@ -438,7 +458,9 @@ def parse_arguments() -> argparse.Namespace:
     Returns:
         argparse.Namespace: Parsed arguments
     """
-    parser = argparse.ArgumentParser(description="Convert Paddle safetensors model to PyTorch format.")
+    parser = argparse.ArgumentParser(
+        description="Convert Paddle safetensors model to PyTorch format."
+    )
 
     parser.add_argument(
         "--src_dir",
@@ -460,13 +482,23 @@ def parse_arguments() -> argparse.Namespace:
         help="Enable Mixture of Experts (MoE) in the source model",
     )
 
-    parser.add_argument("--src_prefix", type=str, default="ernie.", help="Source key prefix to replace")
+    parser.add_argument(
+        "--src_prefix", type=str, default="ernie.", help="Source key prefix to replace"
+    )
 
-    parser.add_argument("--dst_prefix", type=str, default="model.", help="Destination key prefix")
+    parser.add_argument(
+        "--dst_prefix", type=str, default="model.", help="Destination key prefix"
+    )
 
-    parser.add_argument("--overwrite", action="store_true", help="Overwrite destination directory if it exists")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite destination directory if it exists",
+    )
 
-    parser.add_argument("--skip_config_update", action="store_true", help="Skip updating config files")
+    parser.add_argument(
+        "--skip_config_update", action="store_true", help="Skip updating config files"
+    )
 
     return parser.parse_args()
 

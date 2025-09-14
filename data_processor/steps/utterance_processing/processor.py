@@ -50,9 +50,6 @@ class UtteranceProcessor(ProcessorBase):
         """
         super().__init__(args)
         self.tokenizer = tokenizer
-        self.eos_token = None
-        self.cls_token = None
-        self.sep_token = None
         self.image_start_token = self.tokenizer.special_tokens_map.get(
             "image_start_id", "<|IMAGE_START|>"
         )

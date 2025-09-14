@@ -72,7 +72,7 @@ class CoarseProcessor(ProcessorBase):
             ):
                 raise ValueError("target_frames must be smaller than max_frames")
         else:
-            if video_frame_args["fps"] < 0:
+            if video_frame_args["fps"] <= 0:
                 raise ValueError(
                     "Must provide either positive target_fps or positive target_frames."
                 )

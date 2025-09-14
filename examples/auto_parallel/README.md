@@ -12,7 +12,7 @@ This repository provide a demo dataset on the path `examples/pre-training/demo_d
 please reference this document [Pretrain dataset](https://paddlenlp.readthedocs.io/en/latest/llm/dataset.html).
 
 ## Docker Image Preparation
-The CUDA driver on your machine should be ‌≥525.60.13, and the CUDA toolkit 12.9 image is needed. You can use `ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.1.0-gpu-cuda12.9-cudnn9.9` for training. And `mpi` environment should be deployed on the cluster.
+The CUDA driver on your machine should be ‌≥525.60.13, and the CUDA toolkit 12.9 image is needed. You can use `ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.2.0-gpu-cuda12.9-cudnn9.9` for training. And `mpi` environment should be deployed on the cluster.
 
 ## Runtime Environment Preparation
 `mpirun python -m pip install -r requirements.txt --force-reinstall`

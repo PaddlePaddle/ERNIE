@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """utterance processing"""
-from data_processor.steps.utterance_processing.args import UtteranceProcessorArguments
 from data_processor.steps.utterance_processing.processor import UtteranceProcessor
 
-__all__ = ["UtteranceProcessor", "UtteranceProcessorArguments"]
+__all__ = ["UtteranceProcessor"]

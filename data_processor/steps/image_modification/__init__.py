@@ -14,12 +14,6 @@
 
 # erniebot commit_id: 3c860653f7528110ba8f2e6f598a63261f327092
 """image_modification"""
-from data_processor.steps.image_modification.args import (
-    ImageModificationProcessorArguments,
-)
 from data_processor.steps.image_modification.processor import ImageModificationProcessor
 
-__all__ = [
-    "ImageModificationProcessor",
-    "ImageModificationProcessorArguments",
-]
+__all__ = ["ImageModificationProcessor"]
