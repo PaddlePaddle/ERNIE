@@ -5,6 +5,20 @@
 
 ## News
 
+## 📣 Recent updates
+
+**[2025-09] 🔥 Released ERNIEKit v1.2:**
+
+- **New Features**
+    - WebUI: Added support for training and conversation functionalities with ERNIE 28b/424b VL models.
+    - VL Model Training: Introduced support for query-response format in training data.
+    - Command-Line Tool: Added iluvatar GPU hardware support.
+
+- **Bug Fixes:**
+    - [AutoParallel] Fix use_intermediate_api pp+recompute+moe bug (#1250)
+    - [AutoParallel] Fix save checkpoint bug (#1242)
+    - [VL Model Training] Fix lora 128k training bug (#1234)
+
 **[2025-09] 🔥 Released ERNIEKit v1.1:** ERNIEKit now supports SFT/LoRA for ERNIE-4.5-VL series.
 
 **[2025-06] 🔥 Released ERNIEKit v1.0:** We're excited to announce ERNIEKit v1.0, the most powerful and efficient toolkit yet for developing with the latest ERNIE models!
