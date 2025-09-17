@@ -16,6 +16,7 @@
 
 import gc
 import importlib.util
+import json
 import math
 import os
 import time
@@ -33,6 +34,11 @@ if importlib.util.find_spec("triton") is not None:
         )
 
 import paddle
+from paddleformers.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+)
 from paddleformers.trainer import (
     IntervalStrategy,
     RuntimeTimer,
@@ -203,14 +209,33 @@ def run_sft(
 
     logger.info("Start to load model ...")
 
+    config_path = os.path.join(model_args.model_name_or_path, "config.json")
+    if not os.path.exists(config_path):
+        raise ValueError(
+            f"Config path {config_path} doesn't exist. Please make sure you have downloaded the correct model."
+        )
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_dict = json.load(f)
+
+    if "torch_dtype" in config_dict:
+        finetuning_args.use_huggingface_model = True
+        finetuning_args.convert_from_hf = True
+        finetuning_args.save_to_hf = True
+        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
+        logger.info("loading model from HuggingFace")
+
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
         download_hub=model_args.download_hub,
     )
-
-    model_class = Ernie4_5_MoeForCausalLM
-    if finetuning_args.pipeline_parallel_degree > 1:
-        model_class = Ernie4_5_MoeForCausalLMPipe
+    if finetuning_args.use_huggingface_model:
+        model_class = AutoModelForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = AutoModelForCausalLMPipe
+    else:
+        model_class = Ernie4_5_MoeForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = Ernie4_5_MoeForCausalLMPipe
     if (
         model_args.moe_group.lower() in {"data", "dp"}
         and finetuning_args.data_parallel_degree > 1
@@ -292,15 +317,37 @@ def run_sft(
             "convert_from_hf"
             if paddleformers_version >= "0.3"
             else "convert_from_torch"
-        ): False
+        ): finetuning_args.convert_from_hf
+        and finetuning_args.use_huggingface_model
     }
-    model_config = Ernie4_5_MoeConfig.from_pretrained(
-        model_args.model_name_or_path,
-        dtype=dtype,
-        quantization_config=quantization_config,
-        **convert_from_kwargs,
-        **download_source_kwargs,
-    )
+    if finetuning_args.use_huggingface_model:
+        if (
+            model_args.use_attn_mask_startend_row_indices
+            and model_args.use_sparse_flash_attn
+        ):
+            _attn_implementation = "flashmask"
+        else:
+            _attn_implementation = "sdpa"
+        model_config = AutoConfig.from_pretrained(
+            model_args.model_name_or_path,
+            _attn_implementation=_attn_implementation,
+            dtype=dtype,
+            quantization_config=quantization_config,
+            use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
+            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
+            loss_subbatch_sequence_length=32768,
+            num_nextn_predict_layers=model_args.num_nextn_predict_layers,
+            **convert_from_kwargs,
+            **download_source_kwargs,
+        )
+    else:
+        model_config = Ernie4_5_MoeConfig.from_pretrained(
+            model_args.model_name_or_path,
+            dtype=dtype,
+            quantization_config=quantization_config,
+            **convert_from_kwargs,
+            **download_source_kwargs,
+        )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = finetuning_args.tensor_parallel_rank
     model_config.recompute = finetuning_args.recompute
@@ -345,7 +392,10 @@ def run_sft(
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
-    if model_config.moe_num_experts is None or model_config.moe_num_experts == 0:
+    if (
+        model_config.get("moe_num_experts", None) is None
+        or model_config.get("moe_num_experts", 0) == 0
+    ):
         model_config.moe_group = (
             "dummy" if model_args.moe_group == "mp" else model_args.moe_group
         )
@@ -358,6 +408,15 @@ def run_sft(
         raise NotImplementedError(
             "Quantization is not supported for models with tied lm_head and word_embedding \
             weights when using Pipeline Parallelism (PP)."
+        )
+
+    # (NOTE): ERNIEKit currently only support finetuning ernie4_5 and ernie4_5_moe models from huggingface
+    if finetuning_args.use_huggingface_model and model_config.model_type not in (
+        "ernie4_5",
+        "ernie4_5_moe",
+    ):
+        raise ValueError(
+            f"Currently, only support ernie4_5 and ernie4_5_moe for HuggingFace model, but got {model_config.model_type}."
         )
 
     if model_args.continue_training or finetuning_args.weight_quantize_algo is not None:
@@ -555,6 +614,7 @@ def run_sft(
         if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
     ]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
+    print(trainer.args)
 
     if (
         finetuning_args.hidden_dropout_prob
