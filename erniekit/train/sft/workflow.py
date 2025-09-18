@@ -320,34 +320,15 @@ def run_sft(
         ): finetuning_args.convert_from_hf
         and finetuning_args.use_huggingface_model
     }
-    if finetuning_args.use_huggingface_model:
-        if (
-            model_args.use_attn_mask_startend_row_indices
-            and model_args.use_sparse_flash_attn
-        ):
-            _attn_implementation = "flashmask"
-        else:
-            _attn_implementation = "sdpa"
-        model_config = AutoConfig.from_pretrained(
-            model_args.model_name_or_path,
-            _attn_implementation=_attn_implementation,
-            dtype=dtype,
-            quantization_config=quantization_config,
-            use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
-            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
-            loss_subbatch_sequence_length=32768,
-            num_nextn_predict_layers=model_args.num_nextn_predict_layers,
-            **convert_from_kwargs,
-            **download_source_kwargs,
-        )
-    else:
-        model_config = Ernie4_5_MoeConfig.from_pretrained(
-            model_args.model_name_or_path,
-            dtype=dtype,
-            quantization_config=quantization_config,
-            **convert_from_kwargs,
-            **download_source_kwargs,
-        )
+    if paddleformers_version >= "0.3":
+        finetuning_args.save_to_hf = False
+    model_config = Ernie4_5_MoeConfig.from_pretrained(
+        model_args.model_name_or_path,
+        dtype=dtype,
+        quantization_config=quantization_config,
+        **convert_from_kwargs,
+        **download_source_kwargs,
+    )
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = finetuning_args.tensor_parallel_rank
     model_config.recompute = finetuning_args.recompute

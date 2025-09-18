@@ -61,7 +61,6 @@ class CoarseProcessorArguments(BasePreprocessArguments):
     video_frames_sample: str = field(
         default="middle", metadata={"help": " middle, rand, leading"}
     )
-    video_use_asr: bool = field(default=False, metadata={"help": "whether to use asr"})
 
     def __post_init__(self):
         self.video_frames_sample = self.video_frames_sample.lower()

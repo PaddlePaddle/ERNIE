@@ -334,7 +334,8 @@ def run_dpo(
         ): finetuning_args.convert_from_hf
         and finetuning_args.use_huggingface_model
     }
-
+    if paddleformers_version >= "0.3":
+        finetuning_args.save_to_hf = False
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": model_args.moe_use_aux_free})
 

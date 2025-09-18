@@ -57,30 +57,6 @@ def image_to_json_serializable(image):
     return output
 
 
-def add_prompt(sample: dict, use_prompt: bool, prompt: str, data_type: str):
-    """
-    All images come before the text, prompt:
-    <imgs, text> -> <imgs, prompt, text>
-    For interleaved image-text data, prompt:
-    <imgs, texts, imgs, texts> -> <prompt, imgs, texts, imgs, texts>
-
-    Args:
-        sample (dict): one sample
-        use_prompt (bool): use prompt or not
-        prompt (str): prompt text
-        data_type (str): data type
-
-    Returns:
-        dict: sample with prompt
-    """
-    if use_prompt and len(prompt) > 0:
-        sample["text_info"].insert(0, {"text": prompt, "tag": "mask"})
-        if not all(one["matched_text_index"] == 0 for one in sample["image_info"]):
-            for image_info in sample["image_info"]:
-                image_info["matched_text_index"] += 1
-    return sample
-
-
 def merge_list(lists):
     """merge multi list to one list
 
