@@ -16,7 +16,6 @@
 
 import contextlib
 import json
-import os
 import re
 from collections import defaultdict
 from copy import deepcopy
@@ -42,7 +41,6 @@ from .dfnrope.modeling import (
     DFNRopeVisionTransformerPretrainedModel,
 )
 from .distributed import RowSequenceParallelLinear, parallel_matmul
-from paddle.distributed.fleet import get_hybrid_communicate_group as get_hcg
 from .longcontext_ops import TensorBalanceByTokenType
 from .modeling import Ernie4_5_LMHead, RMSNorm
 from .modeling import ErniePretrainingCriterion as ErniePretrainingCriterionBase
