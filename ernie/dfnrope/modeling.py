@@ -14,14 +14,22 @@
 
 
 import numpy as np
+import math
+import contextlib
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn.functional.flash_attention import flashmask_attention
+from paddle.distributed import fleet
 from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.utils.log import logger
+
+from ..sequence_parallel_utils import (
+    SliceVarlenOp,
+    AllGatherVarlenOpV2,
+)
 
 from ..distributed import get_hcg
 from .activation import ACT2FN
@@ -375,6 +383,10 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
             embed_dim=config.embed_dim,
         )
 
+        self.attn_sep = (
+            getattr(config, "attn_sep", False) and config.tensor_parallel_degree > 1
+        )
+
         head_dim = config.embed_dim // config.num_heads
         self.rotary_pos_emb = VisionRotaryEmbedding(head_dim // 2)
 
@@ -508,18 +520,62 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
         ret = self.ln(hidden_states)  # add norm
         return ret
 
-    def extract_feature(
-        self, hidden_states: paddle.Tensor, grid_thw: paddle.Tensor
-    ) -> paddle.Tensor:
-        """
-        Args:
-            hidden_states (paddle.Tensor): input tensor
-            grid_thw (paddle.Tensor): grid thw of input
+    def extract_feature(self, images, grid_thw):
+        """extract feature"""
+        if self.config.tensor_parallel_degree <= 1:
+            return self._extract_feature(images, grid_thw)
+        else:
+            grid_thw = grid_thw.clone()
+            # logger.info("use sp extract feature")
+            images_indices = []
+            hcg = fleet.get_hybrid_communicate_group()
+            group = hcg.get_model_parallel_group()
+            parallelism = group.nranks
+            image_size_per_rank = paddle.zeros([parallelism], dtype="int64")
+            images_indices = image_size_per_rank
 
-        Returns:
-            paddle.Tensor: output tensor
-        """
-        return self.forward(hidden_states, grid_thw)
+            num_pad = 0
+            if self.attn_sep:
+                seqlen = images.shape[0]
+                num_pad = math.ceil(seqlen / parallelism) * parallelism - seqlen
+                images = paddle.nn.functional.pad(images, [0, num_pad, 0, 0], value=0)
+                images_indices = [
+                    images.shape[0] // parallelism for _ in range(parallelism)
+                ]
+                images = SliceVarlenOp.apply(images, images_indices)
+            else:
+                images = SliceVarlenOp.apply(images, images_indices)
+                images = images.detach()
+
+            if len(images):
+                image_features = self._extract_feature(
+                    images, grid_thw, num_pad=num_pad
+                )
+            else:
+                image_features = paddle.empty(
+                    [0, self.config.hidden_size],
+                    dtype=self.patch_embed.proj.weight.dtype,
+                )
+                image_features.stop_gradient = (
+                    self.patch_embed.proj.weight.stop_gradient
+                )
+
+            image_features = AllGatherVarlenOpV2.apply(image_features, images_indices)
+            if self.attn_sep:
+                image_features = image_features[:seqlen, :]
+
+            return image_features
+
+    def _extract_feature(self, images, grid_thw, num_pad=0):
+        """extract feature"""
+        ctx = (
+            paddle.no_grad
+            if getattr(self.config, "freeze_vision", False)
+            else contextlib.nullcontext
+        )
+        with ctx():
+            image_features = self.forward(images, grid_thw, num_pad)
+        return image_features
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):

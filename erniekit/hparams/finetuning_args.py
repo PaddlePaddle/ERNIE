@@ -185,6 +185,10 @@ class PreTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "whether to disable pipeline warmup"},
     )
+    packing: bool = field(
+        default=True,
+        metadata={"help": "whether to use data packing strategy."},
+    )
     global_logging_interval: int = field(
         default=1,
         metadata={"help": "the logging interval of global_training_logs"},

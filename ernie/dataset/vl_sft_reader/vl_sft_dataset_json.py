@@ -383,7 +383,26 @@ class ExampleSet:
 
         idx, cur = 0, 0
         for meta in self.exs:
-            if cur % self.args.pp_need_data_degree == self.args.pipeline_parallel_rank:
+            if self.args.pp_need_data_degree > 0:
+                if (
+                    cur % self.args.pp_need_data_degree
+                    == self.args.pipeline_parallel_rank
+                ):
+                    ret = Example(
+                        meta=meta,
+                        src=self.src,
+                        task="lm",
+                        prompt=None,
+                        labels=None,
+                    )
+
+                    ret = self.process_fn(ret)
+                    ret.update(data_id=idx, example_id=idx)
+                    idx += 1
+
+                    yield ret
+                cur += 1
+            else:
                 ret = Example(
                     meta=meta,
                     src=self.src,
@@ -392,16 +411,12 @@ class ExampleSet:
                     labels=None,
                 )
 
-                # (LiuTing) todo: can be optimized in pp data shard strategy.
-                # import os
-                # print(f"Ting: worker shard iter. PID: {os.getpid()}")
-                # print(f"Ting: worker shard iter. cur: {cur}, ret: {ret}")
                 ret = self.process_fn(ret)
                 ret.update(data_id=idx, example_id=idx)
                 idx += 1
 
                 yield ret
-            cur += 1
+                cur += 1
 
 
 class SFTMultimodalDatasetJson(IterableDataset):

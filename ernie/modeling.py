@@ -845,13 +845,8 @@ class Ernie4_5_Attention(nn.Layer):
                 token_type_ids = token_type_ids.reshape([-1])
                 token_type_ids = ScatterOp.apply(token_type_ids)
                 token_type_ids.stop_gradient = True
-            max_sequence_length = self.config.max_sequence_length
-            bsz = (
-                hidden_states.shape[0]
-                * self.config.tensor_parallel_degree
-                // max_sequence_length
-            )
-            q_len = max_sequence_length
+            bsz = 1
+            q_len = hidden_states.shape[0] * self.config.tensor_parallel_degree
         else:
             bsz, q_len, _ = hidden_states.shape
         query_states = key_states = value_states = mix_layer = None

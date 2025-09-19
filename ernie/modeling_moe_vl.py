@@ -16,6 +16,7 @@
 
 import contextlib
 import json
+import os
 import re
 from collections import defaultdict
 from copy import deepcopy
@@ -41,6 +42,7 @@ from .dfnrope.modeling import (
     DFNRopeVisionTransformerPretrainedModel,
 )
 from .distributed import RowSequenceParallelLinear, parallel_matmul
+from paddle.distributed.fleet import get_hybrid_communicate_group as get_hcg
 from .longcontext_ops import TensorBalanceByTokenType
 from .modeling import Ernie4_5_LMHead, RMSNorm
 from .modeling import ErniePretrainingCriterion as ErniePretrainingCriterionBase
@@ -535,6 +537,11 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
         self.im_patch_id = config.im_patch_id
         self.max_text_id = config.max_text_id
         self.use_one_head = config.mm_vocab_size == 0
+        from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
+
+        self.tokenizer = Ernie4_5_VLTokenizer.from_pretrained(
+            "baidu/paddle_internal/ernie-4_5-vl-28b-a3b-bf16-paddle/",
+        )
 
     def forward(
         self,
@@ -562,6 +569,26 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             loss: text-only CE loss
             loss_sum. text-only CE loss_sum
         """
+        hcg = get_hcg()
+        group = hcg.get_model_parallel_group()
+        logits_text_list = []
+        dist.stream.all_gather(
+            logits_text_list, scores_text, group=group, use_calc_stream=True
+        )
+        logits_text_list = paddle.concat(logits_text_list, axis=-1)
+        max_ids = paddle.argmax(logits_text_list, axis=2)
+        result = paddle.squeeze(max_ids, axis=0)
+        s = self.tokenizer.decode(result[labels[0] > 0])
+        print("result:", s)
+        # print("logits_text:", logits_text)
+        with open(
+            "/root/paddlejob/workspace/env_run/liuting/ERNIE/logits_decode_{}.txt".format(
+                os.getpid()
+            ),
+            "a",
+        ) as f:
+            f.write("result:\n" + s + "\n\n\n")
+
         if self.config.use_recompute_loss_fn and self.config.use_fused_head_and_loss_fn:
             with paddle.no_grad():
                 if token_type_ids_shifted.unique().shape[0] > 1:
@@ -711,7 +738,7 @@ def calc_multimodal_logits(
         if config.sequence_parallel:
             last_hidden_state = GatherOp.apply(last_hidden_state)
             last_hidden_state = last_hidden_state.reshape(
-                [-1, config.max_sequence_length, last_hidden_state.shape[-1]]
+                [1, -1, last_hidden_state.shape[-1]]
             )
 
         assert last_hidden_state.shape[:2] == token_type_ids_shifted.shape, (
@@ -874,6 +901,8 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
             config=config.vision_config
         )
         self.add_vision_model(vision_model)
+
+        self.tie_weights()  # maybe weight share
 
     def add_vision_model(
         self,
@@ -1254,7 +1283,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
             ):
                 nonlocal input_ids, token_type_ids_labels, mm_input_ids, image_type_ids
                 """During the backward of this function, the stop_graident attribute of param is reset"""
-                inputs_embeds = self.ernie.embed_tokens(lm_input_ids)
+                inputs_embeds = self.ernie.embed_tokens(lm_input_ids).astype(
+                    self.embed_tokens.weight.dtype
+                )
                 token_type_ids_w_video = token_type_ids[..., :-1].clone()
                 token_type_ids[token_type_ids == TokenType.video] = TokenType.image
                 if images is not None:

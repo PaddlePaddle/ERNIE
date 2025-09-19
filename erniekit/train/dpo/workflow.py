@@ -284,6 +284,7 @@ def run_dpo(
         add_tail_layers=model_args.add_tail_layers,
         num_nextn_predict_layers=0,
         download_hub=model_args.download_hub,
+        per_device_train_batch_size=finetuning_args.per_device_train_batch_size,
     )
 
     try:
