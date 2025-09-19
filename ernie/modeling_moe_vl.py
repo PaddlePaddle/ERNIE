@@ -537,11 +537,6 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
         self.im_patch_id = config.im_patch_id
         self.max_text_id = config.max_text_id
         self.use_one_head = config.mm_vocab_size == 0
-        from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
-
-        self.tokenizer = Ernie4_5_VLTokenizer.from_pretrained(
-            "baidu/paddle_internal/ernie-4_5-vl-28b-a3b-bf16-paddle/",
-        )
 
     def forward(
         self,
@@ -569,26 +564,6 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
             loss: text-only CE loss
             loss_sum. text-only CE loss_sum
         """
-        hcg = get_hcg()
-        group = hcg.get_model_parallel_group()
-        logits_text_list = []
-        dist.stream.all_gather(
-            logits_text_list, scores_text, group=group, use_calc_stream=True
-        )
-        logits_text_list = paddle.concat(logits_text_list, axis=-1)
-        max_ids = paddle.argmax(logits_text_list, axis=2)
-        result = paddle.squeeze(max_ids, axis=0)
-        s = self.tokenizer.decode(result[labels[0] > 0])
-        print("result:", s)
-        # print("logits_text:", logits_text)
-        with open(
-            "/root/paddlejob/workspace/env_run/liuting/ERNIE/logits_decode_{}.txt".format(
-                os.getpid()
-            ),
-            "a",
-        ) as f:
-            f.write("result:\n" + s + "\n\n\n")
-
         if self.config.use_recompute_loss_fn and self.config.use_fused_head_and_loss_fn:
             with paddle.no_grad():
                 if token_type_ids_shifted.unique().shape[0] > 1:
