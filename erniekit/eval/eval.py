@@ -422,7 +422,9 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     from paddleformers.datasets.finetuning import collate_fn
 
     if data_args.dataset_type == "map":
-        from paddleformers.datasets.finetuning import create_indexed_dataset as create_dataset
+        from paddleformers.datasets.finetuning import (
+            create_indexed_dataset as create_dataset,
+        )
     else:
         from paddleformers.datasets.finetuning import create_dataset
     dataset_config.update(

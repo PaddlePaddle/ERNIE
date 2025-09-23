@@ -84,7 +84,9 @@ class DataArguments:
     )
     encode_one_turn: bool = field(
         default=False,
-        metadata={"help": "Whether encode each round independently in a multi-round dialogue."},
+        metadata={
+            "help": "Whether encode each round independently in a multi-round dialogue."
+        },
     )
     max_prompt_len: int = field(
         default=2048,
