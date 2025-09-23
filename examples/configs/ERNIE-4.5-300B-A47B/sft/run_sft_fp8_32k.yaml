@@ -7,8 +7,6 @@ eval_dataset_path: "./examples/data/sft-eval.jsonl"
 eval_dataset_prob: "1.0"
 max_seq_len: 32768
 num_samples_each_epoch: 6000000
-mix_strategy: random
-packing: true
 
 ### model
 model_name_or_path: baidu/ERNIE-4.5-300B-A47B-Paddle

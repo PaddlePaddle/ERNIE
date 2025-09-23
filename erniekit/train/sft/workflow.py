@@ -215,6 +215,7 @@ def run_sft(
         model_args.model_name_or_path,
         download_hub=model_args.download_hub,
     )
+
     if (
         model_args.moe_group.lower() in {"data", "dp"}
         and finetuning_args.data_parallel_degree > 1
@@ -364,6 +365,7 @@ def run_sft(
             **convert_from_kwargs,
             **download_source_kwargs,
         )
+
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = finetuning_args.tensor_parallel_rank
     model_config.recompute = finetuning_args.recompute
@@ -633,7 +635,6 @@ def run_sft(
         if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
     ]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
-    print(trainer.args)
 
     if (
         finetuning_args.hidden_dropout_prob
