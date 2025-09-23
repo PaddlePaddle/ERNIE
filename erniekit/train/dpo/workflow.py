@@ -16,7 +16,6 @@
 
 import gc
 import importlib.util
-import json
 import os
 import time
 from functools import partial
@@ -351,7 +350,7 @@ def run_dpo(
 
     if finetuning_args.use_huggingface_model:
         if (
-            model_args.use_attn_mask_start_row_indices
+            model_args.use_attn_mask_startend_row_indices
             and model_args.use_sparse_flash_attn
         ):
             _attn_implementation = "flashmask"
@@ -486,6 +485,7 @@ def run_dpo(
         "mask_out_eos_token": data_args.mask_out_eos_token,
         "packing": data_args.packing,
         "mix_strategy": data_args.mix_strategy,
+        "encode_one_turn": data_args.encode_one_turn,
     }
 
     if finetuning_args.max_steps == -1:

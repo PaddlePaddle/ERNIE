@@ -16,7 +16,6 @@
 
 import gc
 import importlib.util
-import json
 import math
 import os
 import time
@@ -338,7 +337,7 @@ def run_sft(
 
     if finetuning_args.use_huggingface_model:
         if (
-            model_args.use_attn_mask_start_row_indices
+            model_args.use_attn_mask_startend_row_indices
             and model_args.use_sparse_flash_attn
         ):
             _attn_implementation = "flashmask"

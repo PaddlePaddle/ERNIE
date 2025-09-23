@@ -83,7 +83,7 @@ class DataArguments:
         metadata={"help": "Maximum sequence length."},
     )
     encode_one_turn: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Whether encode each round independently in a multi-round dialogue."},
     )
     max_prompt_len: int = field(

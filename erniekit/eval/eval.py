@@ -288,7 +288,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     if finetuning_args.use_huggingface_model:
         if (
-            model_args.use_attn_mask_start_row_indices
+            model_args.use_attn_mask_startend_row_indices
             and model_args.use_sparse_flash_attn
         ):
             _attn_implementation = "flashmask"
@@ -417,6 +417,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         "rank": finetuning_args.dataset_rank,
         "packing": data_args.packing,
         "mix_strategy": data_args.mix_strategy,
+        "encode_one_turn": data_args.encode_one_turn,
     }
     from paddleformers.datasets.finetuning import collate_fn
 

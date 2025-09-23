@@ -87,6 +87,7 @@ def dpo_estimate_training(tokenizer, data_args, training_args, config, train_dat
             "mask_out_eos_token": data_args.mask_out_eos_token,
             "packing": data_args.packing,
             "mix_strategy": data_args.mix_strategy,
+            "encode_one_turn": data_args.encode_one_turn,
             }
         train_dataset = create_dataset(
                 task_group=data_args.train_dataset_path,
