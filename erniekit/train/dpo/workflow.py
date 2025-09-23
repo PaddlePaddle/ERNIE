@@ -33,11 +33,6 @@ if importlib.util.find_spec("triton") is not None:
         )
 
 import paddle
-from paddleformers.transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoModelForCausalLMPipe,
-)
 from paddleformers.trainer import (
     IntervalStrategy,
     get_last_checkpoint,
@@ -212,22 +207,6 @@ def run_dpo(
             dtype = "bfloat16"
 
     logger.info("Start to load model ...")
-    config_path = os.path.join(model_args.model_name_or_path, "config.json")
-    if not os.path.exists(config_path):
-        raise ValueError(
-            f"Config path {config_path} doesn't exist. Please make sure you have downloaded the correct model."
-        )
-    with open(config_path, "r", encoding="utf-8") as f:
-        config_dict = json.load(f)
-
-    if "torch_dtype" in config_dict:
-        finetuning_args.use_huggingface_model = True
-        finetuning_args.convert_from_hf = True
-        finetuning_args.save_to_hf = True
-        finetuning_args.layerwise_lr_decay_bound = 1.0
-        model_args.fused_head_and_loss_fn = False
-        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
-        logger.info("loading model from HuggingFace")
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
