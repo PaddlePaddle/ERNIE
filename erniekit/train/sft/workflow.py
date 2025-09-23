@@ -36,6 +36,7 @@ if importlib.util.find_spec("triton") is not None:
 import paddle
 from paddleformers.transformers import (
     AutoConfig,
+    AutoTokenizer,
     AutoModelForCausalLM,
     AutoModelForCausalLMPipe,
 )
@@ -62,6 +63,7 @@ from ernie.utils.common_utils import (
     save_stop_info,
 )
 from ernie.utils.download_utils import check_download_repo
+from ernie.utils.load_utils import resolve_weight_source
 
 from ...hparams import (
     DataArguments,
@@ -228,14 +230,6 @@ def run_sft(
         model_args.model_name_or_path,
         download_hub=model_args.download_hub,
     )
-    if finetuning_args.use_huggingface_model:
-        model_class = AutoModelForCausalLM
-        if finetuning_args.pipeline_parallel_degree > 1:
-            model_class = AutoModelForCausalLMPipe
-    else:
-        model_class = Ernie4_5_MoeForCausalLM
-        if finetuning_args.pipeline_parallel_degree > 1:
-            model_class = Ernie4_5_MoeForCausalLMPipe
     if (
         model_args.moe_group.lower() in {"data", "dp"}
         and finetuning_args.data_parallel_degree > 1
@@ -312,17 +306,53 @@ def run_sft(
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    weight_source = resolve_weight_source(
+        model_args.model_name_or_path,
+        download_source_kwargs=download_source_kwargs,
+    )
+    if weight_source["convert_from_hf"]:
+        finetuning_args.use_huggingface_model = True
+        finetuning_args.convert_from_hf = True
+        if finetuning_args.weight_quantize_algo is not None:
+            quantization_config["weight_quantize_algo"] = {
+                "weight_only_int4": [".*mlp.experts.*"],
+                "weight_only_int8": [
+                    ".*self_attn.q_proj.*",
+                    ".*self_attn.k_proj.*",
+                    ".*self_attn.v_proj.*",
+                    ".*self_attn.o_proj.*",
+                    ".*mlp.up_proj.*",
+                    ".*mlp.gate_proj.*",
+                    ".*mlp.down_proj.*",
+                ],
+            }
+        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
+        logger.info("loading model from HuggingFace")
+
+    if finetuning_args.use_huggingface_model:
+        model_class = AutoModelForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = AutoModelForCausalLMPipe
+    else:
+        model_class = Ernie4_5_MoeForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = Ernie4_5_MoeForCausalLMPipe
+
     convert_from_kwargs = {
         (
             "convert_from_hf"
             if paddleformers_version >= "0.3"
             else "convert_from_torch"
-        ): finetuning_args.convert_from_hf
-        and finetuning_args.use_huggingface_model
+        ): weight_source["convert_from_hf"]
     }
+    if paddleformers_version >= "0.3":
+        finetuning_args.save_to_hf = (
+            weight_source["save_to_hf"] and finetuning_args.use_huggingface_model
+        )
+
     if finetuning_args.use_huggingface_model:
         if (
-            model_args.use_attn_mask_startend_row_indices
+            model_args.use_attn_mask_start_row_indices
             and model_args.use_sparse_flash_attn
         ):
             _attn_implementation = "flashmask"
@@ -331,6 +361,7 @@ def run_sft(
         model_config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
             _attn_implementation=_attn_implementation,
+            attention_dropout_prob=finetuning_args.attention_probs_dropout_prob,
             dtype=dtype,
             quantization_config=quantization_config,
             use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
@@ -436,7 +467,10 @@ def run_sft(
     logger.info("Loading model successfully !")
     logger.debug(f"Model config: {model.config}")
     logger.info(f"{runtime_timer.log()}")
-    tokenizer = Ernie4_5_Tokenizer.from_pretrained(
+    tokenizer_cls = (
+        AutoTokenizer if weight_source["convert_from_hf"] else Ernie4_5_Tokenizer
+    )
+    tokenizer = tokenizer_cls.from_pretrained(
         model_args.model_name_or_path,
         **convert_from_kwargs,
         **download_source_kwargs,

@@ -16,6 +16,7 @@ import os
 import shutil
 import time
 from typing import Any, Optional
+import json
 
 import paddle
 from paddleformers.mergekit import MergeConfig, MergeModel
@@ -23,6 +24,7 @@ from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.download import resolve_file_path
 from paddleformers.utils.env import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from ernie.utils.download_utils import check_download_repo
 
@@ -122,8 +124,17 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
             [SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME],
             **download_source_kwargs,
         )
+
+        convert_from_hf = False
+        save_to_hf = False
         if resolve_result is not None:
             resolve_path = os.path.dirname(resolve_result)
+            config_json = os.path.join(resolve_path, "config.json")
+            with open(config_json) as f:
+                config_dict = json.load(f)
+            if "torch_dtype" in config_dict:
+                convert_from_hf = True
+                save_to_hf = True
             logger.info(f"base model path parsed:{resolve_path}")
         else:
             logger.error(f"{model_args.model_name_or_path} does not found.")
@@ -132,6 +143,10 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
         config["base_model_path"] = resolve_path
         config["lora_model_path"] = last_checkpoint
         config["output_path"] = os.path.join(finetuning_args.output_dir, "export")
+        if paddleformers_version >= "0.3":
+            config["convert_from_hf"] = convert_from_hf
+            config["save_to_hf"] = save_to_hf
+
         if export_args.copy_tokenizer:
             config["copy_file_list"] = [
                 "tokenizer.model",

@@ -43,6 +43,12 @@ from paddleformers.trainer import (
     get_last_checkpoint,
     set_seed,
 )
+from paddleformers.transformers import (
+    AutoConfig,
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+)
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.utils.log import logger
 from paddleformers import __version__ as paddleformers_version
@@ -55,6 +61,7 @@ from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import check_refined_recompute
 from ernie.utils.download_utils import check_download_repo
+from ernie.utils.load_utils import resolve_weight_source
 
 # isort: off
 from .dpo_estimate_training import dpo_estimate_training
@@ -326,32 +333,56 @@ def run_dpo(
     else:
         download_source_kwargs["download_hub"] = model_args.download_hub
 
+    weight_source = resolve_weight_source(
+        model_args.model_name_or_path,
+        download_source_kwargs=download_source_kwargs,
+    )
+    if weight_source["convert_from_hf"]:
+        finetuning_args.use_huggingface_model = True
+        if finetuning_args.weight_quantize_algo is not None:
+            quantization_config["weight_quantize_algo"] = {
+                "weight_only_int4": [".*mlp.experts.*"],
+                "weight_only_int8": [
+                    ".*self_attn.q_proj.*",
+                    ".*self_attn.k_proj.*",
+                    ".*self_attn.v_proj.*",
+                    ".*self_attn.o_proj.*",
+                    ".*mlp.up_proj.*",
+                    ".*mlp.gate_proj.*",
+                    ".*mlp.down_proj.*",
+                ],
+            }
+        finetuning_args.layerwise_lr_decay_bound = 1.0
+        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
+        logger.info("loading model from HuggingFace")
+
     convert_from_kwargs = {
         (
             "convert_from_hf"
             if paddleformers_version >= "0.3"
             else "convert_from_torch"
-        ): finetuning_args.convert_from_hf
-        and finetuning_args.use_huggingface_model
+        ): weight_source["convert_from_hf"]
     }
     if paddleformers_version >= "0.3":
-        finetuning_args.save_to_hf = False
+        finetuning_args.save_to_hf = (
+            weight_source["save_to_hf"] and finetuning_args.use_huggingface_model
+        )
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": model_args.moe_use_aux_free})
 
     if finetuning_args.use_huggingface_model:
         if (
-            model_args.use_attn_mask_startend_row_indices
+            model_args.use_attn_mask_start_row_indices
             and model_args.use_sparse_flash_attn
         ):
             _attn_implementation = "flashmask"
         else:
             _attn_implementation = "sdpa"
-        finetuning_args.offset_alpha = 1.0
-        model_kwargs["moe_use_aux_free"] = True
         config = AutoConfig.from_pretrained(
             _attn_implementation=_attn_implementation,
+            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
             loss_subbatch_sequence_length=1024,
+            attention_dropout_prob=finetuning_args.attention_probs_dropout_prob,
             **convert_from_kwargs,
             **model_kwargs,
         )
@@ -450,7 +481,10 @@ def run_dpo(
             dtype=dtype,
         )
 
-    tokenizer = Ernie4_5_Tokenizer.from_pretrained(
+    tokenizer_cls = (
+        AutoTokenizer if weight_source["convert_from_hf"] else Ernie4_5_Tokenizer
+    )
+    tokenizer = tokenizer_cls.from_pretrained(
         model_args.model_name_or_path,
         **convert_from_kwargs,
         **download_source_kwargs,

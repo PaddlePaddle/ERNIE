@@ -87,3 +87,9 @@ class ServerArguments:
     kv_cache_ratio: float = field(
         default=0.75, metadata={"help": "Ratio of tokens to process in a block."}
     )
+
+    # load_choices
+    load_choices: list[str] = field(
+        default="default_v1",
+        metadata={"help": "List of choices for loading models."},
+    )

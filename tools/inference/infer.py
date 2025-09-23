@@ -24,6 +24,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
+from paddleformers.transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM
 from paddleformers.trainer import RuntimeTimer
 from paddleformers.utils.log import logger
 from paddleformers import __version__ as paddleformers_version
@@ -125,6 +126,7 @@ def get_parser():
         help="weight_only_int8",
     )
     parser.add_argument("--download_hub", type=str, default=None)
+    parser.add_argument("--convert_from_hf", type=bool, default=False)
     parser.add_argument(
         "--input_file", type=str, default="./examples/inference/data/query-demo.jsonl"
     )
@@ -211,15 +213,18 @@ class Predictor:
                 "convert_from_hf"
                 if paddleformers_version >= "0.3"
                 else "convert_from_torch"
-            ): False
+            ): args.convert_from_hf
         }
         # init model & tokenizer
-        self.tokenizer = Ernie4_5_Tokenizer.from_pretrained(
+        tokenizer_cls = AutoTokenizer if args.convert_from_hf else Ernie4_5_Tokenizer
+        self.tokenizer = tokenizer_cls.from_pretrained(
             args.model_name_or_path, **convert_from_kwargs, **download_source_kwargs
         )
         self.tokenizer.padding_side = "left"
         paddle.set_default_dtype(self.args.dtype)
-        self.config = Ernie4_5_MoeConfig.from_pretrained(
+
+        config_cls = AutoConfig if args.convert_from_hf else Ernie4_5_MoeConfig
+        self.config = config_cls.from_pretrained(
             args.model_name_or_path,
             quantization_config=dict(
                 weight_quantize_algo=args.weight_quantize_algo,
@@ -236,12 +241,16 @@ class Predictor:
             tensor_parallel_degree=self.tensor_parallel_degree,
             tensor_parallel_rank=self.tensor_parallel_rank,
             use_flash_attention=True,
-            moe_group="dummy",
-            num_nextn_predict_layers=0,
+            _attn_implementation="sdpa",
+            moe_group="mp" if self.tensor_parallel_degree > 1 else "dummy",
+            num_nextn_predict_layers=1,
             **convert_from_kwargs,
             **download_source_kwargs,
         )
-        self.model = Ernie4_5_MoeForCausalLM.from_pretrained(
+        model_cls = (
+            AutoModelForCausalLM if args.convert_from_hf else Ernie4_5_MoeForCausalLM
+        )
+        self.model = model_cls.from_pretrained(
             args.model_name_or_path,
             config=self.config,
             **convert_from_kwargs,

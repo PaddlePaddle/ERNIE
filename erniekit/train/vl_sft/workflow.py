@@ -24,6 +24,7 @@ from paddle.distributed import fleet
 from paddleformers.datasets import IterDataset
 from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 from paddleformers.utils.tools import get_env_device
 from .trainer import SFTTrainer
 
@@ -370,6 +371,8 @@ def run_vl_sft(
         logger.info(f"disable moe flag when using moe-group={model_args.moe_group}")
         finetuning_args.use_moe = False
 
+    if paddleformers_version >= "0.3":
+        finetuning_args.save_to_hf = False
     cfg = Ernie4_5_VLMoeConfig.from_pretrained(
         os.path.join(model_args.model_name_or_path),
         quantization_config=quantization_config,

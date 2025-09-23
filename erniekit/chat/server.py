@@ -23,7 +23,7 @@ from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.log import logger
 
 from ..hparams import get_server_args, read_args
-from ..utils.process import terminate_process_tree, is_valid_model_dir
+from ..utils.process import terminate_process_tree, is_valid_model_dir, detect_device
 
 
 def run_server(args: Optional[dict[str, Any]] = None) -> None:
@@ -98,6 +98,10 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
             f"--kv-cache-ratio {server_args.kv_cache_ratio} "
             f"--quantization {server_args.quantization} "
         ).split()
+
+        device_type = detect_device()
+        if device_type != "xpu":
+            command.extend(["--load_choices", server_args.load_choices])
 
     process = subprocess.Popen(
         command,
