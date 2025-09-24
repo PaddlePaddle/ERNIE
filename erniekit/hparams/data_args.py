@@ -88,6 +88,10 @@ class DataArguments:
             "help": "Whether encode each round independently in a multi-round dialogue."
         },
     )
+    use_template: bool = field(
+        default=True,
+        metadata={"help": "Whether to use template in data processing."},
+    )
     max_prompt_len: int = field(
         default=2048,
         metadata={"help": "Maximum prompt length."},

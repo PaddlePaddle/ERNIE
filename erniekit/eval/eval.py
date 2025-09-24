@@ -418,6 +418,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         "packing": data_args.packing,
         "mix_strategy": data_args.mix_strategy,
         "encode_one_turn": data_args.encode_one_turn,
+        "use_template": data_args.use_template,
     }
     from paddleformers.datasets.finetuning import collate_fn
 
