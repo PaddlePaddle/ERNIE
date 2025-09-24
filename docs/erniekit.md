@@ -7,12 +7,21 @@
 
 ## 📣 Recent updates
 
+**[2025-09] 🔥 Released ERNIEKit v1.3:**
+
+- **New Features**
+    - [Torch ecosystem compatibility] Suport text-only model training with torch weights.
+    - [ERNIE 21b thinking model] Supports SFT training and function call training for the 21B thinking model.
+
+- **Bug Fixes:**
+    - [VL Model Training] Optimization of multimodal video data processing speed (#1266).
+
 **[2025-09] 🔥 Released ERNIEKit v1.2:**
 
 - **New Features**
-    - WebUI: Added support for training and conversation functionalities with ERNIE 28b/424b VL models.
-    - VL Model Training: Introduced support for query-response format in training data.
-    - Command-Line Tool: Added iluvatar GPU hardware support.
+    - [WebUI] Added support for training and conversation functionalities with ERNIE 28b/424b VL models.
+    - [VL Model Training] Introduced support for query-response format in training data.
+    - [Command-Line Tool] Added iluvatar GPU hardware support.
 
 - **Bug Fixes:**
     - [AutoParallel] Fix use_intermediate_api pp+recompute+moe bug (#1250)
@@ -55,7 +64,7 @@ Support NVDIA GPU, [Kunlunxin XPU](./devices/README_XPU.md) and [Ascend NPU](./d
 
 **Docker-Based Installation (Recommended)**
 
-To ensure environment consistency across different hardware configurations, we recommend using our pre-configured Docker images. These images include CUDA, cuDNN, and NCCL dependencies with PaddlePaddle v3.1 pre-installed:
+To ensure environment consistency across different hardware configurations, we recommend using our pre-configured Docker images. These images include CUDA, cuDNN, and NCCL dependencies with PaddlePaddle v3.2 pre-installed:
 
 ```bash
 # Choose based on your CUDA version requirements:
@@ -65,7 +74,7 @@ docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.1.0-gpu-c
 
 **Source Code Installation**
 
-If not using Docker, ensure your environment meets the prerequisites in 2.1. ERNIEKit requires PaddlePaddle v3.1+. See official [PaddlePaddle Installation Guide](https://www.paddlepaddle.org.cn/install/quick) for details.
+If not using Docker, ensure your environment meets the prerequisites in 2.1. ERNIEKit requires PaddlePaddle v3.2+. See official [PaddlePaddle Installation Guide](https://www.paddlepaddle.org.cn/install/quick) for details.
 
 
 Verify installation with:
