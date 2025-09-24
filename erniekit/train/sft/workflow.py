@@ -356,6 +356,7 @@ def run_sft(
             **convert_from_kwargs,
             **download_source_kwargs,
         )
+        model_config.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
     else:
         model_config = Ernie4_5_MoeConfig.from_pretrained(
             model_args.model_name_or_path,

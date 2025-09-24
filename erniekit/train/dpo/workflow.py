@@ -364,7 +364,7 @@ def run_dpo(
             **convert_from_kwargs,
             **model_kwargs,
         )
-        config.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
+        config.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
     else:
         config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
 
@@ -417,7 +417,13 @@ def run_dpo(
     if not finetuning_args.reference_free and not model_args.lora:
         if finetuning_args.use_huggingface_model:
             ref_config = AutoConfig.from_pretrained(
-                _attn_implementation=_attn_implementation, **model_kwargs
+                _attn_implementation=_attn_implementation,
+                use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
+                loss_subbatch_sequence_length=1024,
+                **model_kwargs,
+            )
+            ref_config.use_fused_head_and_loss_fn = (
+                model_args.use_fused_head_and_loss_fn
             )
             if (
                 ref_config.get("moe_num_experts", None) is None
