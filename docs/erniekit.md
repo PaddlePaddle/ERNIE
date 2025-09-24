@@ -10,8 +10,7 @@
 **[2025-09] 🔥 Released ERNIEKit v1.3:**
 
 - **New Features**
-    - [Torch ecosystem compatibility] Suport text-only model training with torch weights.
-    - [ERNIE 21b thinking model] Supports SFT training and function call training for the 21B thinking model.
+    - [ERNIE-4.5-21B-A3B-Thinking] Supports SFT training and function call training for ERNIE-4.5-21B-A3B-Thinking (https://huggingface.co/baidu/ERNIE-4.5-21B-A3B-Thinking).
 
 - **Bug Fixes:**
     - [VL Model Training] Optimization of multimodal video data processing speed (#1266).
