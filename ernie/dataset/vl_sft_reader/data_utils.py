@@ -24,8 +24,6 @@ from ernie.dataset.data_utils import round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
 
-DEBUG_PRINT_CNT = 0
-
 
 def pad_sequence(sequences, padding_value=0, fix_len=None):
     """Fill sequences(np.ndarray) into a fixed-length matrix."""
@@ -212,7 +210,6 @@ def merge_fn_group_batch(
     if "need_multiround" in batch[0]:
         del batch[0]["need_multiround"]
 
-    global DEBUG_PRINT_CNT
     if pad_to_max_seqlen and shift_label:
         pad_to_max_seqlen += 1
 
@@ -235,7 +232,7 @@ def merge_fn_group_batch(
 
     if not packing:
         pad_to_max_seqlen = round_up_to_multiple_of_8(len(batch[0]["input_ids"]))
-        print(
+        logger.info(
             f"[Not Packing] ori {len(batch[0]['input_ids'])} pad {pad_to_max_seqlen}."
         )
 
@@ -350,18 +347,6 @@ def merge_fn_group_batch(
         )
     ret["inbatch_pack_offset"] = inbatch_pack_offset
     batch = ret
-
-    if DEBUG_PRINT_CNT < debug_print:
-        DEBUG_PRINT_CNT += 1
-        for k, v in batch.items():
-            logger.debug(
-                f"""Example={DEBUG_PRINT_CNT} key={k},
-                len={len(v[0])if isinstance(v, np.ndarray) and v.ndim > 1 else 0},
-                value={v[0] if isinstance(v, np.ndarray) else v}"""
-            )
-        logger.debug(
-            f"Example={DEBUG_PRINT_CNT} text={fancy_print(batch, tokenizer, im_prefix_length)}"
-        )
 
     if shift_label:
         batch["labels"] = batch["labels"][:, 1:]
