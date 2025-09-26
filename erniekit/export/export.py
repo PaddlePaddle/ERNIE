@@ -148,12 +148,22 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
             config["save_to_hf"] = save_to_hf
 
         if export_args.copy_tokenizer:
-            config["copy_file_list"] = [
-                "tokenizer.model",
-                "tokenizer_config.json",
-                "special_tokens_map.json",
-                # "config.json",
-            ]
+            if convert_from_hf:
+                config["copy_file_list"] = [
+                    "added_tokens.json",
+                    "chat_template.jinja",
+                    "tokenizer.json",
+                    "tokenizer.model",
+                    "tokenizer_config.json",
+                    "special_tokens_map.json",
+                ]
+            else:
+                config["copy_file_list"] = [
+                    "tokenizer.model",
+                    "tokenizer_config.json",
+                    "special_tokens_map.json",
+                    # "config.json",
+                ]
 
         merge_config = MergeConfig(**config)
         mergekit = MergeModel(merge_config)
