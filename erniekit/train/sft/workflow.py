@@ -299,18 +299,19 @@ def run_sft(
         finetuning_args.use_huggingface_model = True
         finetuning_args.convert_from_hf = True
         if finetuning_args.weight_quantize_algo is not None:
-            quantization_config["weight_quantize_algo"] = {
-                "weight_only_int4": [".*mlp.experts.*"],
-                "weight_only_int8": [
-                    ".*self_attn.q_proj.*",
-                    ".*self_attn.k_proj.*",
-                    ".*self_attn.v_proj.*",
-                    ".*self_attn.o_proj.*",
-                    ".*mlp.up_proj.*",
-                    ".*mlp.gate_proj.*",
-                    ".*mlp.down_proj.*",
-                ],
-            }
+            if finetuning_args.weight_quantize_algo == "weight_only_mix":
+                quantization_config["weight_quantize_algo"] = {
+                    "weight_only_int4": [".*mlp.experts.*"],
+                    "weight_only_int8": [
+                        ".*self_attn.q_proj.*",
+                        ".*self_attn.k_proj.*",
+                        ".*self_attn.v_proj.*",
+                        ".*self_attn.o_proj.*",
+                        ".*mlp.up_proj.*",
+                        ".*mlp.gate_proj.*",
+                        ".*mlp.down_proj.*",
+                    ],
+                }
         model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
         logger.info("loading model from HuggingFace")
 

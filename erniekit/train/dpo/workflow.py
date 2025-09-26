@@ -318,18 +318,19 @@ def run_dpo(
     if weight_source["convert_from_hf"]:
         finetuning_args.use_huggingface_model = True
         if finetuning_args.weight_quantize_algo is not None:
-            quantization_config["weight_quantize_algo"] = {
-                "weight_only_int4": [".*mlp.experts.*"],
-                "weight_only_int8": [
-                    ".*self_attn.q_proj.*",
-                    ".*self_attn.k_proj.*",
-                    ".*self_attn.v_proj.*",
-                    ".*self_attn.o_proj.*",
-                    ".*mlp.up_proj.*",
-                    ".*mlp.gate_proj.*",
-                    ".*mlp.down_proj.*",
-                ],
-            }
+            if finetuning_args.weight_quantize_algo == "weight_only_mix":
+                quantization_config["weight_quantize_algo"] = {
+                    "weight_only_int4": [".*mlp.experts.*"],
+                    "weight_only_int8": [
+                        ".*self_attn.q_proj.*",
+                        ".*self_attn.k_proj.*",
+                        ".*self_attn.v_proj.*",
+                        ".*self_attn.o_proj.*",
+                        ".*mlp.up_proj.*",
+                        ".*mlp.gate_proj.*",
+                        ".*mlp.down_proj.*",
+                    ],
+                }
         finetuning_args.layerwise_lr_decay_bound = 1.0
         model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
         logger.info("loading model from HuggingFace")
@@ -365,6 +366,7 @@ def run_dpo(
             **model_kwargs,
         )
         config.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
+        config.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
     else:
         config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
 
@@ -424,6 +426,9 @@ def run_dpo(
             )
             ref_config.use_fused_head_and_loss_fn = (
                 model_args.use_fused_head_and_loss_fn
+            )
+            ref_config.use_sparse_head_and_loss_fn = (
+                model_args.use_sparse_head_and_loss_fn
             )
             if (
                 ref_config.get("moe_num_experts", None) is None
