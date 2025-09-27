@@ -1260,7 +1260,7 @@ class PretrainingTrainer(Trainer):
             )
             logs["learning_rate"] = float(self._get_learning_rate())
             logs["global_step"] = int(self.state.global_step)
-
+            logs["loss_md5"] = paddle.to_tensor(logs["loss"])._md5sum()
             divisor = 2**30
 
             current_device = framework._current_expected_place_()

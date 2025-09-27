@@ -490,6 +490,7 @@ class MOELayer(nn.Layer):
             p.no_sync = not (self.is_mp_moe or is_dummy_moe)
             logger.info(f"expert no-sync={p.no_sync}-{p.name}")
             if self.is_mp_moe or self.is_ep_moe:
+                p.mp_moe = True
                 p.is_distributed = True
 
         expert_color = None
@@ -498,11 +499,11 @@ class MOELayer(nn.Layer):
                 fleet.get_hybrid_communicate_group().get_moe_sharding_parallel_group()
             )
             expert_color = {"color": "moe_expert", "group": moe_grad_group}
-        elif (
-            self.config.offline_quant_expert_weight
-            and self.config.clear_origin_weight_when_offline_quant
-        ):
-            expert_color = {"color": "moe_expert"}
+        # elif (
+        #     self.config.offline_quant_expert_weight
+        #     and self.config.clear_origin_weight_when_offline_quant
+        # ):
+        #     expert_color = {"color": "moe_expert"}
 
         if expert_color is not None:
             for p in self.experts.parameters():
@@ -1133,7 +1134,17 @@ class MOELayer(nn.Layer):
                 orig_shape[:-1] + [combined_output.shape[-1]]
             )
         return combined_output, combine_weights, router_loss2, gate_logits
-
+        
+    def sharded_state_dict(
+        self,
+        structured_name_prefix: str = "",
+        ):
+        sharded_state_dict = super().sharded_state_dict(structured_name_prefix)
+        global_expert_id_offset = self.group.rank * self.num_local_experts
+        for k,v in sharded_state_dict.items():
+            v.global_expert_id_offset = global_expert_id_offset
+            sharded_state_dict[k] = v
+        return sharded_state_dict
 
 class FP8FusedWLCHFunc(paddle.autograd.PyLayer):
     @staticmethod

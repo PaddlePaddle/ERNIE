@@ -49,4 +49,4 @@ class OrthogonalCallback(TrainerCallback):
                         gate.weight.data.add_(-oloss_grad * self.ortho_loss_lambda)
                     gate.weight.stop_gradient = False
 
-        model.apply(update_)
+        # model.apply(update_)

@@ -296,16 +296,16 @@ def main():
         and not args.overwrite_output_dir
     ):
         last_checkpoint = get_last_checkpoint(args.output_dir)
-        if last_checkpoint is None and len(os.listdir(args.output_dir)) > 0:
-            raise ValueError(
-                f"Output directory ({args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
-            )
-        elif last_checkpoint is not None and args.resume_from_checkpoint is None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
+        # if last_checkpoint is None and len(os.listdir(args.output_dir)) > 0:
+        #     raise ValueError(
+        #         f"Output directory ({args.output_dir}) already exists and is not empty. "
+        #         "Use --overwrite_output_dir to overcome."
+        #     )
+        # elif last_checkpoint is not None and args.resume_from_checkpoint is None:
+        #     logger.info(
+        #         f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+        #         "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+        #     )
 
     def compute_metrics(p):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
@@ -439,6 +439,7 @@ def main():
     cfg.token_balance_seqlen = args.max_seq_length * args.per_device_train_batch_size
     cfg.fp16_opt_level = args.fp16_opt_level
     cfg.moe_group = args.moe_group
+    cfg.moe_group_name = args.moe_group
     cfg.dtype = dtype
     cfg.use_fp8 = args.use_fp8
     cfg.enable_mtp_magic_send = args.enable_mtp_magic_send
@@ -502,7 +503,7 @@ def main():
     logger.info(f"using model type:{type(model)}")
     paddle.set_default_dtype("float32")
 
-    logger.info(f"using model={type(model)}, cfg={cfg}")
+    # logger.info(f"using model={type(model)}, cfg={cfg}")
 
     train_dataset, eval_dataset, test_dataset, data_collator = (
         create_pretrained_dataset(args)

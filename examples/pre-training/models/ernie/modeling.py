@@ -61,6 +61,9 @@ from paddleformers.transformers.model_outputs import (
 )
 from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
 from paddleformers.utils.tools import get_env_device
+from paddle.distributed.flex_checkpoint.dcp.sharded_weight import (
+    build_sharded_state_dict,
+)
 
 from .configuration import ErnieMoEConfig
 
@@ -2175,6 +2178,13 @@ class ErnieLMHead(nn.Layer):
             training=self.training,
         )
 
+    def sharded_state_dict(
+        self,
+        structured_name_prefix: str = "",
+    ):
+        axis = 0 if self.config.tie_word_embeddings else 1
+        state_dict = self.state_dict(structured_name_prefix="")
+        return build_sharded_state_dict(state_dict, {"weight": axis, "bias" : 0}, structured_name_prefix)
 
 class ErnieForCausalLM(ErniePretrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
@@ -2379,3 +2389,33 @@ class ErnieForCausalLM(ErniePretrainedModel):
         assert labels is not None
         loss, loss_sum = self.criterion(logits, labels)
         return loss, loss_sum
+
+    def sharded_state_dict(self, *args, **kwargs):
+        sharded_state_dict = super().sharded_state_dict(*args, **kwargs)
+
+
+
+        import re
+        def increment_expert_number(s, increment):
+            def replace(match):
+                original_number = int(match.group(0))  
+                new_number = original_number + increment 
+                return str(new_number) 
+            return re.sub(r'(?<=experts\.)\d+', replace, s)
+
+
+        renamed_sharded_state_dict = {}
+        for k, v in sharded_state_dict.items():
+            global_expert_id_offset = getattr(v, 'global_expert_id_offset', None)
+            if global_expert_id_offset is not None:
+                new_key = increment_expert_number(k, global_expert_id_offset)
+                v.key = new_key
+                delattr(v, 'global_expert_id_offset')
+                renamed_sharded_state_dict[new_key] = v
+            else:
+                renamed_sharded_state_dict[k] = v
+
+        logger.info("====> debug  PipelinePretrainedModel renamed sharded state dict")
+        for k,v in renamed_sharded_state_dict.items():
+            logger.info(f"==> {k}:{v}")
+        return renamed_sharded_state_dict

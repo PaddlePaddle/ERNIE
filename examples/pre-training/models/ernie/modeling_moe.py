@@ -900,7 +900,6 @@ class ErnieMoEAttention(ErnieAttention):
         )
         self.use_rms_qkv_recompute = config.use_rms_qkv_recompute
         if config.use_rms_qkv_recompute is True:
-
             assert config.use_rmsnorm is True and config.fuse_rms_norm is True
             assert config.fuse_linear is True and config.use_bias is False
 
@@ -1512,6 +1511,13 @@ class ErniePretrainedModel(PretrainedModel):
                     "embed_tokens.weight": partial(fn, is_column=False),
                     "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                     "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+                    # add mtp block actions
+                    "mtp_block.0.self_attn.qkv_proj.weight": qkv_fn,
+                    "mtp_block.0.mlp.up_gate_proj.weight": partial(
+                        fn, is_column=True, is_naive_2fuse=True
+                    ),
+                    "mtp_block.0.self_attn.o_proj.weight": partial(fn, is_column=False),
+                    "mtp_block.0.mlp.down_proj.weight": partial(fn, is_column=False),
                 }
                 if config.use_bias:
                     base_actions.update(
@@ -1522,6 +1528,12 @@ class ErniePretrainedModel(PretrainedModel):
                             ),
                             "layers.0.mlp.down_proj.bias": lambda x: x,
                             "lm_head.bias": partial(fn, is_column=True),
+                            # add mtp block bias actions
+                            "mtp_block.0.self_attn.qkv_proj.bias": qkv_fn,
+                            "mtp_block.0.mlp.up_gate_proj.bias": partial(
+                                fn, is_column=True, is_naive_2fuse=True
+                            ),
+                            "mtp_block.0.mlp.down_proj.bias": lambda x: x,
                         }
                     )
             else:
@@ -1534,6 +1546,14 @@ class ErniePretrainedModel(PretrainedModel):
                     "embed_tokens.weight": partial(fn, is_column=False),
                     "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                     "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+                    # add mtp block actions
+                    "mtp_block.0.self_attn.q_proj.weight": partial(fn, is_column=True),
+                    "mtp_block.0.self_attn.k_proj.weight": partial(fn, is_column=True),
+                    "mtp_block.0.self_attn.v_proj.weight": partial(fn, is_column=True),
+                    "mtp_block.0.mlp.gate_proj.weight": partial(fn, is_column=True),
+                    "mtp_block.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                    "mtp_block.0.self_attn.o_proj.weight": partial(fn, is_column=False),
+                    "mtp_block.0.mlp.down_proj.weight": partial(fn, is_column=False),
                 }
                 if config.use_bias:
                     base_actions.update(
@@ -1551,18 +1571,34 @@ class ErniePretrainedModel(PretrainedModel):
                             "layers.0.mlp.up_proj.bias": partial(fn, is_column=True),
                             "layers.0.mlp.down_proj.bias": lambda x: x,
                             "lm_head.bias": partial(fn, is_column=True),
+                            # add mtp block bias actions
+                            "mtp_block.0.self_attn.q_proj.bias": partial(
+                                fn, is_column=True
+                            ),
+                            "mtp_block.0.self_attn.k_proj.bias": partial(
+                                fn, is_column=True
+                            ),
+                            "mtp_block.0.self_attn.v_proj.bias": partial(
+                                fn, is_column=True
+                            ),
+                            "mtp_block.0.mlp.gate_proj.bias": partial(fn, is_column=True),
+                            "mtp_block.0.mlp.up_proj.bias": partial(fn, is_column=True),
+                            "mtp_block.0.mlp.down_proj.bias": lambda x: x,
                         }
                     )
-            moe_in_mp = config.moe_group in {"mp", "model", "tp", "mpdp"}
+
+            moe_in_mp = config.moe_group_name in {"mp", "model", "tp", "mpdp"}
+
             for key, action in base_actions.items():
                 if "layers.0." in key:
                     for i in range(num_layers):
                         newkey = key.replace("layers.0.", f"layers.{i}.")
-                        if config.moe_group in {"mpdp"}:
+                        if config.moe_group_name in {"mpdp"}:
                             final_actions[newkey] = lambda x: x
                         else:
                             final_actions[newkey] = action
-                        if "mlp" in key and (i + 1) % config.moe_layer_interval == 0:
+                        # only expand experts for non-MTP layers
+                        if key.startswith("layers.0.mlp") and (i + 1) % config.moe_layer_interval == 0:
                             moe_num_experts = config.moe_num_experts
                             if moe_num_experts > 0:
                                 for expert_id in range(moe_num_experts):
@@ -1602,6 +1638,11 @@ class ErniePretrainedModel(PretrainedModel):
                             final_actions[key.replace("layers.0.", f"layers.{i}.")] = (
                                 action
                             )
+                elif "mtp_block.0." in key:
+                    depth = getattr(config, "multi_token_pred_depth", 0) or 0
+                    for d in range(depth):
+                        newkey = key.replace("mtp_block.0.", f"mtp_block.{d}.")
+                        final_actions[newkey] = action
                 else:
                     final_actions[key] = action
             return final_actions
@@ -1695,13 +1736,12 @@ class ErniePretrainedModel(PretrainedModel):
 
 @register_base_model
 class ErnieModel(ErniePretrainedModel):
-    def __init__(self, config: ErnieMoEConfig):
+    def __init__(self, config: ErnieMoEConfig):    
         if config.moe_group in {"mp", "model", "tp", "mpdp"}:
             logger.info(
                 f"disable FFN tensor model parallel, moe-group={config.moe_group}"
             )
             config.disable_ffn_model_parallel = True
-
         config.moe_group = _parse_moe_group(config.moe_group)
 
         config.moe_world_size = dist.get_world_size(config.moe_group)
@@ -2214,7 +2254,7 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
         self.lm_head = ErnieMoELMHead(config)
         self.criterion = ErniePretrainingCriterion(config)
 
-        self.tie_weights()
+        # self.tie_weights()
 
         if self.config.fuse_rms_norm:
             logger.info("Use fusedRMSNorm")
@@ -2471,3 +2511,30 @@ class ErnieMoEForCausalLM(ErniePretrainedModel):
             router_loss = None
         assert labels is not None
         return self.criterion(logits, labels, router_loss, mtp_logits)
+
+    def sharded_state_dict(self, *args, **kwargs):
+        sharded_state_dict = super().sharded_state_dict(*args, **kwargs)
+
+
+
+        import re
+        def increment_expert_number(s, increment):
+            def replace(match):
+                original_number = int(match.group(0))  
+                new_number = original_number + increment 
+                return str(new_number) 
+            return re.sub(r'(?<=experts\.)\d+', replace, s)
+
+
+        renamed_sharded_state_dict = {}
+        for k, v in sharded_state_dict.items():
+            global_expert_id_offset = getattr(v, 'global_expert_id_offset', None)
+            if global_expert_id_offset is not None:
+                new_key = increment_expert_number(k, global_expert_id_offset)
+                v.key = new_key
+                delattr(v, 'global_expert_id_offset')
+                renamed_sharded_state_dict[new_key] = v
+            else:
+                renamed_sharded_state_dict[k] = v
+
+        return renamed_sharded_state_dict
