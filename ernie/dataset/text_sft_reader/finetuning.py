@@ -20,6 +20,7 @@ import copy
 import logging
 import os
 import random
+import re
 from collections import defaultdict, namedtuple
 
 import numpy as np
@@ -29,7 +30,7 @@ from paddleformers.trainer import TrainerState
 from paddleformers.trainer.trainer import TRAINER_STATE_NAME
 
 from .data_utils import RandomNoReplacementSampler, sampling_pseudo_examples
-from ernie.dataset.data_utils import pad_batch_data, round_up_to_multiple_of_8
+from ernie.dataset.data_utils import pad_batch_data
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class BaseReader:
         dp_worldrank=0,
         dp_worldsize=1,
         number_of_samples_each_epoch=50000,
+        pseudo_strategy=0,
         example_from_same_task_prob=0.1,
         pseudo_sampling_prob=0.5,
         trigger_data_prob=0.5,
@@ -85,6 +87,7 @@ class BaseReader:
         self.dp_worldrank = dp_worldrank  # should be dp_index
         self.dp_worldsize = dp_worldsize  # should be dp_num
         self.number_of_samples_each_epoch = number_of_samples_each_epoch
+        self.pseudo_strategy = pseudo_strategy
         self.example_from_same_task_prob = example_from_same_task_prob
         self.pseudo_sampling_prob = pseudo_sampling_prob
         self.trigger_data_prob = trigger_data_prob
@@ -428,6 +431,7 @@ class BaseReader:
                 self.tokenizer,
                 self.global_rng,
                 self.max_seq_len,
+                self.pseudo_strategy,
                 self.pseudo_sampling_prob,
                 self.trigger_data_prob,
                 self.use_anti_k_sampling,
@@ -575,6 +579,7 @@ class BaseReader:
                 self.current_epoch = epoch_index
                 if phase == "train":
                     weighted_task_indices = []  # weighted task_ids
+                    sample_from_same_source_flags = []
 
                     if shuffle:
                         rng = np.random.RandomState(self.random_seed + epoch_index)
@@ -697,6 +702,91 @@ class KnowledgeBasedSFTReader(BaseReader):
         previous_cur_len = 2  # start_token, break_turn_token
         resever_multi_turn_break_length = 8
 
+        def extract_knowledge(result):
+            add_token = ""
+            if not self.add_break_token_multi_turn_for_nontrigger_data:
+                add_token = self.break_turn_token
+            if "kg-" in result:
+                for markup in [
+                    "[<kg-res>]",
+                    "[</kg-res>]",
+                    "[<kg-yes>]",
+                    "[</kg-yes>]",
+                    "[</kg-cs-yes>]",
+                    "[</kg-cs-yes>]",
+                    "[</kg-cs-no>]",
+                    "[</kg-cs-no>]",
+                    "[<image>]",
+                    "[</image>]",
+                ]:
+                    result = result.replace(markup, "")
+                result = (
+                    f"知识库：{result.strip()}\n根据所提供的知识库信息，回答问题并补全对话："
+                    + add_token
+                )
+            elif "search-res" in result:
+                result = re.findall(
+                    r"\[<search-res>\](.*?)\[<\/search-res>\]",
+                    result,
+                    re.DOTALL | re.MULTILINE,
+                )[0]
+                result = (
+                    f"{result.strip()}\n根据以上参考文章回答问题，补全对话" + add_token
+                )
+            elif "prompt-res" in result:
+                result = re.findall(
+                    r"\[<prompt-res>\](.*?)\[<\/prompt-res>\]",
+                    result,
+                    re.DOTALL | re.MULTILINE,
+                )[0]
+                result = result.strip() + add_token
+            elif "compute-res" in result:
+                result = re.findall(
+                    r"\[<compute-res>\](.*?)\[<\/compute-res>\]",
+                    result,
+                    re.DOTALL | re.MULTILINE,
+                )[0]
+                result = (
+                    f"参考文章1：{result.strip()}\n根据以上参考文章回答问题，补全对话"
+                    + add_token
+                )
+            elif "citation-ref" in result:
+                result = re.findall(
+                    r"\[<citation-ref>\](.*?)\[<\/citation-ref>\]",
+                    result,
+                    re.DOTALL | re.MULTILINE,
+                )[0]
+                result = (
+                    f"""请参考搜索结果回答下面问题并使用引用标记来标注回答内容参考的搜索结果序号，
+                    例如^[1]^ (引用单个搜索结果）,^[1][2]^（引用多个搜索结果），其中方括号中的数字是搜索结果序号。
+                    引用标记只能出现在句尾标点符号前。
+                    \n以下是搜索结果（每行开头[1]、[2]、...是搜索结果序号），
+                    可以对答案中的核心部分进行markdown加粗（**加粗内容**）：
+                    \n{result.strip()}\n根据以上搜索结果回答问题并标注引用，补全对话"""
+                    + add_token
+                )
+            elif "retrieve-ref" in result:
+                result = re.findall(
+                    r"\[<retrieve-ref>\](.*?)\[<\/retrieve-ref>\]",
+                    result,
+                    re.DOTALL | re.MULTILINE,
+                )[0]
+                result = (
+                    f"""请你扮演一个专家，参考搜索结果中正确、可信、高质量的信息回答问题，
+                    并注明答案中引用的搜索结果，格式为^[2]^表示引用了第2条搜索结果，
+                    ^[1][3]^表示引用第1和第3条搜索结果。每条搜索结果包含若干相关内容片段。同时你需要遵循以下原则回答问题：
+                    \n1. 严格遵循搜索结果作答，可以承认不知道答案，并尝试给出一些搜索结果中的相关背景信息。
+                    \n2. 如果搜索结果存在多种可能的答案，要罗列出每种情况。
+                    \n3. 如果问题涉及金融、医疗、法律等存在风险的领域，请在结尾提醒用户注意并进行免责说明。
+                    \n搜索结果：\n{result.strip()}\n\n现在，请根据上面的搜索结果回答问题并标注引用，补全对话"""
+                    + add_token
+                )
+            else:
+                assert False, result
+
+            result += "\n"
+            return result
+
         if self.add_sys_token:
             system_info = example.system
             system_tokens = (
@@ -817,16 +907,9 @@ class KnowledgeBasedSFTReader(BaseReader):
         """
         simplify
         """
-
         batch_record_token_ids = [
             record.token_ids for record in batch_records
         ]  # leave one token for tgt_ids
-
-        if not self.in_tokens:
-            pad_length = round_up_to_multiple_of_8(
-                sum(map(len, batch_record_token_ids))
-            )
-
         batch_token_ids = [sum(batch_record_token_ids, [])]
 
         if not self.rope_3d:
@@ -896,38 +979,31 @@ class KnowledgeBasedSFTReader(BaseReader):
             padded_position_ids_extra = pad_sequence(
                 np.array([batch_position_ids_extra]),
                 padding_value=[0, 0, 0],
-                fix_len=self.max_seq_len if self.in_tokens else pad_length,
+                fix_len=self.max_seq_len,
             )
         else:
             padded_position_ids_extra = pad_batch_data(
-                batch_position_ids_extra,
-                pad_idx=0,
-                max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
+                batch_position_ids_extra, pad_idx=0, max_seq_len=self.max_seq_len
             )
 
         padded_token_ids = pad_batch_data(
             batch_token_ids,
             pad_idx=self.pad_id,
             return_input_mask=False,
-            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
+            max_seq_len=self.max_seq_len,
         )
         # padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=0, max_seq_len=self.max_seq_len)
 
         padded_batch_loss_mask = pad_batch_data(
-            batch_loss_mask,
-            pad_idx=0,
-            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
+            batch_loss_mask, pad_idx=0, max_seq_len=self.max_seq_len
         )
         padded_batch_labels = pad_batch_data(
-            batch_labels,
-            pad_idx=self.pad_id,
-            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
+            batch_labels, pad_idx=self.pad_id, max_seq_len=self.max_seq_len
         )
         # add in-batch mask
         if not simplify:
             input_mask = self._gen_self_attn_mask_for_glm_flatten(
-                batch_record_token_ids,
-                self.max_seq_len if self.in_tokens else pad_length,
+                batch_record_token_ids, self.max_seq_len
             )
 
         padded_batch_task_ids = pad_batch_data(
@@ -941,17 +1017,12 @@ class KnowledgeBasedSFTReader(BaseReader):
         for item in batch_record_token_ids:
             inbatch_pack_offset.append(inbatch_pack_offset[-1] + len(item))
         inbatch_pack_offset[-1] = (
-            self.max_seq_len if self.in_tokens else pad_length
+            self.max_seq_len
         )  # include padding in the last interval
         padded_inbatch_pack_offset = np.reshape(
             np.array(
                 inbatch_pack_offset
-                + [-1]
-                * (
-                    (self.max_seq_len if self.in_tokens else pad_length)
-                    + 1
-                    - len(inbatch_pack_offset)
-                ),
+                + [-1] * (self.max_seq_len + 1 - len(inbatch_pack_offset)),
                 dtype=np.int64,
             ),
             [1, -1],

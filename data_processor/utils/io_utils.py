@@ -26,7 +26,6 @@ import numpy as np
 import requests
 from PIL import Image
 from PIL.ExifTags import TAGS
-from decord import VideoReader
 
 RAW_VIDEO_DIR = "./download_tmp/raw_video/"
 RAW_IMAGE_DIR = "./download_tmp/raw_images/"
@@ -43,10 +42,11 @@ def file_download(url, download_dir, save_to_disk=False, retry=0, retry_interval
         save_to_disk: whether to save in the local path
 
     """
+    from data_processor.utils.video_utils import VideoReaderWrapper
 
     if isinstance(url, Image.Image):
         return url
-    elif isinstance(url, VideoReader):
+    elif isinstance(url, VideoReaderWrapper):
         return url
     elif url.startswith("http"):
         response = requests.get(url)
@@ -86,9 +86,7 @@ def get_filename(url=None):
     return image_filname
 
 
-def get_downloadable(
-    url, download_dir=RAW_VIDEO_DIR, save_to_disk=False, retry=0, retry_interval=3
-):
+def get_downloadable(url, download_dir=RAW_VIDEO_DIR, save_to_disk=False, retry=0, retry_interval=3):
     """download video and store it in the disk
 
     return downloaded **path** if save_to_disk is set to true
@@ -107,9 +105,7 @@ def get_downloadable(
     return downloaded_path
 
 
-def get_downloadable_image(
-    download_path, need_exif_info, retry_max_time=0, retry_interval=3
-):
+def get_downloadable_image(download_path, need_exif_info, retry_max_time=0, retry_interval=3):
     """
     Get downloadable with exif info and image processing
     """
@@ -125,9 +121,7 @@ def get_downloadable_image(
 
     def has_transparent_background(img):
         """has_transparent_background"""
-        if img.mode in ("RGBA", "LA") or (
-            img.mode == "P" and "transparency" in img.info
-        ):
+        if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
             # Check for any pixel with alpha channel less than 255 (fully opaque)
             alpha = img.convert("RGBA").split()[-1]
             if alpha.getextrema()[0] < 255:
@@ -155,12 +149,7 @@ def get_downloadable_image(
         # Since the point function in I mode only supports addition, subtraction, and multiplication, the following * (1 / 256) cannot be changed to division.
         return img.point(lambda i: i * (1 / 256)).convert("L")
 
-    image = get_downloadable(
-        download_path,
-        save_to_disk=False,
-        retry=retry_max_time,
-        retry_interval=retry_interval,
-    )
+    image = get_downloadable(download_path, save_to_disk=False, retry=retry_max_time, retry_interval=retry_interval)
     if isinstance(image, Image.Image):
         pil_image = image
     else:
@@ -168,7 +157,7 @@ def get_downloadable_image(
     if need_exif_info:
         try:
             exif_info = get_image_exif(pil_image)
-        except Exception:
+        except Exception as why:
             exif_info = {}
     else:
         exif_info = {}
@@ -178,7 +167,7 @@ def get_downloadable_image(
             pil_image = change_I16_to_L(pil_image)
         if has_transparent_background(pil_image):
             pil_image = add_white_background(pil_image)
-    except Exception:
+    except Exception as e:
         pass
 
     return pil_image.convert("RGB"), exif_info

@@ -20,22 +20,14 @@ from functools import partial
 from typing import Any, Optional
 
 import paddle
-from paddleformers.transformers import (
-    AutoConfig,
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    AutoModelForCausalLMPipe,
-)
 from paddleformers.trainer import (
     IntervalStrategy,
     RuntimeTimer,
     get_last_checkpoint,
     set_seed,
 )
-
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.utils.log import logger
-from paddleformers import __version__ as paddleformers_version
 
 from ernie.configuration import Ernie4_5_MoeConfig
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
@@ -43,10 +35,8 @@ from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import check_refined_recompute, save_stop_info
 from ernie.utils.download_utils import check_download_repo
-from ernie.utils.load_utils import resolve_weight_source
 
 from ..hparams import get_eval_args, read_args
-
 from ..train.sft.trainer import ErnieMoETrainer
 from ..utils.process import is_valid_model_dir
 
@@ -157,18 +147,18 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     is_local = os.path.isfile(model_args.model_name_or_path) or os.path.isdir(
         model_args.model_name_or_path
     )
-
-    weight_source = {
-        "convert_from_hf": False,
-        "save_to_hf": False,
-    }
     if is_local:
         config_path = os.path.join(model_args.model_name_or_path, "config.json")
         with open(config_path, "r", encoding="utf-8") as f:
             config_dict = json.load(f)
         if "torch_dtype" in config_dict:
-            weight_source["convert_from_hf"] = True
+            raise ValueError(
+                "Unsupported weight format: Torch weights are not compatible with Paddle model currently."
+            )
 
+    model_class = Ernie4_5_MoeForCausalLM
+    if finetuning_args.pipeline_parallel_degree > 1:
+        model_class = Ernie4_5_MoeForCausalLMPipe
     if (
         model_args.moe_group.lower() in {"data", "dp"}
         and finetuning_args.data_parallel_degree > 1
@@ -196,13 +186,8 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
                 "weight_only_int4": [".*mlp.experts.*"],
                 "weight_only_int8": [
                     ".*self_attn.qkv_proj.*",
-                    ".*self_attn.q_proj.*",
-                    ".*self_attn.k_proj.*",
-                    ".*self_attn.v_proj.*",
                     ".*self_attn.o_proj.*",
                     ".*mlp.up_gate_proj.*",
-                    ".*mlp.gate_proj.*",
-                    ".*mlp.up_proj.*",
                     ".*mlp.down_proj.*",
                 ],
             }
@@ -234,87 +219,22 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        download_hub=model_args.download_hub,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        from_modelscope=model_args.from_modelscope,
     )
 
-    try:
-        from paddleformers.utils.download import (
-            DownloadSource,
-        )  # test if paddleformers is the newest
-    except Exception:
-        DownloadSource = None
+    if getattr(model_args, "from_modelscope", False):
+        os.environ["from_modelscope"] = "True"
 
-    download_source_kwargs = {}
-    if DownloadSource is None:
-        if model_args.download_hub == "huggingface":
-            download_source_kwargs["from_hf_hub"] = True
-        elif model_args.download_hub == "aistudio":
-            download_source_kwargs["from_aistudio"] = True
-        elif model_args.download_hub == "modelscope":
-            download_source_kwargs["from_modelscope"] = True
-    else:
-        download_source_kwargs["download_hub"] = model_args.download_hub
-
-    weight_source = resolve_weight_source(
+    model_config = Ernie4_5_MoeConfig.from_pretrained(
         model_args.model_name_or_path,
-        download_source_kwargs=download_source_kwargs,
+        dtype=dtype,
+        quantization_config=quantization_config,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        convert_from_torch=False,
     )
-
-    if weight_source["convert_from_hf"]:
-        finetuning_args.use_huggingface_model = True
-        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
-        logger.info("loading model from HuggingFace")
-
-    if finetuning_args.use_huggingface_model:
-        model_class = AutoModelForCausalLM
-        if finetuning_args.pipeline_parallel_degree > 1:
-            model_class = AutoModelForCausalLMPipe
-    else:
-        model_class = Ernie4_5_MoeForCausalLM
-        if finetuning_args.pipeline_parallel_degree > 1:
-            model_class = Ernie4_5_MoeForCausalLMPipe
-
-    convert_from_kwargs = {
-        (
-            "convert_from_hf"
-            if paddleformers_version >= "0.3"
-            else "convert_from_torch"
-        ): weight_source["convert_from_hf"]
-    }
-    if paddleformers_version >= "0.3":
-        finetuning_args.save_to_hf = (
-            weight_source["save_to_hf"] and finetuning_args.use_huggingface_model
-        )
-
-    if finetuning_args.use_huggingface_model:
-        if (
-            model_args.use_attn_mask_start_row_indices
-            and model_args.use_sparse_flash_attn
-        ):
-            _attn_implementation = "flashmask"
-        else:
-            _attn_implementation = "sdpa"
-        model_config = AutoConfig.from_pretrained(
-            model_args.model_name_or_path,
-            _attn_implementation=_attn_implementation,
-            dtype=dtype,
-            quantization_config=quantization_config,
-            use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
-            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
-            loss_subbatch_sequence_length=32768,
-            num_nextn_predict_layers=model_args.num_nextn_predict_layers,
-            **convert_from_kwargs,
-            **download_source_kwargs,
-        )
-    else:
-        model_config = Ernie4_5_MoeConfig.from_pretrained(
-            model_args.model_name_or_path,
-            dtype=dtype,
-            quantization_config=quantization_config,
-            **convert_from_kwargs,
-            **download_source_kwargs,
-        )
-
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = finetuning_args.tensor_parallel_rank
     model_config.recompute = finetuning_args.recompute
@@ -359,10 +279,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
-    if (
-        model_config.get("moe_num_experts", None) is None
-        or model_config.get("moe_num_experts", 0) == 0
-    ):
+    if model_config.moe_num_experts is None or model_config.moe_num_experts == 0:
         model_config.moe_group = (
             "dummy" if model_args.moe_group == "mp" else model_args.moe_group
         )
@@ -371,15 +288,17 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
-            **convert_from_kwargs,
-            **download_source_kwargs,
+            from_hf_hub=model_args.from_hf_hub,
+            from_aistudio=model_args.from_aistudio,
+            convert_from_torch=False,
         )
     else:
         model = model_class.from_config(
             model_config,
             dtype=dtype,
-            **convert_from_kwargs,
-            **download_source_kwargs,
+            from_hf_hub=model_args.from_hf_hub,
+            from_aistudio=model_args.from_aistudio,
+            convert_from_torch=False,
         )
 
     if model.config.head_dim is None:
@@ -399,13 +318,11 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             weights when using Pipeline Parallelism (PP)."
         )
 
-    tokenizer_cls = (
-        AutoTokenizer if weight_source["convert_from_hf"] else Ernie4_5_Tokenizer
-    )
-    tokenizer = tokenizer_cls.from_pretrained(
+    tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
-        **convert_from_kwargs,
-        **download_source_kwargs,
+        from_hf_hub=model_args.from_hf_hub,
+        from_aistudio=model_args.from_aistudio,
+        convert_from_torch=False,
     )
 
     logger.info("Start to create dataset ...")

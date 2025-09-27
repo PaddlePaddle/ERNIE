@@ -21,18 +21,20 @@ Mapper for input_ids_messaging
 
 import copy
 import json
+import os
 import random
 import traceback
 from collections import OrderedDict
 from copy import deepcopy
 
 import numpy as np
+import yaml
 
 from data_processor.steps.input_ids_messaging import (
     data_adaptive,
     data_process,
 )
-from data_processor.steps.input_ids_messaging.data_utils import merge_list
+from data_processor.steps.input_ids_messaging.data_utils import add_prompt, merge_list
 from data_processor.utils.constant import (
     CUT_FLAG,
     DATASET_TYPE_TO_DATA_TYPE,
@@ -43,9 +45,10 @@ from data_processor.utils.constant import (
 from data_processor.utils.io_utils import image_info_2_hash
 from data_processor.utils.logger_utils import logger
 from data_processor.utils.processor_base import ProcessorBase
-from data_processor.utils.video_utils import group_frame_by_video
 from ernie.tokenizer_vl import (
     NOT_FOUND_TOKEN_ID,
+    SFT_ASR_END_TOKEN,
+    SFT_ASR_START_TOKEN,
     SFT_IMAGE_END_TOKEN,
     SFT_IMAGE_START_TOKEN,
     SFT_VIDEO_END_TOKEN,
@@ -82,6 +85,7 @@ class ExampleToFeature(ProcessorBase):
     def __init__(
         self,
         tokenizer,
+        data_filelist=None,
         corpus_name="default",
         im_prefix_length=64,
         max_seq_length=8192,
@@ -90,6 +94,7 @@ class ExampleToFeature(ProcessorBase):
         adaptive_max_imgtoken_rate=None,
         special_tokens_info=None,
         loc_coordinate_num=1001,
+        prompt_dir=None,
         one_sample_in_one_seq=False,
         variable_resolution=False,
         spatial_conv_size=1,
@@ -102,18 +107,43 @@ class ExampleToFeature(ProcessorBase):
     ):
         super().__init__(None)
 
-        # for utterance, fake a dataset_config
-        dataset_config = {
-            "name": corpus_name,
-            "dataset_type": "default",
-            "data_setting": "{}",
-        }
+        self.data_filelist = data_filelist
+        if data_filelist:
+            with open(data_filelist, "r", encoding="utf-8") as f:
+                datasets_config = yaml.load(f.read(), yaml.FullLoader)["datasets"]
+
+            for dataset_config in datasets_config:
+                if dataset_config["name"] == corpus_name:
+                    break
+            else:
+                raise ValueError(f"{corpus_name} not in {data_filelist}")
+
+        else:
+            # for utterance, fake a dataset_config
+            dataset_config = {
+                "name": corpus_name,
+                "dataset_type": "default",
+                "prompt_file": None,
+                "data_setting": "{}",
+            }
 
         # data_info
         self.data_info = {
             "dataset_type": dataset_config["dataset_type"],
             "dataset_name": dataset_config["name"],
         }
+
+        # prompt
+        if prompt_dir and dataset_config["prompt_file"]:
+            prompt_filepath = os.path.join(prompt_dir, dataset_config["prompt_file"])
+            with open(prompt_filepath, encoding="utf-8") as f:
+                prompt_list = f.read().strip("\n").split("\n")
+
+        else:
+            # for untterance, use empty prompt
+            prompt_list = [""]
+        self.data_info["prompt_list"] = prompt_list
+        self.data_info["prompt_id_list"] = list(range(len(prompt_list)))
 
         # adaptive
         self.variable_resolution = variable_resolution
@@ -197,6 +227,8 @@ class ExampleToFeature(ProcessorBase):
         self.image_end_token = SFT_IMAGE_END_TOKEN
         self.video_start_token = SFT_VIDEO_START_TOKEN
         self.video_end_token = SFT_VIDEO_END_TOKEN
+        self.asr_start_token = SFT_ASR_START_TOKEN
+        self.asr_end_token = SFT_ASR_END_TOKEN
         self.cls_token_id = self.vocab.get(self.cls_token, self.not_found_token_id)
         self.sep_token_id = self.vocab.get(self.sep_token, self.not_found_token_id)
         self.image_start_id = self.vocab.get(
@@ -211,6 +243,10 @@ class ExampleToFeature(ProcessorBase):
         self.video_end_id = self.vocab.get(
             self.video_end_token, self.not_found_token_id
         )
+        self.asr_start_id = self.vocab.get(
+            self.asr_start_token, self.not_found_token_id
+        )
+        self.asr_end_id = self.vocab.get(self.asr_end_token, self.not_found_token_id)
         self.eos_token_id = self.vocab.get(self.eos_token, self.not_found_token_id)
         # system setting start
         self.bosys_token = self.tokenizer.special_tokens_map.get(
@@ -231,6 +267,8 @@ class ExampleToFeature(ProcessorBase):
         self.token_type_mapping[self.image_end_id] = IDS_TYPE_FLAG["image"]
         self.token_type_mapping[self.video_start_id] = IDS_TYPE_FLAG["image"]
         self.token_type_mapping[self.video_end_id] = IDS_TYPE_FLAG["image"]
+        self.token_type_mapping[self.asr_start_id] = IDS_TYPE_FLAG["image"]
+        self.token_type_mapping[self.asr_end_id] = IDS_TYPE_FLAG["image"]
 
         if self.not_found_token_id in self.token_type_mapping:
             # TODO How to fix unfound special token.
@@ -262,20 +300,27 @@ class ExampleToFeature(ProcessorBase):
             meta (dict): one sample
         """
 
-        if "image_info" not in meta or len(meta["image_info"]) == 0:
-            dataset_type = "default"
-            meta["image_info"] = []
+        prompt_id = self.prompt_rng.choice(self.data_info["prompt_id_list"])
+        prompt = self.data_info["prompt_list"][prompt_id]
+        if not self.is_training or self.data_filelist is None:
+            if "image_info" not in meta or len(meta["image_info"]) == 0:
+                dataset_type = "default"
+                meta["image_info"] = []
+            else:
+                data_types = [item["image_type"] for item in meta["image_info"]]
+                if len(set(data_types)) == 1:
+                    dataset_type = (
+                        "default" if data_types[0] == "image" else data_types[0]
+                    )
         else:
-            data_types = [item["image_type"] for item in meta["image_info"]]
-            if len(set(data_types)) == 1:
-                dataset_type = "default" if data_types[0] == "image" else data_types[0]
+            dataset_type = self.data_info["dataset_type"]
         dataset_name = self.data_info["dataset_name"]
         data_type = DATASET_TYPE_TO_DATA_TYPE.get(dataset_type, None)
         assert data_type is not None, f"Unknow dataset type: {dataset_type}."
 
         for i, sample_info in enumerate(
             self._example_to_feature(
-                deepcopy(meta), data_type, dataset_type, dataset_name, **kwargs
+                deepcopy(meta), prompt, data_type, dataset_type, dataset_name, **kwargs
             )
         ):
             """
@@ -300,9 +345,11 @@ class ExampleToFeature(ProcessorBase):
     def _example_to_feature(
         self,
         meta: dict,
+        prompt: str,
         data_type: str,
         dataset_type: str,
         dataset_name: str,
+        use_prompt: bool = True,
         lazy_image: bool = True,
         max_tile: int = -1,
         max_dec_len: int = 0,
@@ -312,8 +359,10 @@ class ExampleToFeature(ProcessorBase):
 
         Args:
             meta (dict): one sample with schema format
+            prompt (str): one prompt
             dataset_type (str): see DATA_TYPE_TO_DATASET_TYPE
             dataset_name (str): data name
+            use_prompt (bool, optional): use prompt. Defaults to True.
             lazy_image (bool, optional): lazy image. Defaults to True.
 
         Yields:
@@ -349,7 +398,6 @@ class ExampleToFeature(ProcessorBase):
                     img_one["image_type"] = img_one.get("image_type", "image")
 
             """[STEP 0] adaptiver """
-            sample_grouped_info = group_frame_by_video(meta)
             adaptiver = getattr(data_adaptive, "Adaptive")(
                 image_processor=self.image_processor,
                 spatial_conv_size=self.spatial_conv_size,
@@ -363,9 +411,12 @@ class ExampleToFeature(ProcessorBase):
                 rope_3d=self.rope_3d,
             )
 
-            """[STEP 1] process"""
+            """[STEP 1] add prompt"""
+            if self.is_training:
+                meta = add_prompt(deepcopy(meta), use_prompt, prompt, data_type)
+
+            """[STEP 2] process"""
             metas = [meta]
-            processor = None
             if dataset_type in DATASET_TYPE_TO_PROCESS_FN:
                 obj_process = getattr(
                     data_process, DATASET_TYPE_TO_PROCESS_FN[dataset_type]
@@ -384,14 +435,14 @@ class ExampleToFeature(ProcessorBase):
                     is_training=self.is_training,
                     variable_resolution=self.variable_resolution,
                     rope_3d=self.rope_3d,
-                    sample_grouped_info=sample_grouped_info,
                 )
-
                 meta = processor.process(
-                    sample=meta,
+                    sample=deepcopy(meta),
                     dataset_name=dataset_name,
                     data_type=data_type,
                     dataset_type=dataset_type,
+                    use_prompt=use_prompt,
+                    prompt=prompt,
                 )
                 metas = meta if isinstance(meta, list) else [meta]
             if self.is_training and len(metas) == 0:
@@ -403,35 +454,25 @@ class ExampleToFeature(ProcessorBase):
             for idx, meta in enumerate(metas):
                 if not meta:
                     continue
+                """[STEP 3] adaptive"""
+                meta = adaptiver.process(sample=deepcopy(meta))
 
-                """[STEP 2] adaptive"""
-                meta = adaptiver.process(
-                    sample=meta,
-                    sample_grouped_info=(
-                        processor.sample_grouped_info if processor else None
-                    ),
-                )
-
-                """[STEP 3] text tokenizer & add placeholder"""
+                """[STEP 4] text tokenizer & add placeholder"""
                 meta = self._text_tokenization_add_placeholder(
-                    meta,
+                    deepcopy(meta),
                     dataset_name,
                     data_type,
                     adaptiver,
                     add_eos_token=False,
                 )
 
-                """[STEP 4] image_wise type id"""
-                meta = self._add_image_wise_type_id(meta, data_type)
+                """[STEP 5] image_wise type id"""
+                meta = self._add_image_wise_type_id(deepcopy(meta), data_type)
 
-                """[STEP 5] add mask"""
+                """[STEP 6] add mask"""
                 with SlidingWindowsContextManager(self.tokenizer, self.is_training):
                     for one in self._sliding_window(
-                        meta,
-                        dataset_name,
-                        data_type,
-                        adaptiver,
-                        processor.sample_grouped_info if processor else None,
+                        meta, dataset_name, data_type, adaptiver
                     ):
                         if one is not None:
                             assert len(one["ids_type"]) == len(
@@ -485,7 +526,9 @@ class ExampleToFeature(ProcessorBase):
                 split_token_id = self.sep_token_id
                 min_num = 1
             else:
-                raise NotImplementedError(f"{self.chat_template} is not supported now.")
+                raise NotImplementedError(
+                    f"{self.chat_tempelate} is not supported now."
+                )
 
             split_token_num = sum(truncate_ids == split_token_id)
             if split_token_num < min_num:
@@ -645,9 +688,7 @@ class ExampleToFeature(ProcessorBase):
 
         return sample
 
-    def _sliding_window(
-        self, sample, dataset_name, data_type, adaptiver, sample_grouped_info
-    ):
+    def _sliding_window(self, sample, dataset_name, data_type, adaptiver):
         """
         sliding_window
         """
@@ -772,13 +813,11 @@ class ExampleToFeature(ProcessorBase):
                 if self.variable_resolution:
                     assert (
                         sample_ids == self.image_token_id
-                    ).sum() == adaptiver.get_images_token_num(
-                        image_info, sample_grouped_info
-                    ), (
+                    ).sum() == adaptiver.get_images_token_num(image_info), (
                         "(sample_ids == self.image_token_id).sum(): "
                         + f"{(sample_ids == self.image_token_id).sum()}, "
-                        + "adaptiver.get_images_token_num(image_info, sample_grouped_info): "
-                        + f"{adaptiver.get_images_token_num(image_info, sample_grouped_info)}"
+                        + "adaptiver.get_images_token_num(image_info): "
+                        + f"{adaptiver.get_images_token_num(image_info)}"
                     )
 
                 assert len(image_info) == len(

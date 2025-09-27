@@ -185,10 +185,6 @@ class PreTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "whether to disable pipeline warmup"},
     )
-    packing: bool = field(
-        default=True,
-        metadata={"help": "whether to use data packing strategy."},
-    )
     global_logging_interval: int = field(
         default=1,
         metadata={"help": "the logging interval of global_training_logs"},
@@ -270,6 +266,7 @@ class VLSFTTrainingArguments(PreTrainingArguments):
     factor: int = field(
         default=20, metadata={"help": "Pretrained model name or path to local model."}
     )
+    pseudo_strategy: int = field(default=0, metadata={"help": "."})
     example_from_same_task_prob: float = field(default=0.0, metadata={"help": "."})
     pseudo_sampling_prob: float = field(default=0.5, metadata={"help": "."})
     trigger_data_prob: float = field(default=0.5, metadata={"help": "."})
@@ -477,12 +474,6 @@ class FinetuningArguments(
         default=False, metadata={"help": "Whether to use recompute_mtp"}
     )
 
-    # training pytorch models from huggingFace
-    use_huggingface_model: bool = field(
-        default=False,
-        metadata={"help": "Whether to use huggingface model to finetune."},
-    )
-
     def __post_init__(self):
         self.bf16 = True
         if self.compute_type == "bf16":
@@ -504,8 +495,6 @@ class FinetuningArguments(
             self.weight_quantize_algo = "weight_only_int8"
         elif self.compute_type == "wint4/8":
             self.weight_quantize_algo = "weight_only_mix"
-        elif self.compute_type == "nf4":
-            self.weight_quantize_algo = "nf4"
         else:
             raise ValueError(f"Unknown compute_type: {self.compute_type}")
         self.per_device_train_batch_size = self.batch_size

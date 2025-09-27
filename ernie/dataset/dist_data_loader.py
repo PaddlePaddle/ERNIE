@@ -181,7 +181,6 @@ class MMDataloader(paddle.io.DataLoader):
         worker_init_fn=None,
         persistent_workers=False,
         multimodal_multiround_ratio=0.3,
-        packing=False,
     ):
 
         # dummy_dataset is a placeholder, not used
@@ -239,7 +238,6 @@ class MMDataloader(paddle.io.DataLoader):
         self.rng = random.Random(2048)
         self.multimodal_multiround_ratio = multimodal_multiround_ratio
         self.need_multiround = self.rng.random() < self.multimodal_multiround_ratio
-        self.packing = packing
 
     def __len__(self):
         return super().__len__()
@@ -387,75 +385,14 @@ class MMDataloader(paddle.io.DataLoader):
                     data.get("position_ids", None),
                 )
 
-                if self.packing:
-                    need_to_yield_sample = (
-                        self._lens_rcd[src_id] + input_ids.shape[0]
-                        > self.tokenizer.model_max_length
-                    )
-                    if need_to_yield_sample:
-                        slice_result = self.sync_array_slices(
-                            self._sample_buffer[src_id], self.need_multiround
-                        )
-                        example = {
-                            "data_id": np.array(self._sample_buffer[src_id]["data_id"]),
-                            "part_id": np.array(self._sample_buffer[src_id]["part_id"]),
-                            "src_id": np.array(self._sample_buffer[src_id]["src_id"]),
-                            "example_id": np.array(
-                                self._sample_buffer[src_id]["example_id"]
-                            ),
-                            "need_multiround": self.need_multiround,
-                        }
-                        example.update(slice_result)
+                need_to_yield_sample = (
+                    self._lens_rcd[src_id] + input_ids.shape[0]
+                    > self.tokenizer.model_max_length
+                )
 
-                        self._batch_buffer["cur_batch"].append(example)
-
-                        self._lens_rcd[src_id] = 0
-                        self._lens_images[src_id] = 0
-                        self._sample_buffer[src_id] = defaultdict(list)
-                        if len(self._batch_buffer["cur_batch"]) == self.batch_size:
-                            batch_data = self._collate_fn(
-                                self._batch_buffer["cur_batch"]
-                            )
-                            for k in batch_data:
-                                if batch_data[k] is not None:
-                                    batch_data[k] = paddle.to_tensor(batch_data[k])
-                            self._batch_buffer["cur_batch"] = []
-                            yield batch_data
-                            self.need_multiround = (
-                                self.rng.random() < self.multimodal_multiround_ratio
-                            )
-                    self._sample_buffer[src_id]["input_ids"].append(input_ids)
-                    self._sample_buffer[src_id]["labels"].append(labels)
-                    self._sample_buffer[src_id]["data_id"].append(data_id)
-                    self._sample_buffer[src_id]["part_id"].append(part_id)
-                    self._sample_buffer[src_id]["src_id"].append(src_id)
-                    self._sample_buffer[src_id]["example_id"].append(example_id)
-                    self._sample_buffer[src_id]["data_type"].append(data_type)
-                    self._sample_buffer[src_id]["token_type_ids"].append(token_type_ids)
-                    self._sample_buffer[src_id]["image_type_ids"].extend(image_type_ids)
-                    self._sample_buffer[src_id]["images"].append(images)
-                    self._sample_buffer[src_id]["grid_thw"].append(grid_thw)
-                    self._sample_buffer[src_id]["position_ids"].append(position_ids)
-                    self._lens_rcd[src_id] += input_ids.shape[0]
-                    self._lens_images[src_id] += len(images)
-                else:
-                    self._sample_buffer[src_id]["input_ids"].append(input_ids)
-                    self._sample_buffer[src_id]["labels"].append(labels)
-                    self._sample_buffer[src_id]["data_id"].append(data_id)
-                    self._sample_buffer[src_id]["part_id"].append(part_id)
-                    self._sample_buffer[src_id]["src_id"].append(src_id)
-                    self._sample_buffer[src_id]["example_id"].append(example_id)
-                    self._sample_buffer[src_id]["data_type"].append(data_type)
-                    self._sample_buffer[src_id]["token_type_ids"].append(token_type_ids)
-                    self._sample_buffer[src_id]["image_type_ids"].extend(image_type_ids)
-                    self._sample_buffer[src_id]["images"].append(images)
-                    self._sample_buffer[src_id]["grid_thw"].append(grid_thw)
-                    self._sample_buffer[src_id]["position_ids"].append(position_ids)
-                    self._lens_rcd[src_id] += input_ids.shape[0]
-                    self._lens_images[src_id] += len(images)
-
+                if need_to_yield_sample:
                     slice_result = self.sync_array_slices(
-                        self._sample_buffer[src_id], False
+                        self._sample_buffer[src_id], self.need_multiround
                     )
                     example = {
                         "data_id": np.array(self._sample_buffer[src_id]["data_id"]),
@@ -464,7 +401,7 @@ class MMDataloader(paddle.io.DataLoader):
                         "example_id": np.array(
                             self._sample_buffer[src_id]["example_id"]
                         ),
-                        "need_multiround": False,
+                        "need_multiround": self.need_multiround,
                     }
                     example.update(slice_result)
 
@@ -480,6 +417,23 @@ class MMDataloader(paddle.io.DataLoader):
                                 batch_data[k] = paddle.to_tensor(batch_data[k])
                         self._batch_buffer["cur_batch"] = []
                         yield batch_data
+                        self.need_multiround = (
+                            self.rng.random() < self.multimodal_multiround_ratio
+                        )
+                self._sample_buffer[src_id]["input_ids"].append(input_ids)
+                self._sample_buffer[src_id]["labels"].append(labels)
+                self._sample_buffer[src_id]["data_id"].append(data_id)
+                self._sample_buffer[src_id]["part_id"].append(part_id)
+                self._sample_buffer[src_id]["src_id"].append(src_id)
+                self._sample_buffer[src_id]["example_id"].append(example_id)
+                self._sample_buffer[src_id]["data_type"].append(data_type)
+                self._sample_buffer[src_id]["token_type_ids"].append(token_type_ids)
+                self._sample_buffer[src_id]["image_type_ids"].extend(image_type_ids)
+                self._sample_buffer[src_id]["images"].append(images)
+                self._sample_buffer[src_id]["grid_thw"].append(grid_thw)
+                self._sample_buffer[src_id]["position_ids"].append(position_ids)
+                self._lens_rcd[src_id] += input_ids.shape[0]
+                self._lens_images[src_id] += len(images)
 
 
 class SFTDataLoader(paddle.io.DataLoader):
@@ -544,12 +498,11 @@ class DistDataLoader(paddle.io.DataLoader):
         gradient_accumulation_steps=1,
         multimodal_multiround_ratio=0.3,
         modality_ratio=[1, 1],
-        packing=True,
     ):
 
         if dataset is None:
             dataset = DummyDataset()
-            batch_sampler = None
+            batch_sampler = DistributedBatchSampler(dataset, 1)
             log.info("rank has no data, use Dummpy dataset")
         super().__init__(
             dataset=dataset,
@@ -590,7 +543,7 @@ class DistDataLoader(paddle.io.DataLoader):
                 places=places,
                 return_list=return_list,
                 batch_sampler=batch_sampler,
-                batch_size=batch_size,
+                batch_size=1,
                 shuffle=shuffle,
                 drop_last=drop_last,
                 collate_fn=collate_fn,
@@ -602,7 +555,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 worker_init_fn=worker_init_fn,
                 persistent_workers=persistent_workers,
                 multimodal_multiround_ratio=0.3,
-                packing=packing,
             )
             if text_sft_dataset is not None:
                 self.text_sft_dataset = text_sft_dataset

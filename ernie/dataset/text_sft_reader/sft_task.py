@@ -91,5 +91,6 @@ class KnoverDataset(IterableDataset):
             )
             batch["data_type"] = np.array(DATATYPE_2_ID["lm"]).astype("int64")
             buf.append(batch)
-            yield buf  # list of dict
-            buf = []
+            if len(buf) == self.batch_size:
+                yield buf  # list of dict
+                buf = []

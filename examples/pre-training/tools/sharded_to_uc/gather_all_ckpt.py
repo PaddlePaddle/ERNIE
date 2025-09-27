@@ -20,19 +20,7 @@ import subprocess
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--org_path",
-        type=str,
-        required=True,
-        help="The path of checkpoint to be gathered.",
-    )
-    parser.add_argument(
-        "--tgt_path",
-        type=str,
-        required=True,
-        help="The output path to gather all checkpoints.",
-    )
-    parser.add_argument(
-        "--hostfile_path", type=str, required=True, help="The file for hostfile."
+        "--ckpt", type=str, required=True, help="the path of checkpoint to be gathered."
     )
     args = parser.parse_args()
     return args
@@ -40,24 +28,17 @@ def parse_args():
 
 def parse_path(args):
     pwd = subprocess.run(["pwd"], capture_output=True, text=True).stdout.strip()
-    org_path = args.org_path
-    tgt_path = args.tgt_path
-    assert not org_path.startswith(
-        "/"
-    ), "Please path relative path instead of absolute path to org_path."
-    assert not tgt_path.startswith(
-        "/"
-    ), "Please path relative path instead of absolute path to tgt_path."
+    org_path = args.ckpt
+    tgt_path = org_path.split("/")[1]
     assert not os.path.exists(tgt_path), f"{tgt_path} exist, please check"
     os.makedirs(f"{tgt_path}")
     return f"{pwd}/{org_path}", f"{pwd}/{tgt_path}"
 
 
-def get_ip_list(args):
-    hostfile_path = args.hostfile_path
-    assert os.path.exists(hostfile_path), f"{hostfile_path} not exist, please check"
+def get_ip_list():
+    TRAIN_WORKSPACE = os.getenv("TRAIN_WORKSPACE")
     hostnames = subprocess.run(
-        ["cat", hostfile_path], capture_output=True, text=True
+        ["cat", f"{TRAIN_WORKSPACE}/hostfile"], capture_output=True, text=True
     ).stdout.split("\n")
     for i in range(len(hostnames)):
         hostname = hostnames[i].split(" ")[0]
@@ -173,7 +154,7 @@ if __name__ == "__main__":
     args = parse_args()
     org_path, tgt_path = parse_path(args)
     print(f"gather ckpt from {org_path} to {tgt_path}")
-    hostnames, local_host = get_ip_list(args)
+    hostnames, local_host = get_ip_list()
     print(f"gather ips list {hostnames}, and local_host is {local_host}")
     gather_ckpt(org_path, tgt_path, hostnames, local_host)
     print("done gathered all ckpt")

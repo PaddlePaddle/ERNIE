@@ -29,7 +29,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet.meta_optimizers.dygraph_optimizer
-from tqdm import tqdm
+import tqdm
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
 )
@@ -110,8 +110,6 @@ class SFTTrainer(PretrainingTrainer):
         is_train_mm=True,
         text_sft_dataset=None,
         modality_ratio=[1, 1],
-        batch_size=1,
-        packing=True,
         **kwargs,
     ):
         super().__init__(
@@ -121,8 +119,6 @@ class SFTTrainer(PretrainingTrainer):
         self.text_sft_dataset = text_sft_dataset
         self.modality_ratio = modality_ratio
         self.is_train_mm = is_train_mm
-        self.batch_size = batch_size
-        self.packing = packing
 
     def get_train_dataloader(self):
         """get train data loader"""
@@ -151,14 +147,12 @@ class SFTTrainer(PretrainingTrainer):
             collate_fn=self.data_collator,
             num_workers=self.args.dataloader_num_workers,
             prefetch_factor=self.args.prefetch_factor,
-            batch_size=self.batch_size,
             is_train_text=self.is_train_text,
             text_sft_dataset=self.text_sft_dataset,
             need_data=self.args.need_data,
             gradient_accumulation_steps=self.args.gradient_accumulation_steps,
             modality_ratio=self.modality_ratio,
             is_train_mm=self.is_train_mm,
-            packing=self.packing,
         )
 
     def train(
@@ -554,6 +548,7 @@ class SFTTrainer(PretrainingTrainer):
                         steps_trained_progress_bar.update(1)
                     if steps_trained_in_current_epoch == 0:
                         self._load_rng_state(resume_from_checkpoint)
+                    self.timers and self.timers("read-data").start()
                     continue
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()

@@ -131,11 +131,17 @@ class ModelArguments:
             "help": "Whether to use the fused gate-detach matmul implementation."
         },
     )
-    download_hub: str = field(
-        default=None,
-        metadata={
-            "help": "The source for model downloading, options include `huggingface`, `aistudio`, `modelscope`, default `None`."
-        },
+    from_hf_hub: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from huggingface hub"},
+    )
+    from_aistudio: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from aistudio"},
+    )
+    from_modelscope: bool = field(
+        default=False,
+        metadata={"help": "Whether to download model from modelscope"},
     )
 
     # performance
@@ -144,12 +150,12 @@ class ModelArguments:
         metadata={"help": "virtual_pp_degree"},
     )
     pp_seg_method: str = field(
-        default="layer:Ernie4_5_DecoderLayer|ErnieDecoderLayer|EmptyLayer",
+        default="layer:Ernie4_5_DecoderLayer|EmptyLayer",
         metadata={
             "help": (
                 "The method used to segment the pipeline layers among pipeline stages. "
                 "Possible values include `layer:Ernie4_5_DecoderLayer`, "
-                "`layer:Ernie4_5_DecoderLayer|ErnieDecoderLayer|Empty`, `uniform`, `[0, 30, 59]`."
+                "`layer:Ernie4_5_DecoderLayer|Empty`, `uniform`, `[0, 30, 59]`."
             )
         },
     )
@@ -304,9 +310,6 @@ class ModelArguments:
     moe_gate: str = field(default="top2_fused", metadata={"help": "MoE gate type"})
     use_recompute_loss_fn: bool = field(
         default=True, metadata={"help": "Whether to recompute loss function"}
-    )
-    loss_subbatch_seqlen: int = field(
-        default=32768, metadata={"help": "Sub batch size for loss calculation"}
     )
 
     def __post_init__(self):

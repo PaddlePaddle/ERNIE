@@ -13,6 +13,10 @@
 # limitations under the License.
 
 """coarse_processing"""
+from data_processor.steps.coarse_processing.args import CoarseProcessorArguments
 from data_processor.steps.coarse_processing.processor import CoarseProcessor
 
-__all__ = ["CoarseProcessor"]
+__all__ = [
+    "CoarseProcessor",
+    "CoarseProcessorArguments",
+]

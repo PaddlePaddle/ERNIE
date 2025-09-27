@@ -80,8 +80,6 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
             f"--enable-chunked-prefill "
             f"--max-num-batched-tokens {server_args.max_num_batched_tokens} "
         )
-        if server_args.load_choices == "default_v1":
-            command += "--load_choices default_v1 "
         command = shlex.split(command)
     else:
         command = (
@@ -99,14 +97,7 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
             f"--block-size {server_args.block_size} "
             f"--kv-cache-ratio {server_args.kv_cache_ratio} "
             f"--quantization {server_args.quantization} "
-        )
-        if server_args.load_choices == "default_v1":
-            command += "--load_choices default_v1 "
-        if server_args.reasoning_parser == "ernie_x1":
-            command += "--reasoning-parser ernie_x1 "
-        if server_args.tool_call_parser == "ernie_x1":
-            command += "--tool-call-parser ernie_x1 "
-        command = command.split()
+        ).split()
 
     process = subprocess.Popen(
         command,

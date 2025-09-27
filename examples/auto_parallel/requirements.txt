@@ -1,5 +1,0 @@
-paddlepaddle-gpu
-paddleformers>=0.2.0
-tensorboardX>=2.6.4
-decord>=0.6.0
-moviepy>=2.2.1
