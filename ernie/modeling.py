@@ -845,13 +845,8 @@ class Ernie4_5_Attention(nn.Layer):
                 token_type_ids = token_type_ids.reshape([-1])
                 token_type_ids = ScatterOp.apply(token_type_ids)
                 token_type_ids.stop_gradient = True
-            max_sequence_length = self.config.max_sequence_length
-            bsz = (
-                hidden_states.shape[0]
-                * self.config.tensor_parallel_degree
-                // max_sequence_length
-            )
-            q_len = max_sequence_length
+            bsz = 1
+            q_len = hidden_states.shape[0] * self.config.tensor_parallel_degree
         else:
             bsz, q_len, _ = hidden_states.shape
         query_states = key_states = value_states = mix_layer = None
@@ -1466,7 +1461,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         """
 
         if self.config.use_sparse_head_and_loss_fn:
-            hidden_states, outlinear_weight, outlinear_bias, _ = prediction_scores
+            hidden_states, outlinear_weight, outlinear_bias = prediction_scores[:3]
 
             if self.config.sequence_parallel:
                 masked_lm_labels, sparse_label_idx = (

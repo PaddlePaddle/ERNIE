@@ -2,7 +2,7 @@
 {
   "demo_sft_train": {
     "path": "examples/data/sft-train.jsonl",
-    "prob": 1.0,
+    "prob": 0.9,
     "type": "erniekit"
   },
   "demo_sft_eval": {
@@ -17,6 +17,16 @@
   },
   "demo_dpo_eval": {
     "path": "examples/data/dpo-eval.jsonl",
+    "prob": 1.0,
+    "type": "erniekit"
+  },
+  "sft_vl-train_demo1": {
+    "path": "examples/data/sft_vl-train_demo1.jsonl",
+    "prob": 1.0,
+    "type": "erniekit"
+  },
+  "sft_vl-train_demo2": {
+    "path": "examples/data/sft_vl-train_demo2.jsonl",
     "prob": 1.0,
     "type": "erniekit"
   },

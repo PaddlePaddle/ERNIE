@@ -14,4 +14,4 @@
 
 from .moe_clip import ClipGradForMOEByGlobalNorm
 
-__all__ = ['ClipGradForMOEByGlobalNorm']
+__all__ = ["ClipGradForMOEByGlobalNorm"]

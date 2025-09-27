@@ -20,10 +20,9 @@ import logging
 import re
 
 import numpy as np
+from ernie.dataset.data_utils import round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
-
-DEBUG_PRINT_CNT = 0
 
 
 def pad_sequence(sequences, padding_value=0, fix_len=None):
@@ -198,6 +197,7 @@ def merge_fn_group_batch(
     shift_label=False,
     rng=None,
     combine_batch: int = 1,
+    packing: bool = True,
     image_dtype="uint8",
     multimodal_multiround_ratio=0.3,
 ):
@@ -210,14 +210,13 @@ def merge_fn_group_batch(
     if "need_multiround" in batch[0]:
         del batch[0]["need_multiround"]
 
-    global DEBUG_PRINT_CNT
     if pad_to_max_seqlen and shift_label:
         pad_to_max_seqlen += 1
 
-    assert len(batch) == 1, f"zzz len(batch) != 1, {len(batch)}"
     keys = list(batch[0].keys())
-    if combine_batch > 1:
+    if len(batch) > 1:
         _batch = []
+        combine_batch = len(batch)
         for group in [
             batch[i : i + combine_batch] for i in range(0, len(batch), combine_batch)
         ]:
@@ -230,6 +229,12 @@ def merge_fn_group_batch(
                     item[k] = np.concatenate([i[k] for i in group])
             _batch.append(item)
         batch = _batch
+
+    if not packing:
+        pad_to_max_seqlen = round_up_to_multiple_of_8(len(batch[0]["input_ids"]))
+        logger.info(
+            f"[Not Packing] ori {len(batch[0]['input_ids'])} pad {pad_to_max_seqlen}."
+        )
 
     ret = {}
     for k in keys:
@@ -292,7 +297,11 @@ def merge_fn_group_batch(
                 try:
                     if k == "token_type_ids":
                         ret[k] = pad_sequence(
-                            tmp, padding_value=pad_value, fix_len=pad_to_max_seqlen + 1
+                            tmp,
+                            padding_value=pad_value,
+                            fix_len=(
+                                pad_to_max_seqlen + 1 if pad_to_max_seqlen else None
+                            ),
                         )
                     else:
                         ret[k] = pad_sequence(
@@ -303,7 +312,6 @@ def merge_fn_group_batch(
                         f"k: {k}, tmp: {tmp}, original: {[b[k] for b in batch]}"
                     )
                     logger.info(f"e: {e}")
-                    # exit()
 
                 if k == "image_position_ids":
                     ret["image_attention_mask"] = ret[k] != pad_value
@@ -322,33 +330,23 @@ def merge_fn_group_batch(
             ]
 
             # logger.debug(f"unmerge position_ids: ret['position_ids']")
-        inbatch_pack_offset[-1] = (
-            pad_to_max_seqlen  # include padding in the last interval
-        )
+        if pad_to_max_seqlen:
+            inbatch_pack_offset[-1] = (
+                pad_to_max_seqlen  # include padding in the last interval
+            )
     else:
         inbatch_pack_offset.append(pad_to_max_seqlen)
-    padded_inbatch_pack_offset = np.reshape(
-        np.array(
-            inbatch_pack_offset
-            + [-1] * (pad_to_max_seqlen + 1 - len(inbatch_pack_offset)),
-            dtype=np.int64,
-        ),
-        [1, -1],
-    )
-    ret["inbatch_pack_offset"] = padded_inbatch_pack_offset
-    batch = ret
-
-    if DEBUG_PRINT_CNT < debug_print:
-        DEBUG_PRINT_CNT += 1
-        for k, v in batch.items():
-            logger.debug(
-                f"""Example={DEBUG_PRINT_CNT} key={k},
-                len={len(v[0])if isinstance(v, np.ndarray) and v.ndim > 1 else 0},
-                value={v[0] if isinstance(v, np.ndarray) else v}"""
-            )
-        logger.debug(
-            f"Example={DEBUG_PRINT_CNT} text={fancy_print(batch, tokenizer, im_prefix_length)}"
+    if pad_to_max_seqlen:
+        inbatch_pack_offset = np.reshape(
+            np.array(
+                inbatch_pack_offset
+                + [-1] * (pad_to_max_seqlen + 1 - len(inbatch_pack_offset)),
+                dtype=np.int64,
+            ),
+            [1, -1],
         )
+    ret["inbatch_pack_offset"] = inbatch_pack_offset
+    batch = ret
 
     if shift_label:
         batch["labels"] = batch["labels"][:, 1:]

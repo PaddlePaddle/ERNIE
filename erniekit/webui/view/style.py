@@ -14,7 +14,7 @@
 
 """
 
-Customize CSS styles to achieve the floating effect of the modal box.
+Customize CSS styles to achieve the floating effect of the modal box..
 
 """
 
@@ -162,11 +162,94 @@ CSS = """
     z-index: 999; /* 遮罩层在模态框下方 */
 }
 
+
+.modal-box-1 {
+    position: fixed!important;
+    top: 50%!important;
+    left: 50%!important;
+    margin-top: -42.5vh!important;
+    margin-left: -45vw!important;
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    width: 90vw!important;
+    max-width: 1400px!important;
+    height: 85vh!important;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-overlay-1 {
+    position: fixed!important;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.form-row-1 {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.close-btn-1 {
+    background: #dc3545 !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 16px !important;
+}
+
+.close-btn-1:hover {
+    background: #c82333 !important;
+}
+
+.custom-file-input {
+    height: 180px !important;
+    min-height: 180px !important;
+    position: relative !important;
+}
+
+.custom-file-input button svg  {
+    color: black;
+}
+.custom-file-input button > div  {
+    color: transparent !important;
+}
+.custom-file-input button > div span.or  {
+    color: transparent;
+}
+
+.large-checkbox input[type="checkbox"] {
+    width: 30px;
+    height: 30px;
+    margin-right: 5px;
+}
+
 """
 
 html_log = """
 <div style="display: flex; justify-content: center; width: 100%; margin: 0; padding: 0;">
     <img src="data:image/png;base64,{}"
          style="width: 520px; height: auto; border: none; box-shadow: none;">
+</div>
+"""
+
+html_progress = """
+<div style="width: 100%; background-color: #f0f0f0; border-radius: 10px; padding: 3px; margin: 10px 0;">
+    <div style="width: {}%; background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+    height: 19px; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; color: white; font-weight: bold; font-size: 14px;">
+        {}%
+    </div>
 </div>
 """

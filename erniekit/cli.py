@@ -22,7 +22,8 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
-from .utils.env import VERSION
+from .version.env import VERSION
+from .version import commit
 from .utils.process import terminate_process_tree, detect_device, set_ascend_environment
 
 script_dir = Path(__file__).parent.resolve()
@@ -54,14 +55,15 @@ USAGE = (
 
 
 WELCOME = (
-    "-" * 48
+    "-" * 60
     + "\n"
-    + f"| Welcome to ErnieKit, version {VERSION}"
-    + " " * (16 - len(VERSION))
-    + "|\n|"
-    + " " * 46
-    + "|\n"
-    + "-" * 48
+    + "Welcome to ErnieKit"
+    + "\n"
+    + f"version : {VERSION}"
+    + "\n"
+    + f"commit : {commit}"
+    + "\n"
+    + "-" * 60
 )
 
 
@@ -103,6 +105,10 @@ def main():
         num_npus = len(paddle.device.get_available_custom_device())
         default_npus = ",".join(map(str, range(0, num_npus)))
         visible_cards = os.getenv("ASCEND_RT_VISIBLE_DEVICES", default_npus)
+    elif current_device == "iluvatar_gpu":
+        num_iluvatar_gpus = len(paddle.device.get_available_custom_device())
+        default_iluvatar_gpus = ",".join(map(str, range(0, num_iluvatar_gpus)))
+        visible_cards = os.getenv("CUDA_VISIBLE_DEVICES", default_iluvatar_gpus)
     else:
         import GPUtil
 
@@ -159,6 +165,10 @@ def main():
             set_ascend_environment()
         except Exception as e:
             print("Unexpected error setting Ascend environment: %s", e)
+    elif current_device == "iluvatar_gpu":
+        os.environ["PADDLE_XCCL_BACKEND"] = "iluvatar_gpu"
+        os.environ["LD_PRELOAD"] = "/usr/local/corex/lib64/libcuda.so.1"
+        os.environ["FLAGS_embedding_deterministic"] = "1"
 
     if command in distributed_funcs:
 
@@ -172,6 +182,8 @@ def main():
         # launch distributed training
         env = deepcopy(os.environ)
         args_to_pass = " ".join(shlex.quote(arg) for arg in sys.argv[1:])
+        if current_device == "iluvatar_gpu":
+            current_device = "gpu"
         command = (
             f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
             f"--{current_device}s {visible_cards} --master {master_ip}:{master_port} "

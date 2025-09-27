@@ -28,7 +28,7 @@ from PIL import Image
 from data_processor.utils.format_utils import get_format_type
 from data_processor.utils.io_utils import RAW_IMAGE_DIR, RAW_VIDEO_DIR, get_downloadable
 from data_processor.utils.processor_base import ProcessorBase
-from data_processor.utils.video_utils import VideoReaderWrapper
+from decord import VideoReader, cpu
 from ernie.tokenizer_vl import SFT_VIDEO_END_TOKEN, SFT_VIDEO_START_TOKEN
 
 
@@ -50,10 +50,6 @@ class UtteranceProcessor(ProcessorBase):
         """
         super().__init__(args)
         self.tokenizer = tokenizer
-        self.eos_token = None
-        self.cls_token = None
-        self.sep_token = None
-        self.use_pic_id = True
         self.image_start_token = self.tokenizer.special_tokens_map.get(
             "image_start_id", "<|IMAGE_START|>"
         )
@@ -95,7 +91,6 @@ class UtteranceProcessor(ProcessorBase):
             return self.schema_correction(data)
         else:
             if not self.is_training:
-
                 data = self.utterance_2_schema(data, **kwargs)
             if not self.is_pretraining:
                 # Support for SFT-Data
@@ -115,7 +110,7 @@ class UtteranceProcessor(ProcessorBase):
         """
         schema_correction
         """
-        if schema.get("video_info"):
+        if len(schema.get("video_info", [])) > 0:
             video_info = schema["video_info"]
             text_info = schema["text_info"]
             matched_text_index_offset = 0
@@ -136,9 +131,9 @@ class UtteranceProcessor(ProcessorBase):
                     downloaded_path = get_downloadable(url, save_to_disk=False)
                     if isinstance(downloaded_path, bytes):
                         bytes_content = io.BytesIO(downloaded_path)
-                        vr = VideoReaderWrapper(bytes_content, num_threads=1)
+                        vr = VideoReader(bytes_content, ctx=cpu(0), num_threads=1)
                     else:
-                        vr = VideoReaderWrapper(downloaded_path, num_threads=1)
+                        vr = VideoReader(downloaded_path, ctx=cpu(0), num_threads=1)
                     tmp_frame = Image.fromarray(vr[0].asnumpy(), "RGB")
                     video_width = tmp_frame.width
                     video_height = tmp_frame.height
@@ -156,35 +151,16 @@ class UtteranceProcessor(ProcessorBase):
                     ret["extracted_frame_indices"] = video_one[
                         "extracted_frame_indices"
                     ]
-                if "subtitles_auto" in video_one:
-                    ret["asr"] = video_one["subtitles_auto"]
-                if "subtitles" in video_one:
-                    ret["asr"] = video_one["subtitles"]
-                if "asr" in ret:
-                    for asr_one in ret["asr"]:
-                        assert len(asr_one) == 3
-                        assert isinstance(asr_one[0], str)
-                        assert isinstance(asr_one[1], (float, int))
-                        assert isinstance(asr_one[2], (float, int))
-                        asr_one[1], asr_one[2] = float(asr_one[1]), float(asr_one[2])
 
                 if not self.is_pretraining:
-                    if self.use_pic_id:
-                        text_info = (
-                            text_info[:matched_text_index]
-                            + [
-                                {
-                                    "text": f"Video {vid_id}:",
-                                    "tag": "mask",
-                                }
-                            ]
-                            + text_info[matched_text_index:]
-                        )
-                        vid_id += 1
-                        matched_text_index += 1
-                        matched_text_index_offset += 1
                     text_info = (
                         text_info[:matched_text_index]
+                        + [
+                            {
+                                "text": f"Video {vid_id}:",
+                                "tag": "mask",
+                            }
+                        ]
                         + [
                             {
                                 "text": self.video_start_token,
@@ -201,8 +177,9 @@ class UtteranceProcessor(ProcessorBase):
                         ]
                         + text_info[matched_text_index:]
                     )
-                    matched_text_index += 1
-                    matched_text_index_offset += 2
+                    vid_id += 1
+                    matched_text_index += 2
+                    matched_text_index_offset += 3
                     ret["matched_text_index"] = matched_text_index
 
                 video_info[video_index] = ret
@@ -216,21 +193,14 @@ class UtteranceProcessor(ProcessorBase):
             if not self.is_pretraining:
                 vid_id = 1
                 matched_text_index = schema["image_info"][0]["matched_text_index"]
-                if self.use_pic_id:
-                    text_info = (
-                        text_info[:matched_text_index]
-                        + [
-                            {
-                                "text": f"Video {vid_id}:",
-                                "tag": "mask",
-                            }
-                        ]
-                        + text_info[matched_text_index:]
-                    )
-                    matched_text_index_offset += 1
-                    matched_text_index += 1
                 text_info = (
                     text_info[:matched_text_index]
+                    + [
+                        {
+                            "text": f"Video {vid_id}:",
+                            "tag": "mask",
+                        }
+                    ]
                     + [
                         {
                             "text": self.video_start_token,
@@ -240,8 +210,8 @@ class UtteranceProcessor(ProcessorBase):
                     ]
                     + text_info[matched_text_index:]
                 )
-                matched_text_index += 1
-                matched_text_index_offset += 1
+                matched_text_index += 2
+                matched_text_index_offset += 2
 
             uid = str(uuid.uuid4())
             ret_image_info = []
@@ -316,9 +286,9 @@ class UtteranceProcessor(ProcessorBase):
                     downloaded_path = get_downloadable(url, save_to_disk=False)
                     if isinstance(downloaded_path, bytes):
                         bytes_content = io.BytesIO(downloaded_path)
-                        vr = VideoReaderWrapper(bytes_content, num_threads=1)
+                        vr = VideoReader(bytes_content, ctx=cpu(0), num_threads=1)
                     else:
-                        vr = VideoReaderWrapper(downloaded_path, num_threads=1)
+                        vr = VideoReader(downloaded_path, ctx=cpu(0), num_threads=1)
                     tmp_frame = Image.fromarray(vr[0].asnumpy(), "RGB")
                     video_width = tmp_frame.width
                     video_height = tmp_frame.height
@@ -335,26 +305,14 @@ class UtteranceProcessor(ProcessorBase):
                     ret["extracted_frame_indices"] = video_one[
                         "extracted_frame_indices"
                     ]
-                if "subtitles_auto" in video_one:
-                    ret["asr"] = video_one["subtitles_auto"]
-                if "subtitles" in video_one:
-                    ret["asr"] = video_one["subtitles"]
-                if "asr" in ret:
-                    for asr_one in ret["asr"]:
-                        assert len(asr_one) == 3
-                        assert isinstance(asr_one[0], str)
-                        assert isinstance(asr_one[1], (float, int))
-                        assert isinstance(asr_one[2], (float, int))
-                        asr_one[1], asr_one[2] = float(asr_one[1]), float(asr_one[2])
 
                 if not self.is_pretraining:
-                    if self.use_pic_id:
-                        vid_id = len(schema_new["video_info"])
-                        element = {"text": f"Video {vid_id}:", "tag": "mask"}
-                        schema_new["text_info"].append(element)
-                        add_item_to_order(
-                            order_new, element, "text", len(schema_new["text_info"]) - 1
-                        )
+                    vid_id = len(schema_new["video_info"])
+                    element = {"text": f"Video {vid_id}:", "tag": "mask"}
+                    schema_new["text_info"].append(element)
+                    add_item_to_order(
+                        order_new, element, "text", len(schema_new["text_info"]) - 1
+                    )
 
                     # video start
                     element = {
@@ -484,9 +442,9 @@ class UtteranceProcessor(ProcessorBase):
                         )
                         if isinstance(downloaded_path, bytes):
                             bytes_content = io.BytesIO(downloaded_path)
-                            vr = VideoReaderWrapper(bytes_content, num_threads=1)
+                            vr = VideoReader(bytes_content, ctx=cpu(0), num_threads=1)
                         else:
-                            vr = VideoReaderWrapper(downloaded_path, num_threads=1)
+                            vr = VideoReader(downloaded_path, ctx=cpu(0), num_threads=1)
                         tmp_frame = Image.fromarray(vr[0].asnumpy(), "RGB")
                         video_width = tmp_frame.width
                         video_height = tmp_frame.height
@@ -502,19 +460,6 @@ class UtteranceProcessor(ProcessorBase):
                             video_one["extracted_frame_indices"] = one["video_url"][
                                 "extracted_frame_indices"
                             ]
-                        if "subtitles_auto" in one["video_url"]:
-                            video_one["asr"] = one["video_url"]["subtitles_auto"]
-                        if "subtitles" in one["video_url"]:
-                            video_one["asr"] = one["video_url"]["subtitles"]
-                        if "asr" in video_one:
-                            for asr_one in video_one["asr"]:
-                                assert len(asr_one) == 3
-                                assert isinstance(asr_one[0], str)
-                                assert isinstance(asr_one[1], (float, int))
-                                assert isinstance(asr_one[2], (float, int))
-                                asr_one[1], asr_one[2] = float(asr_one[1]), float(
-                                    asr_one[2]
-                                )
 
                         video_info.append(video_one)
                     elif one["type"] == "text":

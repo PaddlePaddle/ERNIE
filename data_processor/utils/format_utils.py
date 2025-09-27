@@ -19,7 +19,6 @@ schema_utils
 """
 
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 validate = None
@@ -34,22 +33,6 @@ def get_format_type(data):
         return "schema"
     else:
         return "utterance"
-
-
-def remove_info(schema, info_name):
-    """
-    remove the info from schema
-    """
-    assert info_name in schema.keys()
-    for item in schema[info_name]:
-        if "image_url" in item:
-            image_url = item["image_url"]
-            if isinstance(image_url, str):
-                if os.path.exists(image_url) and os.path.isfile(image_url):
-                    os.remove(item["image_url"])
-
-    del schema[info_name]
-    return schema
 
 
 def check_schema_format(sample, data_name, data_type):
@@ -159,7 +142,9 @@ def check_schema_format(sample, data_name, data_type):
         "video",
     ], f"[ERROR] {data_name} schema no support {data_type}!"
 
-    assert validate(sample, MULTI_MODAL_SCHEMA) is None, f"[ERROR] {data_name} schema error!\n{ValidationError}"
+    assert (
+        validate(sample, MULTI_MODAL_SCHEMA) is None
+    ), f"[ERROR] {data_name} schema error!\n{ValidationError}"
 
     for one in sample.get("text_info", []):
         points = one.get("points", None)
@@ -170,26 +155,3 @@ def check_schema_format(sample, data_name, data_type):
                         len(p) == 2 or len(p) == 4
                     ), f"[ERROR] {data_name} point={point}, \
                         The coordinates cannot be three-point coordinates!"
-
-
-def schema_to_sequence(schema, serialize=False):
-    """
-    dummy
-    """
-    image_info = schema["image_info"]
-    text_info = schema["text_info"]
-    image_cnt = 0
-    result = []
-    for text_index, text_one in enumerate(text_info):
-        while image_cnt < len(image_info) and image_info[image_cnt]["matched_text_index"] == text_index:
-            if serialize:
-                result.append(f"<|IMAGE@? [timestamp: {image_info[image_cnt].get('time_stamp', -1)}]|>")
-            else:
-                result.append(image_info[image_cnt])
-            image_cnt += 1
-        if serialize:
-            result.append(f"{text_one['text']}")
-        else:
-            result.append(text_one)
-
-    return result

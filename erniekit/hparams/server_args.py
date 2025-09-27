@@ -87,3 +87,19 @@ class ServerArguments:
     kv_cache_ratio: float = field(
         default=0.75, metadata={"help": "Ratio of tokens to process in a block."}
     )
+
+    # torch
+    load_choices: str = field(
+        default=None,
+        metadata={
+            "help": "To load Torch weights or enable weight acceleration, 'default_v1' must be used."
+        },
+    )
+
+    # tool call
+    tool_call_parser: str = field(
+        default=None,
+        metadata={
+            "help": "Specify the function call parser to be used for extracting function call content from the model's output."
+        },
+    )

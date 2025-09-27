@@ -2056,14 +2056,23 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
             score_deltas = kwargs.get("score_deltas", None)
             reference_chosen_logps = kwargs.get("reference_chosen_logps", None)
             reference_rejected_logps = kwargs.get("reference_rejected_logps", None)
-            labels = (
-                chosen_labels,
-                rejected_labels,
-                response_indexs,
-                score_deltas,
-                reference_chosen_logps,
-                reference_rejected_logps,
-            )
+            if score_deltas:
+                labels = (
+                    chosen_labels,
+                    rejected_labels,
+                    response_indexs,
+                    score_deltas,
+                    reference_chosen_logps,
+                    reference_rejected_logps,
+                )
+            else:
+                labels = (
+                    chosen_labels,
+                    rejected_labels,
+                    response_indexs,
+                    reference_chosen_logps,
+                    reference_rejected_logps,
+                )
             return self.criterion(
                 logits,
                 labels,

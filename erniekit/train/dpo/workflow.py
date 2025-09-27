@@ -37,8 +37,15 @@ from paddleformers.trainer import (
     get_last_checkpoint,
     set_seed,
 )
+from paddleformers.transformers import (
+    AutoConfig,
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+)
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from ernie.callbacks import LayerwiseDropoutCallback
 from ernie.configuration import Ernie4_5_MoeConfig
@@ -48,6 +55,7 @@ from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import check_refined_recompute
 from ernie.utils.download_utils import check_download_repo
+from ernie.utils.load_utils import resolve_weight_source
 
 # isort: off
 from .dpo_estimate_training import dpo_estimate_training
@@ -201,13 +209,8 @@ def run_dpo(
 
     model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        from_modelscope=model_args.from_modelscope,
+        download_hub=model_args.download_hub,
     )
-
-    if getattr(model_args, "from_modelscope", False):
-        os.environ["from_modelscope"] = "True"
 
     # fuse_softmax_mask only support for rocm.
     if not paddle.is_compiled_with_rocm():
@@ -287,12 +290,86 @@ def run_dpo(
         num_acc_steps=finetuning_args.gradient_accumulation_steps,
         add_tail_layers=model_args.add_tail_layers,
         num_nextn_predict_layers=0,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
+        download_hub=model_args.download_hub,
+        per_device_train_batch_size=finetuning_args.per_device_train_batch_size,
     )
+
+    try:
+        from paddleformers.utils.download import (
+            DownloadSource,
+        )  # test if paddleformers is the newest
+    except Exception:
+        DownloadSource = None
+
+    download_source_kwargs = {}
+    if DownloadSource is None:
+        if model_args.download_hub == "huggingface":
+            download_source_kwargs["from_hf_hub"] = True
+        elif model_args.download_hub == "aistudio":
+            download_source_kwargs["from_aistudio"] = True
+        elif model_args.download_hub == "modelscope":
+            download_source_kwargs["from_modelscope"] = True
+    else:
+        download_source_kwargs["download_hub"] = model_args.download_hub
+
+    weight_source = resolve_weight_source(
+        model_args.model_name_or_path,
+        download_source_kwargs=download_source_kwargs,
+    )
+    if weight_source["convert_from_hf"]:
+        finetuning_args.use_huggingface_model = True
+        if finetuning_args.weight_quantize_algo is not None:
+            if finetuning_args.weight_quantize_algo == "weight_only_mix":
+                quantization_config["weight_quantize_algo"] = {
+                    "weight_only_int4": [".*mlp.experts.*"],
+                    "weight_only_int8": [
+                        ".*self_attn.q_proj.*",
+                        ".*self_attn.k_proj.*",
+                        ".*self_attn.v_proj.*",
+                        ".*self_attn.o_proj.*",
+                        ".*mlp.up_proj.*",
+                        ".*mlp.gate_proj.*",
+                        ".*mlp.down_proj.*",
+                    ],
+                }
+        finetuning_args.layerwise_lr_decay_bound = 1.0
+        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
+        logger.info("loading model from HuggingFace")
+
+    convert_from_kwargs = {
+        (
+            "convert_from_hf"
+            if paddleformers_version >= "0.3"
+            else "convert_from_torch"
+        ): weight_source["convert_from_hf"]
+    }
+    if paddleformers_version >= "0.3":
+        finetuning_args.save_to_hf = (
+            weight_source["save_to_hf"] and finetuning_args.use_huggingface_model
+        )
     if model_args.moe_use_aux_free is False:
         model_kwargs.update({"moe_use_aux_free": model_args.moe_use_aux_free})
-    config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+
+    if finetuning_args.use_huggingface_model:
+        if (
+            model_args.use_attn_mask_start_row_indices
+            and model_args.use_sparse_flash_attn
+        ):
+            _attn_implementation = "flashmask"
+        else:
+            _attn_implementation = "sdpa"
+        config = AutoConfig.from_pretrained(
+            _attn_implementation=_attn_implementation,
+            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
+            loss_subbatch_sequence_length=1024,
+            attention_dropout_prob=finetuning_args.attention_probs_dropout_prob,
+            **convert_from_kwargs,
+            **model_kwargs,
+        )
+        config.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
+        config.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
+    else:
+        config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
 
     if (
         finetuning_args.pipeline_parallel_degree > 1
@@ -304,34 +381,73 @@ def run_dpo(
             weights when using Pipeline Parallelism (PP)."
         )
 
-    if config.moe_num_experts is None or config.moe_num_experts == 0:
+    if (
+        config.get("moe_num_experts", None) is None
+        or config.get("moe_num_experts", 0) == 0
+    ):
         config.moe_group = (
             "dummy" if model_args.moe_group == "mp" else model_args.moe_group
         )
 
-    if finetuning_args.pipeline_parallel_degree > 1:
-        model_class = Ernie4_5_MoeForCausalLMPipe
+    if finetuning_args.use_huggingface_model:
+        model_class = AutoModelForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = AutoModelForCausalLMPipe
     else:
         model_class = Ernie4_5_MoeForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = Ernie4_5_MoeForCausalLMPipe
+
+    # (NOTE): ERNIEKit currently only support finetuning ernie4_5 and ernie4_5_moe models from huggingface
+    if finetuning_args.use_huggingface_model and config.model_type not in (
+        "ernie4_5",
+        "ernie4_5_moe",
+    ):
+        raise ValueError(
+            f"Currently, only support ernie4_5 and ernie4_5_moe for HuggingFace model, but got {config.model_type}."
+        )
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=config,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
-            convert_from_torch=False,
+            **convert_from_kwargs,
+            **download_source_kwargs,
         )
     else:
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
 
     if not finetuning_args.reference_free and not model_args.lora:
-        ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
-        if ref_config.moe_num_experts is None or ref_config.moe_num_experts == 0:
-            ref_config.moe_group = (
-                "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        if finetuning_args.use_huggingface_model:
+            ref_config = AutoConfig.from_pretrained(
+                _attn_implementation=_attn_implementation,
+                use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
+                loss_subbatch_sequence_length=1024,
+                **model_kwargs,
             )
-        ref_model = model_class._from_config(ref_config, dtype=dtype)
+            ref_config.use_fused_head_and_loss_fn = (
+                model_args.use_fused_head_and_loss_fn
+            )
+            ref_config.use_sparse_head_and_loss_fn = (
+                model_args.use_sparse_head_and_loss_fn
+            )
+            if (
+                ref_config.get("moe_num_experts", None) is None
+                or ref_config.get("moe_num_experts", 0) == 0
+            ):
+                ref_config.moe_group = (
+                    "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+                )
+        else:
+            ref_config = Ernie4_5_MoeConfig.from_pretrained(**model_kwargs)
+            if (
+                ref_config.get("moe_num_experts", None) is None
+                or ref_config.get("moe_num_experts", 0) == 0
+            ):
+                ref_config.moe_group = (
+                    "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+                )
+        ref_model = model_class.from_config(ref_config, dtype=dtype)
         # make sure the state_dict is the same to get the same loss for first step
         ref_model.set_state_dict(model.state_dict())
     else:
@@ -355,11 +471,13 @@ def run_dpo(
             dtype=dtype,
         )
 
-    tokenizer = Ernie4_5_Tokenizer.from_pretrained(
+    tokenizer_cls = (
+        AutoTokenizer if weight_source["convert_from_hf"] else Ernie4_5_Tokenizer
+    )
+    tokenizer = tokenizer_cls.from_pretrained(
         model_args.model_name_or_path,
-        from_hf_hub=model_args.from_hf_hub,
-        from_aistudio=model_args.from_aistudio,
-        convert_from_torch=False,
+        **convert_from_kwargs,
+        **download_source_kwargs,
     )
     logger.info("Loading model & tokenizer successfully !")
 

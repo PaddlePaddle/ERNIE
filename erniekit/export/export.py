@@ -16,6 +16,7 @@ import os
 import shutil
 import time
 from typing import Any, Optional
+import json
 
 import paddle
 from paddleformers.mergekit import MergeConfig, MergeModel
@@ -23,6 +24,7 @@ from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.download import resolve_file_path
 from paddleformers.utils.env import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from ernie.utils.download_utils import check_download_repo
 
@@ -96,21 +98,43 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
 
         model_args.model_name_or_path = check_download_repo(
             model_args.model_name_or_path,
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
-            from_modelscope=model_args.from_modelscope,
+            download_hub=model_args.download_hub,
         )
-        if getattr(model_args, "from_modelscope", False):
-            os.environ["from_modelscope"] = "True"
+
+        try:
+            from paddleformers.utils.download import (
+                DownloadSource,
+            )  # test if paddleformers is the newest
+        except Exception:
+            DownloadSource = None
+
+        download_source_kwargs = {}
+        if DownloadSource is None:
+            if model_args.download_hub == "huggingface":
+                download_source_kwargs["from_hf_hub"] = True
+            elif model_args.download_hub == "aistudio":
+                download_source_kwargs["from_aistudio"] = True
+            elif model_args.download_hub == "modelscope":
+                download_source_kwargs["from_modelscope"] = True
+        else:
+            download_source_kwargs["download_hub"] = model_args.download_hub
 
         resolve_result = resolve_file_path(
             model_args.model_name_or_path,
             [SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME],
-            from_hf_hub=model_args.from_hf_hub,
-            from_aistudio=model_args.from_aistudio,
+            **download_source_kwargs,
         )
+
+        convert_from_hf = False
+        save_to_hf = False
         if resolve_result is not None:
             resolve_path = os.path.dirname(resolve_result)
+            config_json = os.path.join(resolve_path, "config.json")
+            with open(config_json) as f:
+                config_dict = json.load(f)
+            if "torch_dtype" in config_dict:
+                convert_from_hf = True
+                save_to_hf = True
             logger.info(f"base model path parsed:{resolve_path}")
         else:
             logger.error(f"{model_args.model_name_or_path} does not found.")
@@ -119,13 +143,27 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
         config["base_model_path"] = resolve_path
         config["lora_model_path"] = last_checkpoint
         config["output_path"] = os.path.join(finetuning_args.output_dir, "export")
+        if paddleformers_version >= "0.3":
+            config["convert_from_hf"] = convert_from_hf
+            config["save_to_hf"] = save_to_hf
+
         if export_args.copy_tokenizer:
-            config["copy_file_list"] = [
-                "tokenizer.model",
-                "tokenizer_config.json",
-                "special_tokens_map.json",
-                # "config.json",
-            ]
+            if convert_from_hf:
+                config["copy_file_list"] = [
+                    "added_tokens.json",
+                    "chat_template.jinja",
+                    "tokenizer.json",
+                    "tokenizer.model",
+                    "tokenizer_config.json",
+                    "special_tokens_map.json",
+                ]
+            else:
+                config["copy_file_list"] = [
+                    "tokenizer.model",
+                    "tokenizer_config.json",
+                    "special_tokens_map.json",
+                    # "config.json",
+                ]
 
         merge_config = MergeConfig(**config)
         mergekit = MergeModel(merge_config)
@@ -138,6 +176,14 @@ def run_export(args: Optional[dict[str, Any]] = None) -> None:
         else:
             logger.debug(
                 f'Copy failed: "config.json" not found in {config["base_model_path"]}'
+            )
+        src_file = os.path.join(config["base_model_path"], "preprocessor_config.json")
+        dst_file = os.path.join(config["output_path"], "preprocessor_config.json")
+        if os.path.isfile(src_file):
+            shutil.copy2(src_file, dst_file)
+        else:
+            logger.debug(
+                f'Copy failed: "preprocessor_config.json" not found in {config["base_model_path"]}'
             )
         logger.info(
             f"***** Successfully finished merging LoRA model. Time cost: {time.time() - start} s *****"

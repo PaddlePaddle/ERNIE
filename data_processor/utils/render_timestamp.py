@@ -21,7 +21,9 @@ cur_directory = Path(__file__).parent.absolute()
 FONT_PATH = os.path.join(cur_directory, "Roboto-Regular.ttf")
 
 
-def render_single_image_with_timestamp(image: Image, number: str, rate: float, font_path: str = FONT_PATH):
+def render_single_image_with_timestamp(
+    image: Image, number: str, rate: float, font_path: str = FONT_PATH
+):
     """
     Function: Renders a timestamp to the image of pil.image
     The timestamp size is the rate of min(width, height)
@@ -37,7 +39,14 @@ def render_single_image_with_timestamp(image: Image, number: str, rate: float, f
     y = 0
 
     # Draw a black timestamp with a white border
-    draw.text((x, y), number, font=font, fill=(0, 0, 0), stroke_width=outline_size, stroke_fill=(255, 255, 255))
+    draw.text(
+        (x, y),
+        number,
+        font=font,
+        fill=(0, 0, 0),
+        stroke_width=outline_size,
+        stroke_fill=(255, 255, 255),
+    )
 
     return image
 
@@ -62,20 +71,6 @@ def timestamp_converting(time_stamp_in_seconds):
     fi_time_stamp = time_hours + ":" + time_mins + ":" + time_secs
 
     return fi_time_stamp
-
-
-def get_timestamp_for_uniform_frame_extraction(num_frames, frame_id, duration):
-    """
-    function: get the timestamp of a frame, used when evenly extracting frames.
-
-    num_frames: total number of frames
-    frameid_list: index of the extracted frame
-    duration: total duration of the video
-    return: timestamp; xx:xx:xx (str)
-    """
-    time_stamp = duration * 1.0 * frame_id / num_frames
-
-    return time_stamp
 
 
 def render_frame_timestamp(frame, timestamp, font_rate=0.1):

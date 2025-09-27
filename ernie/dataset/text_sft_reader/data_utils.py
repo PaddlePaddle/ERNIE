@@ -105,7 +105,6 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
     current_pseudo_example_list,
     tokenizer,
     stop_by_k=False,
-    no_opt_markups=None,
     rng=None,
     use_anti_k_sampling=False,
     drop_history_with_k=False,
@@ -119,7 +118,6 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
         tokenizer (Tokenizer): The tokenizer used for tokenization.
         stop_by_k (bool, optional): Whether to stop optimization based on K.
         Defaults to False.
-        no_opt_markups (list, optional): List of markup tags that do not
         require optimization. Defaults to empty list.
         rng (Random, optional): Random number generator. Defaults to None.
         use_anti_k_sampling (bool, optional): Whether to use anti-K sampling strategy.
@@ -133,8 +131,6 @@ def convert_pseudo_example_list_to_example_only_opt_kb(
     """
     multi_turn_src, multi_turn_tgt, multi_turn_label = [], [], []
     source_to_num_opt = defaultdict(int)
-    if no_opt_markups is None:
-        no_opt_markups = []
     for i, example in enumerate(previous_pseudo_example_list):
 
         if example.math_is_end == 1:
@@ -278,7 +274,6 @@ def sampling_pseudo_examples(
     tokenizer,
     rng,
     max_seq_len,
-    pseudo_strategy,
     pseudo_sampling_prob,
     trigger_data_prob,
     use_anti_k_sampling,
@@ -299,7 +294,6 @@ def sampling_pseudo_examples(
         tokenizer (Any): Tokenizer object.
         rng (Any): Random number generator object.
         max_seq_len (int): Maximum sequence length.
-        pseudo_strategy (int): Pseudo strategy, value in [0, 3].
         pseudo_sampling_prob (float): Pseudo sampling probability.
         trigger_data_prob (float): Trigger data probability.
         use_anti_k_sampling (bool): Whether to use anti-K sampling.
@@ -316,33 +310,6 @@ def sampling_pseudo_examples(
             - task_id_counter (Dict[int, int]): Task ID counter.
             - exact_total_task_id_counter (Dict[int, int]): Exact total task ID counter.
     """
-    if pseudo_strategy == 0:
-        no_opt_markups = []
-    elif pseudo_strategy == 1:
-        no_opt_markups = ["[<kg>]", "[<kg-res>]"]
-    elif pseudo_strategy == 2:
-        no_opt_markups = ["[<kg>]", "[<kg-res>]", "[<search>]", "[<search-res>]"]
-    elif pseudo_strategy == 3:
-        no_opt_markups = [
-            "[<kg>]",
-            "[<kg-res>]",
-            "[<search>]",
-            "[<search-res>]",
-            "[<prompt>]",
-            "[<prompt-res>]",
-        ]
-    else:
-        no_opt_markups = []
-
-    no_opt_markups = no_opt_markups + [
-        "[<citation>]",
-        "[<citation-ref>]",
-        "[<kg>]",
-        "[<kg-res>]",
-        "[<retrieve>]",
-        "[<retrieve-ref>]",
-    ]
-
     previous_pseudo_example_list = []
     current_pseudo_example_list = []
     total_len_wo_k = 0
@@ -428,7 +395,6 @@ def sampling_pseudo_examples(
                         current_pseudo_example_list,
                         tokenizer,
                         False,
-                        no_opt_markups,
                         rng,
                         use_anti_k_sampling=use_anti_k_sampling,
                         drop_history_with_k=False,
