@@ -213,7 +213,7 @@ def process_fc(data, input_file):
             ex = Example(
                 request={"messages": message, "tools": tools_list},
                 system=system,
-                label=label,
+                label=[1],
                 is_system=is_system,
                 source=input_file,
                 is_function_call=True,
@@ -614,6 +614,9 @@ class SequenceDataset(IterableDataset):
 
         turn_index = len(encoded_messages) - 1
 
+        print('lrl debug ------------------------------')
+        print('len(encoded_messages) : ', len(encoded_messages))
+        print('len(example.label) : ', len(example.label))
         tokens = []
         loss_mask = []
         while turn_index >= 0:
