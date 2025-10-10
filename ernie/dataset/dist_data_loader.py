@@ -197,22 +197,22 @@ class MMDataloader(paddle.io.DataLoader):
 
         self._collate_fn = collate_fn
         self._dataloader = paddle.io.DataLoader(
-            dataset,
-            feed_list,
-            places,
-            return_list,
-            batch_sampler,
-            1,
-            shuffle,
-            drop_last,
-            lambda x: x,  # collate_fn,
-            num_workers,
-            use_buffer_reader,
-            prefetch_factor,
-            use_shared_memory,
-            timeout,
-            worker_init_fn,
-            persistent_workers,
+            dataset=dataset,
+            feed_list=feed_list,
+            places=places,
+            return_list=return_list,
+            batch_sampler=batch_sampler,
+            batch_size=1,
+            shuffle=shuffle,
+            drop_last=drop_last,
+            collate_fn=lambda x: x,  # collate_fn,
+            num_workers=num_workers,
+            use_buffer_reader=use_buffer_reader,
+            prefetch_factor=prefetch_factor,
+            use_shared_memory=use_shared_memory,
+            timeout=timeout,
+            worker_init_fn=worker_init_fn,
+            persistent_workers=persistent_workers,
         )
         self._lens_rcd = defaultdict(int)
         self._lens_images = defaultdict(int)
