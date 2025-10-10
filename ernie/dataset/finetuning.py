@@ -213,7 +213,7 @@ def process_fc(data, input_file):
             ex = Example(
                 request={"messages": message, "tools": tools_list},
                 system=system,
-                label=label,
+                label=[1],
                 is_system=is_system,
                 source=input_file,
                 is_function_call=True,
