@@ -614,9 +614,6 @@ class SequenceDataset(IterableDataset):
 
         turn_index = len(encoded_messages) - 1
 
-        print('lrl debug ------------------------------')
-        print('len(encoded_messages) : ', len(encoded_messages))
-        print('len(example.label) : ', len(example.label))
         tokens = []
         loss_mask = []
         while turn_index >= 0:
