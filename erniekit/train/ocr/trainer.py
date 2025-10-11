@@ -155,6 +155,8 @@ class SFTTrainer(PretrainingTrainer):
                 num_workers=self.args.dataloader_num_workers,
                 prefetch_factor=self.args.prefetch_factor,
                 multimodal_multiround_ratio=0.0,
+                need_slice=False,
+                packing_size=4,
             )
         
 

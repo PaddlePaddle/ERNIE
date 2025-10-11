@@ -223,8 +223,8 @@ class ExampleSet:
         prompt_list,
         shuffle_json: bool = False,
         process_fn=None,
-        data_rank: int = -1,
-        data_size: int = -1,
+        data_rank=-1,
+        data_size=-1,
     ):
         self.args = args
         self._file_name = file_name
@@ -750,6 +750,7 @@ class SFTMultimodalDatasetJson(IterableDataset):
         indices = []
         for i, _ in enumerate(self.task_group):
             sample_size = int(self.weight_list[i] * self.length)
+            print(f"Take {sample_size} samples from {self.task_group[i]._file_name} (total length: {len(self.task_group[i].exs)}) to construct current sample list")
             indices.extend([i] * sample_size)
         return indices
 
