@@ -13,8 +13,8 @@
 # limitations under the License.
 
 
-from .configuration import SiglipVisionConfig
+from .configuration import PPOCRVisionConfig
 from .modeling import SiglipVisionModel
 from .modeling_pp import SiglipVisionModelPipe
 
-__all__ = ['SiglipVisionConfig', 'SiglipVisionModel', 'SiglipVisionModelPipe']
+__all__ = ['PPOCRVisionConfig', 'SiglipVisionModel', 'SiglipVisionModelPipe']

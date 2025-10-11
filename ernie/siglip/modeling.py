@@ -51,7 +51,7 @@ from paddleformers.utils.log import logger
 
 from ..distributed import get_hcg
 from .activation import ACT2FN
-from .configuration import SiglipVisionConfig
+from .configuration import PPOCRVisionConfig
 
 
 def rotate_half(x):
@@ -189,39 +189,35 @@ class SiglipAttention(nn.Layer):
         rope_emb: Optional[Tuple[paddle.Tensor, paddle.Tensor]] = None,  # (cos, sin)
     ):
         
-        batch_size, seq_length, embed_dim = hidden_states.shape
+        B, L, D = hidden_states.shape
 
-        queries = self.q_proj(hidden_states)
-        keys = self.k_proj(hidden_states)
-        values = self.v_proj(hidden_states)
+        q = self.q_proj(hidden_states)
+        k = self.k_proj(hidden_states)
+        v = self.v_proj(hidden_states)
 
         # [B, L, H, Dh] -> [B, H, L, Dh]
 
-        if rope_emb is None:
-            queries = queries.reshape([batch_size, seq_length, self.num_heads, self.head_dim])
-            keys = keys.reshape([batch_size, seq_length, self.num_heads, self.head_dim])
-            values = values.reshape([batch_size, seq_length, self.num_heads, self.head_dim])
-        else:
+        q = q.reshape([B, L, self.num_heads, self.head_dim])
+        k = k.reshape([B, L, self.num_heads, self.head_dim])
+        v = v.reshape([B, L, self.num_heads, self.head_dim])
+        if rope_emb is not None:
             assert cu_seqlens is not None, "Rope support flash attn only."
             cos, sin = rope_emb
-            queries = queries.reshape([batch_size, seq_length, self.num_heads, self.head_dim])
-            keys = keys.reshape([batch_size, seq_length, self.num_heads, self.head_dim])
             # if self.config.use_flash_attention:
             #     queries, keys = apply_rotary_pos_emb_flashatt(queries, keys, cos, sin)
             # else:
             #     queries, keys = apply_rotary_pos_emb_vision(queries, keys, cos, sin)
-            queries, keys = apply_rotary_pos_emb_vision(queries, keys, cos, sin)
-            values = values.reshape([batch_size, seq_length, self.num_heads, self.head_dim])
+            q, k = apply_rotary_pos_emb_vision(q, k, cos, sin)
 
         if not self.config.use_flash_attention:
-            queries = queries.transpose([0, 2, 1, 3])
-            keys = keys.transpose([0, 2, 1, 3])
-            values = values.transpose([0, 2, 1, 3])
+            q = q.transpose([0, 2, 1, 3])
+            k = k.transpose([0, 2, 1, 3])
+            v = v.transpose([0, 2, 1, 3])
 
         has_gradient = not (
-            queries.stop_gradient
-            and keys.stop_gradient
-            and values.stop_gradient
+            q.stop_gradient
+            and k.stop_gradient
+            and v.stop_gradient
         )
 
         if (
@@ -231,23 +227,24 @@ class SiglipAttention(nn.Layer):
         ):
             attn_output, attn_weights = recompute(
                 self.attn_func,
-                queries,
-                keys,
-                values,
+                q,
+                k,
+                v,
                 attention_mask,
                 cu_seqlens,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
 
         else:
             attn_output, attn_weights = self.attn_func(
-                queries,
-                keys,
-                values,
+                q,
+                k,
+                v,
                 attention_mask,
                 cu_seqlens,
             )
         
-        attn_output = attn_output.reshape([batch_size, seq_length, embed_dim]).contiguous()
+        attn_output = attn_output.reshape([B, L, D]).contiguous()
         attn_output = self.out_proj(attn_output)
 
         if not output_attentions:
@@ -680,6 +677,7 @@ class SiglipEncoder(nn.Layer):
                     output_attentions=output_attentions,
                     cu_seqlens=attn_cu_seqlens,
                     rope_emb=rope_emb,
+                    use_reentrant=self.config.recompute_use_reentrant,
                 )
             else:
                 layer_outputs = encoder_layer(
@@ -737,23 +735,9 @@ class SiglipMultiheadAttentionPoolingHead(nn.Layer):
         return hidden_state[:, 0]
 
 
-class SiglipVisionModel(PretrainedModel):
-    config_class = SiglipVisionConfig
-    main_input_name = "pixel_values"
-    base_model_prefix = "siglip"
-    supports_gradient_checkpointing = True
-
-    _no_split_modules = [
-        "SiglipTextEmbeddings",
-        "SiglipEncoderLayer",
-        "SiglipVisionEmbeddings",
-        "SiglipMultiheadAttentionPoolingHead",
-    ]
-    _supports_flash_attn_2 = True
-    _supports_sdpa = True
-    
-    def __init__(self, config):
-        super().__init__(config)
+class SiglipVisionTransformer(nn.Layer):
+    def __init__(self, config: PPOCRVisionConfig):
+        super().__init__()
         self.config = config
         embed_dim = config.hidden_size
 
@@ -765,14 +749,7 @@ class SiglipVisionModel(PretrainedModel):
         )
         if self.use_head:
             self.head = SiglipMultiheadAttentionPoolingHead(config)
-
-
-    def get_input_embeddings(self) -> nn.Layer:
-        return self.embeddings.patch_embedding
-
-    def get_dtype(self) -> paddle.dtype:
-        return self.encoder.layers[0].mlp.fc2.weight.dtype
-
+    
     def forward(
         self,
         pixel_values,
@@ -913,17 +890,61 @@ class SiglipVisionModel(PretrainedModel):
         )
 
 
-    @classmethod
-    def _get_tensor_parallel_mappings(cls, config, is_split=True):
-        """
-        dummy
-        """
-        return {}
+class SiglipPreTrainedModel(PretrainedModel):
+    config_class = PPOCRVisionConfig
+    base_model_prefix = "siglip"
+    supports_gradient_checkpointing = True
 
-    def set_state_dict(self, state_dict, *args, **kwargs):
-        """
-        Args:
-            state_dict (Mapping[str, Any]): state_dict
-        """
-        ret = super().set_state_dict(state_dict, *args, **kwargs)
-        logger.info(f"siglip set_state_dict: {ret}")
+    _no_split_modules = [
+        "SiglipTextEmbeddings",
+        "SiglipEncoderLayer",
+        "SiglipVisionEmbeddings",
+        "SiglipMultiheadAttentionPoolingHead",
+    ]
+    _supports_flash_attn_2 = True
+    _supports_sdpa = True
+
+
+class SiglipVisionModel(SiglipPreTrainedModel):
+    config_class = PPOCRVisionConfig
+    main_input_name = "pixel_values"
+
+    def __init__(self, config: PPOCRVisionConfig):
+        super().__init__(config)
+
+        self.vision_model = SiglipVisionTransformer(config)
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.vision_model.embeddings.patch_embedding
+
+    def forward(
+        self,
+        pixel_values,
+        sample_indices=None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        interpolate_pos_encoding: bool = False,
+        position_ids=None,
+        vision_return_embed_list: Optional[bool] = False,
+        image_grid_thw: Optional[
+            List[Union[Tuple[int, int, int], List[Tuple[int, int, int]]]]
+        ] = None,
+        cu_seqlens=None,
+        return_pooler_output: Optional[bool] = True,
+        use_rope: Optional[bool] = False,
+        window_size: Optional[bool] = -1,
+    ) -> BaseModelOutputWithPooling:
+        return self.vision_model(
+            pixel_values=pixel_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            interpolate_pos_encoding=interpolate_pos_encoding,
+            position_ids=position_ids,
+            vision_return_embed_list=vision_return_embed_list,
+            image_grid_thw=image_grid_thw,
+            sample_indices=sample_indices,
+            cu_seqlens=cu_seqlens,
+            return_pooler_output=return_pooler_output,
+            use_rope=use_rope,
+            window_size=window_size,
+        )

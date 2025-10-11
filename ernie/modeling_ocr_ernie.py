@@ -188,52 +188,16 @@ def _apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_di
     """Applies Rotary Position Embedding with Multimodal Sections to the query and key tensors (https://qwenlm.github.io/blog/qwen2-vl/).
     """
     mrope_section = mrope_section * 2
-    cos = paddle.concat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, axis=-1))], axis=-1).unsqueeze(
-        unsqueeze_dim
-    )
-    sin = paddle.concat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, axis=-1))], axis=-1).unsqueeze(
-        unsqueeze_dim
-    )
+    cos = paddle.concat(
+        [m[i % 3] for i, m in enumerate(cos.split(mrope_section, axis=-1))], axis=-1
+    ).unsqueeze(unsqueeze_dim)
+    sin = paddle.concat(
+        [m[i % 3] for i, m in enumerate(sin.split(mrope_section, axis=-1))], axis=-1
+    ).unsqueeze(unsqueeze_dim)
 
     q_embed = (q * cos) + (_rotate_half(q) * sin)
     k_embed = (k * cos) + (_rotate_half(k) * sin)
     return q_embed, k_embed
-
-def _make_causal_mask(input_ids_shape, past_key_values_length):
-    """
-    Make casual mask used for self-attention
-    """
-    batch_size, target_length = input_ids_shape  # target_length: seq_len
-
-    # TODO: Support NPU
-    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
-
-    if past_key_values_length > 0:
-        # [tgt_len, tgt_len + past_len]
-        mask = paddle.concat(
-            [paddle.ones([target_length, past_key_values_length], dtype="bool"), mask],
-            axis=-1,
-        )
-
-    # [bs, 1, tgt_len, tgt_len + past_len]
-    return mask[None, None, :, :].expand(
-        [batch_size, 1, target_length, target_length + past_key_values_length]
-    )
-
-
-def _expand_2d_mask(mask, dtype, tgt_length):
-    """
-    Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
-    """
-    batch_size, src_length = mask.shape[0], mask.shape[-1]
-    tgt_length = tgt_length if tgt_length is not None else src_length
-
-    # TODO: Support NPU
-    mask = mask[:, None, None, :].astype("bool")
-    mask.stop_gradient = True
-    expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
-
-    return expanded_mask
 
 
 class FusedDropoutImpl(nn.Layer):
@@ -397,16 +361,13 @@ class KeyeRotaryEmbedding(nn.Layer):
 
     @paddle.no_grad()
     def forward(self, x, position_ids):
-        if "dynamic" in self.rope_type:
-            self._dynamic_frequency_update(position_ids)
-
         # Core RoPE block. In contrast to other models, Keye has different position ids for the grids
         # So we expand the inv_freq to shape (3, ...)
-        inv_freq_expanded = self.inv_freq[None, None, :, None].astype('float32').expand((3, position_ids.shape[1], -1, 1))
-        position_ids_expanded = position_ids[:, :, None, :].astype('float32')  # shape (3, bs, 1, positions)
+        inv_freq_expanded = self.inv_freq[None, None, :, None].cast("float32").expand((3, position_ids.shape[1], -1, 1))
+        position_ids_expanded = position_ids[:, :, None, :].cast("float32")  # shape (3, bs, 1, positions)
         
         with paddle.amp.auto_cast(enable=False):
-            freqs = (inv_freq_expanded.astype('float32') @ position_ids_expanded.astype('float32')).transpose((0,1,3,2))
+            freqs = (inv_freq_expanded.cast("float32") @ position_ids_expanded.cast("float32")).transpose((0,1,3,2))
             emb = paddle.concat((freqs, freqs), axis=-1)
             cos = emb.cos()
             sin = emb.sin()
@@ -417,53 +378,6 @@ class KeyeRotaryEmbedding(nn.Layer):
 
         return cos.astype(dtype=x.dtype), sin.astype(dtype=x.dtype)
 
-class Ernie4_5RotaryEmbedding(nn.Layer):
-    def __init__(self, config):
-        super().__init__()
-        # BC: "rope_type" was originally "type"
-        if hasattr(config, "rope_scaling") and isinstance(config.rope_scaling, dict):
-            self.rope_type = config.rope_scaling.get(
-                "rope_type", config.rope_scaling.get("type")
-            )
-        else:
-            self.rope_type = "default"
-        self.max_seq_len_cached = config.max_position_embeddings
-        self.original_max_seq_len = config.max_position_embeddings
-
-        self.config = config
-        if self.rope_type == "default":
-            dim = config.head_dim
-            inv_freq = 1.0 / (
-                config.rope_theta
-                ** (paddle.arange(0, dim, 2, dtype="int64").astype("float32") / dim)
-            )
-            self.attention_scaling = 1.0
-        else:
-            raise ValueError(f"Unsupported rope type: {self.rope_type}")
-
-        self.register_buffer("inv_freq", inv_freq, persistable=False)
-        self.original_inv_freq = self.inv_freq
-
-    @paddle.no_grad()
-    def forward(self, position_ids):
-        inv_freq_expanded = (
-            self.inv_freq[None, :, None]
-            .astype("float32")
-            .expand((position_ids.shape[0], -1, 1))
-        )
-        position_ids_expanded = position_ids[:, None, :].astype("float32")
-
-        with paddle.amp.auto_cast(enable=False):  # Force float32
-            freqs = (
-                inv_freq_expanded.astype("float32")
-                @ position_ids_expanded.astype("float32")
-            ).transpose((0, 2, 1))
-            emb = paddle.concat((freqs, freqs), axis=-1)
-            cos = emb.cos() * self.attention_scaling
-            sin = emb.sin() * self.attention_scaling
-
-        # keeping it in full precision
-        return cos, sin
 
 class Ernie4_5MLP(nn.Layer):
     """
@@ -994,7 +908,7 @@ class Ernie4_5Attention(nn.Layer):
 
         cos, sin = position_embeddings
         query_states, key_states = _apply_multimodal_rotary_pos_emb(
-            query_states, key_states, cos, sin, self.rope_scaling['mrope_section']
+            query_states, key_states, cos, sin, self.rope_scaling["mrope_section"]
         )
 
         if past_key_value is not None:
@@ -1843,7 +1757,7 @@ class Ernie4_5PretrainedModel(PretrainedModel):
     """Base class for ERNIE pretrained models."""
 
     config_class = PPOCRVLConfig
-    base_model_prefix = "model"
+    base_model_prefix = "ernie"
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
@@ -2185,10 +2099,10 @@ class Ernie4_5Model(Ernie4_5PretrainedModel):
                 "You have to specify either decoder_input_ids or decoder_inputs_embeds"
             )
 
-        layers = self.layers[: self.config.num_hidden_layers]
-
         if batch_size != 1:
             raise NotImplementedError
+
+        layers = self.layers[: self.config.num_hidden_layers]
 
         if past_key_values is None:
             past_key_values = tuple([None] * len(layers))

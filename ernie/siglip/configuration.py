@@ -17,13 +17,14 @@
 from paddleformers.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
-    "SiglipVisionConfig",
+    "PPOCRVisionConfig",
 ]
 
 
-class SiglipVisionConfig(PretrainedConfig):
+class PPOCRVisionConfig(PretrainedConfig):
 
-    model_type = "Siglip_vision_transformer"
+    model_type = "ppocrvl"
+    base_config_key = "vision_config"
 
     def __init__(
         self,
@@ -43,6 +44,7 @@ class SiglipVisionConfig(PretrainedConfig):
         attn_sep=False,
         recompute=False,
         recompute_granularity="full",
+        recompute_use_reentrant=False,
         use_flash_attention=False,
         **kwargs,
     ):
@@ -64,4 +66,5 @@ class SiglipVisionConfig(PretrainedConfig):
         self.attn_sep = attn_sep
         self.recompute = recompute
         self.recompute_granularity = recompute_granularity
+        self.recompute_use_reentrant = recompute_use_reentrant
         self.use_flash_attention = use_flash_attention

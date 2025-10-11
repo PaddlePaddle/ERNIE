@@ -15,6 +15,7 @@
 
 import math
 from collections import OrderedDict
+from functools import partial
 
 import paddle
 import paddle.nn.functional as F
@@ -86,6 +87,27 @@ class GELUTanhActivation(nn.Layer):
     tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * pow(x, 3)))) This is now written in C in nn.functional with `approximate = True`
     Also see the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
     """
+    def __init__(self, use_gelu_tanh_python: bool = False):
+        """
+        Args:
+            use_gelu_tanh_python (bool, optional): Whether use python implement. Defaults to False.
+        """
+        super().__init__()
+        if use_gelu_tanh_python:
+            self.act = self._gelu_tanh_python
+        else:
+            self.act = partial(nn.functional.gelu, approximate=True)
+
+    def _gelu_tanh_python(self, input: Tensor) -> Tensor:
+        """
+        Args:
+            input (Tensor): The input Tensor
+
+        Returns:
+            Tensor: A Tensor with the same data type and shape as ``input``
+        """
+        return 0.5 * input * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (input + 0.044715 * paddle.pow(input, 3.0))))
+    
     def forward(self, input: Tensor) -> Tensor:
         """
         Args:
@@ -94,7 +116,7 @@ class GELUTanhActivation(nn.Layer):
         Returns:
             Tensor: A Tensor with the same data type and shape as ``input``
         """
-        return nn.functional.gelu(input, approximate=True)
+        return self.act(input)
 
 class FastGELUActivation(nn.Layer):
     """
@@ -230,6 +252,7 @@ ACT2CLS = {
     "gelu_fast": FastGELUActivation,
     "gelu_new": NewGELUActivation,
     "gelu_python": (GELUActivation, {"use_gelu_python": True}),
+    "gelu_tanh_python": (GELUTanhActivation, {"use_gelu_tanh_python": True}),
     "linear": LinearActivation,
     "mish": MishActivation,
     "quick_gelu": QuickGELUActivation,

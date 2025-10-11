@@ -27,13 +27,13 @@
 # limitations under the License.
 
 from paddleformers.transformers.configuration_utils import PretrainedConfig
-from .siglip.modeling import SiglipVisionConfig
+from .siglip.modeling import PPOCRVisionConfig
 
 
 class PPOCRVLConfig(PretrainedConfig):
     model_type = "ppocrvl"
     keys_to_ignore_at_inference = ["past_key_values"]
-    sub_configs = {"vision_config": SiglipVisionConfig}
+    sub_configs = {"vision_config": PPOCRVisionConfig}
 
     base_model_tp_plan = {
         "layers.*.self_attn.q_proj": "colwise",
@@ -110,6 +110,8 @@ class PPOCRVLConfig(PretrainedConfig):
         self.video_token_id = video_token_id
         self.vision_start_token_id = vision_start_token_id
         self.head_dim = head_dim
+        if hidden_act != "silu":
+            raise NotImplementedError
         self.hidden_act = hidden_act
         self.hidden_size = hidden_size
         self.use_bias = use_bias
@@ -153,12 +155,11 @@ class PPOCRVLConfig(PretrainedConfig):
             output = super().to_dict(saving_file=saving_file)
 
             if self.vision_config:
-                # output["vision_config"] = (
-                #     self.vision_config.to_diff_dict()
-                #     if isinstance(self.vision_config, (SiglipVisionConfig))
-                #     else self.vision_config
-                # )
-                output["vision_config"] = self.vision_config.to_dict()
+                output["vision_config"] = (
+                    self.vision_config.to_diff_dict()
+                    if isinstance(self.vision_config, (PPOCRVisionConfig))
+                    else self.vision_config
+                )
 
             output["model_type"] = self.__class__.model_type
             return output

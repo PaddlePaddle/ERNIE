@@ -483,7 +483,7 @@ def run_ocr_vl_sft(
                 model_args.model_name_or_path,
                 config=cfg,
             )
-    logger.info(f"vision_model: {model.vision_model}")
+    logger.info(f"vision_model: {model.visual.vision_model}")
 
     if model.config.head_dim is None:
         del model.config.head_dim
@@ -510,9 +510,9 @@ def run_ocr_vl_sft(
         logger.info("Freeze model vision module")
         model.freeze_vision()
     # Stop gradient for parameters which not be updated in training.
-    for p in model.vision_model.head.parameters():
+    for p in model.visual.vision_model.head.parameters():
         p.stop_gradient = True
-    model.vision_model.embeddings.packing_position_embedding.weight.stop_gradient = True
+    model.visual.vision_model.embeddings.packing_position_embedding.weight.stop_gradient = True
     
     # data
     logger.info("loading data...")
