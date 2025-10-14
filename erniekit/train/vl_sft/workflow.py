@@ -431,6 +431,8 @@ def run_vl_sft(
     ).repeat_interleave(cfg.vision_config.patch_size**2 * 1, -1)
 
     cfg.use_flash_attention = model_args.use_flash_attention
+    cfg.use_sparse_flash_attn = model_args.use_sparse_flash_attn
+    cfg.use_attn_mask_start_row_indices = model_args.use_attn_mask_start_row_indices
     cfg.use_recompute_moe = model_args.use_recompute_moe
     cfg.recompute = finetuning_args.recompute
     cfg.recompute_granularity = model_args.recompute_granularity

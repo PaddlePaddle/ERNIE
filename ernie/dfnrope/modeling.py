@@ -21,7 +21,10 @@ import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed.fleet.utils import recompute
-from paddle.nn.functional.flash_attention import flashmask_attention
+from paddle.nn.functional.flash_attention import (
+    flashmask_attention,
+    flash_attn_unpadded,
+)
 from paddle.distributed import fleet
 from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.utils.log import logger
@@ -34,6 +37,7 @@ from ..sequence_parallel_utils import (
 from ..distributed import get_hcg
 from .activation import ACT2FN
 from .configuration import DFNRopeVisionTransformerConfig
+from erniekit.utils.process import detect_device
 
 
 class _AllToAll(paddle.autograd.PyLayer):
@@ -179,6 +183,8 @@ class VisionFlashAttention2(nn.Layer):
         self.qkv = nn.Linear(dim, dim * 3, bias_attr=True)
         self.proj = nn.Linear(dim, dim)
         self.head_dim = dim // num_heads  # must added
+        self.device = detect_device()
+        self.softmax_scale = self.head_dim**-0.5
 
     def forward(
         self,
@@ -186,6 +192,8 @@ class VisionFlashAttention2(nn.Layer):
         startend_row_indices: paddle.Tensor,
         rotary_pos_emb: paddle.Tensor = None,
         attn_sep=False,
+        cu_seqlens=None,
+        max_seqlen=None,
     ) -> paddle.Tensor:
         """
         Args:
@@ -217,13 +225,25 @@ class VisionFlashAttention2(nn.Layer):
             axis=0
         )
 
-        attn_output = flashmask_attention(
-            q.astype("bfloat16").unsqueeze(0),
-            k.astype("bfloat16").unsqueeze(0),
-            v.astype("bfloat16").unsqueeze(0),
-            startend_row_indices=startend_row_indices,
-            causal=False,
-        )
+        if self.device == "iluvatar_gpu":
+            attn_output = flash_attn_unpadded(
+                q,
+                k,
+                v,
+                cu_seqlens,
+                cu_seqlens,
+                max_seqlen,
+                max_seqlen,
+                scale=self.softmax_scale,
+            )[0].squeeze(0)
+        else:
+            attn_output = flashmask_attention(
+                q.astype("bfloat16").unsqueeze(0),
+                k.astype("bfloat16").unsqueeze(0),
+                v.astype("bfloat16").unsqueeze(0),
+                startend_row_indices=startend_row_indices,
+                causal=False,
+            )
         attn_output = attn_output.reshape([seq_length, -1])
 
         if attn_sep:
@@ -343,7 +363,13 @@ class DFNRopeVisionBlock(nn.Layer):
         self.config = config
 
     def forward(
-        self, hidden_states, startend_row_indices, rotary_pos_emb, attn_sep=False
+        self,
+        hidden_states,
+        startend_row_indices,
+        rotary_pos_emb,
+        attn_sep=False,
+        cu_seqlens=None,
+        max_seqlen=None,
     ) -> paddle.Tensor:
         """
         Args:
@@ -359,6 +385,8 @@ class DFNRopeVisionBlock(nn.Layer):
             startend_row_indices=startend_row_indices,
             rotary_pos_emb=rotary_pos_emb,
             attn_sep=attn_sep,
+            cu_seqlens=cu_seqlens,
+            max_seqlen=max_seqlen,
         )
         hidden_states = hidden_states + self.mlp(self.norm2(hidden_states))
         return hidden_states
@@ -484,6 +512,7 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
         cu_seqlens_rm_first = cu_seqlens[1:]
         cu_seqlens_rm_last = cu_seqlens[:-1]
         repeats = cu_seqlens_rm_first - cu_seqlens_rm_last
+        max_seqlen = repeats.max().item()
 
         startend_row_indices_lts = paddle.repeat_interleave(
             cu_seqlens_rm_first, repeats
@@ -507,7 +536,13 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
                 and idx < vit_num_recompute_layers
             ):
                 hidden_states = recompute(
-                    blk, hidden_states, startend_row_indices, rotary_pos_emb, attn_sep
+                    blk,
+                    hidden_states,
+                    startend_row_indices,
+                    rotary_pos_emb,
+                    attn_sep,
+                    cu_seqlens,
+                    max_seqlen,
                 )
             else:
                 hidden_states = blk(
@@ -515,6 +550,8 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
                     startend_row_indices=startend_row_indices,
                     rotary_pos_emb=rotary_pos_emb,
                     attn_sep=attn_sep,
+                    cu_seqlens=cu_seqlens,
+                    max_seqlen=max_seqlen,
                 )
 
         ret = self.ln(hidden_states)  # add norm

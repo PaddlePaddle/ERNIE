@@ -1309,7 +1309,7 @@ class PretrainingTrainer(Trainer):
             logs["mem_reserved_gb"] = current_memory_reserved / divisor
             logs["max_mem_reserved_gb"] = max_memory_reserved / divisor
 
-            if get_env_device() == "gpu":
+            if get_env_device() in ["gpu", "iluvatar_gpu"]:
                 info_callback = global_training_logs.dict(use_async=True)
 
             if hasattr(self, "scaler"):

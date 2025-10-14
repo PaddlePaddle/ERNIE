@@ -52,6 +52,7 @@ from .sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
+from erniekit.utils.process import detect_device
 
 try:
     from ernie.utils.misc import global_training_logs
@@ -308,9 +309,11 @@ class VariableResolutionResamplerModel(nn.Layer):
             * self.spatial_conv_size
             * self.temporal_conv_size
         )
+        self.device = detect_device()
 
         with paddle.utils.unique_name.guard("mm_resampler_"):
 
+            fuse_matmul_bias = False if self.device == "iluvatar_gpu" else True
             self.spatial_linear = nn.Sequential(
                 (
                     RowSequenceParallelLinear(
@@ -318,7 +321,7 @@ class VariableResolutionResamplerModel(nn.Layer):
                         self.spatial_dim,
                         input_is_parallel=True,
                         has_bias=True,
-                        fuse_matmul_bias=True,
+                        fuse_matmul_bias=fuse_matmul_bias,
                     )
                     if config.tensor_parallel_degree > 1
                     else nn.Linear(self.spatial_dim, self.spatial_dim)
