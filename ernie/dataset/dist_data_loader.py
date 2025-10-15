@@ -176,7 +176,7 @@ class MMDataloader(paddle.io.DataLoader):
         collate_fn=None,
         num_workers=0,
         use_buffer_reader=True,
-        reader_buffer_size = 2,
+        reader_buffer_size=2,
         prefetch_factor=2,
         use_shared_memory=True,
         timeout=0,

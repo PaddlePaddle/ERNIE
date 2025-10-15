@@ -37,7 +37,15 @@ class NewGELUActivation(nn.Layer):
             Tensor: A Tensor with the same data type and shape as ``input``
         """
         return (
-            0.5 * input * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (input + 0.044715 * paddle.pow(input, 3.0))))
+            0.5
+            * input
+            * (
+                1.0
+                + paddle.tanh(
+                    math.sqrt(2.0 / math.pi)
+                    * (input + 0.044715 * paddle.pow(input, 3.0))
+                )
+            )
         )
 
 
@@ -80,6 +88,7 @@ class GELUActivation(nn.Layer):
         """
         return self.act(input)
 
+
 class GELUTanhActivation(nn.Layer):
     """
     Implementation of the OpenAI GPT's GELU activation function when initially created. For
@@ -87,6 +96,7 @@ class GELUTanhActivation(nn.Layer):
     tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * pow(x, 3)))) This is now written in C in nn.functional with `approximate = True`
     Also see the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
     """
+
     def __init__(self, use_gelu_tanh_python: bool = False):
         """
         Args:
@@ -106,8 +116,18 @@ class GELUTanhActivation(nn.Layer):
         Returns:
             Tensor: A Tensor with the same data type and shape as ``input``
         """
-        return 0.5 * input * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (input + 0.044715 * paddle.pow(input, 3.0))))
-    
+        return (
+            0.5
+            * input
+            * (
+                1.0
+                + paddle.tanh(
+                    math.sqrt(2.0 / math.pi)
+                    * (input + 0.044715 * paddle.pow(input, 3.0))
+                )
+            )
+        )
+
     def forward(self, input: Tensor) -> Tensor:
         """
         Args:
@@ -117,6 +137,7 @@ class GELUTanhActivation(nn.Layer):
             Tensor: A Tensor with the same data type and shape as ``input``
         """
         return self.act(input)
+
 
 class FastGELUActivation(nn.Layer):
     """
@@ -131,7 +152,14 @@ class FastGELUActivation(nn.Layer):
         Returns:
             Tensor: A Tensor with the same data type and shape as ``input``
         """
-        return 0.5 * input * (1.0 + paddle.tanh(input * 0.7978845608 * (1.0 + 0.044715 * input * input)))
+        return (
+            0.5
+            * input
+            * (
+                1.0
+                + paddle.tanh(input * 0.7978845608 * (1.0 + 0.044715 * input * input))
+            )
+        )
 
 
 class QuickGELUActivation(nn.Layer):
@@ -271,7 +299,9 @@ def get_activation(activation_string):
     if activation_string in ACT2FN:
         return ACT2FN[activation_string]
     else:
-        raise KeyError(f"function {activation_string} not found in ACT2FN mapping {list(ACT2FN.keys())}")
+        raise KeyError(
+            f"function {activation_string} not found in ACT2FN mapping {list(ACT2FN.keys())}"
+        )
 
 
 # For backwards compatibility with: from activations import gelu_python

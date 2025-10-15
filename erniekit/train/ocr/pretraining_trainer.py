@@ -90,7 +90,7 @@ from ernie.callbacks.moe_logging_callback import MoeLoggingCallback
 from ernie.lr_schedulers import (
     get_cosine_schedule_with_warmup,
     get_wsd_schedule_with_warmup,
-    get_constant_schedule_with_warmup
+    get_constant_schedule_with_warmup,
 )
 from ernie.utils.misc import global_training_logs
 
@@ -1548,7 +1548,7 @@ class PretrainingTrainer(Trainer):
                 p for n, p in self.model.named_parameters() if p.stop_gradient is False
             ]
         )
-        with open('output.txt', 'w') as f:
+        with open("output.txt", "w") as f:
             for n, p in self.model.named_parameters():
                 if p.stop_gradient is False:
                     f.write(f"{n}\n")

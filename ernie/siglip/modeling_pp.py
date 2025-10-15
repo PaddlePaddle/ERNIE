@@ -12,22 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 import contextlib
 from typing import List, Optional, Tuple, Union
 
 import paddle
-from paddle.distributed import fleet
 from paddleformers.utils.log import logger
 
-from .modeling import (
-    SiglipVisionModel,
-    BaseModelOutputWithPooling
-)
+from .modeling import SiglipVisionModel, BaseModelOutputWithPooling
 from ..sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
-    SliceVarlenOp,
-    AllGatherVarlenOpV2,
 )
 
 
@@ -58,7 +51,6 @@ class SiglipVisionModelPipe(SiglipVisionModel):
             for p in self.parameters():
                 mark_as_sequence_parallel_parameter(p)
 
-    
     def forward(
         self,
         pixel_values,

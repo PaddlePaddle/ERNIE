@@ -37,8 +37,6 @@ import random
 import io
 
 import numpy as np
-import paddle
-import PIL
 from PIL import Image, ImageOps
 from paddle.vision import transforms
 from paddleformers.utils.log import logger
@@ -46,16 +44,12 @@ from paddleformers.transformers.feature_extraction_utils import BatchFeature
 from paddleformers.transformers.image_processing_utils import BaseImageProcessor
 from paddleformers.transformers.image_transforms import (
     convert_to_rgb,
-    normalize,
-    rescale,
-    resize,
     to_channel_dimension_format,
 )
 from paddleformers.transformers.image_utils import (
     ChannelDimension,
     ImageInput,
     PILImageResampling,
-    get_image_size,
     infer_channel_dimension_format,
     is_valid_image,
     make_list_of_images,
@@ -73,37 +67,41 @@ __all__ = [
 
 # --- Transformation Classes ---
 
+
 class RandomApply:
     def __init__(self, transforms, p=0.5):
         self.transforms = transforms
         self.p = p
-    
+
     def __call__(self, x):
         if random.random() < self.p:
             for t in self.transforms:
                 x = t(x)
         return x
 
+
 class RandomDiscreteRotation:
     def __init__(self, degrees, interpolation="nearest", expand=True):
         self.degrees = degrees
         self.interpolation = interpolation
         self.expand = expand
-    
+
     def __call__(self, img):
         angle = random.choice(self.degrees)
         return img.rotate(angle, self.interpolation, self.expand)
 
+
 class JpegCompression:
     def __init__(self, quality_range=(20, 80)):
         self.quality_range = quality_range
-    
+
     def __call__(self, img):
         quality = random.randint(self.quality_range[0], self.quality_range[1])
         output = io.BytesIO()
         img.convert("RGB").save(output, "JPEG", quality=quality)
         output.seek(0)
         return Image.open(output)
+
 
 class RandomScale:
     def __init__(self, scale_range=(0.7, 1.3), interpolation="bicubic"):
@@ -112,22 +110,23 @@ class RandomScale:
 
     def __call__(self, img):
         scale = random.uniform(self.scale_range[0], self.scale_range[1])
-        
+
         original_width, original_height = img.size
         new_width = int(original_width * scale)
         new_height = int(original_height * scale)
-        new_size = (new_height, new_width) # transforms.Resize需要 (h, w)
+        new_size = (new_height, new_width)  # transforms.Resize需要 (h, w)
 
         return transforms.functional.resize(img, new_size, self.interpolation)
 
+
 class RandomPadding:
-    def __init__(self, max_padding_fraction=0.1, fill='white'):
+    def __init__(self, max_padding_fraction=0.1, fill="white"):
         self.max_padding_fraction = max_padding_fraction
         self.fill = fill
 
     def __call__(self, img):
         width, height = img.size
-        
+
         max_pad_x = int(width * self.max_padding_fraction)
         max_pad_y = int(height * self.max_padding_fraction)
 
@@ -135,9 +134,10 @@ class RandomPadding:
         pad_top = random.randint(0, max_pad_y)
         pad_right = random.randint(0, max_pad_x)
         pad_bottom = random.randint(0, max_pad_y)
-        
+
         padding = (pad_left, pad_top, pad_right, pad_bottom)
         return ImageOps.expand(img, border=padding, fill=self.fill)
+
 
 def get_ocr_augmentations(
     # scale parameters
@@ -147,7 +147,7 @@ def get_ocr_augmentations(
     padding_fraction=0.05,
     padding_p=0.5,
     # rotation parameters
-    rotation_degrees=[0], 
+    rotation_degrees=[0],
     rotation_p=0.5,
     # color jitter parameters
     color_jitter_p=0.5,
@@ -157,41 +157,46 @@ def get_ocr_augmentations(
 ):
 
     augmentations = []
-    
+
     if scale_p > 0:
         scale_transform = RandomScale(scale_range=scale_range)
         augmentations.append(RandomApply([scale_transform], p=scale_p))
 
     if padding_p > 0:
-        padding_transform = RandomPadding(padding_fraction, fill='white')
+        padding_transform = RandomPadding(padding_fraction, fill="white")
         augmentations.append(RandomApply([padding_transform], p=padding_p))
-    
+
     if rotation_p > 0 and rotation_degrees:
-        rotation_transform = RandomDiscreteRotation(degrees=rotation_degrees, interpolation="nearest", expand=True)
+        rotation_transform = RandomDiscreteRotation(
+            degrees=rotation_degrees, interpolation="nearest", expand=True
+        )
         augmentations.append(RandomApply([rotation_transform], p=rotation_p))
-    
+
     if color_jitter_p > 0:
-        color_jitter = transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.1)
+        color_jitter = transforms.ColorJitter(
+            brightness=0.3, contrast=0.3, saturation=0.2, hue=0.1
+        )
         augmentations.append(RandomApply([color_jitter], p=color_jitter_p))
-    
+
     if jpeg_p > 0:
         jpeg_transform = JpegCompression(quality_range=jpeg_quality_range)
         augmentations.append(RandomApply([jpeg_transform], p=jpeg_p))
-    
+
     return transforms.Compose(augmentations)
 
 
 image_augmentation = get_ocr_augmentations(
-    rotation_degrees=[90, 270], 
+    rotation_degrees=[90, 270],
     rotation_p=0,
     jpeg_quality_range=(80, 100),
     jpeg_p=0,
     scale_range=(0.5, 1.5),
     scale_p=0,
-    padding_p=0,       
+    padding_p=0,
     padding_fraction=0,
-    color_jitter_p=0.1,             
+    color_jitter_p=0.1,
 )
+
 
 def is_scaled_image(image: np.ndarray) -> bool:
     """
@@ -202,6 +207,7 @@ def is_scaled_image(image: np.ndarray) -> bool:
 
     # It's possible the image has pixel values in [0, 255] but is of floating type
     return np.min(image) >= 0 and np.max(image) <= 1
+
 
 def make_batched_images(images) -> List[List[ImageInput]]:
     """
@@ -253,7 +259,7 @@ def smart_resize(
     3. The aspect ratio of the image is maintained as closely as possible.
 
     """
-    
+
     if height < factor:
         logger.debug(
             f"smart_resize: height={height} < factor={factor}, reset height=factor"
@@ -338,12 +344,16 @@ class SiglipImageProcessor(BaseImageProcessor):
     def set_pixels(self, min_pixels=None, max_pixels=None, msg=""):
         """set_pixels"""
         if min_pixels is not None:
-            assert isinstance(min_pixels, int) and min_pixels >= 0, "min_pixels must be positive int"
+            assert (
+                isinstance(min_pixels, int) and min_pixels >= 0
+            ), "min_pixels must be positive int"
             logger.info(f"{msg} SiglipImageProcessor set min_pixels = {min_pixels}")
             self.min_pixels = min_pixels
             self.size["min_pixels"] = int(min_pixels)
         if max_pixels is not None:
-            assert isinstance(max_pixels, int) and max_pixels > 0, "max_pixels must be positive int"
+            assert (
+                isinstance(max_pixels, int) and max_pixels > 0
+            ), "max_pixels must be positive int"
             logger.info(f"{msg} SiglipImageProcessor set max_pixels = {max_pixels}")
             self.max_pixels = max_pixels
             self.size["max_pixels"] = int(max_pixels)
@@ -359,8 +369,11 @@ class SiglipImageProcessor(BaseImageProcessor):
             min_pixels=actual_min_pixels,
             max_pixels=actual_max_pixels,
         )
-        return (resized_height, resized_width), (resized_height // self.patch_size, resized_width // self.patch_size)
-    
+        return (resized_height, resized_width), (
+            resized_height // self.patch_size,
+            resized_width // self.patch_size,
+        )
+
     def _preprocess(
         self,
         images,
@@ -374,7 +387,7 @@ class SiglipImageProcessor(BaseImageProcessor):
         do_convert_rgb: Optional[bool] = None,
         data_format: Optional[ChannelDimension] = ChannelDimension.FIRST,
         input_data_format: Optional[Union[str, ChannelDimension]] = None,
-        predetermined_grid_thw = None,
+        predetermined_grid_thw=None,
     ):
         images = make_list_of_images(images)
 
@@ -405,9 +418,7 @@ class SiglipImageProcessor(BaseImageProcessor):
                         max_pixels=self.max_pixels,
                     )
 
-                image = image.resize(
-                    (resized_width, resized_height), resample=resample
-                )
+                image = image.resize((resized_width, resized_height), resample=resample)
 
             image = to_numpy_array(image)
 
@@ -421,7 +432,7 @@ class SiglipImageProcessor(BaseImageProcessor):
 
             if input_data_format is None:
                 input_data_format = infer_channel_dimension_format(images[0])
-            
+
             image = to_channel_dimension_format(
                 image, data_format, input_channel_dim=input_data_format
             )
@@ -494,7 +505,10 @@ class SiglipImageProcessor(BaseImageProcessor):
             raise NotImplementedError("Videos are not yet supported")
 
         if images is not None and not valid_images(images):
-            raise ValueError("Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, " "paddle.Tensor.")
+            raise ValueError(
+                "Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, "
+                "paddle.Tensor."
+            )
 
         if images is not None:
             pixel_values, vision_grid_thws = [], []

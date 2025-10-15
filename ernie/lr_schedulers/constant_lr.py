@@ -15,7 +15,6 @@
 """ Custom lr schedule
 """
 
-import math
 
 from paddle.optimizer.lr import LambdaDecay
 
@@ -45,6 +44,6 @@ def get_constant_schedule_with_warmup(
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
         ratio = 1.0
-        return ratio 
+        return ratio
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)

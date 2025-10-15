@@ -48,19 +48,22 @@ from paddleformers.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
     ModelOutput,
 )
-from paddleformers.utils.log import logger
 from .configuration_ocr import PPOCRVLConfig
 from .modeling_moe_vl_pp import inbatch_pack_offset_to_attn_mask_start_row_indices
 from .modeling_ocr_ernie import Ernie4_5Model, Ernie4_5PretrainedModel
+
 # from paddleformers.transformers.ernie4_5.modeling import Ernie4_5Model, Ernie4_5PretrainedModel
-from .siglip import SiglipVisionModel, PPOCRVisionConfig
+from .siglip import SiglipVisionModel
 
 
 def paddle_cross_entropy_by_hand(shift_logits, shift_labels):
-    softmax = paddle.exp(shift_logits) / paddle.sum(paddle.exp(shift_logits), axis=1, keepdim=True)
+    softmax = paddle.exp(shift_logits) / paddle.sum(
+        paddle.exp(shift_logits), axis=1, keepdim=True
+    )
     log_softmax = paddle.log(softmax + 1e-10)
     loss = F.nll_loss(log_softmax, shift_labels)
     return loss
+
 
 class GELUActivation(nn.Layer):
     """
@@ -164,7 +167,6 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.rope_deltas_var = ContextVar("rope_deltas", default=None)
-    
 
     def add_image_preprocess(self, preprocess):
         self.image_preprocess = preprocess
@@ -757,7 +759,7 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
         if inputs_embeds is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
             if pixel_values is not None:
-                
+
                 # normalize image
                 # if self.image_preprocess is not None:
                 #     assert pixel_values.dtype == paddle.uint8, pixel_values.dtype
@@ -776,7 +778,6 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
                 sample_indices = list()
                 cu_seqlens = [0]
 
-                pro = 0
                 for idx, thw in enumerate(image_grid_thw):
                     thw_tuple = tuple(thw.detach().cpu().numpy().tolist())
                     numel = np.prod(thw_tuple)
@@ -832,11 +833,12 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
         else:
             attn_mask_start_row_indices = None
 
-        
         if attention_mask is not None and attention_mask.dtype != paddle.bool:
             attention_mask = paddle.cast(attention_mask, paddle.bool)
 
-        if position_ids is None and (attention_mask is None or attention_mask.ndim == 2):
+        if position_ids is None and (
+            attention_mask is None or attention_mask.ndim == 2
+        ):
             # calculate RoPE index once per generation in the pre-fill stage only
             if curr_rope_deltas is None or (
                 past_key_values is None or past_key_values[0] is None
@@ -983,7 +985,7 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
     #     #     )
     #     # else:
     #     #     raise RuntimeError(f"unknown vision_config: {config.vision_config}")
-        
+
     #     return mappings
 
     # @staticmethod

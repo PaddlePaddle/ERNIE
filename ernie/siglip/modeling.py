@@ -39,17 +39,14 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddle.distributed as dist
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn.functional.flash_attention import flashmask_attention
 from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.transformers.model_outputs import (
     BaseModelOutput,
-    BaseModelOutputWithPooling
+    BaseModelOutputWithPooling,
 )
-from paddleformers.utils.log import logger
 
-from ..distributed import get_hcg
 from .activation import ACT2FN
 from .configuration import PPOCRVisionConfig
 
@@ -115,6 +112,7 @@ def eager_attention_forward(
 
     return attn_output, attn_weights
 
+
 class SiglipAttention(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -131,7 +129,7 @@ class SiglipAttention(nn.Layer):
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim)
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim)
-    
+
     def attn_func(
         self,
         queries: paddle.Tensor,
@@ -156,7 +154,7 @@ class SiglipAttention(nn.Layer):
             startend_row_indices = paddle.concat(
                 [startend_row_indices_lts, startend_row_indices_ute], axis=-1
             )
-            
+
             attn_output = flashmask_attention(
                 queries,
                 keys,
@@ -179,7 +177,7 @@ class SiglipAttention(nn.Layer):
             )
 
         return attn_output, attn_weights
-    
+
     def forward(
         self,
         hidden_states: paddle.Tensor,  # [B, L, D]
@@ -188,7 +186,7 @@ class SiglipAttention(nn.Layer):
         cu_seqlens: Optional[List[paddle.Tensor]] = None,
         rope_emb: Optional[Tuple[paddle.Tensor, paddle.Tensor]] = None,  # (cos, sin)
     ):
-        
+
         B, L, D = hidden_states.shape
 
         q = self.q_proj(hidden_states)
@@ -214,11 +212,7 @@ class SiglipAttention(nn.Layer):
             k = k.transpose([0, 2, 1, 3])
             v = v.transpose([0, 2, 1, 3])
 
-        has_gradient = not (
-            q.stop_gradient
-            and k.stop_gradient
-            and v.stop_gradient
-        )
+        has_gradient = not (q.stop_gradient and k.stop_gradient and v.stop_gradient)
 
         if (
             self.config.recompute
@@ -243,7 +237,7 @@ class SiglipAttention(nn.Layer):
                 attention_mask,
                 cu_seqlens,
             )
-        
+
         attn_output = attn_output.reshape([B, L, D]).contiguous()
         attn_output = self.out_proj(attn_output)
 
@@ -373,7 +367,6 @@ class SiglipVisionEmbeddings(nn.Layer):
                 flatten_image_grid_thw = self.flatten_list(image_grid_thw)
                 assert batch_size == 1
                 start = 0
-                image_embedding_list = list()
 
                 assert (
                     sum([np.prod(x) for x in flatten_image_grid_thw])
@@ -749,7 +742,7 @@ class SiglipVisionTransformer(nn.Layer):
         )
         if self.use_head:
             self.head = SiglipMultiheadAttentionPoolingHead(config)
-    
+
     def forward(
         self,
         pixel_values,

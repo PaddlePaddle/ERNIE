@@ -209,10 +209,10 @@ def merge_fn_group_batch(
     )
     if "need_multiround" in batch[0]:
         del batch[0]["need_multiround"]
-    
+
     if not pad_to_max_seqlen:
         pad_to_max_seqlen = batch[0]["input_ids"].shape[0]
-    
+
     global DEBUG_PRINT_CNT
     if pad_to_max_seqlen and shift_label:
         pad_to_max_seqlen += 1
@@ -311,7 +311,7 @@ def merge_fn_group_batch(
                 if k == "image_position_ids":
                     ret["image_attention_mask"] = ret[k] != pad_value
                     ret[k][ret[k] == pad_value] = 0
-    
+
     assert (
         pad_to_max_seqlen == batch[0]["input_ids"].shape[0]
     ), f"pad_to_max_seqlen {pad_to_max_seqlen} != input_ids shape {batch[0]['input_ids'].shape}"

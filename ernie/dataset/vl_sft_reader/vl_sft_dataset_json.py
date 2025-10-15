@@ -247,7 +247,9 @@ class ExampleSet:
             assert data_size > 0
             self.exs = self.exs[data_rank::data_size]
         else:
-            self.exs = self.exs[self.args.pipeline_parallel_rank::self.args.pp_need_data_degree]
+            self.exs = self.exs[
+                self.args.pipeline_parallel_rank :: self.args.pp_need_data_degree
+            ]
 
         def trans_query_response_type(ex):
             text_idx, image_idx, video_idx = 0, 0, 0
@@ -582,7 +584,7 @@ class SFTMultimodalDatasetJson(IterableDataset):
                 shuffle_json=shuffle_json,
                 process_fn=process_fn,
                 data_rank=self.data_rank,
-                data_size=self.data_size
+                data_size=self.data_size,
             )
 
             self.task_group[part.src] = part
@@ -750,7 +752,9 @@ class SFTMultimodalDatasetJson(IterableDataset):
         indices = []
         for i, _ in enumerate(self.task_group):
             sample_size = int(self.weight_list[i] * self.length)
-            print(f"Take {sample_size} samples from {self.task_group[i]._file_name} (total length: {len(self.task_group[i].exs)}) to construct current sample list")
+            print(
+                f"Take {sample_size} samples from {self.task_group[i]._file_name} (total length: {len(self.task_group[i].exs)}) to construct current sample list"
+            )
             indices.extend([i] * sample_size)
         return indices
 

@@ -41,7 +41,7 @@ from paddle.distributed.fleet.utils import recompute
 from paddleformers.utils.log import logger
 from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.transformers.model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions
+    BaseModelOutputWithPastAndCrossAttentions,
 )
 from .configuration_ocr import PPOCRVLConfig
 from .distributed import (
@@ -61,7 +61,6 @@ from .fusion_ops import (
     fused_swiglu,
     fusion_flash_attention,
 )
-from .refined_recompute.utils import RefinedRecomputeFunction
 from .sequence_parallel_utils import ScatterOp
 
 
@@ -184,9 +183,9 @@ def _rotate_half(x):
     x2 = x[..., x.shape[-1] // 2 :]
     return paddle.concat((-x2, x1), axis=-1)
 
+
 def _apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim=2):
-    """Applies Rotary Position Embedding with Multimodal Sections to the query and key tensors (https://qwenlm.github.io/blog/qwen2-vl/).
-    """
+    """Applies Rotary Position Embedding with Multimodal Sections to the query and key tensors (https://qwenlm.github.io/blog/qwen2-vl/)."""
     mrope_section = mrope_section * 2
     cos = paddle.concat(
         [m[i % 3] for i, m in enumerate(cos.split(mrope_section, axis=-1))], axis=-1
@@ -337,10 +336,12 @@ class KeyeRotaryEmbedding(nn.Layer):
     def __init__(self, config: PPOCRVLConfig):
         super().__init__()
         self.rope_kwargs = {}
-            
+
         # BC: "rope_type" was originally "type"
         if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
-            self.rope_type = config.rope_scaling.get("rope_type", config.rope_scaling.get("type"))
+            self.rope_type = config.rope_scaling.get(
+                "rope_type", config.rope_scaling.get("type")
+            )
         else:
             self.rope_type = "default"
         self.max_seq_len_cached = config.max_position_embeddings
@@ -355,7 +356,7 @@ class KeyeRotaryEmbedding(nn.Layer):
             self.attention_scaling = 1.0
         else:
             raise ValueError(f"Unsupported rope type: {self.rope_type}")
-        
+
         self.register_buffer("inv_freq", inv_freq, persistable=False)
         self.original_inv_freq = self.inv_freq
 
@@ -363,11 +364,20 @@ class KeyeRotaryEmbedding(nn.Layer):
     def forward(self, x, position_ids):
         # Core RoPE block. In contrast to other models, Keye has different position ids for the grids
         # So we expand the inv_freq to shape (3, ...)
-        inv_freq_expanded = self.inv_freq[None, None, :, None].cast("float32").expand((3, position_ids.shape[1], -1, 1))
-        position_ids_expanded = position_ids[:, :, None, :].cast("float32")  # shape (3, bs, 1, positions)
-        
+        inv_freq_expanded = (
+            self.inv_freq[None, None, :, None]
+            .cast("float32")
+            .expand((3, position_ids.shape[1], -1, 1))
+        )
+        position_ids_expanded = position_ids[:, :, None, :].cast(
+            "float32"
+        )  # shape (3, bs, 1, positions)
+
         with paddle.amp.auto_cast(enable=False):
-            freqs = (inv_freq_expanded.cast("float32") @ position_ids_expanded.cast("float32")).transpose((0,1,3,2))
+            freqs = (
+                inv_freq_expanded.cast("float32")
+                @ position_ids_expanded.cast("float32")
+            ).transpose((0, 1, 3, 2))
             emb = paddle.concat((freqs, freqs), axis=-1)
             cos = emb.cos()
             sin = emb.sin()
@@ -2106,9 +2116,6 @@ class Ernie4_5Model(Ernie4_5PretrainedModel):
 
         if past_key_values is None:
             past_key_values = tuple([None] * len(layers))
-            kv_seq_len = 0
-        else:
-            kv_seq_len = past_key_values[0][0].shape[1]
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -2123,7 +2130,7 @@ class Ernie4_5Model(Ernie4_5PretrainedModel):
         if position_ids is None or position_ids.dim() == 2:
             raise NotImplementedError
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
-        
+
         causal_mask = self._update_causal_mask(
             attention_mask,
             inputs_embeds,
@@ -2223,7 +2230,9 @@ class Ernie4_5Model(Ernie4_5PretrainedModel):
 
         if self.config.use_flash_attention:
             if attention_mask is not None and past_key_values is not None:
-                is_padding_right = attention_mask[:, -1].sum().item() != input_tensor.size()[0]
+                is_padding_right = (
+                    attention_mask[:, -1].sum().item() != input_tensor.size()[0]
+                )
                 if is_padding_right:
                     raise ValueError(
                         "You are attempting to perform batched generation with padding_side='right'"
@@ -2233,7 +2242,7 @@ class Ernie4_5Model(Ernie4_5PretrainedModel):
             if attention_mask is not None and 0.0 in attention_mask:
                 return attention_mask
             return None
-        
+
         past_seen_tokens = (
             past_key_values[0][0].shape[1]
             if past_key_values is not None and past_key_values[0] is not None
@@ -2241,7 +2250,6 @@ class Ernie4_5Model(Ernie4_5PretrainedModel):
         )
 
         dtype = input_tensor.dtype
-        min_dtype = paddle.finfo(dtype).min
         sequence_length = input_tensor.shape[1]
         target_length = (
             attention_mask.shape[-1]

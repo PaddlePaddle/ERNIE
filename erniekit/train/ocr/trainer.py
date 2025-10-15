@@ -22,7 +22,6 @@ import shutil
 import sys
 import time
 from paddle.io import Dataset
-from functools import partial
 from typing import List, Optional, Union
 
 import numpy as np
@@ -36,7 +35,6 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from paddle.io import DataLoader
 
 
 from distutils.util import strtobool
@@ -158,7 +156,6 @@ class SFTTrainer(PretrainingTrainer):
                 need_slice=False,
                 packing_size=4,
             )
-        
 
     def train(
         self,
@@ -523,7 +520,7 @@ class SFTTrainer(PretrainingTrainer):
                 position_ids = inputs["position_ids"]
                 position_ids = position_ids.squeeze(0).transpose([1, 0]).unsqueeze(1)
                 inputs["position_ids"] = position_ids
-                
+
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 if (

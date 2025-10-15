@@ -62,8 +62,8 @@ def _training_function(config: dict[str, Any]) -> None:
     elif model_args.stage == "OCR-SFT":
         with paddle.amp.auto_cast(enable=False):
             run_ocr_vl_sft(
-            model_args, data_args, preprocess_args, generating_args, finetuning_args
-        )
+                model_args, data_args, preprocess_args, generating_args, finetuning_args
+            )
     elif model_args.stage == "DPO":
         with paddle.amp.auto_cast(enable=False):
             run_dpo(model_args, data_args, generating_args, finetuning_args)
