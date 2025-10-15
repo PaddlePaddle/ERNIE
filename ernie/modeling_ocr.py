@@ -41,6 +41,7 @@ from contextvars import ContextVar
 import numpy as np
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
 
 from paddleformers.generation import GenerationMixin
 from paddleformers.transformers.model_outputs import (
@@ -51,8 +52,15 @@ from paddleformers.utils.log import logger
 from .configuration_ocr import PPOCRVLConfig
 from .modeling_moe_vl_pp import inbatch_pack_offset_to_attn_mask_start_row_indices
 from .modeling_ocr_ernie import Ernie4_5Model, Ernie4_5PretrainedModel
+# from paddleformers.transformers.ernie4_5.modeling import Ernie4_5Model, Ernie4_5PretrainedModel
 from .siglip import SiglipVisionModel, PPOCRVisionConfig
 
+
+def paddle_cross_entropy_by_hand(shift_logits, shift_labels):
+    softmax = paddle.exp(shift_logits) / paddle.sum(paddle.exp(shift_logits), axis=1, keepdim=True)
+    log_softmax = paddle.log(softmax + 1e-10)
+    loss = F.nll_loss(log_softmax, shift_labels)
+    return loss
 
 class GELUActivation(nn.Layer):
     """
@@ -887,7 +895,8 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
             # shift_logits = logits.contiguous()
             # shift_labels = labels.contiguous()
             # Flatten the tokens
-            loss_fct = paddle.nn.CrossEntropyLoss()
+            # loss_fct = paddle.nn.CrossEntropyLoss()
+            loss_fct = paddle_cross_entropy_by_hand
             shift_logits = shift_logits.reshape((-1, self.config.vocab_size))
             shift_labels = shift_labels.reshape((-1,))
             loss = loss_fct(shift_logits, shift_labels)
