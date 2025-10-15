@@ -90,6 +90,7 @@ from ernie.callbacks.moe_logging_callback import MoeLoggingCallback
 from ernie.lr_schedulers import (
     get_cosine_schedule_with_warmup,
     get_wsd_schedule_with_warmup,
+    get_constant_schedule_with_warmup
 )
 from ernie.utils.misc import global_training_logs
 
@@ -1517,12 +1518,18 @@ class PretrainingTrainer(Trainer):
                 min_lr=self.args.min_lr if self.args.min_lr else 0.0,
                 num_steady_steps=num_steady_steps,
             )
-        else:
+        elif self.args.lr_scheduler == "cosine":
             self.lr_scheduler = get_cosine_schedule_with_warmup(
                 self.args.learning_rate,
                 warmup,
                 self.args.max_steps,
                 min_lr=self.args.min_lr if self.args.min_lr else 0.0,
+            )
+        elif self.args.lr_scheduler == "constant":
+            self.lr_scheduler = get_constant_schedule_with_warmup(
+                self.args.learning_rate,
+                warmup,
+                self.args.max_steps,
             )
         return self.lr_scheduler
 
