@@ -8,13 +8,17 @@ eval_dataset_prob: "1.0"
 max_seq_len: 1536
 num_samples_each_epoch: 6000000
 use_pic_id: False
+sft_replace_ids: True
+sft_image_normalize: True
+sft_image_rescale: True
+image_dtype: "float32"
 
 ### model
 model_name_or_path: baidu/ERNIE-4.5-0.3B-Paddle
 fine_tuning: Full
 fuse_rope: True
 use_sparse_head_and_loss_fn: True
-multimodal: true
+multimodal: True
 use_flash_attention: True
 
 ### finetuning
@@ -25,6 +29,7 @@ do_train: True
 # do_eval: True
 distributed_dataloader: False
 dataloader_num_workers: 1
+prefetch_factor: 10
 batch_size: 1
 num_train_epochs: 1
 max_steps: 1000
