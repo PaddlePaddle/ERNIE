@@ -148,17 +148,39 @@ def create_pretrained_dataset(args):
         data_cache_path=None,
     )
 
+    def ratio_maker(CPT):
+        """
+        input: [True, False, False, True]
+        output: {"kl_ratio": Tensor([0.5, 1, 1, 0.5]), "ce_ratio": Tensor([1, 0.5, 0.5, 1])}
+        """
+        CPT = paddle.to_tensor(CPT, dtype="bool")
+        true_kl = 0.5
+        false_kl = 1
+        true_ce = 1
+        false_ce = 0.5
+
+        kl_ratio = paddle.full_like(CPT, false_kl, dtype="float32")
+        kl_ratio[CPT] = true_kl
+
+        ce_ratio = paddle.full_like(CPT, false_ce, dtype="float32")
+        ce_ratio[CPT] = true_ce
+
+        return {"kl_ratio": kl_ratio, "ce_ratio": ce_ratio}
+
     from paddleformers.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn([x["text"] for x in data])
+        kl_logits_ = stack_fn([x["logits"] for x in data])
+        CPT = ratio_maker([x["CPT"] for x in data])
 
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
+        kl_logits = kl_logits_[:, :-1]
 
         return {
             "input_ids": tokens,
-            "labels": labels,
+            "labels": [labels, kl_logits, CPT],
         }
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
