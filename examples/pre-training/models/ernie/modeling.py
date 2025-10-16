@@ -30,7 +30,6 @@ from models.sequence_parallel_utils import (
     AllGatherVarlenOp,
     ColumnSequenceParallelLinear,
     GatherOp,
-    AllGatherOp,
     RowSequenceParallelLinear,
     ScatterOp,
     mark_as_sequence_parallel_parameter,
@@ -121,98 +120,6 @@ __all__ = [
     "ErniePretrainedModel",
     "ErnieForCausalLM",
 ]
-
-
-class DistributedSoftmaxOp(PyLayer):
-    """
-    分布式Softmax操作，支持模型并行
-    输入形状: [s/n, b, h]，n是模型并行度
-    输出形状: [s/n, b, h]
-    """
-
-    @staticmethod
-    def forward(ctx, x, axis=-1, mp_group=None):
-        """
-        前向传播
-        Args:
-            x: 输入张量 [s/n, b, h]
-            axis: softmax计算的轴
-            mp_group: 模型并行组
-        Returns:
-            softmax_output: softmax输出 [s/n, b, h]
-        """
-        # 保存参数用于反向传播
-        ctx.axis = axis
-        ctx.mp_group = mp_group
-
-        if mp_group is None:
-            hcg = fleet.get_hybrid_communicate_group()
-            ctx.mp_group = hcg.get_model_parallel_group()
-
-        # 1. 数值稳定性处理：减去最大值防止指数运算溢出
-        # 计算本地最大值
-        local_max = paddle.max(x, axis=axis, keepdim=True)
-
-        # 收集所有设备的最大值 - 使用AllGatherOp
-        # 注意：这里需要将最大值在模型并行组内收集
-        all_max = AllGatherOp.apply(local_max, axis=0, group=ctx.mp_group)
-
-        # 计算全局最大值
-        global_max = paddle.max(all_max, axis=0, keepdim=True)
-
-        # 减去全局最大值
-        x_stable = x - global_max
-
-        # 2. 计算指数
-        exp_x = paddle.exp(x_stable.cast("float32"))
-
-        local_sum_exp = paddle.sum(exp_x, axis=axis, keepdim=True)
-
-        sum_exp = mp_ops._mp_allreduce(
-            local_sum_exp,
-            group=mp_group,
-            use_calc_stream=True,
-            use_model_parallel=True,
-        )
-
-        # 4. 计算softmax概率
-        softmax_output = exp_x / sum_exp
-
-        # 保存中间结果用于反向传播
-        ctx.save_for_backward(softmax_output, sum_exp)
-
-        return softmax_output
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        """
-        反向传播
-        Args:
-            grad_output: 上游梯度 [s/n, b, h]
-        Returns:
-            grad_input: 输入梯度 [s/n, b, h]
-        """
-        # 恢复保存的张量
-        softmax_output, global_sum_exp = ctx.saved_tensor()
-        axis = ctx.axis
-        mp_group = ctx.mp_group
-
-        # softmax的梯度公式: dL/dx = softmax * (dL/dy - sum(dL/dy * softmax, axis=axis))
-
-        # 1. 计算 dL/dy * softmax
-        grad_softmax = grad_output * softmax_output
-
-        # 2. 计算 sum(dL/dy * softmax, axis=axis) 的本地部分
-        local_sum_grad = paddle.sum(grad_softmax, axis=axis, keepdim=True)
-
-        # 3. 使用AllGatherOp收集所有设备的局部梯度，然后求和得到全局梯度
-        all_sum_grad = AllGatherOp.apply(local_sum_grad, axis=0, group=mp_group)
-        global_sum_grad = paddle.sum(all_sum_grad, axis=0, keepdim=True)
-
-        # 4. 计算最终梯度
-        grad_input = softmax_output * (grad_output - global_sum_grad)
-
-        return grad_input
 
 
 def kl_divergence(p, q, eps: float = 1e-10, degree=-1, rank=-1):
@@ -2487,31 +2394,28 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                 masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
             else:
                 masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
-                if kl_logits is not None:
-                    # print(self.enable_parallel_cross_entropy)
-                    if self.enable_parallel_cross_entropy:
-                        prediction_scores = DistributedSoftmaxOp.apply(
-                            prediction_scores, axis=-1
-                        )
-                    else:
-                        prediction_scores = F.softmax(
-                            prediction_scores, axis=-1, dtype="float32"
-                        )
-                    kl_logits = F.softmax(kl_logits, axis=-1, dtype="float32")
-                    kl_loss = self.kl_loss_fn(
-                        prediction_scores,
-                        kl_logits,
-                        degree=self.config.tensor_parallel_degree,
-                        rank=self.config.tensor_parallel_rank,
-                    )
-                    print("Kl loss:", kl_loss.mean())
-                    print("ce loss:", masked_lm_loss.mean())
-                    # print("ratio:", loss_ratio)
-                    masked_lm_loss = (
-                        loss_ratio["kl_ratio"][:, None, None] * kl_loss
-                        + loss_ratio["ce_ratio"][:, None, None] * masked_lm_loss
-                    )
-                    print("kl_ce_loss:", masked_lm_loss.mean())
+
+            if kl_logits is not None:
+                # print(self.enable_parallel_cross_entropy)
+                prediction_scores = F.softmax(
+                    prediction_scores, axis=-1, dtype="float32"
+                )
+                kl_logits = F.softmax(kl_logits, axis=-1, dtype="float32")
+                kl_loss = self.kl_loss_fn(
+                    prediction_scores,
+                    kl_logits,
+                    degree=self.config.tensor_parallel_degree,
+                    rank=self.config.tensor_parallel_rank,
+                )
+                print("Kl loss:", kl_loss.mean())
+                print("ce loss:", masked_lm_loss.mean())
+                # print("ratio:", loss_ratio)
+                masked_lm_loss = (
+                    loss_ratio[: loss_ratio.shape[0] // 2][:, None, None] * kl_loss
+                    + loss_ratio[loss_ratio.shape[0] // 2 :][:, None, None]
+                    * masked_lm_loss
+                )
+                print("kl_ce_loss:", masked_lm_loss.mean())
 
             lossmask = masked_lm_labels != self.ignored_index
             if (~lossmask).all():

@@ -165,7 +165,7 @@ def create_pretrained_dataset(args):
         ce_ratio = paddle.full_like(CPT, false_ce, dtype="float32")
         ce_ratio[CPT] = true_ce
 
-        return {"kl_ratio": kl_ratio, "ce_ratio": ce_ratio}
+        return paddle.cat([kl_ratio, ce_ratio])
 
     from paddleformers.data import Stack
 
