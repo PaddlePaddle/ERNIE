@@ -65,6 +65,9 @@ class PPOCRVLConfig(PretrainedConfig):
         rms_norm_eps=1e-6,
         use_cache=False,
         use_flash_attention=False,
+        recompute=False,
+        recompute_granularity="core_attn",
+        recompute_use_reentrant=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -103,6 +106,9 @@ class PPOCRVLConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
         self.use_flash_attention = use_flash_attention
+        self.recompute = recompute
+        self.recompute_granularity = recompute_granularity
+        self.recompute_use_reentrant = recompute_use_reentrant
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
@@ -147,6 +153,22 @@ class PPOCRVLConfig(PretrainedConfig):
         self.cachekv_quant = False
         self.fuse_swiglu = False
         self.freq_allocation = 20
+
+        self.register_unsavable_keys(
+            [
+                "recompute",
+                "recompute_use_reentrant",
+                "recompute_granularity",
+                "use_recompute_loss_fn",
+                "use_sparse_flash_attn",
+                "use_var_len_flash_attn",
+                "use_sparse_head_and_loss_fn",
+                "fuse_softmax_mask",
+                "cachekv_quant",
+                "use_fused_head_and_loss_fn",
+                "max_sequence_length",
+            ]
+        )
 
         def to_dict(self, saving_file=False):
             """to_dict"""

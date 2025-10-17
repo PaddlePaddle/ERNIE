@@ -417,9 +417,12 @@ def run_ocr_vl_sft(
         image_preprocess.rescale_factor, dtype="float32"
     )
     cfg.use_flash_attention = model_args.use_flash_attention
-    cfg.use_recompute_moe = model_args.use_recompute_moe
+    cfg.vision_config.use_flash_attention = model_args.use_flash_attention
     cfg.recompute = finetuning_args.recompute
+    cfg.vision_config.recompute = finetuning_args.recompute
     cfg.recompute_granularity = model_args.recompute_granularity
+    cfg.vision_config.recompute_granularity = model_args.recompute_granularity
+    cfg.use_recompute_moe = model_args.use_recompute_moe
     cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
     cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
     cfg.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
@@ -578,7 +581,7 @@ def run_ocr_vl_sft(
                     data_processor=data_processor,
                     need_prefix=False,
                 )
-                train_dataset._load(shuffle_json=False)
+                train_dataset._load(shuffle_json=True)
                 train_dataset = IterDataset(
                     MixExampleSetJson(
                         finetuning_args,
