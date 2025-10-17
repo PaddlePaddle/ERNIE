@@ -72,7 +72,7 @@ class RandomApply:
     def __init__(self, transforms, p=0.5):
         self.transforms = transforms
         self.p = p
-
+    
     def __call__(self, x):
         if random.random() < self.p:
             for t in self.transforms:
@@ -85,23 +85,19 @@ class RandomDiscreteRotation:
         self.degrees = degrees
         self.interpolation = interpolation
         self.expand = expand
-
     def __call__(self, img):
         angle = random.choice(self.degrees)
         return img.rotate(angle, self.interpolation, self.expand)
 
-
 class JpegCompression:
     def __init__(self, quality_range=(20, 80)):
         self.quality_range = quality_range
-
     def __call__(self, img):
         quality = random.randint(self.quality_range[0], self.quality_range[1])
         output = io.BytesIO()
         img.convert("RGB").save(output, "JPEG", quality=quality)
         output.seek(0)
         return Image.open(output)
-
 
 class RandomScale:
     def __init__(self, scale_range=(0.7, 1.3), interpolation="bicubic"):
@@ -110,50 +106,54 @@ class RandomScale:
 
     def __call__(self, img):
         scale = random.uniform(self.scale_range[0], self.scale_range[1])
-
+        
         original_width, original_height = img.size
         new_width = int(original_width * scale)
         new_height = int(original_height * scale)
-        new_size = (new_height, new_width)  # transforms.Resize需要 (h, w)
-
+        new_size = (new_height, new_width) # transforms.Resize需要 (h, w)
+        
         return transforms.functional.resize(img, new_size, self.interpolation)
 
+class RandomSingleSidePadding:
 
-class RandomPadding:
-    def __init__(self, max_padding_fraction=0.1, fill="white"):
-        self.max_padding_fraction = max_padding_fraction
+    def __init__(self, padding_range=(0, 20), fill='white'):
+        assert isinstance(padding_range, (tuple, list)) and len(padding_range) == 2, \
+        self.min_pad, self.max_pad = padding_range
         self.fill = fill
 
     def __call__(self, img):
-        width, height = img.size
 
-        max_pad_x = int(width * self.max_padding_fraction)
-        max_pad_y = int(height * self.max_padding_fraction)
+        pad_amount = random.randint(self.min_pad, self.max_pad)
+        if pad_amount == 0:
+            return img
+        
+        chosen_edge = random.choice(['left', 'top', 'right', 'bottom'])
+        
+        pad_left, pad_top, pad_right, pad_bottom = 0, 0, 0, 0
 
-        pad_left = random.randint(0, max_pad_x)
-        pad_top = random.randint(0, max_pad_y)
-        pad_right = random.randint(0, max_pad_x)
-        pad_bottom = random.randint(0, max_pad_y)
-
+        if chosen_edge == 'left':
+            pad_left = pad_amount
+        elif chosen_edge == 'top':
+            pad_top = pad_amount
+        elif chosen_edge == 'right':
+            pad_right = pad_amount
+        else: # 'bottom'
+            pad_bottom = pad_amount
+        
         padding = (pad_left, pad_top, pad_right, pad_bottom)
         return ImageOps.expand(img, border=padding, fill=self.fill)
 
 
 def get_ocr_augmentations(
-    # scale parameters
     scale_range=(0.8, 1.2),
     scale_p=0.5,
-    # padding parameters
-    padding_fraction=0.05,
+    padding_range=(0, 15),
     padding_p=0.5,
-    # rotation parameters
-    rotation_degrees=[0],
+    rotation_degrees=[0], 
     rotation_p=0.5,
-    # color jitter parameters
     color_jitter_p=0.5,
-    # JPEG compression parameters
     jpeg_quality_range=(40, 90),
-    jpeg_p=0.5,
+    jpeg_p=0.5
 ):
 
     augmentations = []
@@ -163,7 +163,7 @@ def get_ocr_augmentations(
         augmentations.append(RandomApply([scale_transform], p=scale_p))
 
     if padding_p > 0:
-        padding_transform = RandomPadding(padding_fraction, fill="white")
+        padding_transform = RandomSingleSidePadding(padding_range=padding_range, fill='white')
         augmentations.append(RandomApply([padding_transform], p=padding_p))
 
     if rotation_p > 0 and rotation_degrees:
@@ -173,28 +173,26 @@ def get_ocr_augmentations(
         augmentations.append(RandomApply([rotation_transform], p=rotation_p))
 
     if color_jitter_p > 0:
-        color_jitter = transforms.ColorJitter(
-            brightness=0.3, contrast=0.3, saturation=0.2, hue=0.1
-        )
+        color_jitter = transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.1)
         augmentations.append(RandomApply([color_jitter], p=color_jitter_p))
-
+    
     if jpeg_p > 0:
         jpeg_transform = JpegCompression(quality_range=jpeg_quality_range)
         augmentations.append(RandomApply([jpeg_transform], p=jpeg_p))
-
+    
     return transforms.Compose(augmentations)
 
 
 image_augmentation = get_ocr_augmentations(
-    rotation_degrees=[90, 270],
-    rotation_p=0,
-    jpeg_quality_range=(80, 100),
-    jpeg_p=0,
+    rotation_degrees=[90,270], 
+    rotation_p=0.1,
+    jpeg_quality_range=(60, 100),
+    jpeg_p=0.3,
     scale_range=(0.5, 1.5),
-    scale_p=0,
-    padding_p=0,
-    padding_fraction=0,
-    color_jitter_p=0.1,
+    scale_p=0.5,
+    padding_range=(0, 15),
+    padding_p=0.1,
+    color_jitter_p=0.1,               
 )
 
 
