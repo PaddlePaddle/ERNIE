@@ -59,7 +59,6 @@ weight_decay: 0.1
 adam_epsilon: 1.0e-8
 adam_beta1: 0.9
 adam_beta2: 0.95
-offload_optim: True
 
 # performance
 tensor_parallel_degree: 1
@@ -74,7 +73,7 @@ recompute_use_reentrant: True
 compute_type: bf16
 fp16_opt_level: O2
 disable_ckpt_quant: True
-amp_master_grad: True
+# amp_master_grad: True
 amp_custom_white_list:
   - lookup_table
   - lookup_table_v2
