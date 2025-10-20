@@ -135,6 +135,9 @@ def kl_divergence(p, q, eps: float = 1e-10, degree=-1, rank=-1):
     if p.shape[-1] != q.shape[-1]:
         interval_per_rank = q.shape[-1] // degree
         q = q[..., rank * interval_per_rank : (rank + 1) * interval_per_rank]
+
+    p = F.softmax(p, axis=-1, dtype="float32")
+    q = F.softmax(q, axis=-1, dtype="float32")
     p = p + eps
     q = q + eps
 
@@ -2222,7 +2225,12 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         self.token_balance_loss = config.token_balance_loss
 
     def forward(
-        self, prediction_scores, masked_lm_labels, kl_logits=None, loss_ratio=None
+        self,
+        prediction_scores,
+        masked_lm_labels,
+        kl_logits=None,
+        kl_ids=None,
+        loss_ratio=None,
     ):
 
         # print("kl_logits shape:", kl_logits.shape if kl_logits is not None else None)
@@ -2290,7 +2298,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                 )
         else:
             res = self.forward_impl(
-                prediction_scores, masked_lm_labels, kl_logits, loss_ratio
+                prediction_scores, masked_lm_labels, kl_logits, kl_ids, loss_ratio
             )
 
         return res
@@ -2359,7 +2367,12 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         return masked_lm_loss
 
     def forward_impl(
-        self, prediction_scores, masked_lm_labels, kl_logits=None, loss_ratio=None
+        self,
+        prediction_scores,
+        masked_lm_labels,
+        kl_logits=None,
+        kl_ids=None,
+        loss_ratio=None,
     ):
         if self.enable_parallel_cross_entropy:
             assert prediction_scores.shape[-1] != self.config.vocab_size, (
@@ -2396,20 +2409,22 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                 masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
 
             if kl_logits is not None:
-                # print(self.enable_parallel_cross_entropy)
-                prediction_scores = F.softmax(
+                prediction_scores_kl = F.softmax(
                     prediction_scores, axis=-1, dtype="float32"
                 )
-                kl_logits = F.softmax(kl_logits, axis=-1, dtype="float32")
+                prediction_scores_kl = prediction_scores_kl.take_along_axis(
+                    kl_ids, axis=-1
+                )
+
+                kl_logits = paddle.exp(kl_logits)
                 kl_loss = self.kl_loss_fn(
-                    prediction_scores,
+                    prediction_scores_kl,
                     kl_logits,
                     degree=self.config.tensor_parallel_degree,
                     rank=self.config.tensor_parallel_rank,
                 )
                 print("Kl loss:", kl_loss.mean())
                 print("ce loss:", masked_lm_loss.mean())
-                # print("ratio:", loss_ratio)
                 masked_lm_loss = (
                     loss_ratio[: loss_ratio.shape[0] // 2][:, None, None] * kl_loss
                     + loss_ratio[loss_ratio.shape[0] // 2 :][:, None, None]

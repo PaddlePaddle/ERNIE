@@ -172,15 +172,17 @@ def create_pretrained_dataset(args):
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn([x["text"] for x in data])
         kl_logits_ = stack_fn([x["logits"] for x in data])
+        kl_ids_ = stack_fn([x["ids"] for x in data])
         CPT = ratio_maker([x["CPT"] for x in data])
 
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
         kl_logits = kl_logits_[:, :-1]
+        kl_ids = kl_ids_[:, :-1]
 
         return {
             "input_ids": tokens,
-            "labels": [labels, kl_logits, CPT],
+            "labels": [labels, kl_logits, kl_ids, CPT],
         }
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
