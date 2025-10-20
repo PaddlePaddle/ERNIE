@@ -287,9 +287,6 @@ class ModelArguments:
         },
     )
 
-    num_nextn_predict_layers: int = field(
-        default=0, metadata={"help": "Number of nextn predict layers."}
-    )
     # vl model
     vision_config: VisionArguments = field(
         default_factory=VisionArguments, metadata={"help": "Vision configuration"}
