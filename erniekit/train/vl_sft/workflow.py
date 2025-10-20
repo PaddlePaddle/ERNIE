@@ -42,8 +42,8 @@ from ernie.callbacks import (
     PPNeedDataCallback,
     VitTrainableCallback,
 )
-# from ernie.configuration import Ernie4_5_VLMoeConfig
-from paddleformers.transformers.ernie4_5_vl.model.configuration import Ernie4_5_VLMoeConfig
+from ernie.configuration import Ernie4_5_VLMoeConfig
+# from paddleformers.transformers.ernie4_5_vl.model.configuration import Ernie4_5_VLMoeConfig
 from ernie.dataset.text_sft_reader.sft_task import KnoverDataset, create_pyreader
 from ernie.dataset.vl_sft_reader import (
     MixExampleSetJson,
@@ -51,12 +51,12 @@ from ernie.dataset.vl_sft_reader import (
 )
 from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
-from ernie.modeling_moe_vl import Ernie4_5_VLMoeForConditionalGeneration
 from paddleformers.transformers.ernie4_5_vl import Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_formers
+from ernie.modeling_moe_vl import Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_erniekit
 from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
 from ernie.utils.common_utils import check_refined_recompute
-from ernie.modeling_moe_vl_pp import Ernie4_5_VLMoeForConditionalGenerationPipe
 from paddleformers.transformers.ernie4_5_vl import Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_formers
+from ernie.modeling_moe_vl_pp import Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit
 from ernie.utils.misc import global_training_logs
 from ernie.utils.mm_data_utils import MMSpecialTokensConfig
 from ernie.utils.seed_utils import set_seed
@@ -480,9 +480,11 @@ def run_vl_sft(
     )
 
     if convert_from_hf:
-    # if 1:
         Ernie4_5_VLMoeForConditionalGeneration = Ernie4_5_VLMoeForConditionalGeneration_formers
         Ernie4_5_VLMoeForConditionalGenerationPipe = Ernie4_5_VLMoeForConditionalGenerationPipe_formers
+    else:
+        Ernie4_5_VLMoeForConditionalGeneration = Ernie4_5_VLMoeForConditionalGeneration_erniekit
+        Ernie4_5_VLMoeForConditionalGenerationPipe = Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit
     if finetuning_args.pipeline_parallel_degree > 1:  # pp
         print(f"[sft-debug]: virtual_pp_degree={model_args.virtual_pp_degree}")
         cfg.virtual_pp_degree = model_args.virtual_pp_degree
