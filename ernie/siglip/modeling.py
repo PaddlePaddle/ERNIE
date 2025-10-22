@@ -50,7 +50,7 @@ from paddleformers.transformers.model_outputs import (
 )
 
 from .activation import ACT2FN
-from .configuration import PPOCRVisionConfig
+from .configuration import PaddleOCRVisionConfig
 
 
 def rotate_half(x):
@@ -857,7 +857,7 @@ class SiglipMultiheadAttentionPoolingHead(nn.Layer):
 
 
 class SiglipVisionTransformer(nn.Layer):
-    def __init__(self, config: PPOCRVisionConfig):
+    def __init__(self, config: PaddleOCRVisionConfig):
         super().__init__()
         self.config = config
         embed_dim = config.hidden_size
@@ -1012,7 +1012,7 @@ class SiglipVisionTransformer(nn.Layer):
 
 
 class SiglipPreTrainedModel(PretrainedModel):
-    config_class = PPOCRVisionConfig
+    config_class = PaddleOCRVisionConfig
     base_model_prefix = "siglip"
 
     _no_split_modules = [
@@ -1024,10 +1024,10 @@ class SiglipPreTrainedModel(PretrainedModel):
 
 
 class SiglipVisionModel(SiglipPreTrainedModel):
-    config_class = PPOCRVisionConfig
+    config_class = PaddleOCRVisionConfig
     main_input_name = "pixel_values"
 
-    def __init__(self, config: PPOCRVisionConfig):
+    def __init__(self, config: PaddleOCRVisionConfig):
         super().__init__(config)
 
         self.vision_model = SiglipVisionTransformer(config)

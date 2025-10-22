@@ -31,13 +31,13 @@
 from paddleformers.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
-    "PPOCRVisionConfig",
+    "PaddleOCRVisionConfig",
 ]
 
 
-class PPOCRVisionConfig(PretrainedConfig):
+class PaddleOCRVisionConfig(PretrainedConfig):
 
-    model_type = "ppocrvl"
+    model_type = "paddleocr_vl"
     base_config_key = "vision_config"
 
     def __init__(

@@ -48,11 +48,10 @@ from paddleformers.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
     ModelOutput,
 )
-from .configuration_ocr import PPOCRVLConfig
+from .configuration_paddleocr_vl import PaddleOCRVLConfig
 from .modeling_moe_vl_pp import inbatch_pack_offset_to_attn_mask_start_row_indices
-from .modeling_ocr_ernie import Ernie4_5Model, Ernie4_5PretrainedModel
+from .modeling_paddleocr_vl_ernie import Ernie4_5Model, Ernie4_5PretrainedModel
 
-# from paddleformers.transformers.ernie4_5.modeling import Ernie4_5Model, Ernie4_5PretrainedModel
 from .siglip import SiglipVisionModel
 
 
@@ -143,7 +142,7 @@ class Projector(nn.Layer):
 
 
 @dataclass
-class PPOCRVLCausalLMOutputWithPast(ModelOutput):
+class PaddleOCRVLCausalLMOutputWithPast(ModelOutput):
     loss: Optional[paddle.Tensor] = None
     logits: paddle.Tensor = None
     past_key_values: Optional[List[paddle.Tensor]] = None
@@ -152,9 +151,9 @@ class PPOCRVLCausalLMOutputWithPast(ModelOutput):
     rope_deltas: Optional[paddle.Tensor] = None
 
 
-class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
+class PaddleOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
-    config_class = PPOCRVLConfig
+    config_class = PaddleOCRVLConfig
     _no_split_modules = ["Ernie4_5DecoderLayer", "SiglipEncoderLayer"]
     base_model_prefix = ""
     transpose_weight_keys = [
@@ -531,7 +530,7 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
         rope_deltas: Optional[paddle.Tensor] = None,
         second_per_grid_ts: Optional[paddle.Tensor] = None,
         **kwargs,
-    ) -> Union[Tuple, PPOCRVLCausalLMOutputWithPast]:
+    ) -> Union[Tuple, PaddleOCRVLCausalLMOutputWithPast]:
         output_attentions = (
             output_attentions
             if output_attentions is not None
@@ -685,7 +684,7 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
-        return PPOCRVLCausalLMOutputWithPast(
+        return PaddleOCRVLCausalLMOutputWithPast(
             loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,

@@ -35,7 +35,7 @@ from ernie.callbacks import (
     PPNeedDataCallback,
     VitTrainableCallback,
 )
-from ernie.configuration_ocr import PPOCRVLConfig
+from ernie.configuration_paddleocr_vl import PaddleOCRVLConfig
 from ernie.dataset.text_sft_reader.sft_task import KnoverDataset, create_pyreader
 from ernie.dataset.vl_sft_reader import (
     MixExampleSetJson,
@@ -43,11 +43,9 @@ from ernie.dataset.vl_sft_reader import (
 )
 from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
-from ernie.modeling_ocr import PPOCRVLForConditionalGeneration
+from ernie.modeling_paddleocr_vl import PaddleOCRVLForConditionalGeneration
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import check_refined_recompute
-
-# from ernie.modeling_ocr_pp import PPOCRVLForConditionalGenerationPipe
 from ernie.utils.misc import global_training_logs
 from ernie.utils.mm_data_utils import MMSpecialTokensConfig
 from ernie.utils.seed_utils import set_seed
@@ -367,7 +365,7 @@ def run_ocr_vl_sft(
         logger.info(f"disable moe flag when using moe-group={model_args.moe_group}")
         finetuning_args.use_moe = False
 
-    cfg = PPOCRVLConfig.from_pretrained(
+    cfg = PaddleOCRVLConfig.from_pretrained(
         os.path.join(model_args.model_name_or_path),
         quantization_config=quantization_config,
     )
@@ -445,9 +443,9 @@ def run_ocr_vl_sft(
             finetuning_args.from_scratch
             and finetuning_args.weight_quantize_algo is None
         ):
-            model = PPOCRVLForConditionalGeneration(cfg)
+            model = PaddleOCRVLForConditionalGeneration(cfg)
         else:
-            model = PPOCRVLForConditionalGeneration.from_pretrained(
+            model = PaddleOCRVLForConditionalGeneration.from_pretrained(
                 model_args.model_name_or_path,
                 config=cfg,
                 convert_from_hf=finetuning_args.convert_from_hf,

@@ -40,7 +40,7 @@ from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
 )
-from .configuration_ocr import PPOCRVLConfig
+from .configuration_paddleocr_vl import PaddleOCRVLConfig
 from .distributed import (
     AllGatherVarlenOp,
     GatherOp,
@@ -67,7 +67,7 @@ def calc_lm_head_logits(
     handling sequence parallelism and tensor parallelism configurations.
 
     Args:
-        config (PPOCRVLConfig): Model configuration.
+        config (PaddleOCRVLConfig): Model configuration.
         hidden_states (Tensor): Hidden states from the transformer layers
         weight (Tensor): Weight matrix for the language model head
         bias (Tensor): Bias vector for the language model head
@@ -255,7 +255,7 @@ class RMSNorm(nn.Layer):
         Initialize RMSNorm layer.
 
         Args:
-            config (PPOCRVLConfig): Model configuration.
+            config (PaddleOCRVLConfig): Model configuration.
         """
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -316,7 +316,7 @@ class LayerNorm(nn.LayerNorm):
         Initialize LayerNorm with configuration.
 
         Args:
-            config (PPOCRVLConfig): Model configuration contains normalization parameters and flags.
+            config (PaddleOCRVLConfig): Model configuration contains normalization parameters and flags.
         """
         super().__init__(config.hidden_size, epsilon=config.rms_norm_eps)
         self.config = config
@@ -326,7 +326,7 @@ class LayerNorm(nn.LayerNorm):
 
 
 class KeyeRotaryEmbedding(nn.Layer):
-    def __init__(self, config: PPOCRVLConfig):
+    def __init__(self, config: PaddleOCRVLConfig):
         super().__init__()
         self.rope_kwargs = {}
 
@@ -392,7 +392,7 @@ class Ernie4_5MLP(nn.Layer):
         Initialize the MLP module with configuration options.
 
         Args:
-            config (PPOCRVLConfig): Model configurations.
+            config (PaddleOCRVLConfig): Model configurations.
             layer_idx (int): Index of current layer (default: 0)
         """
         super().__init__()
@@ -446,7 +446,7 @@ class Ernie4_5Attention(nn.Layer):
         """Initialize the attention layer.
 
         Args:
-            config (PPOCRVLConfig): Model configuration.
+            config (PaddleOCRVLConfig): Model configuration.
             layer_idx (int, optional): Index in transformer stack. Defaults to 0.
         """
         super().__init__()
@@ -1093,7 +1093,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         """Initialize the pretraining criterion.
 
         Args:
-            config (PPOCRVLConfig): Model configuration.
+            config (PaddleOCRVLConfig): Model configuration.
             return_tuple (bool): Whether to return loss as tuple (loss, loss_sum). Defaults to True.
         """
         super(ErniePretrainingCriterion, self).__init__()
@@ -1386,7 +1386,7 @@ class Ernie4_5LMHead(nn.Layer):
         """Initialize the language model head.
 
         Args:
-            config (PPOCRVLConfig): Model configuration containing:
+            config (PaddleOCRVLConfig): Model configuration containing:
                 - vocab_size: Size of vocabulary
                 - hidden_size: Dimension of hidden states
                 - tensor_parallel_degree: Degree of tensor parallelism
@@ -1502,7 +1502,7 @@ class Ernie4_5DecoderLayer(nn.Layer):
         """Initialize the decoder layer.
 
         Args:
-            config (PPOCRVLConfig): Model configuration.
+            config (PaddleOCRVLConfig): Model configuration.
             layer_idx (int): Index of this layer in the transformer stack
         """
         super().__init__()
@@ -1646,18 +1646,18 @@ class Ernie4_5DecoderLayer(nn.Layer):
 class Ernie4_5PretrainedModel(PretrainedModel):
     """Base class for ERNIE pretrained models."""
 
-    config_class = PPOCRVLConfig
+    config_class = PaddleOCRVLConfig
     base_model_prefix = "ernie"
 
 
 class Ernie4_5Model(Ernie4_5PretrainedModel):
     """The core ERNIE transformer model"""
 
-    def __init__(self, config: PPOCRVLConfig):
+    def __init__(self, config: PaddleOCRVLConfig):
         """Initialize the ERNIE model architecture.
 
         Args:
-            config (PPOCRVLConfig): Model configuration.
+            config (PaddleOCRVLConfig): Model configuration.
         """
         super().__init__(config)
         self.padding_idx = config.pad_token_id

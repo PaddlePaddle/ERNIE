@@ -27,13 +27,13 @@
 # limitations under the License.
 
 from paddleformers.transformers.configuration_utils import PretrainedConfig
-from .siglip.modeling import PPOCRVisionConfig
+from .siglip.modeling import PaddleOCRVisionConfig
 
 
-class PPOCRVLConfig(PretrainedConfig):
-    model_type = "ppocrvl"
+class PaddleOCRVLConfig(PretrainedConfig):
+    model_type = "paddleocr_vl"
     keys_to_ignore_at_inference = ["past_key_values"]
-    sub_configs = {"vision_config": PPOCRVisionConfig}
+    sub_configs = {"vision_config": PaddleOCRVisionConfig}
 
     def __init__(
         self,
@@ -164,7 +164,7 @@ class PPOCRVLConfig(PretrainedConfig):
             if self.vision_config:
                 output["vision_config"] = (
                     self.vision_config.to_diff_dict()
-                    if isinstance(self.vision_config, (PPOCRVisionConfig))
+                    if isinstance(self.vision_config, (PaddleOCRVisionConfig))
                     else self.vision_config
                 )
 

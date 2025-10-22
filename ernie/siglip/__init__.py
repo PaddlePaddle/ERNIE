@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from .configuration import PPOCRVisionConfig
+from .configuration import PaddleOCRVisionConfig
 from .modeling import SiglipVisionModel
 
-__all__ = ["PPOCRVisionConfig", "SiglipVisionModel", "SiglipVisionModelPipe"]
+__all__ = ["PaddleOCRVisionConfig", "SiglipVisionModel"]
