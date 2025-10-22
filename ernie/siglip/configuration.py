@@ -55,7 +55,6 @@ class PPOCRVisionConfig(PretrainedConfig):
         spatial_merge_size=2,
         temporal_patch_size=2,
         tokens_per_second=2,
-        attn_sep=False,
         recompute=False,
         recompute_granularity="full",
         recompute_use_reentrant=True,
@@ -73,11 +72,12 @@ class PPOCRVisionConfig(PretrainedConfig):
         self.image_size = image_size
         self.attention_dropout = attention_dropout
         self.layer_norm_eps = layer_norm_eps
+        if hidden_act == "gelu_pytorch_tanh":
+            hidden_act = "gelu_new"
         self.hidden_act = hidden_act
         self.spatial_merge_size = spatial_merge_size
         self.temporal_patch_size = temporal_patch_size
         self.tokens_per_second = tokens_per_second
-        self.attn_sep = attn_sep
         self.recompute = recompute
         self.recompute_granularity = recompute_granularity
         self.recompute_use_reentrant = recompute_use_reentrant

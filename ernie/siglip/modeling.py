@@ -33,6 +33,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -40,6 +41,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
+from paddle._typing import ParamAttrLike
 from paddle.nn.functional.flash_attention import flashmask_attention
 from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.transformers.model_outputs import (
@@ -697,6 +699,132 @@ class SiglipEncoder(nn.Layer):
         )
 
 
+class MultiHeadAttention(nn.Layer):
+    """
+    Attention mapps queries and a set of key-value pairs to outputs, and
+    Multi-Head Attention performs multiple parallel attention to jointly attending
+    to information from different representation subspaces.
+
+    Please refer to `Attention Is All You Need <https://arxiv.org/pdf/1706.03762.pdf>`_
+    for more details.
+
+    Parameters:
+        embed_dim (int): The expected feature size in the input and output.
+        num_heads (int): The number of heads in multi-head attention.
+        dropout (float, optional): The dropout probability used on attention
+            weights to drop some attention targets. 0 for no dropout. Default 0
+        kdim (int, optional): The feature size in key. If None, assumed equal to
+            `embed_dim`. Default None.
+        vdim (int, optional): The feature size in value. If None, assumed equal to
+            `embed_dim`. Default None.
+        need_weights (bool, optional): Indicate whether to return the attention
+            weights. Default False.
+        weight_attr(ParamAttr|None, optional):  To specify the weight parameter property.
+            Default: None, which means the default weight parameter property is used.
+            See usage for details in :code:`ParamAttr` .
+        bias_attr (ParamAttr|bool|None, optional): To specify the bias parameter property.
+            Default: None, which means the default bias parameter property is used.
+            If it is set to False, this layer will not have trainable bias parameter.
+            See usage for details in :code:`ParamAttr` .
+
+    Examples:
+
+        .. code-block:: python
+
+            >>> import paddle
+
+            >>> # encoder input: [batch_size, sequence_length, d_model]
+            >>> query = paddle.rand((2, 4, 128))
+            >>> # self attention mask: [batch_size, num_heads, query_len, query_len]
+            >>> attn_mask = paddle.rand((2, 2, 4, 4))
+            >>> multi_head_attn = paddle.nn.MultiHeadAttention(128, 2)
+            >>> output = multi_head_attn(query, None, None, attn_mask=attn_mask)
+            >>> print(output.shape)
+            [2, 4, 128]
+    """
+
+    Cache = collections.namedtuple("Cache", ["k", "v"])
+    StaticCache = collections.namedtuple("StaticCache", ["k", "v"])
+
+    embed_dim: int
+    kdim: int
+    vdim: int
+    num_heads: int
+    head_dim: int
+    dropout: float
+    need_weights: bool
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.0,
+        kdim: int | None = None,
+        vdim: int | None = None,
+        need_weights: bool = False,
+        weight_attr: ParamAttrLike | None = None,
+        bias_attr: ParamAttrLike | None = None,
+    ) -> None:
+        super().__init__()
+
+        assert (
+            embed_dim > 0
+        ), f"Expected embed_dim to be greater than 0, but received {embed_dim}"
+        assert (
+            num_heads > 0
+        ), f"Expected num_heads to be greater than 0, but received {num_heads}"
+
+        self.embed_dim = embed_dim
+        self.kdim = kdim if kdim is not None else embed_dim
+        self.vdim = vdim if vdim is not None else embed_dim
+        self.num_heads = num_heads
+        self.dropout = dropout
+        self.need_weights = need_weights
+
+        self.head_dim = embed_dim // num_heads
+        assert (
+            self.head_dim * num_heads == self.embed_dim
+        ), "embed_dim must be divisible by num_heads"
+
+        # self.q_proj = Linear(
+        #     embed_dim, embed_dim, weight_attr, bias_attr=bias_attr
+        # )
+        # self.k_proj = Linear(
+        #     self.kdim, embed_dim, weight_attr, bias_attr=bias_attr
+        # )
+        # self.v_proj = Linear(
+        #     self.vdim, embed_dim, weight_attr, bias_attr=bias_attr
+        # )
+
+        # register parameters to keep consistent with torch.nn.MultiHeadAttention
+        self.in_proj_weight = self.create_parameter(
+            shape=[3 * embed_dim, embed_dim],
+            default_initializer=nn.initializer.XavierUniform(),
+        )
+
+        self.in_proj_bias = self.create_parameter(
+            shape=[3 * embed_dim], default_initializer=nn.initializer.Constant(0.0)
+        )
+
+        self.out_proj = nn.Linear(
+            embed_dim, embed_dim, weight_attr, bias_attr=bias_attr
+        )
+
+    def forward(
+        self,
+        query,
+        key=None,
+        value=None,
+        key_padding_mask=None,
+        attn_mask=None,
+        cache=None,
+    ):
+
+        raise NotImplementedError(
+            "Please refer to paddle.nn.MultiHeadAttention for more details https://github.com/PaddlePaddle/Paddle/blob/develop/python/paddle/nn/layer/transformer.py#L132"
+        )
+
+
 class SiglipMultiheadAttentionPoolingHead(nn.Layer):
     """Multihead Attention Pooling."""
 
@@ -707,7 +835,7 @@ class SiglipMultiheadAttentionPoolingHead(nn.Layer):
             shape=(1, 1, config.hidden_size),
             default_initializer=paddle.nn.initializer.Normal(),
         )
-        self.attention = nn.MultiHeadAttention(
+        self.attention = MultiHeadAttention(
             config.hidden_size, config.num_attention_heads
         )
         self.layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
@@ -886,7 +1014,6 @@ class SiglipVisionTransformer(nn.Layer):
 class SiglipPreTrainedModel(PretrainedModel):
     config_class = PPOCRVisionConfig
     base_model_prefix = "siglip"
-    supports_gradient_checkpointing = True
 
     _no_split_modules = [
         "SiglipTextEmbeddings",
@@ -894,8 +1021,6 @@ class SiglipPreTrainedModel(PretrainedModel):
         "SiglipVisionEmbeddings",
         "SiglipMultiheadAttentionPoolingHead",
     ]
-    _supports_flash_attn_2 = True
-    _supports_sdpa = True
 
 
 class SiglipVisionModel(SiglipPreTrainedModel):

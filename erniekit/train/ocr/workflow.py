@@ -439,36 +439,7 @@ def run_ocr_vl_sft(
     )
 
     if finetuning_args.pipeline_parallel_degree > 1:  # pp
-        print(f"[sft-debug]: virtual_pp_degree={model_args.virtual_pp_degree}")
-        cfg.virtual_pp_degree = model_args.virtual_pp_degree
-        cfg.num_acc_steps = finetuning_args.gradient_accumulation_steps
-        cfg.moe_with_send_router_loss = model_args.moe_with_send_router_loss
-        cfg.enable_delay_scale_loss = finetuning_args.enable_delay_scale_loss
-        cfg.balanced_image_preprocess = finetuning_args.balanced_image_preprocess
-
-        if finetuning_args.pp_need_data and not finetuning_args.pp_need_data_degree:
-            finetuning_args.pp_need_data_degree = (
-                finetuning_args.pipeline_parallel_degree
-            )
-
-        if cfg.balanced_image_preprocess:
-            assert (
-                finetuning_args.pp_need_data
-            ), "balanced image preprocess must use with pp_need_data"
-
-        # if (
-        #     finetuning_args.from_scratch
-        #     and finetuning_args.weight_quantize_algo is None
-        # ):
-        #     model = PPOCRVLForConditionalGenerationPipe(cfg)
-
-        # else:
-        #     model = PPOCRVLForConditionalGenerationPipe.from_pretrained(
-        #         model_args.model_name_or_path,
-        #         config=cfg,
-        #     )
-        # if finetuning_args.pp_need_data_degree:
-        #     model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
+        raise NotImplementedError("PaddleOCR-VL Not Support Pipeline Parallel")
     else:
         if (
             finetuning_args.from_scratch
@@ -479,14 +450,12 @@ def run_ocr_vl_sft(
             model = PPOCRVLForConditionalGeneration.from_pretrained(
                 model_args.model_name_or_path,
                 config=cfg,
+                convert_from_hf=finetuning_args.convert_from_hf,
             )
     logger.info(f"vision_model: {model.visual.vision_model}")
 
     if model.config.head_dim is None:
         del model.config.head_dim
-
-    # if image_preprocess is not None and hasattr(model, "add_image_preprocess"):
-    #     model.add_image_preprocess(image_preprocess)
 
     cfg = model.config
     logger.info(f"using model type:{type(model)}")

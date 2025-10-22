@@ -15,6 +15,5 @@
 
 from .configuration import PPOCRVisionConfig
 from .modeling import SiglipVisionModel
-from .modeling_pp import SiglipVisionModelPipe
 
 __all__ = ["PPOCRVisionConfig", "SiglipVisionModel", "SiglipVisionModelPipe"]

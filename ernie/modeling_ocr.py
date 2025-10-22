@@ -157,6 +157,22 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
     config_class = PPOCRVLConfig
     _no_split_modules = ["Ernie4_5DecoderLayer", "SiglipEncoderLayer"]
     base_model_prefix = ""
+    transpose_weight_keys = [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "in_proj",
+        "out_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "linear_1",
+        "linear_2",
+        "fc1",
+        "fc2",
+        "lm_head",
+    ]
 
     def __init__(self, config):
         super().__init__(config)
@@ -167,9 +183,6 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.rope_deltas_var = ContextVar("rope_deltas", default=None)
-
-    def add_image_preprocess(self, preprocess):
-        self.image_preprocess = preprocess
 
     def get_input_embeddings(self):
         return self.model.embed_tokens
@@ -494,231 +507,6 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
 
         return model_kwargs
 
-    def get_transpose_weight_keys(self):
-        t_layers = [
-            "out_proj",
-            "q_proj",
-            "k_proj",
-            "v_proj",
-            "lm_head",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
-            "o_proj",
-            "lm_head",
-            "linear_1",
-            "linear_2",
-            "fc",
-            "in_proj",
-        ]
-        keys = []
-        for key, _ in self.get_hf_state_dict().items():
-            for t_layer in t_layers:
-                if t_layer in key and key.endswith("weight"):
-                    keys.append(key)
-        return keys
-
-    def get_hf_state_dict(self, *args, **kwargs):
-        def _merge_attention_weights(
-            q_weight=None,
-            k_weight=None,
-            v_weight=None,
-            q_bias=None,
-            k_bias=None,
-            v_bias=None,
-        ):
-            if q_weight is not None and k_weight is not None and v_weight is not None:
-                return paddle.concat([q_weight, k_weight, v_weight], axis=1)
-            elif q_bias is not None and k_bias is not None and v_bias is not None:
-                return paddle.concat([q_bias, k_bias, v_bias], axis=0)
-            else:
-                raise ValueError
-
-        def _convert_to_hf_state_dict(current_state_dict):
-            hf_state_dict = {}
-
-            for key in list(current_state_dict.keys()):
-                if "up_gate_proj" in key:
-                    combined_weights = current_state_dict[key]
-                    split_size = combined_weights.shape[-1] // 2
-                    gate_proj = combined_weights[..., :split_size]
-                    up_proj = combined_weights[..., split_size:]
-
-                    hf_state_dict[key.replace("up_gate_proj", "gate_proj")] = gate_proj
-                    hf_state_dict[key.replace("up_gate_proj", "up_proj")] = up_proj
-                    continue
-
-                if "qkv_proj" in key and ("weight" in key or "bias" in key):
-                    combined_weights = current_state_dict[key]
-                    if getattr(self.config, "head_dim", None) is None:
-                        head_dim = self.hidden_size // self.num_heads
-                    else:
-                        head_dim = self.config.head_dim
-                    num_heads = self.config.num_attention_heads
-                    num_kv_heads = self.config.num_key_value_heads
-                    q_proj, k_proj, v_proj = paddle.split(
-                        combined_weights,
-                        [
-                            num_heads * head_dim,
-                            num_kv_heads * head_dim,
-                            num_kv_heads * head_dim,
-                        ],
-                        axis=-1,
-                    )
-
-                    if "weight" in key:
-                        hf_state_dict[
-                            key.replace("qkv_proj.weight", "q_proj.weight")
-                        ] = q_proj
-                        hf_state_dict[
-                            key.replace("qkv_proj.weight", "k_proj.weight")
-                        ] = k_proj
-                        hf_state_dict[
-                            key.replace("qkv_proj.weight", "v_proj.weight")
-                        ] = v_proj
-                    else:  # bias
-                        hf_state_dict[key.replace("qkv_proj.bias", "q_proj.bias")] = (
-                            q_proj
-                        )
-                        hf_state_dict[key.replace("qkv_proj.bias", "k_proj.bias")] = (
-                            k_proj
-                        )
-                        hf_state_dict[key.replace("qkv_proj.bias", "v_proj.bias")] = (
-                            v_proj
-                        )
-                    continue
-
-                if "up_gate_proj" not in key and "qkv_proj" not in key:
-                    hf_state_dict[key] = current_state_dict[key]
-
-            new_hf_state_dict = {}
-            keys_to_remove = set()
-
-            for key, value in hf_state_dict.items():
-                if "head.attention" in key and "out_proj" not in key:
-                    if "weight" in key:
-                        q_key = key
-                        k_key = key.replace("q_proj", "k_proj")
-                        v_key = key.replace("q_proj", "v_proj")
-
-                        if (
-                            q_key in hf_state_dict
-                            and k_key in hf_state_dict
-                            and v_key in hf_state_dict
-                        ):
-                            merged_weights = _merge_attention_weights(
-                                q_weight=hf_state_dict[q_key],
-                                k_weight=hf_state_dict[k_key],
-                                v_weight=hf_state_dict[v_key],
-                            )
-                            new_key = key.replace("q_proj.weight", "in_proj_weight")
-                            new_hf_state_dict[new_key] = merged_weights
-                            keys_to_remove.update([q_key, k_key, v_key])
-
-                    elif "bias" in key:
-                        q_key = key
-                        k_key = key.replace("q_proj", "k_proj")
-                        v_key = key.replace("q_proj", "v_proj")
-
-                        if (
-                            q_key in hf_state_dict
-                            and k_key in hf_state_dict
-                            and v_key in hf_state_dict
-                        ):
-                            merged_bias = _merge_attention_weights(
-                                q_bias=hf_state_dict[q_key],
-                                k_bias=hf_state_dict[k_key],
-                                v_bias=hf_state_dict[v_key],
-                            )
-                            new_key = key.replace("q_proj.bias", "in_proj_bias")
-                            new_hf_state_dict[new_key] = merged_bias
-                            keys_to_remove.update([q_key, k_key, v_key])
-                else:
-                    new_hf_state_dict[key] = value
-
-            for key in keys_to_remove:
-                if key in new_hf_state_dict:
-                    del new_hf_state_dict[key]
-
-            return new_hf_state_dict
-
-        current_state_dict = self.state_dict(*args, **kwargs)
-
-        hf_state_dict = _convert_to_hf_state_dict(current_state_dict)
-
-        return hf_state_dict
-
-    def set_hf_state_dict(self, state_dict, *args, **kwargs):
-        def _split_attention_weights(weight=None, bias=None):
-            if weight is not None:
-                split_size = weight.shape[1] // 3
-                q_weight = weight[:, :split_size]
-                k_weight = weight[:, split_size : 2 * split_size]
-                v_weight = weight[:, 2 * split_size :]
-                return q_weight, k_weight, v_weight
-            elif bias is not None:
-                split_size = bias.shape[0] // 3
-                q_bias = bias[:split_size]
-                k_bias = bias[split_size : 2 * split_size]
-                v_bias = bias[2 * split_size :]
-                return q_bias, k_bias, v_bias
-
-        def _convert_state_dict(old_state_dict):
-            new_state_dict = {}
-            for key, value in old_state_dict.items():
-                if "head.attention.in_proj" in key:
-                    if key.endswith("weight"):
-                        q_w, k_w, v_w = _split_attention_weights(weight=value)
-                        new_state_dict[
-                            key.replace("in_proj_weight", "q_proj.weight")
-                        ] = q_w
-                        new_state_dict[
-                            key.replace("in_proj_weight", "k_proj.weight")
-                        ] = k_w
-                        new_state_dict[
-                            key.replace("in_proj_weight", "v_proj.weight")
-                        ] = v_w
-                    elif key.endswith("bias"):
-                        q_b, k_b, v_b = _split_attention_weights(bias=value)
-                        new_state_dict[key.replace("in_proj_bias", "q_proj.bias")] = q_b
-                        new_state_dict[key.replace("in_proj_bias", "k_proj.bias")] = k_b
-                        new_state_dict[key.replace("in_proj_bias", "v_proj.bias")] = v_b
-                    else:
-                        raise ValueError(f"Unexpected key: {key}")
-                else:
-                    new_state_dict[key] = value
-
-            for key in list(new_state_dict.keys()):
-                if key.startswith("model."):
-                    if "mlp.gate_proj." in key:
-                        gate_proj = new_state_dict.pop(key)
-                        up_proj = new_state_dict.pop(
-                            key.replace("gate_proj", "up_proj")
-                        )
-                        new_state_dict[key.replace("gate_proj", "up_gate_proj")] = (
-                            paddle.concat([gate_proj, up_proj], axis=-1)
-                        )
-
-                    if "self_attn.q_proj" in key:
-                        q_proj = new_state_dict.pop(key)
-                        k_proj = new_state_dict.pop(key.replace("q_proj", "k_proj"))
-                        v_proj = new_state_dict.pop(key.replace("q_proj", "v_proj"))
-                        new_state_dict[key.replace("q_proj", "qkv_proj")] = (
-                            paddle.concat([q_proj, k_proj, v_proj], axis=-1)
-                        )
-
-            return new_state_dict
-
-        state_dict = _convert_state_dict(state_dict)
-
-        std_state_dict = self.state_dict()
-        assert std_state_dict.keys() == state_dict.keys()
-        for key in std_state_dict:
-            v1 = std_state_dict[key]
-            state_dict[key] = state_dict[key].to(v1.place)
-
-        return self.set_state_dict(state_dict, *args, **kwargs)
-
     def forward(
         self,
         input_ids: paddle.Tensor = None,
@@ -759,17 +547,6 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
         if inputs_embeds is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
             if pixel_values is not None:
-
-                # normalize image
-                # if self.image_preprocess is not None:
-                #     assert pixel_values.dtype == paddle.uint8, pixel_values.dtype
-                #     pixel_values = self.image_preprocess.rescale_factor * pixel_values.astype("float32")
-                #     pixel_values = (
-                #         pixel_values - self.image_preprocess.image_mean_tensor
-                #     ) / self.image_preprocess.image_std_tensor
-                #     pixel_values = pixel_values.astype("bfloat16")
-                # else:
-                #     assert pixel_values.dtype == paddle.bfloat16, pixel_values.dtype
 
                 pixel_values = pixel_values.astype(inputs_embeds.dtype)
                 pixel_values = pixel_values.unsqueeze(0)
@@ -893,9 +670,6 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
             # Shift so that tokens < n predict n
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
-            # logits & labels have been shift in ernie.dataset.dist_data_loader.MMDataloader.sync_array_slice
-            # shift_logits = logits.contiguous()
-            # shift_labels = labels.contiguous()
             # Flatten the tokens
             # loss_fct = paddle.nn.CrossEntropyLoss()
             loss_fct = paddle_cross_entropy_by_hand
@@ -954,73 +728,3 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
         video_nums = paddle.sum(vision_first_mask & video_mask, axis=1)
 
         return image_nums, video_nums
-
-    # @classmethod
-    # def _get_tensor_parallel_mappings(cls, config, is_split=True):
-
-    #     from paddleformers.transformers.conversion_utils import split_or_merge_func
-
-    #     fn = split_or_merge_func(
-    #         is_split=is_split,
-    #         tensor_parallel_degree=config.tensor_parallel_degree,
-    #         tensor_parallel_rank=config.tensor_parallel_rank,
-    #         num_attention_heads=config.num_attention_heads,
-    #     )
-
-    #     def get_tensor_parallel_split_mappings(num_layers):
-    #         final_actions = Ernie4_5PretrainedModel._get_tensor_parallel_mappings(
-    #             config, is_split=is_split
-    #         )
-    #         return final_actions
-
-    #     mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
-    #     # if isinstance(config.vision_config, PPOCRVisionConfig):
-    #     #     resampler_actions = (
-    #     #         VariableResolutionResamplerModel._get_tensor_parallel_mappings(
-    #     #             config, is_split=is_split
-    #     #         )
-    #     #     )
-    #     #     mappings.update(
-    #     #         {f"resampler_model.{k}": v for k, v in resampler_actions.items()}
-    #     #     )
-    #     # else:
-    #     #     raise RuntimeError(f"unknown vision_config: {config.vision_config}")
-
-    #     return mappings
-
-    # @staticmethod
-    # def _resolve_prefix_keys(
-    #     state_keys_base, state_keys_real, ignore_error=False, base_model_prefix=None
-    # ):
-    #     """_resolve_prefix_keys"""
-    #     # state_keys_map base to real
-    #     state_keys_map = {}
-
-    #     if base_model_prefix:
-    #         for k in state_keys_real:
-    #             if k.startswith("lm_head."):
-    #                 continue
-    #             # remove real key name `base_model_prefix` + '.'
-    #             state_keys_map[k[len(base_model_prefix + ".") :]] = k
-    #         return state_keys_map
-
-    #     # sorted by length，match from long to short for A.key B.key ...
-    #     state_keys_base = sorted(state_keys_base, key=lambda x: len(x), reverse=True)
-    #     state_keys_real = set(state_keys_real)
-
-    #     for key in state_keys_base:
-    #         for x in state_keys_real:
-    #             if "mm_embed_tokens" in x:
-    #                 if "mm_embed_tokens" in key:
-    #                     state_keys_map[key] = x
-    #                     break
-    #             elif x.endswith(key):
-    #                 state_keys_map[key] = x
-    #                 break
-    #         if key not in state_keys_map:
-    #             if not ignore_error:
-    #                 logger.error(f"could not find name {key} in loaded state dict!")
-    #         else:
-    #             state_keys_real.remove(state_keys_map[key])
-
-    #     return state_keys_map
