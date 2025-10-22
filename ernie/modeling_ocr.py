@@ -202,6 +202,10 @@ class PPOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMixin):
     def get_decoder(self):
         return self.model
 
+    def freeze_vision(self):
+        for p in self.visual.vision_model.parameters():
+            p.stop_gradient = True
+
     def get_rope_index(
         self,
         input_ids: Optional[paddle.Tensor] = None,

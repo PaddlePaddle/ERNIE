@@ -31,6 +31,8 @@ distributed_dataloader: False
 dataloader_num_workers: 1
 prefetch_factor: 10
 batch_size: 1
+packing_size: 8
+padding: False
 num_train_epochs: 1
 max_steps: 1000
 # max_evaluate_steps: 10000
@@ -90,3 +92,5 @@ amp_custom_black_list:
   - cos
 unified_checkpoint: True
 # unified_checkpoint_config: async_save
+convert_from_hf: True
+save_to_hf: True

@@ -392,6 +392,11 @@ class FinetuningArguments(
     )
     # base
     batch_size: int = field(default=1, metadata={"help": "Batch size per GPU."})
+    packing_size: int = field(default=1, metadata={"help": "Packing size per Squence."})
+    padding: bool = field(
+        default=True,
+        metadata={"help": "Wheather to padd the sequence to the max squence length."},
+    )
     layerwise_lr_decay_bound: Optional[float] = field(
         default=1.0,
         metadata={
