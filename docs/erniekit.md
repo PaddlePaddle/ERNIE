@@ -10,20 +10,9 @@
 **[2025-10] 🔥 Released ERNIEKit v1.4:**
 
 - **New Features**
-    - VL Modle Training: Support SFT for PaddleOCR-VL-0.9B model.
-        - Download the model from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files). 
-        - Download the [Tibetan train dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_bo.jsonl).
-        - Training with CLI and YAML configuration:
-        ```
-        erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
-               model_name_or_path=/PATH/TO/MODEL \
-               train_dataset_path=/PAHT/TO/DATASET \
-        ```
-        - Download the [Tibetan eval dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-eval_bo.jsonl) and inference with [PaddleX](https://github.com/PaddlePaddle/PaddleX).
-    - Dataflow : Support padding free startegy.
+    - VL Modle Training: Support SFT for PaddleOCR-VL-0.9B model. More details in [PaddleOCR-VL-0.9B SFT](./paddleocr_vl_sft.md).
+    - Dataflow : Support padding-free startegy.
         - Packing data within a batch into a sequence to avoid padding, thereby reducing GPU memory usage and accelerating training.
-        - Set `packing_size` to define the number of samples packed into one sequence.
-        - Set `padding=False` to avoid padding the sequence to the max sequence length.
 
 **[2025-09] 🔥 Released ERNIEKit v1.2:**
 
