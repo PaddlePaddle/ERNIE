@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Paddle Ernie model for ocr"""
+"""Paddle Ernie model for PaddleOCR-VL"""
 
 import contextlib
 import functools
