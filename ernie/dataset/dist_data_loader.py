@@ -400,7 +400,8 @@ class MMDataloader(paddle.io.DataLoader):
                         self._lens_rcd[src_id] + input_ids.shape[0]
                         > self.tokenizer.model_max_length
                     ) or (
-                        len(self._sample_buffer[src_id]["input_ids"]) == self.packing_size
+                        len(self._sample_buffer[src_id]["input_ids"])
+                        == self.packing_size
                     )
                     if need_to_yield_sample:
                         slice_result = self.sync_array_slices(
@@ -490,7 +491,6 @@ class MMDataloader(paddle.io.DataLoader):
                                 batch_data[k] = paddle.to_tensor(batch_data[k])
                         self._batch_buffer["cur_batch"] = []
                         yield batch_data
-
 
 
 class SFTDataLoader(paddle.io.DataLoader):

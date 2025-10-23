@@ -26,14 +26,14 @@ This is where SFT (Supervised Fine-Tuning) becomes necessary to enhance the mode
 ## SFT Training
 
 - Download the PaddleOCR-VL-0.9B model from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files). 
-- Download the [Tibetan train dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_bo.jsonl), or construct your own dataset following the [SFT VL Dataset Foramt](./datasets.md#sft-vl-dataset).
+- Download the Bengali language train dataset, or construct your own dataset following the [SFT VL Dataset Foramt](./datasets.md#sft-vl-dataset).
 - Training with CLI and YAML configuration:
 ```
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
         model_name_or_path=/PATH/TO/MODEL \
         train_dataset_path=/PAHT/TO/DATASET \
 ```
-- Download the [Tibetan eval dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-eval_bo.jsonl) and inference with [PaddleX](https://github.com/PaddlePaddle/PaddleX).
+- Download the Bengali language eval dataset and inference with [PaddleX](https://github.com/PaddlePaddle/PaddleX).
 
 ### Hyper Parameters
 

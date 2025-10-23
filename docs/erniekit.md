@@ -14,6 +14,14 @@
     - Dataflow : Support padding-free startegy.
         - Packing data within a batch into a sequence to avoid padding, thereby reducing GPU memory usage and accelerating training.
 
+**[2025-09] 🔥 Released ERNIEKit v1.3:**
+
+- **New Features**
+    - [ERNIE-4.5-21B-A3B-Thinking] Supports SFT training and function call training for ERNIE-4.5-21B-A3B-Thinking (https://huggingface.co/baidu/ERNIE-4.5-21B-A3B-Thinking).
+
+- **Bug Fixes:**
+    - [VL Model Training] Optimization of multimodal video data processing speed (#1266).
+
 **[2025-09] 🔥 Released ERNIEKit v1.2:**
 
 - **New Features**
