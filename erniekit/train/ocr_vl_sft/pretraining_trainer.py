@@ -1275,8 +1275,11 @@ class PretrainingTrainer(Trainer):
         if self.control.should_log:
             logs = {}
             tr_loss_single_dp_scalar = tr_loss.item()
-            dist.all_reduce(tr_loss, dist.ReduceOp.SUM)
-            tr_loss_scalar = tr_loss.item() / dist.get_world_size()
+            if dist.get_world_size() > 1:
+                dist.all_reduce(tr_loss, dist.ReduceOp.SUM)
+                tr_loss_scalar = tr_loss.item() / dist.get_world_size()
+            else:
+                tr_loss_scalar = tr_loss_single_dp_scalar
             tr_loss.zero_()
 
             # reset tr_loss to zero
@@ -1339,7 +1342,8 @@ class PretrainingTrainer(Trainer):
                     and "embed_tokens" not in n
                 )
                 numel_tensor = paddle.to_tensor(model_numel)
-                dist.all_reduce(numel_tensor)
+                if dist.get_world_size() > 1:
+                    dist.all_reduce(numel_tensor)
                 self.model_numel = numel_tensor.item() // self.args.dataset_world_size
 
             tokens_per_steps = self.args.max_seq_len * total_train_batch_size

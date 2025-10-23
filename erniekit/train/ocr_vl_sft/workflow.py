@@ -485,11 +485,19 @@ def run_ocr_vl_sft(
     logger.info(f"args.need_data: {finetuning_args.need_data}")
 
     if finetuning_args.do_train:
-        hcg = fleet.get_hybrid_communicate_group()
-        dp_rank = hcg.get_data_parallel_rank()
-        dp_size = hcg.get_data_parallel_world_size()
-        sharding_rank = hcg.get_sharding_parallel_rank()
-        sharding_size = hcg.get_sharding_parallel_world_size()
+
+        if paddle.distributed.get_world_size() > 1:
+            hcg = fleet.get_hybrid_communicate_group()
+            dp_rank = hcg.get_data_parallel_rank()
+            dp_size = hcg.get_data_parallel_world_size()
+            sharding_rank = hcg.get_sharding_parallel_rank()
+            sharding_size = hcg.get_sharding_parallel_world_size()
+        else:
+            dp_rank = 0
+            dp_size = 1
+            sharding_rank = 0
+            sharding_size = 1
+        
         logger.info(
             f"""[main] hcg: dp_rank: {dp_rank},
             dp_size: {dp_size},
