@@ -29,7 +29,7 @@ from paddleformers.trainer import TrainerState
 from paddleformers.trainer.trainer import TRAINER_STATE_NAME
 
 from .data_utils import RandomNoReplacementSampler, sampling_pseudo_examples
-from ernie.dataset.data_utils import pad_batch_data
+from ernie.dataset.data_utils import pad_batch_data, round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
 
@@ -817,9 +817,16 @@ class KnowledgeBasedSFTReader(BaseReader):
         """
         simplify
         """
+
         batch_record_token_ids = [
             record.token_ids for record in batch_records
         ]  # leave one token for tgt_ids
+
+        if not self.in_tokens:
+            pad_length = round_up_to_multiple_of_8(
+                sum(map(len, batch_record_token_ids))
+            )
+
         batch_token_ids = [sum(batch_record_token_ids, [])]
 
         if not self.rope_3d:
@@ -889,31 +896,38 @@ class KnowledgeBasedSFTReader(BaseReader):
             padded_position_ids_extra = pad_sequence(
                 np.array([batch_position_ids_extra]),
                 padding_value=[0, 0, 0],
-                fix_len=self.max_seq_len,
+                fix_len=self.max_seq_len if self.in_tokens else pad_length,
             )
         else:
             padded_position_ids_extra = pad_batch_data(
-                batch_position_ids_extra, pad_idx=0, max_seq_len=self.max_seq_len
+                batch_position_ids_extra,
+                pad_idx=0,
+                max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
             )
 
         padded_token_ids = pad_batch_data(
             batch_token_ids,
             pad_idx=self.pad_id,
             return_input_mask=False,
-            max_seq_len=self.max_seq_len,
+            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
         )
         # padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=0, max_seq_len=self.max_seq_len)
 
         padded_batch_loss_mask = pad_batch_data(
-            batch_loss_mask, pad_idx=0, max_seq_len=self.max_seq_len
+            batch_loss_mask,
+            pad_idx=0,
+            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
         )
         padded_batch_labels = pad_batch_data(
-            batch_labels, pad_idx=self.pad_id, max_seq_len=self.max_seq_len
+            batch_labels,
+            pad_idx=self.pad_id,
+            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
         )
         # add in-batch mask
         if not simplify:
             input_mask = self._gen_self_attn_mask_for_glm_flatten(
-                batch_record_token_ids, self.max_seq_len
+                batch_record_token_ids,
+                self.max_seq_len if self.in_tokens else pad_length,
             )
 
         padded_batch_task_ids = pad_batch_data(
@@ -927,12 +941,17 @@ class KnowledgeBasedSFTReader(BaseReader):
         for item in batch_record_token_ids:
             inbatch_pack_offset.append(inbatch_pack_offset[-1] + len(item))
         inbatch_pack_offset[-1] = (
-            self.max_seq_len
+            self.max_seq_len if self.in_tokens else pad_length
         )  # include padding in the last interval
         padded_inbatch_pack_offset = np.reshape(
             np.array(
                 inbatch_pack_offset
-                + [-1] * (self.max_seq_len + 1 - len(inbatch_pack_offset)),
+                + [-1]
+                * (
+                    (self.max_seq_len if self.in_tokens else pad_length)
+                    + 1
+                    - len(inbatch_pack_offset)
+                ),
                 dtype=np.int64,
             ),
             [1, -1],

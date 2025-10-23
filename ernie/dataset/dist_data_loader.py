@@ -555,6 +555,7 @@ class DistDataLoader(paddle.io.DataLoader):
         gradient_accumulation_steps=1,
         multimodal_multiround_ratio=0.3,
         modality_ratio=[1, 1],
+        packing=True,
     ):
 
         if dataset is None:
@@ -600,7 +601,7 @@ class DistDataLoader(paddle.io.DataLoader):
                 places=places,
                 return_list=return_list,
                 batch_sampler=batch_sampler,
-                batch_size=1,
+                batch_size=batch_size,
                 shuffle=shuffle,
                 drop_last=drop_last,
                 collate_fn=collate_fn,
@@ -612,6 +613,7 @@ class DistDataLoader(paddle.io.DataLoader):
                 worker_init_fn=worker_init_fn,
                 persistent_workers=persistent_workers,
                 multimodal_multiround_ratio=0.3,
+                packing=packing,
             )
             if text_sft_dataset is not None:
                 self.text_sft_dataset = text_sft_dataset

@@ -26,6 +26,7 @@ from ernie.dataset.base import MultiSourceDataset
 from ernie.dataset.data_utils import (
     Example,
     pad_batch_data,
+    postprocess_fc_sequence,
 )
 
 LOGGER_COUNT = 0
@@ -190,7 +191,7 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
 
 def process_fc(data, input_file):
     multi_turns_messages = data["messages"]
-    tools_list = data["tools"]
+    tools_list = data["tools"] if "tools" in data else None
     label = data["label"] if "label" in data else None
 
     system = ""
@@ -213,7 +214,7 @@ def process_fc(data, input_file):
             ex = Example(
                 request={"messages": message, "tools": tools_list},
                 system=system,
-                label=label,
+                label=[1],
                 is_system=is_system,
                 source=input_file,
                 is_function_call=True,
@@ -555,34 +556,6 @@ class SequenceDataset(IterableDataset):
             while True:
                 yield from self.__iter_func()
 
-    def function_call_chat_template(self, messages, tools):
-        history = messages[:-1]
-        history_str = self.tokenizer.apply_chat_template(
-            {"messages": history, "tools": tools},
-            add_generation_prompt=True,
-            tokenize=False,
-        )
-        history_len = len(history_str)
-        all_str = self.tokenizer.apply_chat_template(
-            {"messages": messages, "tools": tools},
-            add_generation_prompt=False,
-            tokenize=False,
-        )
-        response_str = all_str[history_len:]
-        history_id = self.tokenizer.convert_tokens_to_ids(
-            self.tokenizer.tokenize(history_str)
-        )
-        response_id = self.tokenizer.convert_tokens_to_ids(
-            self.tokenizer.tokenize(response_str)
-        )
-        return [history_id, response_id]
-
-    def _postprocess_fc_sequence(self, example):
-        messages = example.request["messages"]
-        tools = example.request["tools"]
-        encoded_messages = [self.function_call_chat_template(messages, tools)]
-        return encoded_messages
-
     def _postprocess_sequence(self, example, actual_example_num):
         """Process code completion examples into token sequences.
 
@@ -594,7 +567,7 @@ class SequenceDataset(IterableDataset):
             Sequence: Processed sequence or None if invalid.
         """
         if example.is_function_call:
-            encoded_messages = self._postprocess_fc_sequence(example)
+            encoded_messages = postprocess_fc_sequence(self.tokenizer, example.request)
         else:
             encoded_messages = self.tokenizer.encode_chat_inputs(example.request)
 
@@ -643,7 +616,7 @@ class SequenceDataset(IterableDataset):
                         f"even one turn, example_output:'{{'src':[{sub_src}, ……],'tgt':[……{sub_tgt}]}}'"
                     )
             except Exception:
-                logger.warning(f"[SKIP] wrong example: {example}")
+                logger.warning("[SKIP] wrong example")
 
             return None
 

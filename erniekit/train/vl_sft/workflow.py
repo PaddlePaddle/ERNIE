@@ -383,6 +383,7 @@ def run_vl_sft(
     cfg.token_balance_seqlen = (
         data_args.max_seq_len * finetuning_args.per_device_train_batch_size
     )
+    cfg.per_device_train_batch_size = finetuning_args.per_device_train_batch_size
     cfg.fp16_opt_level = finetuning_args.fp16_opt_level
     cfg.moe_group = model_args.moe_group  # pp mp use sharding group as moe group
     cfg.dtype = dtype
@@ -430,6 +431,8 @@ def run_vl_sft(
     ).repeat_interleave(cfg.vision_config.patch_size**2 * 1, -1)
 
     cfg.use_flash_attention = model_args.use_flash_attention
+    cfg.use_sparse_flash_attn = model_args.use_sparse_flash_attn
+    cfg.use_attn_mask_start_row_indices = model_args.use_attn_mask_start_row_indices
     cfg.use_recompute_moe = model_args.use_recompute_moe
     cfg.recompute = finetuning_args.recompute
     cfg.recompute_granularity = model_args.recompute_granularity
@@ -638,7 +641,8 @@ def run_vl_sft(
                 "worker_index": paddle.distributed.get_rank(),
                 "prefetch_factor": finetuning_args.prefetch_factor,
                 "task_group": train_task_group_text,
-                "in_tokens": True,  # True for Text SFT
+                "in_tokens": finetuning_args.packing,  # Text SFT packing option
+                "batch_size": finetuning_args.per_device_train_batch_size,
                 "tokenizer": tokenizer,
                 "number_of_samples_each_epoch": data_args.num_samples_each_epoch,
                 "example_from_same_task_prob": finetuning_args.example_from_same_task_prob,
@@ -689,6 +693,7 @@ def run_vl_sft(
         im_prefix_length=256,
         rng=random.Random(2024),
         combine_batch=1,
+        packing=finetuning_args.packing,
     )
 
     if model_args.lora:
@@ -753,6 +758,8 @@ def run_vl_sft(
         callbacks=callbacks,
         modality_ratio=modality_ratio,
         processing_class=image_preprocess_save,
+        batch_size=finetuning_args.per_device_train_batch_size,
+        packing=finetuning_args.packing,
     )
     if vit_trainable_callback is not None:
         vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager

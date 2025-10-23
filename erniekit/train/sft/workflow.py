@@ -299,18 +299,19 @@ def run_sft(
         finetuning_args.use_huggingface_model = True
         finetuning_args.convert_from_hf = True
         if finetuning_args.weight_quantize_algo is not None:
-            quantization_config["weight_quantize_algo"] = {
-                "weight_only_int4": [".*mlp.experts.*"],
-                "weight_only_int8": [
-                    ".*self_attn.q_proj.*",
-                    ".*self_attn.k_proj.*",
-                    ".*self_attn.v_proj.*",
-                    ".*self_attn.o_proj.*",
-                    ".*mlp.up_proj.*",
-                    ".*mlp.gate_proj.*",
-                    ".*mlp.down_proj.*",
-                ],
-            }
+            if finetuning_args.weight_quantize_algo == "weight_only_mix":
+                quantization_config["weight_quantize_algo"] = {
+                    "weight_only_int4": [".*mlp.experts.*"],
+                    "weight_only_int8": [
+                        ".*self_attn.q_proj.*",
+                        ".*self_attn.k_proj.*",
+                        ".*self_attn.v_proj.*",
+                        ".*self_attn.o_proj.*",
+                        ".*mlp.up_proj.*",
+                        ".*mlp.gate_proj.*",
+                        ".*mlp.down_proj.*",
+                    ],
+                }
         model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
         logger.info("loading model from HuggingFace")
 
@@ -356,6 +357,7 @@ def run_sft(
             **convert_from_kwargs,
             **download_source_kwargs,
         )
+        model_config.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
     else:
         model_config = Ernie4_5_MoeConfig.from_pretrained(
             model_args.model_name_or_path,
@@ -407,6 +409,9 @@ def run_sft(
     model_config.num_acc_steps = finetuning_args.gradient_accumulation_steps
     model_config.multi_token_pred_lambda = finetuning_args.multi_token_pred_lambda
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
+    model_config.per_device_train_batch_size = (
+        finetuning_args.per_device_train_batch_size
+    )
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
     if (

@@ -35,6 +35,11 @@ class Example:
     is_function_call: bool = False
 
 
+def round_up_to_multiple_of_8(n):
+    """round up to multiple of 8"""
+    return (n + 7) & ~7
+
+
 def pad_batch_data(
     insts,
     pad_idx=0,
@@ -199,3 +204,29 @@ def convert_to_input_ids(
             raise ValueError(f"Unsupported data format: {data_format}")
         num_input_tokens += len(input_ids[-1])
     return input_ids, num_input_tokens
+
+
+def function_call_chat_template(tokenizer, messages, tools):
+    history = messages[:-1]
+    history_str = tokenizer.apply_chat_template(
+        {"messages": history, "tools": tools},
+        add_generation_prompt=True,
+        tokenize=False,
+    )
+    history_len = len(history_str)
+    all_str = tokenizer.apply_chat_template(
+        {"messages": messages, "tools": tools},
+        add_generation_prompt=False,
+        tokenize=False,
+    )
+    response_str = all_str[history_len:]
+    history_id = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(history_str))
+    response_id = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(response_str))
+    return [history_id, response_id]
+
+
+def postprocess_fc_sequence(tokenizer, example):
+    messages = example["messages"]
+    tools = example["tools"]
+    encoded_messages = [function_call_chat_template(tokenizer, messages, tools)]
+    return encoded_messages
