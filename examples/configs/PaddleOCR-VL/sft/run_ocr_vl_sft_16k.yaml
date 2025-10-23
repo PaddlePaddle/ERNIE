@@ -32,6 +32,7 @@ dataloader_num_workers: 1
 prefetch_factor: 10
 batch_size: 1
 packing_size: 8
+packing: True
 padding: False
 num_train_epochs: 2
 max_steps: 862

@@ -153,8 +153,9 @@ class SFTTrainer(PretrainingTrainer):
                 num_workers=self.args.dataloader_num_workers,
                 prefetch_factor=self.args.prefetch_factor,
                 multimodal_multiround_ratio=0.0,
-                need_slice=False,
+                packing=self.args.packing,
                 packing_size=self.args.packing_size,
+                need_slice=False,
             )
 
     def train(
