@@ -497,7 +497,7 @@ def run_ocr_vl_sft(
             dp_size = 1
             sharding_rank = 0
             sharding_size = 1
-        
+
         logger.info(
             f"""[main] hcg: dp_rank: {dp_rank},
             dp_size: {dp_size},
