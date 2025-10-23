@@ -48,11 +48,10 @@ def init_model(model_name, tensor_parallel_size: int = 1):
     llm = LLM(
         model=model_name,
         tensor_parallel_size=tensor_parallel_size,
-        gpu_memory_utilization=0.5,
+        gpu_memory_utilization=0.9,
         max_model_len=8192,
         trust_remote_code=True,
         max_logprobs=-1,
-        distributed_executor_backend="ray",
     )
 
 
@@ -67,9 +66,9 @@ async def generate_logit(request: PromptRequest):
         detokenize=False,
         n=1,
     )
-    if tuple(request.max_tokens) in query_cache:
+    if tuple(request.prompt_token_ids[0]) in query_cache:
         buffer = io.BytesIO()
-        pickle.dump(query_cache[tuple(request.max_tokens)], buffer)
+        pickle.dump(query_cache[tuple(request.prompt_token_ids[0])], buffer)
         buffer.seek(0)
         return Response(content=buffer.read(), media_type="application/octet-stream")
 
@@ -101,7 +100,7 @@ async def generate_logit(request: PromptRequest):
         "logits": all_token,
         "ids": all_ids,
     }
-    query_cache[tuple(request.max_tokens)] = package
+    query_cache[tuple(request.prompt_token_ids[0])] = package
     buffer = io.BytesIO()
     pickle.dump(package, buffer)
     buffer.seek(0)
