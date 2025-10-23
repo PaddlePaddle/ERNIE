@@ -82,7 +82,7 @@ def create_dataset(**dataset_config):
         task_dataset_path=task_dataset_path,
         task_dataset_prob=task_dataset_prob,
         sub_dataset_type=sub_dataset_type,
-        process_fn=process_example,
+        process_fn=process_pretraining_example,
         process_fn_fc=process_fc,
     )
 
@@ -286,6 +286,44 @@ def process_example(data, input_file):
     )
 
 
+def process_pretraining_example(data, input_file):
+    """Convert raw data example into training example.
+
+    Args:
+        data (dict): Raw example data with:
+        input_file (str): Source file path
+
+    Returns:
+        Example: Processed example for sequence generation
+    """
+    # We have the code completion dataset, which has the following fields
+    if isinstance(data["tgt"], str):
+        data["tgt"] = [data["tgt"]]
+
+    if len(data["tgt"]) == 0:
+        raise ValueError("Ignore example with empty src or empty tgt.")
+
+    for item in data["tgt"]:
+        if len(item.strip()) == 0:
+            raise ValueError("Ignore example with empty string in str / tgt field.")
+
+    if "label" not in data:
+        data["label"] = [1] * len(data["tgt"])
+
+    # convert to OpenAI format
+    data["messages"] = []
+    for a in data["tgt"]:
+        data["messages"].append({"role": "assistant", "content": a.strip()})
+
+    return Example(
+        request={"messages": data["messages"]},
+        system="",
+        label=data["label"],
+        is_system=0,
+        source=input_file,
+    )
+
+
 class InfiniteDataset(IterableDataset):
     """Infinite iterable dataset with shuffle support.
 
@@ -365,6 +403,7 @@ class SequenceDataset(IterableDataset):
         self.random_shuffle = random_shuffle
         self.greedy_intokens = greedy_intokens
         self.origin_dataset_num = 0
+        self.is_pretraining = True
 
         # For new data concatenation mode
         self.begin_of_query = self.tokenizer.tokenize("User: ")
@@ -469,7 +508,10 @@ class SequenceDataset(IterableDataset):
             # base
             for example in examples_all[::-1]:
                 actual_example_num = 1
-                sequence = self._postprocess_sequence(example, actual_example_num)
+                if self.is_pretraining:
+                    sequence = self._postprocess_pretraining_sequence(example, actual_example_num)
+                else:
+                    sequence = self._postprocess_sequence(example, actual_example_num)
                 if sequence is None:
                     if self.estimate:
                         self.unused_samples += actual_example_num
@@ -555,6 +597,37 @@ class SequenceDataset(IterableDataset):
         else:
             while True:
                 yield from self.__iter_func()
+
+    def _postprocess_pretraining_sequence(self, example, actual_example_num):
+        # tokens
+        content = example.request["messages"][0]["content"]
+        tokens = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(content))
+        # loss mask
+        loss_mask = [1] * len(tokens)
+
+        # labels
+        oral_tokens = tokens
+        tokens = oral_tokens[:-1]
+        labels = oral_tokens[1:]
+        loss_mask = loss_mask[1:]
+
+        if sum(loss_mask) == 0:
+            logger.warning(f"[SKIP] all labels set to 0: {example}")
+            return None
+
+        # position ids
+        pos_ids = list(range(len(tokens)))
+
+        assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
+        assert len(tokens) == len(labels), f"{len(tokens)}-{len(labels)}"
+        return Sequence(
+            token_ids=tokens,
+            position_ids=pos_ids,
+            labels=labels,
+            loss_mask=loss_mask,
+            num_examples=actual_example_num,
+        )
+
 
     def _postprocess_sequence(self, example, actual_example_num):
         """Process code completion examples into token sequences.
@@ -676,9 +749,14 @@ class SequenceDataset(IterableDataset):
         left_index = 0
 
         while index < len(examples):
-            sequence = self._postprocess_sequence(
-                examples[index], actual_example_num_list[index]
-            )
+            if self.is_pretraining:
+                sequence = self._postprocess_pretraining_sequence(
+                    examples[index], actual_example_num_list[index]
+                )
+            else:
+                sequence = self._postprocess_sequence(
+                    examples[index], actual_example_num_list[index]
+                )
             if sequence is None:
                 if self.estimate:
                     self.unused_samples += actual_example_num_list[index]
