@@ -146,18 +146,30 @@ def create_pretrained_dataset(args):
         seed=args.seed,
         skip_warmup=True,
         data_cache_path=None,
+        self_constraint_cpt=args.self_constraint_cpt,
+        prob_nums=args.prob_nums,
     )
 
     def ratio_maker(CPT):
         """
-        input: [True, False, False, True]
-        output: {"kl_ratio": Tensor([0.5, 1, 1, 0.5]), "ce_ratio": Tensor([1, 0.5, 0.5, 1])}
+        Generates KL and CE ratio tensors based on a boolean input array.
+        Applies different ratios to positions where the input is True vs False.
+
+        Args:
+            CPT: List or tensor of boolean values indicating special positions
+                 Example input: [True, False, False, True]
+
+        Returns:
+            Tensor: Concatenated tensor containing KL ratios followed by CE ratios
+                    Example output structure (values depend on configuration):
+                    Tensor([0.5, 1, 1, 0.5, 1, 0.5, 0.5, 1])
+                    Where first 4 elements are KL ratios and last 4 are CE ratios
         """
         CPT = paddle.to_tensor(CPT, dtype="bool")
-        true_kl = 0.5
-        false_kl = 1
-        true_ce = 1
-        false_ce = 0.5
+        true_kl = args.cpt_kl_ratio
+        false_kl = args.pt_kl_ratio
+        true_ce = args.cpt_ce_ratio
+        false_ce = args.pt_ce_ratio
 
         kl_ratio = paddle.full_like(CPT, false_kl, dtype="float32")
         kl_ratio[CPT] = true_kl
@@ -171,14 +183,16 @@ def create_pretrained_dataset(args):
 
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn([x["text"] for x in data])
-        kl_logits_ = stack_fn([x["logits"] for x in data])
-        kl_ids_ = stack_fn([x["ids"] for x in data])
-        CPT = ratio_maker([x["CPT"] for x in data])
-
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
-        kl_logits = kl_logits_[:, :-1]
-        kl_ids = kl_ids_[:, :-1]
+
+        kl_logits, kl_ids, CPT = None, None, None
+        if args.self_constraint_cpt:
+            kl_logits_ = stack_fn([x["logits"] for x in data])
+            kl_ids_ = stack_fn([x["ids"] for x in data])
+            CPT = ratio_maker([x["CPT"] for x in data])
+            kl_logits = kl_logits_[:, :-1]
+            kl_ids = kl_ids_[:, :-1]
 
         return {
             "input_ids": tokens,

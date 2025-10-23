@@ -2233,8 +2233,6 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         loss_ratio=None,
     ):
 
-        # print("kl_logits shape:", kl_logits.shape if kl_logits is not None else None)
-        # print("hid_logits shape:", prediction_scores.shape)
         if self.config.use_sparse_head_and_loss_fn:
             hidden_states, outlinear_weight, outlinear_bias = prediction_scores
 
@@ -2423,14 +2421,17 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                     degree=self.config.tensor_parallel_degree,
                     rank=self.config.tensor_parallel_rank,
                 )
-                print("Kl loss:", kl_loss.mean())
-                print("ce loss:", masked_lm_loss.mean())
+                kl_loss_log = kl_loss.mean()
+                ce_loss_log = masked_lm_loss.mean()
                 masked_lm_loss = (
                     loss_ratio[: loss_ratio.shape[0] // 2][:, None, None] * kl_loss
                     + loss_ratio[loss_ratio.shape[0] // 2 :][:, None, None]
                     * masked_lm_loss
                 )
-                print("kl_ce_loss:", masked_lm_loss.mean())
+                full_step_loss_log = masked_lm_loss.mean()
+                logger.info(
+                    f"[Micro Step]: KL Loss {kl_loss_log}, CE Loss {ce_loss_log}, Full Loss {full_step_loss_log}"
+                )
 
             lossmask = masked_lm_labels != self.ignored_index
             if (~lossmask).all():

@@ -192,6 +192,32 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
+    self_constraint_cpt: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to use self-constraint continual pre-training."},
+    )
+    prob_nums: int = field(
+        default=10,
+        metadata={
+            "help": "when self-constraint continual pre-train, retrieve prob_nums logprobs for kl loss."
+        },
+    )
+    cpt_kl_ratio: float = field(
+        default=0.5,
+        metadata={"help": "continual pre-training kl loss ratio."},
+    )
+    pt_kl_ratio: float = field(
+        default=1.0,
+        metadata={"help": "pre-training kl loss ratio."},
+    )
+    cpt_ce_ratio: float = field(
+        default=1.0,
+        metadata={"help": "continual pre-training ce loss ratio."},
+    )
+    pt_ce_ratio: float = field(
+        default=0.5,
+        metadata={"help": "pre-training ce loss ratio."},
+    )
     sequence_parallel: Optional[int] = field(
         default=0,
         metadata={},
