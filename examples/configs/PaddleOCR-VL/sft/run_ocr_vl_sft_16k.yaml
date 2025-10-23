@@ -1,9 +1,9 @@
 ### data
 train_dataset_type: "erniekit"
 eval_dataset_type: "erniekit"
-train_dataset_path: "./examples/data/ocr_vl_sft-train_bo.jsonl"
+train_dataset_path: "./examples/data/ocr_vl_sft-train_Bengali.jsonl"
 train_dataset_prob: "1.0"
-eval_dataset_path: "./examples/data/ocr_vl_sft-eval_bo.jsonl"
+eval_dataset_path: "./examples/data/ocr_vl_sft-test_Bengali.jsonl"
 eval_dataset_prob: "1.0"
 max_seq_len: 16384
 num_samples_each_epoch: 6000000
@@ -35,7 +35,7 @@ packing_size: 8
 packing: True
 padding: False
 num_train_epochs: 2
-max_steps: 862
+max_steps: 926
 # max_evaluate_steps: 10000
 # eval_steps: 10000
 # evaluation_strategy: steps
@@ -50,7 +50,7 @@ output_dir: ./output
 disable_tqdm: True
 
 # train
-warmup_steps: 9
+warmup_steps: 10
 learning_rate: 5.0e-6
 lr_scheduler_type: cosine
 min_lr: 5.0e-7
