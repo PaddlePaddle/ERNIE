@@ -1,10 +1,12 @@
+English | [简体中文](./paddleocr_vl_sft_zh.md)
+
 # PaddleOCR-VL-0.9B SFT
 
 ## Introduction
 
 PaddleOCR-VL, a SOTA and resource-efficient model tailored for document parsing. Its core component is PaddleOCR-VL-0.9B, a compact yet powerful vision-language model (VLM) that integrates a NaViT-style dynamic resolution visual encoder with the ERNIE-4.5-0.3B language model to enable accurate element recognition. This innovative model efficiently supports 109 languages and excels in recognizing complex elements (e.g., text, tables, formulas, and charts), while maintaining minimal resource consumption. Through comprehensive evaluations on widely used public benchmarks and in-house benchmarks, PaddleOCR-VL achieves SOTA performance in both page-level document parsing and element-level recognition. It significantly outperforms existing solutions, exhibits strong competitiveness against top-tier VLMs, and delivers fast inference speeds. These strengths make it highly suitable for practical deployment in real-world scenarios.
 
-While PaddleOCR excels in common scenarios, its performance often faces limitations in many specific or complex business applications. For instance:
+While PaddleOCR-VL excels in common scenarios, its performance often faces limitations in many specific or complex business applications. For instance:
 
 - Domain-Specific Applications
     - Finance & Accounting: Recognizing documents such as invoices, receipts, bank statements, and financial reports
