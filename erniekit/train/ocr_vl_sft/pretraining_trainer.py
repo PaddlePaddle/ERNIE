@@ -1405,7 +1405,9 @@ class PretrainingTrainer(Trainer):
             else:
                 zcc_start_save_time = time.time()
             self._save_checkpoint(model, metrics=metrics)
-            paddle.distributed.barrier()
+
+            if dist.get_world_size() > 1:
+                paddle.distributed.barrier()
             self.control = self.callback_handler.on_save(
                 self.args, self.state, self.control
             )

@@ -29,7 +29,7 @@ PaddleOCR-VL 是一款为文档解析任务量身打造的、性能顶尖 (SOTA)
 ## SFT 训练
 
 - 在 [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) 或者 [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files) 可以下载 PaddleOCR-VL-0.9B 模型。
-- 我们提供了[孟加拉语训练数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)可用于微调 PaddleOCR-VL-0.9B 对藏语进行识别，或者你可以按照 [SFT VL 数据集格式](./datasets.md#sft-vl-dataset) 来构建自己的微调数据集。
+- 我们提供了[孟加拉语训练数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)可用于微调 PaddleOCR-VL-0.9B 对孟加拉语进行识别，或者你可以按照 [SFT VL 数据集格式](./datasets.md#sft-vl-dataset) 来构建自己的微调数据集。
 - 使用命令行和 YAML 配置文件来启动训练：
 ```
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
