@@ -44,7 +44,7 @@ save_total_limit: 5
 save_strategy: steps
 logging_steps: 1
 release_grads: True
-gradient_accumulation_steps: 1
+gradient_accumulation_steps: 8
 logging_dir: ./log
 output_dir: ./output
 disable_tqdm: True
