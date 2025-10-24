@@ -35,7 +35,7 @@ huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/Padd
 - Training with CLI and YAML configuration:
 ```
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
-        model_name_or_path=/PATH/TO/MODEL \
+        model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=/PAHT/TO/DATASET \
 ```
 - Download the [Bengali language test dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl) and inference with [PaddleX](https://github.com/PaddlePaddle/PaddleX).

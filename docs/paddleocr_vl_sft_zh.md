@@ -38,7 +38,7 @@ huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/Padd
 - 使用命令行和 YAML 配置文件来启动训练：
 ```
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
-        model_name_or_path=/PATH/TO/MODEL \
+        model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=/PAHT/TO/DATASET \
 ```
 - 我们提供了[孟加拉语测试数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl)，可用于推理来观察微调效果。
