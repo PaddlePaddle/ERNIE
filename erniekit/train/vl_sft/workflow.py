@@ -238,7 +238,6 @@ def run_vl_sft(
     logger.info(f"setting same_data: {finetuning_args.same_data}")
 
     convert_from_hf = resolve_source(model_args.model_name_or_path)
-    print("PZL: convert_from_hf:", convert_from_hf)
 
     image_preprocess_save = AdaptiveImageProcessor.from_pretrained(
         model_args.model_name_or_path
@@ -513,6 +512,7 @@ def run_vl_sft(
             model = Ernie4_5_VLMoeForConditionalGenerationPipe.from_pretrained(
                 model_args.model_name_or_path,
                 config=cfg,
+                convert_from_hf=convert_from_hf,
             )
         if finetuning_args.pp_need_data_degree:
             model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
@@ -526,8 +526,13 @@ def run_vl_sft(
             model = Ernie4_5_VLMoeForConditionalGeneration.from_pretrained(
                 model_args.model_name_or_path,
                 config=cfg,
+                convert_from_hf=convert_from_hf,
             )
-    logger.info(f"vision_model: {model.vision_model}")
+    print("pzl: model: ", model)
+    if convert_from_hf:
+        logger.info(f"vision_model: {model.model.vision_tower}")
+    else:
+        logger.info(f"vision_model: {model.vision_model}")
 
     if model.config.head_dim is None:
         del model.config.head_dim
@@ -809,9 +814,9 @@ def run_vl_sft(
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
         trainer.save_model(finetuning_args.output_dir)
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
+        # trainer.log_metrics("train", metrics)
+        # trainer.save_metrics("train", metrics)
+        # trainer.save_state()
 
     # Evaluate and tests model
     if finetuning_args.do_eval:

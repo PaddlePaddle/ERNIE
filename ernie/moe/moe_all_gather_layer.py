@@ -1070,6 +1070,7 @@ class MOEAllGatherLayerV2(MOELayer):
                 dispatch_token_type_ids,
             )
         else:
+            print("-----------self.use_expert_out_alltoall")
             recv_rank_task and recv_rank_task.wait()  # wait for recv_rank
 
             world_size = dist.get_world_size(self.config.moe_group)
@@ -1105,6 +1106,10 @@ class MOEAllGatherLayerV2(MOELayer):
             recv_counts_num_cpu = recv_counts_cpu.sum(-1)
 
             dispatched_input = self.forward_experts(*dispatched_input)
+            # print("dispatched_input: ", dispatched_input)
+            # paddle.save(dispatched_input, 
+            #     "/root/paddlejob/workspace/env_run/peiziliang/paddle_tensor/after_dispatched_input_raw_{}.pdtensor".format(self.config.tensor_parallel_rank))
+        
 
             if recv_size_task is not None:
                 recv_size_task.cpu_wait()
@@ -1152,9 +1157,20 @@ class MOEAllGatherLayerV2(MOELayer):
             local_scatter_index = distributed_input_to_alltoall_out[local_scatter_index]
             local_scatter_index.stop_gradient = True
         # global -> local
+        # print("expert_out_to_combine: ", expert_out_to_combine)
+        # paddle.save(expert_out_to_combine, 
+        #     "/root/paddlejob/workspace/env_run/peiziliang/paddle_tensor/expert_out_to_combine_raw_{}.pdtensor".format(self.config.tensor_parallel_rank))
+        
         combined_output = self.combine_expert_output(
             expert_out_to_combine, local_combine_weights, local_scatter_index
         )
+        # print("combined_output: ", combined_output)
+        # paddle.save(combined_output, 
+        #     "/root/paddlejob/workspace/env_run/peiziliang/paddle_tensor/combined_output_raw_{}.pdtensor".format(self.config.tensor_parallel_rank))
+        
+        # import time
+        # time.sleep(10)
+        # exit()
 
         if self.shared_experts is not None:
             shared_out = self.shared_experts(input)
@@ -1487,6 +1503,10 @@ class MOEAllGatherLayerV2(MOELayer):
         if offload_task is not None:
             hack_offload_wait(offload_task)
         expert_num_global_list = expert_num_global_list.tolist()
+        # print("dispatched_input: ", dispatched_input)
+        # paddle.save(dispatched_input, 
+        #     "/root/paddlejob/workspace/env_run/peiziliang/paddle_tensor/dispatched_input_raw_{}.pdtensor".format(self.config.tensor_parallel_rank))
+        
 
         return (
             dispatched_input,
@@ -1550,6 +1570,7 @@ class MOEAllGatherLayerV2(MOELayer):
             len(true_experts),
         )
 
+        # experts_weights = []
         for iexpert, chunk in enumerate(dispatched_input):
             if chunk is None:
                 # QuantizationLoRALinear can not call `.weight`.
@@ -1584,6 +1605,13 @@ class MOEAllGatherLayerV2(MOELayer):
 
             expert_out = true_experts[iexpert](chunk.contiguous())
             expert_outputs.append(expert_out)
+        #     experts_weights.append(true_experts[iexpert].up_gate_proj.weight)
+        #     experts_weights.append(true_experts[iexpert].down_proj.weight)
+        # paddle.save(expert_outputs, 
+        #     "/root/paddlejob/workspace/env_run/peiziliang/paddle_tensor/expert_outputs_raw_{}.pdtensor".format(self.config.tensor_parallel_rank))
+        # paddle.save(experts_weights, 
+        #     "/root/paddlejob/workspace/env_run/peiziliang/paddle_tensor/experts_weights_raw_{}.pdtensor".format(self.config.tensor_parallel_rank))
+        
 
         # if self.config.moe_layer_feed_fake_token and len(no_tokens_expert_outputs) > 0:
         if len(no_tokens_expert_outputs) > 0:
