@@ -26,6 +26,11 @@ This is where SFT (Supervised Fine-Tuning) becomes necessary to enhance the mode
 ## SFT Training
 
 - Download the PaddleOCR-VL-0.9B model from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files). 
+
+```
+huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/PaddleOCR-VL
+```
+
 - Download the [Bengali language train dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl), or construct your own dataset following the [SFT VL Dataset Foramt](./datasets.md#sft-vl-dataset).
 - Training with CLI and YAML configuration:
 ```
