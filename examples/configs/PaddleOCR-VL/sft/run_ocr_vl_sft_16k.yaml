@@ -44,9 +44,9 @@ save_total_limit: 5
 save_strategy: steps
 logging_steps: 1
 release_grads: True
-gradient_accumulation_steps: 1
-logging_dir: ./log
-output_dir: ./output
+gradient_accumulation_steps: 8
+logging_dir: ./PaddleOCR-VL-SFT-Bengali/tensorboard_logs/
+output_dir: ./PaddleOCR-VL-SFT-Bengali
 disable_tqdm: True
 
 # train
