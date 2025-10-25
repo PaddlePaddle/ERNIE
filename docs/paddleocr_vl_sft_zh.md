@@ -2,7 +2,7 @@
 
 # PaddleOCR-VL-0.9B SFT
 
-## 引言
+## 1. 引言
 PaddleOCR-VL 是一款为文档解析任务量身打造的、性能顶尖 (SOTA) 且轻量高效的模型。它的核心是 PaddleOCR-VL-0.9B——一个紧凑而强大的视觉语言模型 (VLM)。该模型创新地集成了 NaViT 风格的动态分辨率视觉编码器与 ERNIE-4.5-0.3B 语言模型，从而能够精准地识别各类文档元素。
 
 这款模型不仅能高效支持 109 种语言，还擅长识别文本、表格、公式、图表等复杂元素，并始终保持极低的资源占用。在多个权威的公开及内部基准测试中，PaddleOCR-VL 的页面级文档解析与元素级识别性能均达到了业界顶尖水平。其性能远超现有方案，面对顶级视觉语言模型也极具竞争力，且推理速度飞快。这些杰出特性使其成为在真实场景中落地部署的理想选择。
@@ -26,13 +26,13 @@ PaddleOCR-VL 是一款为文档解析任务量身打造的、性能顶尖 (SOTA)
 这时，就需要通过 SFT (Supervised Fine-Tuning) 来提升模型的准确性和鲁棒性。
 
 
-## 环境配置
+## 2. 环境配置
 
 请参考 [ERNIEKit-安装文档](./erniekit.md#2-installation) 中的安装步骤对训练环境进行配置。
 
-## 模型和数据集准备
+## 3. 模型和数据集准备
 
-### 模型准备
+### 3.1 模型准备
 
 在 [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) 或者 [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files) 可以下载 PaddleOCR-VL-0.9B 模型。
 
@@ -40,33 +40,34 @@ PaddleOCR-VL 是一款为文档解析任务量身打造的、性能顶尖 (SOTA)
 huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/PaddleOCR-VL
 ```
 
-### 数据集准备
+### 3.2 数据集准备
 
-可以按照 [SFT VL 数据集格式](./datasets.md#sft-vl-dataset) 来构建微调数据集，同时我们也提供了一个快速上手的[孟加拉语训练数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)，可用于微调 PaddleOCR-VL-0.9B 对孟加拉语进行识别，使用以下命令下载：
+请参考 [SFT VL 数据集格式](./datasets.md#sft-vl-dataset) 来构建微调数据集，为了方便起见，我们也提供了一个快速上手的[孟加拉语训练数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)，可用于微调 PaddleOCR-VL-0.9B 对孟加拉语进行识别，使用以下命令下载：
 
 ```
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 ```
 
-## 训练配置
+## 4. 训练配置
 
 我们针对孟加拉语示例数据集提供了[配置文件](../examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml)，其中的关键训练超参数如下：
 
 - `max_steps=926`：训练总步数, 约等于 `(D × E) / (G × B × A)`。
-    - `D`：数据集中训练样本数目。
-    - `E`：训练轮次数目。
-    - `G`：数据并行的 GPU 数目。
-    - `B`：每 GPU 每步的批大小 (打包大小)。
-    - `A`：梯度累积的步数。
+    - `D=29605`：数据集中训练样本数目。
+    - `E=2`：训练轮次数目。
+    - `G=1`：用于训练的 GPU 数目。
+    - `B=8`：单卡的训练 Batch Size。
+    - `A=8`：梯度累积步数。
 - `warmup_steps=10`：线性预热步数, 建议设置成最大步数的 1% `0.01 × max_steps`。
-- `packing=True`：设置为 `True` 以将批内的样本打包成序列。
-- `packing_size=8`：单个序列中打包的样本数目。
+- `packing_size=8`：序列中打包的样本数目，作用等同于 `batch_size`。
+- `max_seq_len=16384`：最大序列长度，建议设置成训练过程中显存允许的最大值。
 - `gradient_accumulation_steps=8`：梯度累积步数。
-- `padding=False`：设置为 `False` 以避免将序列填充到最大序列长度。
-- `max_seq_len=16384`：确保该值大于输入样本的最大序列长度。
-- `learning_rate=1e-5`：学习率，即每次参数更新的幅度。
+    - 每达到该步数整数倍更新一次模型参数。
+    - 当显存不足时，可以减小 `packing_size` 并增大 `gradient_accumulation_steps`。
+    - 用时间换空间策略，可以减少显存占用，但会延长训练时间。
+- `learning_rate=5e-6`：学习率，即每次参数更新的幅度。
 
-## SFT 训练
+## 5. SFT 训练
 
 使用以下命令行即可启动训练：
 ```
@@ -85,18 +86,18 @@ GPU 的数目 `GPU_num` 会影响训练超参数 `learning_rate & packing_size &
     - 满足 `x*y = N` 即可
 2. 将 `learning_rate` 增加 `N` 倍，变成 `N*learning_rate`
 
-可以通过 `tensorboard` 对训练过程可视化，使用以下命令行即可启动（默认端口 port 为 `8084`，需要根据实际情况设置可用端口）：
+可以通过 `tensorboard` 对训练过程可视化，使用以下命令行即可启动（下方命令将端口 port 设置为 `8084`，需要根据实际情况设置可用端口）：
 
 ```
 pip install tensorboard
-tensorboard --logdir ./Paddle-OCR-VL-SFT-Bengali-log --port 8084
+tensorboard --logdir ./PaddleOCR-VL-SFT-Bengali/tensorboard_logs/ --port 8084
 ```
 
 成功启动后该服务后，在浏览器输入 `ip:port` ，则可以看到训练日志（通过 `hostname -i` 命令可以查看机器的 ip 地址）
 
-## 模型结构说明
+## 6. 模型结构说明
 
-训练结束后，模型会保存在 `output_dir=./Paddle-OCR-VL-SFT-Bengali` 指定路径下，其中包含：
+训练结束后，模型会保存在 `output_dir=./PaddleOCR-VL-SFT-Bengali` 指定路径下，其中包含：
 
 - preprocessor_config.json：图像预处理配置文件
 - config.json：模型配置文件
@@ -110,9 +111,9 @@ tensorboard --logdir ./Paddle-OCR-VL-SFT-Bengali-log --port 8084
 - generation.json：生成配置文件
 - checkpoint-[save_steps*n]：检查点文件夹，在 `save_steps` 整数倍保存训练状态，除以上文件外，还会保存 master-weight & optimizer-state & scheduler-state 等，可用于训练中断后恢复训练
 
-## 推理
+## 7. 推理
 
-### 推理环境配置
+### 7.1 推理环境配置
 
 安装 PaddleX 用于推理
 
@@ -121,16 +122,16 @@ python -m pip install paddlex
 python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
 ```
 
-### 推理模型准备
+### 7.2 推理模型准备
 
 从 PaddleOCR-VL 中拷贝必要的推理配置文件到 SFT 训练完成后保存的模型目录中
 
 ```
-cp PaddlePaddle/PaddleOCR-VL/chat-template.jinja Paddle-OCR-VL-SFT-Bengali-log
-cp PaddlePaddle/PaddleOCR-VL/inference.yaml Paddle-OCR-VL-SFT-Bengali-log 
+cp PaddlePaddle/PaddleOCR-VL/chat-template.jinja PaddleOCR-VL-SFT-Bengali
+cp PaddlePaddle/PaddleOCR-VL/inference.yaml PaddleOCR-VL-SFT-Bengali
 ```
 
-### 推理数据集准备
+### 7.3 推理数据集准备
 
 我们提供了[孟加拉语测试数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl)，可用于推理来观察微调效果，使用以下命令下载：
 
@@ -138,14 +139,14 @@ cp PaddlePaddle/PaddleOCR-VL/inference.yaml Paddle-OCR-VL-SFT-Bengali-log
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
 ```
 
-### 单样本推理
+### 7.4 单样本推理
 
 执行以下 python 代码即可加载模型并对单样本推理：
 
 ```python
 from paddlex import create_model
 
-model = create_model("PaddleOCR-VL-0.9B", model_dir="Paddle-OCR-VL-SFT-Bengali-log")
+model = create_model("PaddleOCR-VL-0.9B", model_dir="PaddleOCR-VL-SFT-Bengali")
 
 # one sample
 sample= {"image": "https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/dataset/bengali_sft/5b/7a/5b7a5c1c-207a-4924-b5f3-82890dc7b94a.png", "query": "OCR:"}
@@ -158,7 +159,7 @@ res.print()
 
 ```
 
-### 数据集推理
+### 7.5 数据集推理
 
 执行以下 python 代码即可加载模型并对测试数据集推理：
 
@@ -167,7 +168,7 @@ import json
 import jsonlines
 from paddlex import create_model
 
-model = create_model("PaddleOCR-VL-0.9B", model_dir="Paddle-OCR-VL-SFT-Bengali-log")
+model = create_model("PaddleOCR-VL-0.9B", model_dir="PaddleOCR-VL-SFT-Bengali")
 
 with open("./ocr_vl_sft-test_Bengali.jsonl", 'r') as f:
     sample_list = [json.loads(line) for line in f]
