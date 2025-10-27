@@ -96,6 +96,7 @@ def create_dataset(**dataset_config):
         random_seed=dataset_config["random_seed"],
         random_shuffle=dataset_config["random_shuffle"],
         greedy_intokens=dataset_config["greedy_intokens"],
+        is_pretraining=dataset_config["is_pretraining"],
     )
     return sequence_dataset
 
@@ -375,6 +376,7 @@ class SequenceDataset(IterableDataset):
         random_seed: int = 11,
         random_shuffle: bool = True,
         greedy_intokens: bool = False,
+        is_pretraining: bool = False,
     ):
         """Initialize SequenceDataset.
 
@@ -404,7 +406,7 @@ class SequenceDataset(IterableDataset):
         self.random_shuffle = random_shuffle
         self.greedy_intokens = greedy_intokens
         self.origin_dataset_num = 0
-        self.is_pretraining = True
+        self.is_pretraining = is_pretraining
 
         # For new data concatenation mode
         self.begin_of_query = self.tokenizer.tokenize("User: ")
@@ -505,85 +507,124 @@ class SequenceDataset(IterableDataset):
         if self.is_valid:
             examples_all = examples_all[::-1]
 
-        if not self.greedy_intokens:
-            # base
+        # pre-training:
+        # 1. tokenize all the samples in the sampling pool,
+        # 2. combine them into one large sample
+        # 3. truncate it into multiple new samples based on the max_seq_len.
+        if self.is_pretraining:
+            current_length = 0
+            all_tokenized_tokens = []
+            all_tokenized_labels = []
             for example in examples_all[::-1]:
                 actual_example_num = 1
-                if self.is_pretraining:
-                    sequence = self._postprocess_pretraining_sequence(example, actual_example_num)
-                else:
-                    sequence = self._postprocess_sequence(example, actual_example_num)
-                if sequence is None:
+                [tokens, labels] = self._postprocess_pretraining_sequence(example, actual_example_num)
+                if tokens is None:
                     if self.estimate:
                         self.unused_samples += actual_example_num
                     continue
                 if self.estimate:
                     self.used_samples += actual_example_num
-                if cur_len + len(sequence.token_ids) <= self.max_seq_len:
-                    batch_sequence.append(sequence)
-                    cur_len += len(sequence.token_ids)
-                else:
-                    yield batch_sequence
-                    batch_sequence, cur_len = [sequence], len(sequence.token_ids)
 
-                if self.estimate:
-                    self.used_estimate_samples += actual_example_num
-                    if self.used_estimate_samples >= self.max_estimate_samples:
-                        # Yield left batch sequence before estimation ends
-                        if len(batch_sequence) > 0:
-                            yield batch_sequence
-                        self.used_estimate_samples = 0
-                        # Set flag to False and yield empty list to signal the end of estimation
-                        self.estimate = False
-                        yield []
-            if len(batch_sequence) > 0:
-                yield batch_sequence
+                all_tokenized_tokens.extend(tokens)
+                all_tokenized_labels.extend(labels)
+
+                while len(all_tokenized_tokens) >= self.max_seq_len:
+                    res_tokens = all_tokenized_tokens[:self.max_seq_len]
+                    res_labels = all_tokenized_labels[:self.max_seq_len]
+                    all_tokenized_tokens = all_tokenized_tokens[self.max_seq_len:]
+                    all_tokenized_labels = all_tokenized_labels[self.max_seq_len:]
+                    pos_ids = list(range(len(res_tokens)))
+                    loss_mask = loss_mask = [1] * len(res_tokens)
+                    sequence = Sequence(
+                        token_ids=res_tokens,
+                        position_ids=pos_ids,
+                        labels=res_labels,
+                        loss_mask=loss_mask,
+                        num_examples=actual_example_num,
+                    )
+                    batch_sequence.append(sequence)
+                    yield batch_sequence
+                    batch_sequence = []
         else:
-            # Pseudo multiple rounds + group greedy intokens.
-            buffer_size = 500
-            examples = []
-            actual_example_num_list = []
-            i = 0
-            for example in examples_all[::-1]:
-                actual_example_num = 1
-                if i < buffer_size:
-                    examples.append(example)
-                    actual_example_num_list.append(actual_example_num)
-                    i += 1
-                else:
-                    # Running greedy strategy in examples.
+            if not self.greedy_intokens:
+                # base
+                for example in examples_all[::-1]:
+                    actual_example_num = 1
+                    if self.is_pretraining:
+                        sequence = self._postprocess_pretraining_sequence(example, actual_example_num)
+                    else:
+                        sequence = self._postprocess_sequence(example, actual_example_num)
+                    if sequence is None:
+                        if self.estimate:
+                            self.unused_samples += actual_example_num
+                        continue
+                    if self.estimate:
+                        self.used_samples += actual_example_num
+                    if cur_len + len(sequence.token_ids) <= self.max_seq_len:
+                        batch_sequence.append(sequence)
+                        cur_len += len(sequence.token_ids)
+                    else:
+                        yield batch_sequence
+                        batch_sequence, cur_len = [sequence], len(sequence.token_ids)
+
+                    if self.estimate:
+                        self.used_estimate_samples += actual_example_num
+                        if self.used_estimate_samples >= self.max_estimate_samples:
+                            # Yield left batch sequence before estimation ends
+                            if len(batch_sequence) > 0:
+                                yield batch_sequence
+                            self.used_estimate_samples = 0
+                            # Set flag to False and yield empty list to signal the end of estimation
+                            self.estimate = False
+                            yield []
+                if len(batch_sequence) > 0:
+                    yield batch_sequence
+            else:
+                # Pseudo multiple rounds + group greedy intokens.
+                buffer_size = 500
+                examples = []
+                actual_example_num_list = []
+                i = 0
+                for example in examples_all[::-1]:
+                    actual_example_num = 1
+                    if i < buffer_size:
+                        examples.append(example)
+                        actual_example_num_list.append(actual_example_num)
+                        i += 1
+                    else:
+                        # Running greedy strategy in examples.
+                        generate_packs = self._generate_greedy_packs(
+                            examples, actual_example_num_list
+                        )
+                        for pack in generate_packs:
+                            if len(pack) > 0:
+                                yield pack
+                        examples = [example]
+                        i = 1
+
+                    if self.estimate:
+                        self.used_estimate_samples += actual_example_num
+                        # Stop estimation if the number of samples used in estimation is larger than max_estimate_samples
+                        if self.used_estimate_samples >= self.max_estimate_samples:
+                            # Yield left packs before estimation ends
+                            if len(examples) > 0:
+                                generate_packs = self._generate_greedy_packs(
+                                    examples, actual_example_num_list
+                                )
+                                for pack in generate_packs:
+                                    if len(pack) > 0:
+                                        yield pack
+                            # Set flag to False and yield empty list to signal the end of estimation
+                            self.estimate = False
+                            yield []
+
+                if len(examples) > 0:
                     generate_packs = self._generate_greedy_packs(
                         examples, actual_example_num_list
                     )
                     for pack in generate_packs:
                         if len(pack) > 0:
                             yield pack
-                    examples = [example]
-                    i = 1
-
-                if self.estimate:
-                    self.used_estimate_samples += actual_example_num
-                    # Stop estimation if the number of samples used in estimation is larger than max_estimate_samples
-                    if self.used_estimate_samples >= self.max_estimate_samples:
-                        # Yield left packs before estimation ends
-                        if len(examples) > 0:
-                            generate_packs = self._generate_greedy_packs(
-                                examples, actual_example_num_list
-                            )
-                            for pack in generate_packs:
-                                if len(pack) > 0:
-                                    yield pack
-                        # Set flag to False and yield empty list to signal the end of estimation
-                        self.estimate = False
-                        yield []
-
-            if len(examples) > 0:
-                generate_packs = self._generate_greedy_packs(
-                    examples, actual_example_num_list
-                )
-                for pack in generate_packs:
-                    if len(pack) > 0:
-                        yield pack
 
         self.epoch_index += 1
 
@@ -613,21 +654,17 @@ class SequenceDataset(IterableDataset):
         loss_mask = loss_mask[1:]
 
         if sum(loss_mask) == 0:
-            logger.warning(f"[SKIP] all labels set to 0: {example}")
-            return None
+            logger.warning(f"[SKIP] all labels set to 0: oral_tokens: {oral_tokens}")
+            return [None, None]
 
-        # position ids
-        pos_ids = list(range(len(tokens)))
+        # add eos token
+        tokens = tokens + [self.tokenizer.eos_token_id]
+        labels = labels + [self.tokenizer.eos_token_id]
+        loss_mask = loss_mask + [0]
 
         assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
         assert len(tokens) == len(labels), f"{len(tokens)}-{len(labels)}"
-        return Sequence(
-            token_ids=tokens,
-            position_ids=pos_ids,
-            labels=labels,
-            loss_mask=loss_mask,
-            num_examples=actual_example_num,
-        )
+        return [tokens, labels]
 
 
     def _postprocess_sequence(self, example, actual_example_num):

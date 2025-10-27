@@ -486,6 +486,7 @@ def run_sft(
             "num_samples_each_epoch": data_args.num_samples_each_epoch,
             "random_shuffle": data_args.random_shuffle,
             "greedy_intokens": data_args.greedy_intokens,
+            "is_pretraining": True if model_args.stage.lower() == "pt" else False,
         }
     )
 
