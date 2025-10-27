@@ -28,25 +28,81 @@ PaddleOCR-VL 是一款为文档解析任务量身打造的、性能顶尖 (SOTA)
 
 ## 2. 环境配置
 
-请参考 [ERNIEKit-安装文档](./erniekit.md#2-installation) 中的安装步骤对训练环境进行配置。
+请确保在 CUDA12 以上的环境下，安装 ERNIE 与相关依赖，为了避免环境问题，我们推荐基于 Paddle 官方镜像构建容器。
+
+### 2.1. 构建容器
+
+镜像中已经包含了飞桨框架，无需额外安装。
+
+```bash
+docker run --gpus all --name erniekit-ft-paddleocr-vl -v $PWD:/paddle --shm-size=128g --network=host -it ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.2.0-gpu-cuda12.6-cudnn9.5 /bin/bash
+```
+
+### 2.2. 安装 ERNIEKit
+
+拉取 ERNIEKit 并安装依赖：
+
+```bash
+git clone https://github.com/PaddlePaddle/ERNIE -b release/v1.4
+cd ERNIE
+python -m pip install -r requirements/gpu/requirements.txt
+python -m pip install -e .
+python -m pip install tensorboard
+pyhton -m pip install opencv-python-headless
+pyhton -m pip install numpy==1.26.4
+```
+
+更多安装方式请参考 [ERNIEKit-安装文档](./erniekit.md#2-installation)。
 
 ## 3. 模型和数据集准备
 
-### 3.1 模型准备
+### 3.1. 模型准备
 
 在 [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) 或者 [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files) 可以下载 PaddleOCR-VL-0.9B 模型。
 
-```
+```bash
 huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/PaddleOCR-VL
 ```
 
-### 3.2 数据集准备
+### 3.2. 数据集准备
 
-请参考 [SFT VL 数据集格式](./datasets.md#sft-vl-dataset) 来构建微调数据集，为了方便起见，我们也提供了一个快速上手的[孟加拉语训练数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)，可用于微调 PaddleOCR-VL-0.9B 对孟加拉语进行识别，使用以下命令下载：
+训练所用的数据集格式，请参考 [ERNIEKit - SFT VL Dataset Format](./datasets.md#sft-vl-dataset) 进行准备。数据样本中必需字段：
+- `text_info`：文本数据列表，其中每个元素包含一个 `text` 和一个 `tag`。
+    - `text`：查询 Query 或回复 Response 的文本内容。
+    - `tag`：掩码标签（`no_mask` 表示包含在训练中，对应 Response；`mask` 表示从训练中排除，对应 Query）。
+- `image_info`：图像数据列表，其中每个元素包含一个 `image_url` 和一个 `matched_text_index`。
+    - `image_url`：用于在线下载图像的 URL，或本地访问图像的路径。
+    - `matched_text_index`：在 `text_info` 中匹配文本的索引。
+        - 默认值：`matched_text_index=0` 表示该图像与第一个文本匹配，并将被置于第一个文本之前。
 
-```
+备注：
+- 每个训练样本均为 JSON 格式，多个样本之间用换行符分隔。
+- 请确保在 `text_info` 中，带 `mask` 标签的项和带 `no_mask` 标签的项交替出现。
+
+为了方便起见，我们也提供了一个快速上手的[孟加拉语训练数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)，可用于微调 PaddleOCR-VL-0.9B 对孟加拉语进行识别，使用以下命令下载：
+
+```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 ```
+
+孟加拉语训练数据示例：
+<p align="center">
+  <img src="./assets/bengali_train_example.png" width="400px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+    ],
+    "text_info": [
+        {"text": "OCR:", "tag": "mask"},
+        {"text": "দডর মথ বধ বকসট একনজর দখই চনত পরল তর অনমন\nঠক পনতই লকয রখছ\nর নচ থকই চচয বলল কশর, “এইই; পযছ! পযছ!'\nওপর", "tag": "no_mask"},
+    ]
+}
+```
+
+表格/公式/图表数据会使用特殊的识别格式，细节请参考[8.1. 表格/公式/图表数据格式](#81-表格公式图表数据格式)
 
 ## 4. 训练配置
 
@@ -70,7 +126,8 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 ## 5. SFT 训练
 
 使用以下命令行即可启动训练：
-```
+
+```bash
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
         model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=./ocr_vl_sft-train_Bengali.jsonl \
@@ -88,12 +145,15 @@ GPU 的数目 `GPU_num` 会影响训练超参数 `learning_rate & packing_size &
 
 可以通过 `tensorboard` 对训练过程可视化，使用以下命令行即可启动（下方命令将端口 port 设置为 `8084`，需要根据实际情况设置可用端口）：
 
-```
-pip install tensorboard
+```bash
 tensorboard --logdir ./PaddleOCR-VL-SFT-Bengali/tensorboard_logs/ --port 8084
 ```
 
-成功启动后该服务后，在浏览器输入 `ip:port` ，则可以看到训练日志（通过 `hostname -i` 命令可以查看机器的 ip 地址）
+成功启动后该服务后，在浏览器输入 `ip:port` ，则可以看到训练日志（通过 `hostname -i` 命令可以查看机器的 ip 地址）。
+
+损失曲线如下：
+
+![SFT-loss](./assets/PaddleOCR-Bengali-SFT-Loss.png)
 
 ## 6. 模型结构说明
 
@@ -113,72 +173,106 @@ tensorboard --logdir ./PaddleOCR-VL-SFT-Bengali/tensorboard_logs/ --port 8084
 
 ## 7. 推理
 
-### 7.1 推理环境配置
+### 7.1. 推理环境配置
 
-安装 PaddleX 用于推理
+安装 PaddleOCR 用于推理
 
-```
-python -m pip install paddlex
+```bash
+python -m pip install -U "paddleocr[doc-parser]"
 python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
 ```
 
-### 7.2 推理模型准备
+### 7.2. 推理模型准备
 
 从 PaddleOCR-VL 中拷贝必要的推理配置文件到 SFT 训练完成后保存的模型目录中
 
-```
+```bash
 cp PaddlePaddle/PaddleOCR-VL/chat-template.jinja PaddleOCR-VL-SFT-Bengali
 cp PaddlePaddle/PaddleOCR-VL/inference.yaml PaddleOCR-VL-SFT-Bengali
 ```
 
-### 7.3 推理数据集准备
+### 7.3. 推理数据集准备
 
 我们提供了[孟加拉语测试数据集](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl)，可用于推理来观察微调效果，使用以下命令下载：
 
-```
+```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
 ```
 
-### 7.4 单样本推理
+### 7.4. 单样本推理
 
-执行以下 python 代码即可加载模型并对单样本推理：
+孟加拉语测试图像：
+<p align="center">
+  <img src="./assets/bengali_test_example.png" width="400px"></a>
+</p>
 
-```python
-from paddlex import create_model
+使用以下命令进行单样本推理：
+```bash
+paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/dataset/bengali_sft/5b/7a/5b7a5c1c-207a-4924-b5f3-82890dc7b94a.png \
+    --vl_rec_model_name "PaddleOCR-VL-0.9B" \
+    --vl_rec_model_dir "./PaddleOCR-VL-SFT-Bengali" \
+    --save_path="./PaddleOCR-VL-SFT-Bengali_response"
 
-model = create_model("PaddleOCR-VL-0.9B", model_dir="PaddleOCR-VL-SFT-Bengali")
-
-# one sample
-sample= {"image": "https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/dataset/bengali_sft/5b/7a/5b7a5c1c-207a-4924-b5f3-82890dc7b94a.png", "query": "OCR:"}
-# GT： নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
-
-res = next(model.predict(sample, max_new_tokens=2048, use_cache=True))
-res.print()
-
+# GT = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 # Excepted Answer = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
-
 ```
 
-### 7.5 数据集推理
+## 8. 注意事项
 
-执行以下 python 代码即可加载模型并对测试数据集推理：
+### 8.1. 表格/公式/图表数据格式
 
-```python
-import json
-import jsonlines
-from paddlex import create_model
+特别地，表格/公式/图表数据使用特殊的识别格式：
 
-model = create_model("PaddleOCR-VL-0.9B", model_dir="PaddleOCR-VL-SFT-Bengali")
+表格数据：OTSL 格式
 
-with open("./ocr_vl_sft-test_Bengali.jsonl", 'r') as f:
-    sample_list = [json.loads(line) for line in f]
+<p align="center">
+  <img src="./assets/table_example.png" width="400px"></a>
+</p>
 
-for sample in sample_list:
-    sample['image'] = sample['image_info'][0]['image_url']
-    sample['query'] = "OCR:"
-    res = next(model.predict(sample, max_new_tokens=2048, use_cache=True))
-    sample['response'] = res['result']
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Table Recognition:", "tag": "mask"},
+        {"text": "<fcel>分组<fcel>频数<fcel>频率<nl><fcel>[41,51)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl><fcel>[51,61)<fcel>1<fcel>\\( \\frac{1}{30} \\)<nl><fcel>[61,71)<fcel>4<fcel>\\( \\frac{4}{30} \\)<nl><fcel>[71,81)<fcel>6<fcel>\\( \\frac{6}{30} \\)<nl><fcel>[81,91)<fcel>10<fcel>\\( \\frac{10}{30} \\)<nl><fcel>[91,101)<fcel>5<fcel>\\( \\frac{5}{30} \\)<nl><fcel>[101,111)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl>", "tag": "no_mask"},
+    ]
+}
+```
 
-with jsonlines.open("ocr_vl_sft-test_Bengali_response.jsonl", mode='w') as writer:
-    writer.write_all(sample_list)
+公式数据: Latex格式
+
+<p align="center">
+  <img src="./assets/formula_example.jpg" width="200px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Formula Recognition:", "tag": "mask"},
+        {"text": "\\[t_{n}\\in[0,\\infty]\\]", "tag": "no_mask"},
+    ]
+}
+```
+
+图表数据：Markdown格式
+
+<p align="center">
+  <img src="./assets/chart_example.png" width="400px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/chart_example.png"},
+    ],
+    "text_info": [
+        {"text": "Chart Recognition:", "tag": "mask"},
+        {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
+    ]
+}
 ```
