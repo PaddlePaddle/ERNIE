@@ -179,13 +179,14 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
             )
             return_list[-1].append(padded_nbatch_pack_offset)
 
-        # if model_args.use_attn_mask_start_row_indices:
-        #     return_list[-1].append(
-        #         gen_attn_mask_start_row_indices(original_token_ids, max_seq_len)
-        #     )
-        # else:
-        #     return_list[-1].append(gen_self_attn_mask(original_token_ids, max_seq_len))
-        # return_list[-1].append(None)
+        if not model_args.stage.lower() == "pt":
+            if model_args.use_attn_mask_start_row_indices:
+                return_list[-1].append(
+                    gen_attn_mask_start_row_indices(original_token_ids, max_seq_len)
+                )
+            else:
+                return_list[-1].append(gen_self_attn_mask(original_token_ids, max_seq_len))
+            return_list[-1].append(None)
 
     return_list = [np.concatenate(tensor_list) for tensor_list in zip(*return_list)]
     input_dict = dict(zip(input_keys, return_list))
@@ -516,6 +517,7 @@ class SequenceDataset(IterableDataset):
             current_length = 0
             all_tokenized_tokens = []
             all_tokenized_labels = []
+            all_loss_mask = []
             for example in examples_all[::-1]:
                 actual_example_num = 1
                 [tokens, labels] = self._postprocess_pretraining_sequence(example, actual_example_num)
