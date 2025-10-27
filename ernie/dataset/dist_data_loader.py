@@ -170,6 +170,7 @@ class MMDataloader(paddle.io.DataLoader):
         return_list=True,
         batch_sampler=None,
         batch_size=1,
+        packing_size=-1,
         shuffle=False,
         drop_last=False,
         collate_fn=None,
@@ -181,6 +182,7 @@ class MMDataloader(paddle.io.DataLoader):
         worker_init_fn=None,
         persistent_workers=False,
         multimodal_multiround_ratio=0.3,
+        need_slice=True,
         packing=False,
     ):
 
@@ -197,28 +199,29 @@ class MMDataloader(paddle.io.DataLoader):
 
         self._collate_fn = collate_fn
         self._dataloader = paddle.io.DataLoader(
-            dataset,
-            feed_list,
-            places,
-            return_list,
-            batch_sampler,
-            1,
-            shuffle,
-            drop_last,
-            lambda x: x,  # collate_fn,
-            num_workers,
-            use_buffer_reader,
-            prefetch_factor,
-            use_shared_memory,
-            timeout,
-            worker_init_fn,
-            persistent_workers,
+            dataset=dataset,
+            feed_list=feed_list,
+            places=places,
+            return_list=return_list,
+            batch_sampler=batch_sampler,
+            batch_size=1,
+            shuffle=shuffle,
+            drop_last=drop_last,
+            collate_fn=(lambda x: x),  # collate_fn,
+            num_workers=num_workers,
+            use_buffer_reader=use_buffer_reader,
+            prefetch_factor=prefetch_factor,
+            use_shared_memory=use_shared_memory,
+            timeout=timeout,
+            worker_init_fn=worker_init_fn,
+            persistent_workers=persistent_workers,
         )
         self._lens_rcd = defaultdict(int)
         self._lens_images = defaultdict(int)
         self._sample_buffer = defaultdict(lambda: defaultdict(list))
         self._batch_buffer = defaultdict(list)
         self.batch_size = batch_size
+        self.packing_size = packing_size
         self.tokenizer = tokenizer
         self.eos_token = self.tokenizer.special_tokens_map.get("eos_token", "</s>")
         self.cls_token = self.tokenizer.special_tokens_map.get("cls_token", "<mask:0>")
@@ -239,6 +242,7 @@ class MMDataloader(paddle.io.DataLoader):
         self.rng = random.Random(2048)
         self.multimodal_multiround_ratio = multimodal_multiround_ratio
         self.need_multiround = self.rng.random() < self.multimodal_multiround_ratio
+        self.need_slice = need_slice
         self.packing = packing
 
     def __len__(self):
@@ -279,16 +283,22 @@ class MMDataloader(paddle.io.DataLoader):
         # Helper function to slice arrays
         def slice_array(arr, remove_first, area, index):
             this_arr = arr[area[index][0] : area[index][1]]
+            if not self.need_slice:
+                return this_arr
             if remove_first and index == 0:
                 return this_arr
             if not remove_first and index == len(area) - 1:
                 return this_arr
             return this_arr[1:] if remove_first else this_arr[:-1]
 
-        cur_input_ids = np.concatenate(buffer["input_ids"])[:-1]
-        cur_labels = np.concatenate(buffer["labels"])[1:]
-        buffer["input_ids"][-1] = buffer["input_ids"][-1][:-1]
-        buffer["position_ids"][-1] = buffer["position_ids"][-1][:-1]
+        if self.need_slice:
+            cur_input_ids = np.concatenate(buffer["input_ids"])[:-1]
+            cur_labels = np.concatenate(buffer["labels"])[1:]
+            buffer["input_ids"][-1] = buffer["input_ids"][-1][:-1]
+            buffer["position_ids"][-1] = buffer["position_ids"][-1][:-1]
+        else:
+            cur_input_ids = np.concatenate(buffer["input_ids"])
+            cur_labels = np.concatenate(buffer["labels"])
 
         # Apply the slicing consistently
         if len(buffer["input_ids"]) > 1:
@@ -334,9 +344,7 @@ class MMDataloader(paddle.io.DataLoader):
             cur_token_type_ids = np.concatenate(buffer["token_type_ids"])
             cur_image_type_ids = np.array(buffer["image_type_ids"])
             cur_grid_thw = np.concatenate(buffer["grid_thw"], axis=0)
-            cur_position_ids = np.array(
-                merge_rope_3d_position(buffer["position_ids"])[:-1]
-            )
+            cur_position_ids = np.concatenate(buffer["position_ids"], axis=0)
 
         return {
             "input_ids_batch": input_ids_batch,
@@ -391,6 +399,9 @@ class MMDataloader(paddle.io.DataLoader):
                     need_to_yield_sample = (
                         self._lens_rcd[src_id] + input_ids.shape[0]
                         > self.tokenizer.model_max_length
+                    ) or (
+                        len(self._sample_buffer[src_id]["input_ids"])
+                        == self.packing_size
                     )
                     if need_to_yield_sample:
                         slice_result = self.sync_array_slices(

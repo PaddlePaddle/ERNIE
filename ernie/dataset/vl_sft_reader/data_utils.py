@@ -129,7 +129,7 @@ def fancy_print(data, tokenizer, im_prefix_length):
         if j == 1:
             ids2 += tokenizer.encode(
                 marker2, add_special_tokens=False, return_attention_mask=False
-            )
+            )["input_ids"]
         ret = (
             tokenizer.decode(ids2)
             .replace("[unused99]", Bcolors.FAIL)
@@ -210,6 +210,10 @@ def merge_fn_group_batch(
     if "need_multiround" in batch[0]:
         del batch[0]["need_multiround"]
 
+    if not pad_to_max_seqlen:
+        pad_to_max_seqlen = batch[0]["input_ids"].shape[0]
+
+    global DEBUG_PRINT_CNT
     if pad_to_max_seqlen and shift_label:
         pad_to_max_seqlen += 1
 
@@ -246,13 +250,7 @@ def merge_fn_group_batch(
         elif k == "grid_thw":
             to_concat = [b[k] for b in batch if b[k] is not None]
             ret[k] = np.concatenate(to_concat, axis=0)
-            if pad_to_max_seqlen:
-                tmp = max(0, pad_to_max_seqlen * len(batch) - ret[k].shape[0])
-                if tmp > 0:
-                    ret[k] = np.concatenate(
-                        [ret[k], np.zeros([tmp, 3])], axis=0
-                    ).astype("int64")
-        elif k in ["data_id", "part_id", "src_id"]:
+        elif k in ["data_id", "part_id", "src_id", "example_id"]:
             ret[k] = np.concatenate([b[k] for b in batch])
         elif k == "data_type":
             ret[k] = np.array(batch[0][k])
@@ -316,6 +314,10 @@ def merge_fn_group_batch(
                 if k == "image_position_ids":
                     ret["image_attention_mask"] = ret[k] != pad_value
                     ret[k][ret[k] == pad_value] = 0
+
+    assert (
+        pad_to_max_seqlen == ret["input_ids"].shape[1]
+    ), f"pad_to_max_seqlen {pad_to_max_seqlen} != input_ids shape {ret['input_ids'].shape}"
 
     inbatch_pack_offset = [0]
     if not need_multiround:
