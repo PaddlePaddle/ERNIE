@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Training Ernie VL Model. """
+""" Training Ernie OCR Model. """
 
 import os
 import random
@@ -24,7 +24,6 @@ from paddle.distributed import fleet
 from paddleformers.datasets import IterDataset
 from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.log import logger
-from paddleformers import __version__ as paddleformers_version
 from paddleformers.utils.tools import get_env_device
 from .trainer import SFTTrainer
 
@@ -36,7 +35,7 @@ from ernie.callbacks import (
     PPNeedDataCallback,
     VitTrainableCallback,
 )
-from ernie.configuration import Ernie4_5_VLMoeConfig
+from ernie.configuration_paddleocr_vl import PaddleOCRVLConfig
 from ernie.dataset.text_sft_reader.sft_task import KnoverDataset, create_pyreader
 from ernie.dataset.vl_sft_reader import (
     MixExampleSetJson,
@@ -44,10 +43,9 @@ from ernie.dataset.vl_sft_reader import (
 )
 from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
-from ernie.modeling_moe_vl import Ernie4_5_VLMoeForConditionalGeneration
-from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
+from ernie.modeling_paddleocr_vl import PaddleOCRVLForConditionalGeneration
+from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import check_refined_recompute
-from ernie.modeling_moe_vl_pp import Ernie4_5_VLMoeForConditionalGenerationPipe
 from ernie.utils.misc import global_training_logs
 from ernie.utils.mm_data_utils import MMSpecialTokensConfig
 from ernie.utils.seed_utils import set_seed
@@ -55,8 +53,8 @@ from ernie.utils.seed_utils import set_seed
 from data_processor.steps.end2end_processing import (
     End2EndProcessor,
 )
-from data_processor.image_preprocessor.image_preprocessor_adaptive import (
-    AdaptiveImageProcessor,
+from data_processor.image_preprocessor.image_preprocessor_siglip import (
+    SiglipImageProcessor,
 )
 
 
@@ -104,7 +102,7 @@ def get_resume_checkpoint_path(config):
         return user_defined_resume_from_checkpoint
 
 
-def run_vl_sft(
+def run_ocr_vl_sft(
     model_args,
     data_args,
     preprocess_args,
@@ -118,12 +116,6 @@ def run_vl_sft(
     preprocess_args.batch_size = finetuning_args.batch_size
     finetuning_args.max_seq_len = data_args.max_seq_len
     finetuning_args.max_seq_length = data_args.max_seq_len
-    if data_args.max_seq_len < 32768:
-        model_args.use_sparse_head_and_loss_fn = False
-        model_args.use_recompute_loss_fn = False
-    else:
-        model_args.use_sparse_head_and_loss_fn = True
-        model_args.use_recompute_loss_fn = True
 
     # create output dir
     os.makedirs(finetuning_args.output_dir, exist_ok=True)
@@ -184,6 +176,7 @@ def run_vl_sft(
 
     # hacking data processor
     preprocess_args.max_seq_length = data_args.max_seq_len
+    preprocess_args.data_filelist = None
     preprocess_args.serialize_output = False
     logger.info(preprocess_args)
 
@@ -219,12 +212,12 @@ def run_vl_sft(
         finetuning_args.same_data = True
     logger.info(f"setting same_data: {finetuning_args.same_data}")
 
-    image_preprocess_save = AdaptiveImageProcessor.from_pretrained(
+    image_preprocess_save = SiglipImageProcessor.from_pretrained(
         model_args.model_name_or_path
     )
     print("data_processor_args:\n", preprocess_args)
 
-    tokenizer = Ernie4_5_VLTokenizer.from_pretrained(
+    tokenizer = Ernie4_5_Tokenizer.from_pretrained(
         model_args.model_name_or_path,
         padding_side="right",
         model_max_length=data_args.max_seq_len,
@@ -353,6 +346,7 @@ def run_vl_sft(
             "num_token": labels.item(),
         }
 
+    model = None
     # model
     dtype = "float32"
     if finetuning_args.fp16 and finetuning_args.fp16_opt_level == "O2":
@@ -371,9 +365,7 @@ def run_vl_sft(
         logger.info(f"disable moe flag when using moe-group={model_args.moe_group}")
         finetuning_args.use_moe = False
 
-    if paddleformers_version >= "0.3":
-        finetuning_args.save_to_hf = False
-    cfg = Ernie4_5_VLMoeConfig.from_pretrained(
+    cfg = PaddleOCRVLConfig.from_pretrained(
         os.path.join(model_args.model_name_or_path),
         quantization_config=quantization_config,
     )
@@ -383,7 +375,6 @@ def run_vl_sft(
     cfg.token_balance_seqlen = (
         data_args.max_seq_len * finetuning_args.per_device_train_batch_size
     )
-    cfg.per_device_train_batch_size = finetuning_args.per_device_train_batch_size
     cfg.fp16_opt_level = finetuning_args.fp16_opt_level
     cfg.moe_group = model_args.moe_group  # pp mp use sharding group as moe group
     cfg.dtype = dtype
@@ -411,7 +402,7 @@ def run_vl_sft(
     ]
     cfg.max_text_id = cfg.im_patch_id
 
-    image_preprocess = AdaptiveImageProcessor.from_pretrained(
+    image_preprocess = SiglipImageProcessor.from_pretrained(
         model_args.model_name_or_path
     )
     image_preprocess.image_mean_tensor = paddle.to_tensor(
@@ -423,23 +414,15 @@ def run_vl_sft(
     image_preprocess.rescale_factor = paddle.to_tensor(
         image_preprocess.rescale_factor, dtype="float32"
     )
-    image_preprocess.image_mean_tensor = image_preprocess.image_mean_tensor.squeeze(
-        [-2, -1]
-    ).repeat_interleave(cfg.vision_config.patch_size**2 * 1, -1)
-    image_preprocess.image_std_tensor = image_preprocess.image_std_tensor.squeeze(
-        [-2, -1]
-    ).repeat_interleave(cfg.vision_config.patch_size**2 * 1, -1)
-
     cfg.use_flash_attention = model_args.use_flash_attention
-    cfg.use_sparse_flash_attn = model_args.use_sparse_flash_attn
-    cfg.use_attn_mask_start_row_indices = model_args.use_attn_mask_start_row_indices
-    cfg.use_recompute_moe = model_args.use_recompute_moe
+    cfg.vision_config.use_flash_attention = model_args.use_flash_attention
     cfg.recompute = finetuning_args.recompute
+    cfg.vision_config.recompute = finetuning_args.recompute
     cfg.recompute_granularity = model_args.recompute_granularity
+    cfg.vision_config.recompute_granularity = model_args.recompute_granularity
+    cfg.use_recompute_moe = model_args.use_recompute_moe
     cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
     cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
-    cfg.loss_subbatch_seqlen = model_args.loss_subbatch_seqlen
-    cfg.pp_seg_method = model_args.pp_seg_method
     cfg.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
     cfg.moe_multimodal_dispatch_use_allgather = (
         model_args.moe_multimodal_dispatch_use_allgather
@@ -454,54 +437,23 @@ def run_vl_sft(
     )
 
     if finetuning_args.pipeline_parallel_degree > 1:  # pp
-        print(f"[sft-debug]: virtual_pp_degree={model_args.virtual_pp_degree}")
-        cfg.virtual_pp_degree = model_args.virtual_pp_degree
-        cfg.num_acc_steps = finetuning_args.gradient_accumulation_steps
-        cfg.moe_with_send_router_loss = model_args.moe_with_send_router_loss
-        cfg.enable_delay_scale_loss = finetuning_args.enable_delay_scale_loss
-        cfg.balanced_image_preprocess = finetuning_args.balanced_image_preprocess
-
-        if finetuning_args.pp_need_data and not finetuning_args.pp_need_data_degree:
-            finetuning_args.pp_need_data_degree = (
-                finetuning_args.pipeline_parallel_degree
-            )
-
-        if cfg.balanced_image_preprocess:
-            assert (
-                finetuning_args.pp_need_data
-            ), "balanced image preprocess must use with pp_need_data"
-
-        if (
-            finetuning_args.from_scratch
-            and finetuning_args.weight_quantize_algo is None
-        ):
-            model = Ernie4_5_VLMoeForConditionalGenerationPipe(cfg)
-
-        else:
-            model = Ernie4_5_VLMoeForConditionalGenerationPipe.from_pretrained(
-                model_args.model_name_or_path,
-                config=cfg,
-            )
-        if finetuning_args.pp_need_data_degree:
-            model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
+        raise NotImplementedError("PaddleOCR-VL Not Support Pipeline Parallel")
     else:
         if (
             finetuning_args.from_scratch
             and finetuning_args.weight_quantize_algo is None
         ):
-            model = Ernie4_5_VLMoeForConditionalGeneration(cfg)
+            model = PaddleOCRVLForConditionalGeneration(cfg)
         else:
-            model = Ernie4_5_VLMoeForConditionalGeneration.from_pretrained(
+            model = PaddleOCRVLForConditionalGeneration.from_pretrained(
                 model_args.model_name_or_path,
                 config=cfg,
+                convert_from_hf=finetuning_args.convert_from_hf,
             )
-    logger.info(f"vision_model: {model.vision_model}")
+    logger.info(f"vision_model: {model.visual.vision_model}")
 
     if model.config.head_dim is None:
         del model.config.head_dim
-
-    if image_preprocess is not None and hasattr(model, "add_image_preprocess"):
-        model.add_image_preprocess(image_preprocess)
 
     cfg = model.config
     logger.info(f"using model type:{type(model)}")
@@ -521,17 +473,31 @@ def run_vl_sft(
     if "freeze_vision" in freeze_config and hasattr(model, "freeze_vision"):
         logger.info("Freeze model vision module")
         model.freeze_vision()
+    # Stop gradient for parameters which not be updated in training.
+    for p in model.visual.vision_model.head.parameters():
+        p.stop_gradient = True
+    model.visual.vision_model.embeddings.packing_position_embedding.weight.stop_gradient = (
+        True
+    )
 
     # data
     logger.info("loading data...")
     logger.info(f"args.need_data: {finetuning_args.need_data}")
 
     if finetuning_args.do_train:
-        hcg = fleet.get_hybrid_communicate_group()
-        dp_rank = hcg.get_data_parallel_rank()
-        dp_size = hcg.get_data_parallel_world_size()
-        sharding_rank = hcg.get_sharding_parallel_rank()
-        sharding_size = hcg.get_sharding_parallel_world_size()
+
+        if paddle.distributed.get_world_size() > 1:
+            hcg = fleet.get_hybrid_communicate_group()
+            dp_rank = hcg.get_data_parallel_rank()
+            dp_size = hcg.get_data_parallel_world_size()
+            sharding_rank = hcg.get_sharding_parallel_rank()
+            sharding_size = hcg.get_sharding_parallel_world_size()
+        else:
+            dp_rank = 0
+            dp_size = 1
+            sharding_rank = 0
+            sharding_size = 1
+
         logger.info(
             f"""[main] hcg: dp_rank: {dp_rank},
             dp_size: {dp_size},
@@ -588,6 +554,7 @@ def run_vl_sft(
                     dp_rank=finetuning_args.reeao_dataset_rank,
                     dp_size=finetuning_args.reeao_dataset_world_size,
                     data_processor=data_processor,
+                    need_prefix=False,
                 )
                 train_dataset._load(shuffle_json=True)
                 train_dataset = IterDataset(
@@ -641,10 +608,10 @@ def run_vl_sft(
                 "worker_index": paddle.distributed.get_rank(),
                 "prefetch_factor": finetuning_args.prefetch_factor,
                 "task_group": train_task_group_text,
-                "in_tokens": finetuning_args.packing,  # Text SFT packing option
-                "batch_size": finetuning_args.per_device_train_batch_size,
+                "in_tokens": True,  # True for Text SFT
                 "tokenizer": tokenizer,
                 "number_of_samples_each_epoch": data_args.num_samples_each_epoch,
+                "pseudo_strategy": finetuning_args.pseudo_strategy,
                 "example_from_same_task_prob": finetuning_args.example_from_same_task_prob,
                 "pseudo_sampling_prob": finetuning_args.pseudo_sampling_prob,
                 "trigger_data_prob": finetuning_args.trigger_data_prob,
@@ -689,11 +656,11 @@ def run_vl_sft(
     data_collator = partial(
         merge_fn_group_batch,
         tokenizer=tokenizer,
-        pad_to_max_seqlen=data_args.max_seq_len,
+        pad_to_max_seqlen=(data_args.max_seq_len if finetuning_args.padding else None),
         im_prefix_length=256,
         rng=random.Random(2024),
         combine_batch=1,
-        packing=finetuning_args.packing,
+        image_dtype="float32",
     )
 
     if model_args.lora:
@@ -758,8 +725,6 @@ def run_vl_sft(
         callbacks=callbacks,
         modality_ratio=modality_ratio,
         processing_class=image_preprocess_save,
-        batch_size=finetuning_args.per_device_train_batch_size,
-        packing=finetuning_args.packing,
     )
     if vit_trainable_callback is not None:
         vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager

@@ -378,8 +378,6 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         model = model_class.from_config(
             model_config,
             dtype=dtype,
-            **convert_from_kwargs,
-            **download_source_kwargs,
         )
 
     if model.config.head_dim is None:

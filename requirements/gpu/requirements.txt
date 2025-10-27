@@ -11,3 +11,4 @@ triton==3.3
 use-triton-in-paddle
 tensorboardX
 ujson
+einops

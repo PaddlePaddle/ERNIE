@@ -90,6 +90,7 @@ from ernie.callbacks.moe_logging_callback import MoeLoggingCallback
 from ernie.lr_schedulers import (
     get_cosine_schedule_with_warmup,
     get_wsd_schedule_with_warmup,
+    get_constant_schedule_with_warmup,
 )
 from ernie.utils.misc import global_training_logs
 
@@ -1274,8 +1275,11 @@ class PretrainingTrainer(Trainer):
         if self.control.should_log:
             logs = {}
             tr_loss_single_dp_scalar = tr_loss.item()
-            dist.all_reduce(tr_loss, dist.ReduceOp.SUM)
-            tr_loss_scalar = tr_loss.item() / dist.get_world_size()
+            if dist.get_world_size() > 1:
+                dist.all_reduce(tr_loss, dist.ReduceOp.SUM)
+                tr_loss_scalar = tr_loss.item() / dist.get_world_size()
+            else:
+                tr_loss_scalar = tr_loss_single_dp_scalar
             tr_loss.zero_()
 
             # reset tr_loss to zero
@@ -1309,7 +1313,7 @@ class PretrainingTrainer(Trainer):
             logs["mem_reserved_gb"] = current_memory_reserved / divisor
             logs["max_mem_reserved_gb"] = max_memory_reserved / divisor
 
-            if get_env_device() in ["gpu", "iluvatar_gpu"]:
+            if get_env_device() == "gpu":
                 info_callback = global_training_logs.dict(use_async=True)
 
             if hasattr(self, "scaler"):
@@ -1338,7 +1342,8 @@ class PretrainingTrainer(Trainer):
                     and "embed_tokens" not in n
                 )
                 numel_tensor = paddle.to_tensor(model_numel)
-                dist.all_reduce(numel_tensor)
+                if dist.get_world_size() > 1:
+                    dist.all_reduce(numel_tensor)
                 self.model_numel = numel_tensor.item() // self.args.dataset_world_size
 
             tokens_per_steps = self.args.max_seq_len * total_train_batch_size
@@ -1400,7 +1405,9 @@ class PretrainingTrainer(Trainer):
             else:
                 zcc_start_save_time = time.time()
             self._save_checkpoint(model, metrics=metrics)
-            paddle.distributed.barrier()
+
+            if dist.get_world_size() > 1:
+                paddle.distributed.barrier()
             self.control = self.callback_handler.on_save(
                 self.args, self.state, self.control
             )
@@ -1517,12 +1524,18 @@ class PretrainingTrainer(Trainer):
                 min_lr=self.args.min_lr if self.args.min_lr else 0.0,
                 num_steady_steps=num_steady_steps,
             )
-        else:
+        elif self.args.lr_scheduler == "cosine":
             self.lr_scheduler = get_cosine_schedule_with_warmup(
                 self.args.learning_rate,
                 warmup,
                 self.args.max_steps,
                 min_lr=self.args.min_lr if self.args.min_lr else 0.0,
+            )
+        elif self.args.lr_scheduler == "constant":
+            self.lr_scheduler = get_constant_schedule_with_warmup(
+                self.args.learning_rate,
+                warmup,
+                self.args.max_steps,
             )
         return self.lr_scheduler
 
@@ -1541,6 +1554,11 @@ class PretrainingTrainer(Trainer):
                 p for n, p in self.model.named_parameters() if p.stop_gradient is False
             ]
         )
+        with open("output.txt", "w") as f:
+            for n, p in self.model.named_parameters():
+                if p.stop_gradient is False:
+                    f.write(f"{n}\n")
+
         if self.args.train_emb_only:
             logger.info(
                 f"using `train-emb-only`, #embedding params={len(optimizer_params)}"

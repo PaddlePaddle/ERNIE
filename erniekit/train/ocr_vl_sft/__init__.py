@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Learning rate scheduler related classes"""
-from .cosine_lr import get_cosine_schedule_with_warmup
-from .wsd_lr import get_wsd_schedule_with_warmup
-from .constant_lr import get_constant_schedule_with_warmup
+from .workflow import run_ocr_vl_sft
 
-__all__ = [
-    "get_cosine_schedule_with_warmup",
-    "get_wsd_schedule_with_warmup",
-    "get_constant_schedule_with_warmup",
-]
+__all__ = ["run_ocr_vl_sft"]

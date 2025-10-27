@@ -52,6 +52,7 @@ from .sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
+from erniekit.utils.process import detect_device
 
 try:
     from ernie.utils.misc import global_training_logs
@@ -308,9 +309,11 @@ class VariableResolutionResamplerModel(nn.Layer):
             * self.spatial_conv_size
             * self.temporal_conv_size
         )
+        self.device = detect_device()
 
         with paddle.utils.unique_name.guard("mm_resampler_"):
 
+            fuse_matmul_bias = False if self.device == "iluvatar_gpu" else True
             self.spatial_linear = nn.Sequential(
                 (
                     RowSequenceParallelLinear(
@@ -318,7 +321,7 @@ class VariableResolutionResamplerModel(nn.Layer):
                         self.spatial_dim,
                         input_is_parallel=True,
                         has_bias=True,
-                        fuse_matmul_bias=True,
+                        fuse_matmul_bias=fuse_matmul_bias,
                     )
                     if config.tensor_parallel_degree > 1
                     else nn.Linear(self.spatial_dim, self.spatial_dim)
@@ -711,7 +714,7 @@ def calc_multimodal_logits(
         if config.sequence_parallel:
             last_hidden_state = GatherOp.apply(last_hidden_state)
             last_hidden_state = last_hidden_state.reshape(
-                [-1, config.max_sequence_length, last_hidden_state.shape[-1]]
+                [1, -1, last_hidden_state.shape[-1]]
             )
 
         assert last_hidden_state.shape[:2] == token_type_ids_shifted.shape, (
@@ -874,6 +877,8 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
             config=config.vision_config
         )
         self.add_vision_model(vision_model)
+
+        self.tie_weights()  # maybe weight share
 
     def add_vision_model(
         self,
@@ -1254,7 +1259,9 @@ class Ernie4_5_VLMoeForConditionalGeneration(Ernie4_5_MoeForCausalLM):
             ):
                 nonlocal input_ids, token_type_ids_labels, mm_input_ids, image_type_ids
                 """During the backward of this function, the stop_graident attribute of param is reset"""
-                inputs_embeds = self.ernie.embed_tokens(lm_input_ids)
+                inputs_embeds = self.ernie.embed_tokens(lm_input_ids).astype(
+                    self.embed_tokens.weight.dtype
+                )
                 token_type_ids_w_video = token_type_ids[..., :-1].clone()
                 token_type_ids[token_type_ids == TokenType.video] = TokenType.image
                 if images is not None:

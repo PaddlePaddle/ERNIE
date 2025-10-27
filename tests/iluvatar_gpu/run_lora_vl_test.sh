@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,13 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Learning rate scheduler related classes"""
-from .cosine_lr import get_cosine_schedule_with_warmup
-from .wsd_lr import get_wsd_schedule_with_warmup
-from .constant_lr import get_constant_schedule_with_warmup
+export PATH=/usr/local/corex/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/corex/lib64:$LD_LIBRARY_PATH
+export LD_PRELOAD=/usr/local/corex/lib64/libcuda.so.1
+export FD_SAMPLING_CLASS=rejection
+export PADDLE_XCCL_BACKEND=iluvatar_gpu
 
-__all__ = [
-    "get_cosine_schedule_with_warmup",
-    "get_wsd_schedule_with_warmup",
-    "get_constant_schedule_with_warmup",
-]
+rm -rf ./output ./erniekit_dist_log ./log
+
+echo "==============================="
+echo " LoRA VL E2E Test Runner Starting "
+echo "==============================="
+
+python3 ./tests/iluvatar_gpu/test_iluvatar_gpu_vl_model.py
+
+echo "==============================="
+echo " LoRA VL E2E Test Runner Finished "
+echo "==============================="

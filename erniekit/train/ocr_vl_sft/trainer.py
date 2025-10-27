@@ -22,7 +22,6 @@ import shutil
 import sys
 import time
 from paddle.io import Dataset
-from functools import partial
 from typing import List, Optional, Union
 
 import numpy as np
@@ -36,7 +35,6 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from paddle.io import DataLoader
 
 
 from distutils.util import strtobool
@@ -71,7 +69,7 @@ from paddleformers.utils.batch_sampler import DistributedBatchSampler
 from paddleformers.utils.batch_sampler import (
     DistributedBatchSampler as NlpDistributedBatchSampler,
 )
-from ernie.dataset.dist_data_loader import DistDataLoader
+from ernie.dataset.dist_data_loader import DistDataLoader, MMDataloader
 
 from .pretraining_trainer import PretrainingTrainer
 
@@ -110,8 +108,6 @@ class SFTTrainer(PretrainingTrainer):
         is_train_mm=True,
         text_sft_dataset=None,
         modality_ratio=[1, 1],
-        batch_size=1,
-        packing=True,
         **kwargs,
     ):
         super().__init__(
@@ -121,45 +117,46 @@ class SFTTrainer(PretrainingTrainer):
         self.text_sft_dataset = text_sft_dataset
         self.modality_ratio = modality_ratio
         self.is_train_mm = is_train_mm
-        self.batch_size = batch_size
-        self.packing = packing
 
     def get_train_dataloader(self):
         """get train data loader"""
         if self.args.need_data and self.train_dataset is None:
             self.train_dataset = EmptyDataset()
         # `pp_need_data`，data bradcast in model
-        _DataLoader = (
-            partial(
-                DistDataLoader,
+        train_sampler = None
+
+        if (
+            self.args.tensor_parallel_degree > 1
+            or self.args.pipeline_parallel_degree > 1
+        ):
+            return DistDataLoader(
+                self.train_dataset,
+                tokenizer=self.tokenizer,
+                batch_sampler=train_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+                prefetch_factor=self.args.prefetch_factor,
+                is_train_text=self.is_train_text,
+                text_sft_dataset=self.text_sft_dataset,
                 need_data=self.args.need_data,
                 pp_broadcast=not self.args.pp_need_data_degree,
+                gradient_accumulation_steps=self.args.gradient_accumulation_steps,
+                modality_ratio=self.modality_ratio,
+                is_train_mm=self.is_train_mm,
             )
-            if (
-                self.args.tensor_parallel_degree > 1
-                or self.args.pipeline_parallel_degree > 1
+        else:
+            return MMDataloader(
+                self.train_dataset,
+                tokenizer=self.tokenizer,
+                batch_sampler=train_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+                prefetch_factor=self.args.prefetch_factor,
+                multimodal_multiround_ratio=0.0,
+                packing=self.args.packing,
+                packing_size=self.args.packing_size,
+                need_slice=False,
             )
-            else DataLoader
-        )  # use `DistDataLoader` before init fleet
-        train_dataset = self.train_dataset
-
-        train_sampler = None
-        return _DataLoader(
-            train_dataset,
-            tokenizer=self.tokenizer,
-            batch_sampler=train_sampler,
-            collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers,
-            prefetch_factor=self.args.prefetch_factor,
-            batch_size=self.batch_size,
-            is_train_text=self.is_train_text,
-            text_sft_dataset=self.text_sft_dataset,
-            need_data=self.args.need_data,
-            gradient_accumulation_steps=self.args.gradient_accumulation_steps,
-            modality_ratio=self.modality_ratio,
-            is_train_mm=self.is_train_mm,
-            packing=self.packing,
-        )
 
     def train(
         self,
@@ -518,6 +515,13 @@ class SFTTrainer(PretrainingTrainer):
             )
 
             for step, inputs in enumerate(epoch_iterator):
+
+                inputs["pixel_values"] = inputs["images"]
+                inputs["image_grid_thw"] = inputs["grid_thw"]
+                position_ids = inputs["position_ids"]
+                position_ids = position_ids.squeeze(0).transpose([1, 0]).unsqueeze(1)
+                inputs["position_ids"] = position_ids
+
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 if (
