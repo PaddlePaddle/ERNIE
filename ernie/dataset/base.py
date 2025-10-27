@@ -165,6 +165,7 @@ class MultiSourceDataset(IterableDataset):
         sub_dataset_type=["erniekit"],
         random_seed=11,
         process_fn=None,
+        process_fn_pt=None,
         process_fn_fc=None,
         shuffle_file=False,
         shuffle_files=False,
@@ -177,6 +178,8 @@ class MultiSourceDataset(IterableDataset):
             sub_dataset_type (list): List of type of sub-dataset ('erniekit', 'filelist', 'glob', or 'alpaca').
             random_seed (int): Seed for reproducible sampling.
             process_fn (callable, optional): Function to preprocess each example.
+            process_fn_pt (callable, optional): Function to preprocess each pretraining example.
+            process_fn_fc (callable, optional): Function to preprocess each example for function call.
             shuffle_file (bool): Shuffle lines within each file.
             shuffle_files (bool): Shuffle order of files during iteration.
         """
@@ -247,7 +250,15 @@ class MultiSourceDataset(IterableDataset):
                     ),
                     shuffle_file=shuffle_file,
                 )
-
+            elif each_sub_dataset_type == "pt":
+                task["dataset"] = FileDataset(
+                    task["filepath"],
+                    process_fn=(
+                        partial(process_fn_pt, task_name=task["task_name"])
+                        if "task_name" in task
+                        else process_fn_pt
+                    )
+                )
             else:
                 raise NotImplementedError(
                     f"Cannot support {each_sub_dataset_type} now."
