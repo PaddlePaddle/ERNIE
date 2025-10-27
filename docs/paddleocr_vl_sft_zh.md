@@ -40,10 +40,10 @@ docker run --gpus all --name erniekit-ft-paddleocr-vl -v $PWD:/paddle --shm-size
 
 ### 2.2. 安装 ERNIEKit
 
-拉取 ERNIEKit v1.4 并安装依赖：
+拉取 ERNIEKit 并安装依赖：
 
 ```bash
-git clone https://github.com/PaddlePaddle/ERNIE -b release/v1.4
+git clone https://github.com/PaddlePaddle/ERNIE
 cd ERNIE
 python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e .
@@ -66,7 +66,7 @@ huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/Padd
 
 ### 3.2. 数据集准备
 
-请参考 [ERNIEKit - SFT VL Dataset Format](./datasets.md#sft-vl-dataset) 来构建微调数据集。数据样本中必需字段：
+训练所用的数据集格式，请参考 [ERNIEKit - SFT VL Dataset Format](./datasets.md#sft-vl-dataset) 进行准备。数据样本中必需字段：
 - `text_info`：文本数据列表，其中每个元素包含一个 `text` 和一个 `tag`。
     - `text`：查询 Query 或回复 Response 的文本内容。
     - `tag`：掩码标签（`no_mask` 表示包含在训练中，对应 Response；`mask` 表示从训练中排除，对应 Query）。
@@ -102,61 +102,7 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 }
 ```
 
-特别地，表格/公式/图表数据使用特殊的识别格式：
-
-表格数据：OTSL 格式
-
-<p align="center">
-  <img src="./assets/table_example.png" width="400px"></a>
-</p>
-
-```json
-{
-    "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
-    ],
-    "text_info": [
-        {"text": "Table Recognition:", "tag": "mask"},
-        {"text": "<fcel>分组<fcel>频数<fcel>频率<nl><fcel>[41,51)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl><fcel>[51,61)<fcel>1<fcel>\\( \\frac{1}{30} \\)<nl><fcel>[61,71)<fcel>4<fcel>\\( \\frac{4}{30} \\)<nl><fcel>[71,81)<fcel>6<fcel>\\( \\frac{6}{30} \\)<nl><fcel>[81,91)<fcel>10<fcel>\\( \\frac{10}{30} \\)<nl><fcel>[91,101)<fcel>5<fcel>\\( \\frac{5}{30} \\)<nl><fcel>[101,111)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl>", "tag": "no_mask"},
-    ]
-}
-```
-
-公式数据: Latex格式
-
-<p align="center">
-  <img src="./assets/formula_example.jpg" width="200px"></a>
-</p>
-
-```json
-{
-    "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
-    ],
-    "text_info": [
-        {"text": "Formula Recognition:", "tag": "mask"},
-        {"text": "\\[t_{n}\\in[0,\\infty]\\]", "tag": "no_mask"},
-    ]
-}
-```
-
-图表数据：Markdown格式
-
-<p align="center">
-  <img src="./assets/chart_example.png" width="400px"></a>
-</p>
-
-```json
-{
-    "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/chart_example.png"},
-    ],
-    "text_info": [
-        {"text": "Chart Recognition:", "tag": "mask"},
-        {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
-    ]
-}
-```
+表格/公式/图表数据会使用特殊的识别格式，细节请参考[8.1. 表格/公式/图表数据格式](#81-表格公式图表数据格式)
 
 ## 4. 训练配置
 
@@ -269,4 +215,64 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 
 # GT = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 # Excepted Answer = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
+```
+
+## 8. 注意事项
+
+### 8.1. 表格/公式/图表数据格式
+
+特别地，表格/公式/图表数据使用特殊的识别格式：
+
+表格数据：OTSL 格式
+
+<p align="center">
+  <img src="./assets/table_example.png" width="400px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Table Recognition:", "tag": "mask"},
+        {"text": "<fcel>分组<fcel>频数<fcel>频率<nl><fcel>[41,51)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl><fcel>[51,61)<fcel>1<fcel>\\( \\frac{1}{30} \\)<nl><fcel>[61,71)<fcel>4<fcel>\\( \\frac{4}{30} \\)<nl><fcel>[71,81)<fcel>6<fcel>\\( \\frac{6}{30} \\)<nl><fcel>[81,91)<fcel>10<fcel>\\( \\frac{10}{30} \\)<nl><fcel>[91,101)<fcel>5<fcel>\\( \\frac{5}{30} \\)<nl><fcel>[101,111)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl>", "tag": "no_mask"},
+    ]
+}
+```
+
+公式数据: Latex格式
+
+<p align="center">
+  <img src="./assets/formula_example.jpg" width="200px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Formula Recognition:", "tag": "mask"},
+        {"text": "\\[t_{n}\\in[0,\\infty]\\]", "tag": "no_mask"},
+    ]
+}
+```
+
+图表数据：Markdown格式
+
+<p align="center">
+  <img src="./assets/chart_example.png" width="400px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/chart_example.png"},
+    ],
+    "text_info": [
+        {"text": "Chart Recognition:", "tag": "mask"},
+        {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
+    ]
+}
 ```
