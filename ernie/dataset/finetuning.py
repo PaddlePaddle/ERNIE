@@ -179,12 +179,13 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
             )
             return_list[-1].append(padded_nbatch_pack_offset)
 
-        if model_args.use_attn_mask_start_row_indices:
-            return_list[-1].append(
-                gen_attn_mask_start_row_indices(original_token_ids, max_seq_len)
-            )
-        else:
-            return_list[-1].append(gen_self_attn_mask(original_token_ids, max_seq_len))
+        # if model_args.use_attn_mask_start_row_indices:
+        #     return_list[-1].append(
+        #         gen_attn_mask_start_row_indices(original_token_ids, max_seq_len)
+        #     )
+        # else:
+        #     return_list[-1].append(gen_self_attn_mask(original_token_ids, max_seq_len))
+        # return_list[-1].append(None)
 
     return_list = [np.concatenate(tensor_list) for tensor_list in zip(*return_list)]
     input_dict = dict(zip(input_keys, return_list))
@@ -527,14 +528,16 @@ class SequenceDataset(IterableDataset):
 
                 all_tokenized_tokens.extend(tokens)
                 all_tokenized_labels.extend(labels)
+                all_loss_mask.extend([1] * (len(tokens) - 1) + [0])
 
                 while len(all_tokenized_tokens) >= self.max_seq_len:
                     res_tokens = all_tokenized_tokens[:self.max_seq_len]
                     res_labels = all_tokenized_labels[:self.max_seq_len]
+                    loss_mask = all_loss_mask[:self.max_seq_len]
                     all_tokenized_tokens = all_tokenized_tokens[self.max_seq_len:]
                     all_tokenized_labels = all_tokenized_labels[self.max_seq_len:]
+                    all_loss_mask = all_loss_mask[self.max_seq_len:]
                     pos_ids = list(range(len(res_tokens)))
-                    loss_mask = loss_mask = [1] * len(res_tokens)
                     sequence = Sequence(
                         token_ids=res_tokens,
                         position_ids=pos_ids,
@@ -550,10 +553,7 @@ class SequenceDataset(IterableDataset):
                 # base
                 for example in examples_all[::-1]:
                     actual_example_num = 1
-                    if self.is_pretraining:
-                        sequence = self._postprocess_pretraining_sequence(example, actual_example_num)
-                    else:
-                        sequence = self._postprocess_sequence(example, actual_example_num)
+                    sequence = self._postprocess_sequence(example, actual_example_num)
                     if sequence is None:
                         if self.estimate:
                             self.unused_samples += actual_example_num
@@ -644,25 +644,17 @@ class SequenceDataset(IterableDataset):
         # tokens
         content = example.request["messages"][0]["content"]
         tokens = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(content))
-        # loss mask
-        loss_mask = [1] * len(tokens)
-
         # labels
         oral_tokens = tokens
         tokens = oral_tokens[:-1]
         labels = oral_tokens[1:]
-        loss_mask = loss_mask[1:]
-
-        if sum(loss_mask) == 0:
-            logger.warning(f"[SKIP] all labels set to 0: oral_tokens: {oral_tokens}")
+        if len(labels) == 0 or len(tokens) == 0:
             return [None, None]
 
         # add eos token
         tokens = tokens + [self.tokenizer.eos_token_id]
         labels = labels + [self.tokenizer.eos_token_id]
-        loss_mask = loss_mask + [0]
 
-        assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
         assert len(tokens) == len(labels), f"{len(tokens)}-{len(labels)}"
         return [tokens, labels]
 
@@ -787,14 +779,9 @@ class SequenceDataset(IterableDataset):
         left_index = 0
 
         while index < len(examples):
-            if self.is_pretraining:
-                sequence = self._postprocess_pretraining_sequence(
-                    examples[index], actual_example_num_list[index]
-                )
-            else:
-                sequence = self._postprocess_sequence(
-                    examples[index], actual_example_num_list[index]
-                )
+            sequence = self._postprocess_sequence(
+                examples[index], actual_example_num_list[index]
+            )
             if sequence is None:
                 if self.estimate:
                     self.unused_samples += actual_example_num_list[index]
