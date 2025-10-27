@@ -96,7 +96,9 @@ def create_pretrained_dataset(finetuning_args, data_args):
         * finetuning_args.dataset_world_size
         * finetuning_args.eval_iters
         * (finetuning_args.max_steps // finetuning_args.eval_steps + 1),
-        finetuning_args.per_device_eval_batch_size * finetuning_args.dataset_world_size * finetuning_args.test_iters,
+        finetuning_args.per_device_eval_batch_size
+        * finetuning_args.dataset_world_size
+        * finetuning_args.test_iters,
     ]
 
     train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
