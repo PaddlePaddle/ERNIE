@@ -12,8 +12,6 @@
 
 </div>
 
-## News
-
 ## 📣 Recent updates
 
 **[2025-10] 🔥 Released ERNIEKit v1.4:**
