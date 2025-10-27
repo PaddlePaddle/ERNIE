@@ -518,11 +518,9 @@ class SequenceDataset(IterableDataset):
         # 3. truncate it into multiple new samples based on the max_seq_len.
         if self.is_pretraining:
             all_tokenized_tokens = []
-            all_tokenized_labels = []
-            all_loss_mask = []
             for example in examples_all[::-1]:
                 actual_example_num = 1
-                [tokens, labels] = self._postprocess_pretraining_sequence(
+                tokens = self._postprocess_pretraining_sequence(
                     example, actual_example_num
                 )
                 if tokens is None:
@@ -533,16 +531,15 @@ class SequenceDataset(IterableDataset):
                     self.used_samples += actual_example_num
 
                 all_tokenized_tokens.extend(tokens)
-                all_tokenized_labels.extend(labels)
-                all_loss_mask.extend([1] * (len(tokens) - 1) + [0])
 
                 while len(all_tokenized_tokens) >= self.max_seq_len:
-                    res_tokens = all_tokenized_tokens[: self.max_seq_len]
-                    res_labels = all_tokenized_labels[: self.max_seq_len]
-                    loss_mask = all_loss_mask[: self.max_seq_len]
+                    cut_tokens = all_tokenized_tokens[: self.max_seq_len]
+                    cut_tokens = cut_tokens + [self.tokenizer.eos_token_id]
                     all_tokenized_tokens = all_tokenized_tokens[self.max_seq_len :]
-                    all_tokenized_labels = all_tokenized_labels[self.max_seq_len :]
-                    all_loss_mask = all_loss_mask[self.max_seq_len :]
+
+                    res_tokens = cut_tokens[:-1]
+                    res_labels = cut_tokens[1:]
+                    loss_mask = [1] * len(res_tokens)
                     pos_ids = list(range(len(res_tokens)))
                     sequence = Sequence(
                         token_ids=res_tokens,
@@ -650,19 +647,8 @@ class SequenceDataset(IterableDataset):
         # tokens
         content = example.request["messages"][0]["content"]
         tokens = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(content))
-        # labels
-        oral_tokens = tokens
-        tokens = oral_tokens[:-1]
-        labels = oral_tokens[1:]
-        if len(labels) == 0 or len(tokens) == 0:
-            return [None, None]
 
-        # add eos token
-        tokens = tokens + [self.tokenizer.eos_token_id]
-        labels = labels + [self.tokenizer.eos_token_id]
-
-        assert len(tokens) == len(labels), f"{len(tokens)}-{len(labels)}"
-        return [tokens, labels]
+        return tokens
 
     def _postprocess_sequence(self, example, actual_example_num):
         """Process code completion examples into token sequences.
