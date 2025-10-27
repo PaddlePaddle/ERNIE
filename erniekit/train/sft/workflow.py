@@ -45,6 +45,10 @@ from paddleformers.trainer import (
     get_last_checkpoint,
     set_seed,
 )
+from paddleformers.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+)
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.transformers.model_utils import unwrap_model
 from paddleformers.utils.log import logger
@@ -71,6 +75,55 @@ from ...hparams import (
     ModelArguments,
 )
 from .trainer import ErnieMoETrainer
+
+
+def create_pretrained_dataset(finetuning_args, data_args):
+    assert data_args.input_dir is not None and len(data_args.input_dir.split()) > 1
+
+    check_data_split(
+        data_args.split,
+        finetuning_args.do_train,
+        finetuning_args.do_eval,
+        finetuning_args.do_predict,
+    )
+
+    train_val_test_num_samples = [
+        finetuning_args.per_device_train_batch_size
+        * finetuning_args.dataset_world_size
+        * finetuning_args.max_steps
+        * finetuning_args.gradient_accumulation_steps,
+        finetuning_args.per_device_eval_batch_size
+        * finetuning_args.dataset_world_size
+        * finetuning_args.eval_iters
+        * (finetuning_args.max_steps // finetuning_args.eval_steps + 1),
+        finetuning_args.per_device_eval_batch_size * finetuning_args.dataset_world_size * finetuning_args.test_iters,
+    ]
+
+    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
+        data_prefix=data_args.input_dir.split(),
+        data_impl="mmap",
+        splits_string=data_args.split,
+        train_val_test_num_samples=train_val_test_num_samples,
+        seq_length=data_args.max_seq_len + finetuning_args.num_nextn_predict_layers,
+        seed=finetuning_args.seed,
+        skip_warmup=True,
+        data_cache_path=None,
+    )
+
+    from paddleformers.data import Stack
+
+    def _collate_data(data, stack_fn=Stack()):
+        tokens_ = stack_fn([x["text"] for x in data])
+
+        labels = tokens_[:, 1:]
+        tokens = tokens_[:, :-1]
+
+        return {
+            "input_ids": tokens,
+            "labels": labels,
+        }
+
+    return train_dataset, valid_dataset, test_dataset, _collate_data
 
 
 def run_sft(
@@ -494,6 +547,11 @@ def run_sft(
         if data_args.dataset_type == "map":
             train_file_path = os.path.join(data_args.offline_dataset_path, "train")
             train_dataset = create_dataset(data_file_prefix=train_file_path)
+        elif data_args.dataset_type == "pretrain":
+            finetuning_args.test_iters = finetuning_args.eval_iters * 10
+            train_dataset, eval_dataset, test_dataset, data_collator = (
+                create_pretrained_dataset(finetuning_args, data_args)
+            )
         else:
             train_dataset = create_dataset(
                 task_group=data_args.train_dataset_path,
@@ -506,7 +564,7 @@ def run_sft(
         if data_args.dataset_type == "map":
             eval_file_path = os.path.join(data_args.offline_dataset_path, "eval")
             eval_dataset = create_dataset(data_file_prefix=eval_file_path)
-        else:
+        elif data_args.dataset_type != "pretrain":
             eval_dataset = create_dataset(
                 task_group=data_args.eval_dataset_path,
                 task_group_prob=data_args.eval_dataset_prob,
@@ -517,12 +575,13 @@ def run_sft(
 
     logger.info("Creating dataset successfully ...")
 
-    data_collator = partial(
-        collate_fn,
-        tokenizer=tokenizer,
-        model_args=model_args,
-        max_seq_len=data_args.max_seq_len + model_config.num_nextn_predict_layers,
-    )
+    if data_args.dataset_type != "pretrain":
+        data_collator = partial(
+            collate_fn,
+            tokenizer=tokenizer,
+            model_args=model_args,
+            max_seq_len=data_args.max_seq_len + model_config.num_nextn_predict_layers,
+        )
 
     if model_args.lora:
         from ernie.utils.peft_utils import initialize_lora_model
@@ -537,7 +596,7 @@ def run_sft(
 
     if finetuning_args.max_steps == -1:
         if finetuning_args.should_load_dataset and paddle.distributed.get_rank() == 0:
-            if data_args.dataset_type != "map":
+            if data_args.dataset_type != "map" and data_args.dataset_type != "pretrain":
                 finetuning_args.max_steps = estimate_training(
                     train_dataset, data_args, finetuning_args, model_args
                 )
