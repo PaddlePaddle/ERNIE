@@ -169,6 +169,7 @@ class MultiSourceDataset(IterableDataset):
         process_fn_fc=None,
         shuffle_file=False,
         shuffle_files=False,
+        is_pretraining=False,
     ):
         """Initialize the multi-source dataset.
 
@@ -202,6 +203,17 @@ class MultiSourceDataset(IterableDataset):
                         else process_fn
                     ),
                     shuffle_file=shuffle_file,
+                )
+                continue
+
+            if is_pretraining and each_sub_dataset_type == "erniekit":
+                task["dataset"] = FileDataset(
+                    task["filepath"],
+                    process_fn=(
+                        partial(process_fn_pt, task_name=task["task_name"])
+                        if "task_name" in task
+                        else process_fn_pt
+                    ),
                 )
                 continue
 
@@ -249,15 +261,6 @@ class MultiSourceDataset(IterableDataset):
                         else process_fn_fc
                     ),
                     shuffle_file=shuffle_file,
-                )
-            elif each_sub_dataset_type == "pt":
-                task["dataset"] = FileDataset(
-                    task["filepath"],
-                    process_fn=(
-                        partial(process_fn_pt, task_name=task["task_name"])
-                        if "task_name" in task
-                        else process_fn_pt
-                    )
                 )
             else:
                 raise NotImplementedError(

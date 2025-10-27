@@ -85,6 +85,7 @@ def create_dataset(**dataset_config):
         process_fn=process_example,
         process_fn_pt=process_pretraining_example,
         process_fn_fc=process_fc,
+        is_pretraining=dataset_config["is_pretraining"],
     )
 
     sequence_dataset = SequenceDataset(
@@ -185,7 +186,9 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
                     gen_attn_mask_start_row_indices(original_token_ids, max_seq_len)
                 )
             else:
-                return_list[-1].append(gen_self_attn_mask(original_token_ids, max_seq_len))
+                return_list[-1].append(
+                    gen_self_attn_mask(original_token_ids, max_seq_len)
+                )
             return_list[-1].append(None)
 
     return_list = [np.concatenate(tensor_list) for tensor_list in zip(*return_list)]
@@ -514,13 +517,14 @@ class SequenceDataset(IterableDataset):
         # 2. combine them into one large sample
         # 3. truncate it into multiple new samples based on the max_seq_len.
         if self.is_pretraining:
-            current_length = 0
             all_tokenized_tokens = []
             all_tokenized_labels = []
             all_loss_mask = []
             for example in examples_all[::-1]:
                 actual_example_num = 1
-                [tokens, labels] = self._postprocess_pretraining_sequence(example, actual_example_num)
+                [tokens, labels] = self._postprocess_pretraining_sequence(
+                    example, actual_example_num
+                )
                 if tokens is None:
                     if self.estimate:
                         self.unused_samples += actual_example_num
@@ -533,12 +537,12 @@ class SequenceDataset(IterableDataset):
                 all_loss_mask.extend([1] * (len(tokens) - 1) + [0])
 
                 while len(all_tokenized_tokens) >= self.max_seq_len:
-                    res_tokens = all_tokenized_tokens[:self.max_seq_len]
-                    res_labels = all_tokenized_labels[:self.max_seq_len]
-                    loss_mask = all_loss_mask[:self.max_seq_len]
-                    all_tokenized_tokens = all_tokenized_tokens[self.max_seq_len:]
-                    all_tokenized_labels = all_tokenized_labels[self.max_seq_len:]
-                    all_loss_mask = all_loss_mask[self.max_seq_len:]
+                    res_tokens = all_tokenized_tokens[: self.max_seq_len]
+                    res_labels = all_tokenized_labels[: self.max_seq_len]
+                    loss_mask = all_loss_mask[: self.max_seq_len]
+                    all_tokenized_tokens = all_tokenized_tokens[self.max_seq_len :]
+                    all_tokenized_labels = all_tokenized_labels[self.max_seq_len :]
+                    all_loss_mask = all_loss_mask[self.max_seq_len :]
                     pos_ids = list(range(len(res_tokens)))
                     sequence = Sequence(
                         token_ids=res_tokens,
@@ -659,7 +663,6 @@ class SequenceDataset(IterableDataset):
 
         assert len(tokens) == len(labels), f"{len(tokens)}-{len(labels)}"
         return [tokens, labels]
-
 
     def _postprocess_sequence(self, example, actual_example_num):
         """Process code completion examples into token sequences.

@@ -1,9 +1,9 @@
 ### data
-train_dataset_type: "pt"
-eval_dataset_type: "pt"
-train_dataset_path: "sft-pretrain.jsonl"
+train_dataset_type: "erniekit"
+eval_dataset_type: "erniekit"
+train_dataset_path: "./examples/data/pt-train.jsonl"
 train_dataset_prob: "1.0"
-eval_dataset_path: "sft-pretrain.jsonl"
+eval_dataset_path: "./examples/data/pt-eval.jsonl"
 eval_dataset_prob: "1.0"
 max_seq_len: 8192
 num_samples_each_epoch: 6000000
