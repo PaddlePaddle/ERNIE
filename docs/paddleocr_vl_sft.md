@@ -37,8 +37,10 @@ docker run --gpus all --name erniekit-ft-paddleocr-vl -v $PWD:/paddle --shm-size
 
 ### 2.2. Install ERNIEKit
 
+Clone ERNIEKit and install dependencies:
+
 ```bash
-git clone https://github.com/PaddlePaddle/ERNIE -b release/v1.4
+git clone https://github.com/PaddlePaddle/ERNIE
 cd ERNIE
 python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e .
@@ -60,7 +62,7 @@ huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/Padd
 
 ### 3.2. Dataset Preparation
 
-You can build your fine-tuning dataset according to the [SFT VL Dataset Format]((./datasets.md#sft-vl-dataset)). Required fields are as follows:
+For the training dataset format, please refer to [SFT VL Dataset Format]((./datasets.md#sft-vl-dataset)). Required fields are as follows:
 * `text_info`: The list of text data, each element contains a `text` and a `tag`
   * `text`: The text content from User question or System response
   * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
@@ -98,61 +100,7 @@ Bengali training example:
 }
 ```
 
-In particular, the following formats are used for specific data types:
-
-Table Data: OTSL format
-
-<p align="center">
-  <img src="./assets/table_example.png" width="400px"></a>
-</p>
-
-```json
-{
-    "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
-    ],
-    "text_info": [
-        {"text": "Table Recognition:", "tag": "mask"},
-        {"text": "<fcel>分组<fcel>频数<fcel>频率<nl><fcel>[41,51)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl><fcel>[51,61)<fcel>1<fcel>\\( \\frac{1}{30} \\)<nl><fcel>[61,71)<fcel>4<fcel>\\( \\frac{4}{30} \\)<nl><fcel>[71,81)<fcel>6<fcel>\\( \\frac{6}{30} \\)<nl><fcel>[81,91)<fcel>10<fcel>\\( \\frac{10}{30} \\)<nl><fcel>[91,101)<fcel>5<fcel>\\( \\frac{5}{30} \\)<nl><fcel>[101,111)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl>", "tag": "no_mask"},
-    ]
-}
-```
-
-Formula Data: LaTeX format
-
-<p align="center">
-  <img src="./assets/formula_example.jpg" width="200px"></a>
-</p>
-
-```json
-{
-    "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
-    ],
-    "text_info": [
-        {"text": "Formula Recognition:", "tag": "mask"},
-        {"text": "\\[t_{n}\\in[0,\\infty]\\]", "tag": "no_mask"},
-    ]
-}
-```
-
-Chart Data: Markdown format
-
-<p align="center">
-  <img src="./assets/chart_example.png" width="400px"></a>
-</p>
-
-```json
-{
-    "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/chart_example.png"},
-    ],
-    "text_info": [
-        {"text": "Chart Recognition:", "tag": "mask"},
-        {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
-    ]
-}
-```
+Tables, formulas, and charts use a special data format. For details, please refer to [8.1. Table/Formula/Chart Data Format](#81-tableformulachart-data-format)
 
 ## 4. Training Configuration
 
@@ -266,4 +214,64 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 
 # GT = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 # Excepted Answer = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
+```
+
+## 8. Notes
+
+### 8.1. Table/Formula/Chart Data Format
+
+In particular, the following formats are used for specific data types:
+
+Table Data: OTSL format
+
+<p align="center">
+  <img src="./assets/table_example.png" width="400px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Table Recognition:", "tag": "mask"},
+        {"text": "<fcel>分组<fcel>频数<fcel>频率<nl><fcel>[41,51)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl><fcel>[51,61)<fcel>1<fcel>\\( \\frac{1}{30} \\)<nl><fcel>[61,71)<fcel>4<fcel>\\( \\frac{4}{30} \\)<nl><fcel>[71,81)<fcel>6<fcel>\\( \\frac{6}{30} \\)<nl><fcel>[81,91)<fcel>10<fcel>\\( \\frac{10}{30} \\)<nl><fcel>[91,101)<fcel>5<fcel>\\( \\frac{5}{30} \\)<nl><fcel>[101,111)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl>", "tag": "no_mask"},
+    ]
+}
+```
+
+Formula Data: LaTeX format
+
+<p align="center">
+  <img src="./assets/formula_example.jpg" width="200px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Formula Recognition:", "tag": "mask"},
+        {"text": "\\[t_{n}\\in[0,\\infty]\\]", "tag": "no_mask"},
+    ]
+}
+```
+
+Chart Data: Markdown format
+
+<p align="center">
+  <img src="./assets/chart_example.png" width="400px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/chart_example.png"},
+    ],
+    "text_info": [
+        {"text": "Chart Recognition:", "tag": "mask"},
+        {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
+    ]
+}
 ```
