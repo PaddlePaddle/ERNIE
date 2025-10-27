@@ -2,42 +2,6 @@
 
 **ERNIEKit** is an industrial-grade development toolkit for ERNIE 4.5. It provides training and compression capabilities, including Pre-Training, Supervised Fine-Tuning (SFT), Low-Rank Adaptation (LoRA), Direct Preference Optimization (DPO), and Quantization-Aware Training (QAT) and Post-Training Quantization (PTQ) techniques. It includes practical applications and tutorials for leveraging ERNIE models.
 
-
-## News
-
-## 📣 Recent updates
-
-**[2025-10] 🔥 Released ERNIEKit v1.4:**
-
-- **New Features**
-    - VL Modle Training: Support SFT for [PaddleOCR-VL-0.9B]((https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B)) model. More details in [PaddleOCR-VL-0.9B SFT](./paddleocr_vl_sft.md).
-    - Dataflow : Support padding-free startegy.
-        - Packing data within a batch into a sequence to avoid padding, thereby reducing GPU memory usage and accelerating training.
-
-**[2025-09] 🔥 Released ERNIEKit v1.3:**
-
-- **New Features**
-    - [ERNIE-4.5-21B-A3B-Thinking] Supports SFT training and function call training for ERNIE-4.5-21B-A3B-Thinking (https://huggingface.co/baidu/ERNIE-4.5-21B-A3B-Thinking).
-
-- **Bug Fixes:**
-    - [VL Model Training] Optimization of multimodal video data processing speed (#1266).
-
-**[2025-09] 🔥 Released ERNIEKit v1.2:**
-
-- **New Features**
-    - [WebUI] Added support for training and conversation functionalities with ERNIE 28b/424b VL models.
-    - [VL Model Training] Introduced support for query-response format in training data.
-    - [Command-Line Tool] Added iluvatar GPU hardware support.
-
-- **Bug Fixes:**
-    - [AutoParallel] Fix use_intermediate_api pp+recompute+moe bug (#1250)
-    - [AutoParallel] Fix save checkpoint bug (#1242)
-    - [VL Model Training] Fix lora 128k training bug (#1234)
-
-**[2025-09] 🔥 Released ERNIEKit v1.1:** ERNIEKit now supports SFT/LoRA for ERNIE-4.5-VL series.
-
-**[2025-06] 🔥 Released ERNIEKit v1.0:** We're excited to announce ERNIEKit v1.0, the most powerful and efficient toolkit yet for developing with the latest ERNIE models!
-
 ## 1. Features
 
 * 🚀 **Industrial-grade High-Performance Pre-Training**
