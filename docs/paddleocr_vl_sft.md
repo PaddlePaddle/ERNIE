@@ -181,14 +181,16 @@ Install PaddleOCR for inference:
 ```bash
 python -m pip install -U "paddleocr[doc-parser]"
 python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
+python -m pip install --force-reinstall opencv-python-headless
+python -m pip install numpy==1.26.4
 ```
 
 ### 7.2. Inference Model Preparation
 Copy the necessary inference configuration files from the original PaddleOCR-VL model to the directory where the SFT-trained model is saved:
 
 ```
-cp PaddlePaddle/PaddleOCR-VL/chat-template.jinja PaddleOCR-VL-SFT-Bengali
-cp PaddlePaddle/PaddleOCR-VL/inference.yaml PaddleOCR-VL-SFT-Bengali
+cp PaddlePaddle/PaddleOCR-VL/chat_template.jinja PaddleOCR-VL-SFT-Bengali
+cp PaddlePaddle/PaddleOCR-VL/inference.yml PaddleOCR-VL-SFT-Bengali
 ```
 
 ### 7.3. Inference Dataset Preparation
@@ -216,6 +218,8 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 # GT = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 # Excepted Answer = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 ```
+
+The above command will save the results and visualization images in the PaddleOCR-VL-SFT-Bengali_response directory, where the prediction results are stored in files with the `.md` extension. For more information on the inference capabilities of the paddleocr tool, please refer to: https://www.paddleocr.ai/latest/version3.x/pipeline_usage/PaddleOCR-VL.html.
 
 ## 8. Notes
 
@@ -275,4 +279,29 @@ Chart Data: Markdown format
         {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
     ]
 }
+```
+
+### Common Issues
+
+If you encounter the following problem while using the above command, it is generally due to a conflict between cv2 and the environment. This can be resolved by installing `opencv-python-headless`.
+
+**Error message**
+
+```
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 181, in <module>
+    bootstrap()
+  File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 153, in bootstrap
+    native_module = importlib.import_module("cv2")
+  File "/usr/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+```
+
+**Solution**
+
+```shell
+python -m pip install --force-reinstall opencv-python-headless
+python -m pip install numpy==1.26.4
 ```
