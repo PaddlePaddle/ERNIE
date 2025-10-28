@@ -22,9 +22,6 @@ import numpy as np
 import paddle
 from paddleformers.transformers import (
     AutoConfig,
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    AutoModelForCausalLMPipe,
 )
 from paddle.distributed import fleet
 from paddleformers.datasets import IterDataset
@@ -50,12 +47,20 @@ from ernie.dataset.vl_sft_reader import (
 )
 from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
-from paddleformers.transformers.ernie4_5_vl import Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_formers
-from ernie.modeling_moe_vl import Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_erniekit
+from paddleformers.transformers.ernie4_5_vl import (
+    Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_formers,
+)
+from ernie.modeling_moe_vl import (
+    Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_erniekit,
+)
 from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
 from ernie.utils.common_utils import check_refined_recompute
-from paddleformers.transformers.ernie4_5_vl import Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_formers
-from ernie.modeling_moe_vl_pp import Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit
+from paddleformers.transformers.ernie4_5_vl import (
+    Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_formers,
+)
+from ernie.modeling_moe_vl_pp import (
+    Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit,
+)
 from ernie.utils.misc import global_training_logs
 from ernie.utils.mm_data_utils import MMSpecialTokensConfig
 from ernie.utils.seed_utils import set_seed
@@ -76,6 +81,7 @@ def resolve_source(model_name_or_path):
     if "torch_dtype" in config_dict:
         convert_from_hf = True
     return convert_from_hf
+
 
 def get_resume_checkpoint_path(config):
     """
@@ -479,11 +485,19 @@ def run_vl_sft(
     )
 
     if convert_from_hf:
-        Ernie4_5_VLMoeForConditionalGeneration = Ernie4_5_VLMoeForConditionalGeneration_formers
-        Ernie4_5_VLMoeForConditionalGenerationPipe = Ernie4_5_VLMoeForConditionalGenerationPipe_formers
+        Ernie4_5_VLMoeForConditionalGeneration = (
+            Ernie4_5_VLMoeForConditionalGeneration_formers
+        )
+        Ernie4_5_VLMoeForConditionalGenerationPipe = (
+            Ernie4_5_VLMoeForConditionalGenerationPipe_formers
+        )
     else:
-        Ernie4_5_VLMoeForConditionalGeneration = Ernie4_5_VLMoeForConditionalGeneration_erniekit
-        Ernie4_5_VLMoeForConditionalGenerationPipe = Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit
+        Ernie4_5_VLMoeForConditionalGeneration = (
+            Ernie4_5_VLMoeForConditionalGeneration_erniekit
+        )
+        Ernie4_5_VLMoeForConditionalGenerationPipe = (
+            Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit
+        )
     if finetuning_args.pipeline_parallel_degree > 1:  # pp
         print(f"[sft-debug]: virtual_pp_degree={model_args.virtual_pp_degree}")
         cfg.virtual_pp_degree = model_args.virtual_pp_degree

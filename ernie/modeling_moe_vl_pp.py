@@ -933,7 +933,7 @@ class ErnieVLEmbeddingPipe(Ernie4_5_EmbeddingPipe):
                 #     f"found vistual token in ids, but `mm_vocab_size` == 0, "
                 #     f"ids:{input_ids}, max_text_id={self.config.max_text_id} "
                 # )
-                
+
                 image_indices = paddle.nonzero(image_mask.flatten()).flatten()
                 image_features = image_features.reshape([-1, image_features.shape[-1]])
                 inputs_embeds = paddle.scatter_(
@@ -967,7 +967,7 @@ class ErnieVLEmbeddingPipe(Ernie4_5_EmbeddingPipe):
         fake_tensor = paddle.zeros([])
         fake_tensor.stop_gradient = False
 
-        inputs_embeds = fwd(image_features, fake_tensor) 
+        inputs_embeds = fwd(image_features, fake_tensor)
 
         # modify video token type to image token type for expert gating
         token_type_ids[token_type_ids == TokenType.video] = TokenType.image

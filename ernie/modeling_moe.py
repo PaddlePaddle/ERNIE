@@ -711,7 +711,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
             is_multimodel_token_cpu = None
             has_dense_experts_token_task = None
         hidden_states = self.input_layernorm(hidden_states)
- 
+
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
         if (
@@ -750,7 +750,6 @@ class Ernie4_5_DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-
 
         if isinstance(self.mlp, MOELayer):
             if is_multimodel_token_task is not None:

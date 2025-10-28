@@ -26,8 +26,12 @@ from paddleformers.trainer.trainer_callback import TrainerCallback
 from ernie.modeling_moe import Ernie4_5_DecoderLayer
 from ernie.moe.moe_layer import MOELayer
 
-from paddleformers.transformers.ernie4_5_vl.model.modeling_moe import Ernie4_5_DecoderLayer as Ernie4_5_DecoderLayer_pf
-from paddleformers.transformers.ernie4_5_vl.model.moe.moe_layer import MOELayer as MOELayer_pf
+from paddleformers.transformers.ernie4_5_vl.model.modeling_moe import (
+    Ernie4_5_DecoderLayer as Ernie4_5_DecoderLayer_pf,
+)
+from paddleformers.transformers.ernie4_5_vl.model.moe.moe_layer import (
+    MOELayer as MOELayer_pf,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +88,9 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
                     layer.mlp.moe_statics().expert_usage
                 )  # usage list
                 # biases[layer.layer_idx] = layer.mlp.moe_statics().e_score_correction_bias
-                biases[layer.layer_idx] = paddle.concat(layer.mlp.moe_statics().e_score_correction_bias, axis=0)
+                biases[layer.layer_idx] = paddle.concat(
+                    layer.mlp.moe_statics().e_score_correction_bias, axis=0
+                )
 
         model.apply(get_stat)
         keys, tensor_list = zip(*sorted(usages.items(), key=lambda x: x[0]))
