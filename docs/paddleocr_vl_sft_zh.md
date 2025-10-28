@@ -128,6 +128,7 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 使用以下命令行即可启动训练：
 
 ```bash
+CUDA_VISIBLE_DEVICES=0 \
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
         model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=./ocr_vl_sft-train_Bengali.jsonl \

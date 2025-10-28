@@ -126,6 +126,7 @@ We provide a [configuration](../examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft
 Start the training using the following command:
 
 ```bash
+CUDA_VISIBLE_DEVICES=0 \
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
         model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=./ocr_vl_sft-train_Bengali.jsonl \
