@@ -285,7 +285,7 @@ Chart Data: Markdown format
 
 If you encounter the following problem while using the above command, it is generally due to a conflict between cv2 and the environment. This can be resolved by installing `opencv-python-headless`.
 
-**Problem Manifestation**
+**Error message**
 
 ```
 Traceback (most recent call last):
