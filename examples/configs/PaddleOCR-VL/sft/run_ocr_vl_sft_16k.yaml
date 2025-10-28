@@ -14,7 +14,7 @@ sft_image_rescale: True
 image_dtype: "float32"
 
 ### model
-model_name_or_path: baidu/ERNIE-4.5-0.3B-Paddle
+model_name_or_path: PaddlePaddle/PaddleOCR-VL
 fine_tuning: Full
 fuse_rope: True
 use_sparse_head_and_loss_fn: True
