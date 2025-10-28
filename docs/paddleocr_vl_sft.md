@@ -45,8 +45,8 @@ cd ERNIE
 python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e .
 python -m pip install tensorboard
-pyhton -m pip install opencv-python-headless
-pyhton -m pip install numpy==1.26.4
+python -m pip install opencv-python-headless
+python -m pip install numpy==1.26.4
 ```
 
 For more installation methods, please refer to the [ERNIEKit Installation Guide]((./erniekit.md#2-installation)).
@@ -126,6 +126,7 @@ We provide a [configuration](../examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft
 Start the training using the following command:
 
 ```bash
+CUDA_VISIBLE_DEVICES=0 \
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
         model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=./ocr_vl_sft-train_Bengali.jsonl \
