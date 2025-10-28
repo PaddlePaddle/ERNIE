@@ -16,6 +16,9 @@ basic:
   sharding_parallel_degree: 1
   pipeline_parallel_config: disable_partial_send_recv enable_clear_every_step_cache
   pp_seg_method: layer:Ernie4_5_DecoderLayer|EmptyLayer
+  pp_need_data: false
+  pp_need_data_degree: 0
+  virtual_pp_degree: 1
   use_sp_callback: False
   sharding: stage1
   moe_group: mp
@@ -27,10 +30,7 @@ chat:
   top_p: 0.7
   temperature: 0.95
 eval:
-  eval_dataset_path: null
-  eval_dataset_prob: null
-  eval_dataset_type: null
-  eval_dataset: ['demo_sft_eval']
+  eval_dataset: ['demo_sft_eval', 'alpaca_zh']
   max_seq_len: 8192
   batch_size: 1
 export:
@@ -38,17 +38,13 @@ export:
   hf_hub_id: null
 train_sft:
   ### data
-  train_dataset_path: null
-  train_dataset_prob: null
-  train_dataset_type: null
-  eval_dataset_path: null
-  eval_dataset_prob: null
-  eval_dataset_type: null
   train_dataset: ['demo_sft_train']
   eval_dataset: ['demo_sft_eval']
+  text_dataset:
   max_seq_len: 8192
   num_samples_each_epoch: 6000000
   max_prompt_len: 2048
+  modality_ratio: 1
   ### model
   lora_rank: 32
   lora_alpha: -1
@@ -89,17 +85,13 @@ train_sft:
   save_total_limit: 5
 train_dpo:
   ### data
-  train_dataset_path: null
-  train_dataset_prob: null
-  train_dataset_type: null
-  eval_dataset_path: null
-  eval_dataset_prob: null
-  eval_dataset_type: null
   train_dataset: ['demo_dpo_train']
   eval_dataset: ['demo_dpo_eval']
+  text_dataset:
   max_seq_len: 8192
   num_samples_each_epoch: 6000000
   max_prompt_len: 2048
+  modality_ratio: 0
   ### model
   lora_rank: 32
   lora_alpha: 128
@@ -138,10 +130,67 @@ train_dpo:
   evaluation_strategy: epoch
   save_strategy: steps
   save_total_limit: 5
+train_vl_sft:
+  model_name: Customization_VL
+  train_dataset: ['sft_vl-train_demo1']
+  eval_dataset:
+  text_dataset:
+  max_seq_len: 8192
+  num_samples_each_epoch: 10000000
+  max_prompt_len: 2048
+  modality_ratio: 1
+  ### model
+  lora_rank: 32
+  lora_alpha: -1
+  lora_plus_scale: 1.0
+  rslora: False
+  ### finetuning
+  # base
+  stage: VL-SFT
+  recompute: true
+  num_train_epochs: 1
+  max_steps: 8000
+  batch_size: 1
+  gradient_accumulation_steps: 4
+  use_sp_callback: True
+  # dataloader
+  dataloader_num_workers: 1
+  distributed_dataloader: False
+  # optimizer
+  lr_scheduler_type: cosine
+  learning_rate: 1.0e-05
+  min_lr: 1.0e-06
+  layerwise_lr_decay_bound: 1.0
+  warmup_steps: 100
+  optim: adamw
+  offload_optim: True
+  weight_decay: 0.1
+  adam_epsilon: 1.0e-8
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  release_grads: false
+  scale_loss: 4096
+  # output
+  logging_steps: 1
+  eval_steps: 100
+  save_steps: 10000
+  evaluation_strategy: steps
+  save_strategy: steps
+  save_total_limit: 5
+  tensor_parallel_config: "sync_param sync_grad sync_moment"
+  tensor_parallel_degree: 4
+  pipeline_parallel_degree: 2
+  pp_need_data: true
+  pp_need_data_degree: 2
+  virtual_pp_degree: 1
+  pipeline_parallel_config: "enable_offload_queue enable_delay_scale_loss enable_overlap_p2p_comm best_unbalanced_scheduler"
+  sharding_parallel_degree: -1
 execute:
   # 执行配置请放在/erniekit/webui/config/execute文件夹中
   chat_yaml_path: "chat.yaml"
+  chat_vl_yaml_path: "chat_vl.yaml"
   export_yaml_path: "export.yaml"
   eval_yaml_path: "eval.yaml"
   train_sft_yaml_path: "train_sft.yaml"
   train_dpo_yaml_path: "train_dpo.yaml"
+  train_vl_sft_yaml_path: "train_vl_sft.yaml"

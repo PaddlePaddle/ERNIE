@@ -2,6 +2,7 @@
     "llamafactory/alpaca_en": {
         "hf_hub_url": "llamafactory/alpaca_en",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "alpaca_data_en_52k.json",
         "columns": {
@@ -13,6 +14,7 @@
     "llamafactory/alpaca_zh": {
         "hf_hub_url": "llamafactory/alpaca_zh",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "alpaca_data_zh_51k.json",
         "columns": {
@@ -23,6 +25,7 @@
     },
     "llamafactory/alpaca_gpt4_en": {
         "hf_hub_url": "llamafactory/alpaca_gpt4_en",
+        "train_type": "sft",
         "formatting": "alpaca",
         "doc_formatting": "json",
         "file_name": "alpaca_gpt4_data_en.json",
@@ -35,6 +38,7 @@
     "llamafactory/alpaca_gpt4_zh": {
         "hf_hub_url": "llamafactory/alpaca_gpt4_zh",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "alpaca_gpt4_data_zh.json",
         "columns": {
@@ -46,6 +50,7 @@
     "BelleGroup/train_2M_CN": {
         "hf_hub_url": "BelleGroup/train_2M_CN",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "train_2M_CN.json",
         "columns": {
@@ -57,6 +62,7 @@
     "BelleGroup/train_1M_CN": {
         "hf_hub_url": "BelleGroup/train_1M_CN",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "Belle_open_source_1M.json",
         "columns": {
@@ -68,6 +74,7 @@
     "BelleGroup/train_0.5M_CN": {
         "hf_hub_url": "BelleGroup/train_0.5M_CN",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "Belle_open_source_0.5M.json",
         "columns": {
@@ -79,6 +86,7 @@
     "BelleGroup/generated_chat_0.4M": {
         "hf_hub_url": "BelleGroup/generated_chat_0.4M",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "generated_chat_0.4M.json",
         "columns": {
@@ -90,6 +98,7 @@
     "BelleGroup/school_math_0.25M": {
         "hf_hub_url": "BelleGroup/school_math_0.25M",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "school_math_0.25M.json",
         "columns": {
@@ -101,6 +110,7 @@
     "sahil2801/CodeAlpaca-20k": {
         "hf_hub_url": "sahil2801/CodeAlpaca-20k",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "code_alpaca_20k.json",
         "columns": {
@@ -112,6 +122,7 @@
     "TIGER-Lab/MathInstruct": {
         "hf_hub_url": "TIGER-Lab/MathInstruct",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "MathInstruct.json",
         "columns": {
@@ -123,6 +134,7 @@
     "YeungNLP/firefly-train-1.1M": {
         "hf_hub_url": "YeungNLP/firefly-train-1.1M",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "firefly-train-1.1M.jsonl",
         "columns": {
@@ -133,6 +145,7 @@
     "suolyer/webqa": {
         "hf_hub_url": "suolyer/webqa",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "train.json",
         "columns": {
@@ -143,6 +156,7 @@
     "zxbsmk/webnovel_cn": {
         "hf_hub_url": "zxbsmk/webnovel_cn",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "novel_cn_token512_50k.json",
         "columns": {
@@ -154,6 +168,7 @@
     "AstraMindAI/SFT-Nectar": {
         "hf_hub_url": "AstraMindAI/SFT-Nectar",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "sft_data_structured.json",
         "columns": {
@@ -165,6 +180,7 @@
     "hfl/stem_zh_instruction": {
         "hf_hub_url": "hfl/stem_zh_instruction",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "bio_50282.json",
         "columns": {
@@ -176,6 +192,7 @@
     "llamafactory/OpenO1-SFT": {
         "hf_hub_url": "llamafactory/OpenO1-SFT",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "OpenO1-SFT-Pro.jsonl",
         "columns": {
@@ -186,6 +203,7 @@
     "Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT": {
         "hf_hub_url": "Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "jsonl",
         "file_name": "distill_r1_110k_sft.jsonl",
         "columns": {
@@ -197,6 +215,7 @@
     "mayflowergmbh/oasst_de": {
         "hf_hub_url": "mayflowergmbh/oasst_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "oasst_de.json",
         "columns": {
@@ -209,6 +228,7 @@
     "mayflowergmbh/dolly-15k_de": {
         "hf_hub_url": "mayflowergmbh/dolly-15k_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "dolly_de.json",
         "columns": {
@@ -220,6 +240,7 @@
     "mayflowergmbh/alpaca-gpt4_de": {
         "hf_hub_url": "mayflowergmbh/alpaca-gpt4_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "alpaca_gpt4_data_de.json",
         "columns": {
@@ -231,6 +252,7 @@
     "mayflowergmbh/openschnabeltier_de": {
         "hf_hub_url": "mayflowergmbh/openschnabeltier_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "openschnabeltier.json",
         "columns": {
@@ -242,6 +264,7 @@
     "mayflowergmbh/evol-instruct_de": {
         "hf_hub_url": "mayflowergmbh/evol-instruct_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "evol_instruct_de.json",
         "columns": {
@@ -254,6 +277,7 @@
     "mayflowergmbh/dolphin_de": {
         "hf_hub_url": "mayflowergmbh/dolphin_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "dolphin.json",
         "columns": {
@@ -265,6 +289,7 @@
     "mayflowergmbh/booksum_de": {
         "hf_hub_url": "mayflowergmbh/booksum_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "booksum.json",
         "columns": {
@@ -276,6 +301,7 @@
     "mayflowergmbh/airoboros-3.0_de": {
         "hf_hub_url": "mayflowergmbh/airoboros-3.0_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "airoboros_3.json",
         "columns": {
@@ -287,6 +313,7 @@
     "mayflowergmbh/ultra-chat_de": {
         "hf_hub_url": "mayflowergmbh/ultra-chat_de",
         "formatting": "alpaca",
+        "train_type": "sft",
         "doc_formatting": "json",
         "file_name": "ultra_chat_german.json",
         "columns": {
@@ -295,15 +322,17 @@
             "response": "output"
         }
     },
-    "pleisto/wikipedia-cn-20230720-filtered": {
-        "hf_hub_url": "pleisto/wikipedia-cn-20230720-filtered",
+    "Intel/orca_dpo_pairs": {
+        "hf_hub_url": "Intel/orca_dpo_pairs",
         "formatting": "alpaca",
-        "doc_formatting": "json",
-        "file_name": "wikipedia-cn-20230720-filtered.json",
+        "train_type": "dpo",
+        "doc_formatting": "jsonl",
+        "file_name": "orca_rlhf.jsonl",
         "columns": {
-            "prompt": "instruction",
-            "query": "input",
-            "response": "output"
+            "query": "question",
+            "chosen": "chosen",
+            "rejected": "rejected",
+            "system": "system"
         }
     }
 }

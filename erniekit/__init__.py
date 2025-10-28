@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .utils.env import VERSION
+from .version.env import VERSION
+from .version import commit
 
 __version__ = VERSION
+__commit__ = commit

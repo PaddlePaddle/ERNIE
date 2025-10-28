@@ -47,13 +47,29 @@ Expected output:
 ```
 
 **GPU Configuration**
-Set CUDA_VISIBLE_DEVICES before running CLI/WebUI:
+
+By default, all available gpus are used in CLI/WebUI.
+If you wan to specify certain gpus, please set CUDA_VISIBLE_DEVICES before running CLI/WebUI:
+
 ```bash
 # Single GPU
 export CUDA_VISIBLE_DEVICES=0
 # Multi GPUs
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+
+# Single XPU
+export XPU_VISIBLE_DEVICES=0
+# Multi XPUs
+export XPU_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+
+# Single NPU
+export ASCEND_RT_VISIBLE_DEVICES=0
+# Multi NPUs
+export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 ```
+
+* Note: In `Chat` module, the number of gpus configured by CUDA_VISIBLE_DEVICES should be equal to `tensor_parallel_degree` in the config.
+Alternatively, you can also unset CUDA_VISIBLE_DEVICES.
 
 # 1. CLI Usage
 
@@ -68,6 +84,8 @@ erniekit server examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 # Launch CLI chat interface
 erniekit chat examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 ```
+
+* Note: the command-line dialogue for VL-model only supports pure text input.
 
 ## 1.2. Model Fine-tuning
 
@@ -127,7 +145,9 @@ WebUI contains five modules: Basic Info, Training, Chat, Evaluation, and Export.
 ## 2.1. Basic Info
 
 ### 2.1.1 Model
-Default model name is "Customization". Custom models support local paths (relative/absolute).
+Default model name is `Customization`. Custom models support local paths (relative/absolute).
+
+If using a multimodal model, you need to select `Customization_VL`.
 
 ### 2.1.2 Export Directory
 If empty, training will auto-generate paths like `./output/ERNIE-4.5-0.3B_SFT_LoRA_2025_06_29_12_03_36`. Evaluation/chat/export default to `./output`.
@@ -193,6 +213,8 @@ Choose built-in (demo/HuggingFace) or custom datasets (mixed by probability):
 | Dataset Probability | train_dataset_prob | Sampling probability |
 | Data Type | train_dataset_type | Supported: erniekit, alpaca |
 
+- Note: Multimodal models can additionally be configured with text-only datasets, allowing for mixed training with both multimodal and text-only data. You can adjust the data ratio through a sliding window interface.
+
 ### 2.2.3 Evaluation Dataset
 Same options as training dataset:
 
@@ -251,6 +273,8 @@ Load models from Basic Info section. Click "Verify Model Loading" to check statu
 After successful loading:
 - Enter prompts in the input box
 - Set roles/system prompts
+- 【VL model】 Select "Enable VL Thought Mode" to enable thinking mode
+- 【VL model】 You can drag and drop to upload images or videos, or click to upload, or enter a URL
 - Click "Submit" to start chatting
 - View history in "Chat History"
 - "Clear" resets conversation

@@ -8,6 +8,17 @@ ERNIEKit currently supports reading local datasets and downloading specified Hug
   - Set `train_dataset_path`/`eval_dataset_path` to the absolute or relative path of your local dataset file
   - Set `train_dataset_type`/`eval_dataset_type` to the dataset format (erniekit/alpaca)
   - Set `train_dataset_prob`/`eval_dataset_prob` for multi-source dataset mixing probabilities
+```yaml
+# single-source
+train_dataset_type: "erniekit"
+train_dataset_path: "./examples/data/sft-train.jsonl"
+train_dataset_prob: "1.0"
+
+# multi-source
+train_dataset_type: "erniekit,erniekit"
+train_dataset_path: "./examples/data/sft-train1.jsonl,./examples/data/sft-train2.jsonl"
+train_dataset_prob: "0.8,0.2"
+```
 
 - **WebUI**:
   - Under `Set Custom Dataset`, input the local file path in `Dataset Path`
@@ -19,7 +30,17 @@ ERNIEKit currently supports reading local datasets and downloading specified Hug
   - Set `train_dataset_path`/`eval_dataset_path` to the Hugging Face repo ID
   - Set `train_dataset_type`/`eval_dataset_type` to alpaca
   - Set `train_dataset_prob`/`eval_dataset_prob` for multi-source dataset mixing probabilities
+```yaml
+# single-source
+train_dataset_type: "alpaca"
+train_dataset_path: "BelleGroup/train_2M_CN"
+train_dataset_prob: "1.0"
 
+# multi-source
+train_dataset_type: "alpaca,alpaca"
+train_dataset_path: "llamafactory/alpaca_gpt4_zh,BelleGroup/train_2M_CN"
+train_dataset_prob: "0.8,0.2"
+```
 - **WebUI**:
   - Under `Set Built-in Dataset`, select the dataset name in `Dataset Selection`
   - The system will automatically configure the path and type, then download and read from Hugging Face
@@ -27,36 +48,36 @@ ERNIEKit currently supports reading local datasets and downloading specified Hug
 Supported Hugging Face datasets are defined in `ernie.dataset.hf.data_info.json`:
 
 ### Supported Hugging Face Datasets
-| Dataset Name | Format | File | File Format |
-|--------------|--------|------|-------------|
-| [llamafactory/alpaca_en](https://huggingface.co/datasets/llamafactory/alpaca_en) | alpaca | alpaca_data_en_52k.json | json |
-| [llamafactory/alpaca_zh](https://huggingface.co/datasets/llamafactory/alpaca_zh) | alpaca | alpaca_data_zh_51k.json | json |
-| [llamafactory/alpaca_gpt4_en](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_en) | alpaca | alpaca_gpt4_data_en.json | json |
-| [llamafactory/alpaca_gpt4_zh](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_zh) | alpaca | alpaca_gpt4_data_zh.json | json |
-| [BelleGroup/train_2M_CN](https://huggingface.co/datasets/BelleGroup/train_2M_CN) | alpaca | train_2M_CN.json | jsonl |
-| [BelleGroup/train_1M_CN](https://huggingface.co/datasets/BelleGroup/train_1M_CN) | alpaca | Belle_open_source_1M.json | jsonl |
-| [BelleGroup/train_0.5M_CN](https://huggingface.co/datasets/BelleGroup/train_0.5M_CN) | alpaca | Belle_open_source_0.5M.json | jsonl |
-| [BelleGroup/generated_chat_0.4M](https://huggingface.co/datasets/BelleGroup/generated_chat_0.4M) | alpaca | generated_chat_0.4M.json | jsonl |
-| [BelleGroup/school_math_0.25M](https://huggingface.co/datasets/BelleGroup/school_math_0.25M) | alpaca | school_math_0.25M.json | jsonl |
-| [sahil2801/CodeAlpaca-20k](https://huggingface.co/datasets/sahil2801/CodeAlpaca-20k) | alpaca | code_alpaca_20k.json | json |
-| [TIGER-Lab/MathInstruct](https://huggingface.co/datasets/TIGER-Lab/MathInstruct) | alpaca | MathInstruct.json | json |
-| [YeungNLP/firefly-train-1.1M](https://huggingface.co/datasets/YeungNLP/firefly-train-1.1M) | alpaca | firefly-train-1.1M.jsonl | jsonl |
-| [suolyer/webqa](https://huggingface.co/datasets/suolyer/webqa) | alpaca | train.json | jsonl |
-| [zxbsmk/webnovel_cn](https://huggingface.co/datasets/zxbsmk/webnovel_cn) | alpaca | novel_cn_token512_50k.json | json |
-| [AstraMindAI/SFT-Nectar](https://huggingface.co/datasets/AstraMindAI/SFT-Nectar) | alpaca | sft_data_structured.json | json |
-| [hfl/stem_zh_instruction](https://huggingface.co/datasets/hfl/stem_zh_instruction) | alpaca | bio_50282.json | jsonl |
-| [llamafactory/OpenO1-SFT](https://huggingface.co/datasets/llamafactory/OpenO1-SFT) | alpaca | OpenO1-SFT-Pro.jsonl | jsonl |
-| [Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT](https://huggingface.co/datasets/Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT) | alpaca | distill_r1_110k_sft.jsonl | jsonl |
-| [mayflowergmbh/oasst_de](https://huggingface.co/datasets/mayflowergmbh/oasst_de) | alpaca | oasst_de.json | json |
-| [mayflowergmbh/dolly-15k_de](https://huggingface.co/datasets/mayflowergmbh/dolly-15k_de) | alpaca | dolly_de.json | json |
-| [mayflowergmbh/alpaca-gpt4_de](https://huggingface.co/datasets/mayflowergmbh/alpaca-gpt4_de) | alpaca | alpaca_gpt4_data_de.json | json |
-| [mayflowergmbh/openschnabeltier_de](https://huggingface.co/datasets/mayflowergmbh/openschnabeltier_de) | alpaca | openschnabeltier.json | json |
-| [mayflowergmbh/evol-instruct_de](https://huggingface.co/datasets/mayflowergmbh/evol-instruct_de) | alpaca | evol_instruct_de.json | json |
-| [mayflowergmbh/dolphin_de](https://huggingface.co/datasets/mayflowergmbh/dolphin_de) | alpaca | dolphin.json | json |
-| [mayflowergmbh/booksum_de](https://huggingface.co/datasets/mayflowergmbh/booksum_de) | alpaca | booksum.json | json |
-| [mayflowergmbh/airoboros-3.0_de](https://huggingface.co/datasets/mayflowergmbh/airoboros-3.0_de) | alpaca | airoboros_3.json | json |
-| [mayflowergmbh/ultra-chat_de](https://huggingface.co/datasets/mayflowergmbh/ultra-chat_de) | alpaca | ultra_chat_german.json | json |
-| [pleisto/wikipedia-cn-20230720-filtered](https://huggingface.co/datasets/pleisto/wikipedia-cn-20230720-filtered) | alpaca | wikipedia-cn-20230720-filtered.json | json |
+| Dataset Name | Type |Format | File | File Format |
+|--------------|------|-------|------|-------------|
+| [llamafactory/alpaca_en](https://huggingface.co/datasets/llamafactory/alpaca_en) | sft | alpaca | alpaca_data_en_52k.json | json |
+| [llamafactory/alpaca_zh](https://huggingface.co/datasets/llamafactory/alpaca_zh) | sft | alpaca | alpaca_data_zh_51k.json | json |
+| [llamafactory/alpaca_gpt4_en](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_en) | sft | alpaca | alpaca_gpt4_data_en.json | json |
+| [llamafactory/alpaca_gpt4_zh](https://huggingface.co/datasets/llamafactory/alpaca_gpt4_zh) | sft | alpaca | alpaca_gpt4_data_zh.json | json |
+| [BelleGroup/train_2M_CN](https://huggingface.co/datasets/BelleGroup/train_2M_CN) | sft | alpaca | train_2M_CN.json | jsonl |
+| [BelleGroup/train_1M_CN](https://huggingface.co/datasets/BelleGroup/train_1M_CN) | sft | alpaca | Belle_open_source_1M.json | jsonl |
+| [BelleGroup/train_0.5M_CN](https://huggingface.co/datasets/BelleGroup/train_0.5M_CN) | sft | alpaca | Belle_open_source_0.5M.json | jsonl |
+| [BelleGroup/generated_chat_0.4M](https://huggingface.co/datasets/BelleGroup/generated_chat_0.4M) | sft | alpaca | generated_chat_0.4M.json | jsonl |
+| [BelleGroup/school_math_0.25M](https://huggingface.co/datasets/BelleGroup/school_math_0.25M) | sft | alpaca | school_math_0.25M.json | jsonl |
+| [sahil2801/CodeAlpaca-20k](https://huggingface.co/datasets/sahil2801/CodeAlpaca-20k) | sft | alpaca | code_alpaca_20k.json | json |
+| [TIGER-Lab/MathInstruct](https://huggingface.co/datasets/TIGER-Lab/MathInstruct) | sft | alpaca | MathInstruct.json | json |
+| [YeungNLP/firefly-train-1.1M](https://huggingface.co/datasets/YeungNLP/firefly-train-1.1M) | sft | alpaca | firefly-train-1.1M.jsonl | jsonl |
+| [suolyer/webqa](https://huggingface.co/datasets/suolyer/webqa) | sft | alpaca | train.json | jsonl |
+| [zxbsmk/webnovel_cn](https://huggingface.co/datasets/zxbsmk/webnovel_cn) | sft | alpaca | novel_cn_token512_50k.json | json |
+| [AstraMindAI/SFT-Nectar](https://huggingface.co/datasets/AstraMindAI/SFT-Nectar) | sft | alpaca | sft_data_structured.json | json |
+| [hfl/stem_zh_instruction](https://huggingface.co/datasets/hfl/stem_zh_instruction) | sft | alpaca | bio_50282.json | jsonl |
+| [llamafactory/OpenO1-SFT](https://huggingface.co/datasets/llamafactory/OpenO1-SFT) | sft | alpaca | OpenO1-SFT-Pro.jsonl | jsonl |
+| [Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT](https://huggingface.co/datasets/Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT) | sft | alpaca | distill_r1_110k_sft.jsonl | jsonl |
+| [mayflowergmbh/oasst_de](https://huggingface.co/datasets/mayflowergmbh/oasst_de) | sft | alpaca | oasst_de.json | json |
+| [mayflowergmbh/dolly-15k_de](https://huggingface.co/datasets/mayflowergmbh/dolly-15k_de) | sft | alpaca | dolly_de.json | json |
+| [mayflowergmbh/alpaca-gpt4_de](https://huggingface.co/datasets/mayflowergmbh/alpaca-gpt4_de) | sft | alpaca | alpaca_gpt4_data_de.json | json |
+| [mayflowergmbh/openschnabeltier_de](https://huggingface.co/datasets/mayflowergmbh/openschnabeltier_de) | sft | alpaca | openschnabeltier.json | json |
+| [mayflowergmbh/evol-instruct_de](https://huggingface.co/datasets/mayflowergmbh/evol-instruct_de) | sft | alpaca | evol_instruct_de.json | json |
+| [mayflowergmbh/dolphin_de](https://huggingface.co/datasets/mayflowergmbh/dolphin_de) | sft | alpaca | dolphin.json | json |
+| [mayflowergmbh/booksum_de](https://huggingface.co/datasets/mayflowergmbh/booksum_de) | sft | alpaca | booksum.json | json |
+| [mayflowergmbh/airoboros-3.0_de](https://huggingface.co/datasets/mayflowergmbh/airoboros-3.0_de) | sft | alpaca | airoboros_3.json | json |
+| [mayflowergmbh/ultra-chat_de](https://huggingface.co/datasets/mayflowergmbh/ultra-chat_de) | sft | alpaca | ultra_chat_german.json | json |
+| [Intel/orca_dpo_pairs](https://huggingface.co/datasets/Intel/orca_dpo_pairs) | dpo | alpaca | orca_rlhf.jsonl | jsonl |
 
 ## erniekit Data Format
 
@@ -74,6 +95,20 @@ Required fields for SFT:
 Notes:
 * `src` and `tgt` are List objects supporting multi-turn conversations
 * Each training sample is in JSON format, with multiple samples separated by newlines
+```json
+{
+    "system": "你是一个生活小助理",
+    "src": [
+        "我们如何在日常生活中减少用水？",
+        "还有别的建议吗？"
+    ],
+    "tgt": [
+        "1. 使用节水装置，如节水淋浴喷头和水龙头。",
+        "2. 使用水箱或水桶收集家庭废水，例如洗碗和洗浴。 \n3. 在社区中提高节水意识。 \n4. 检查水管和灌溉系统的漏水情况，并及时修复它们。 \n5. 洗澡时间缩短，使用低流量淋浴头节约用水。 \n6. 收集雨水，用于园艺或其他非饮用目的。 \n7. 刷牙或擦手时关掉水龙头。 \n8. 减少浇水草坪的时间。 \n9. 尽可能多地重复使用灰水（来自洗衣机、浴室水槽和淋浴的水）。 \n10. 只购买能源效率高的洗碗机和洗衣机。"
+    ],
+    "label": [0, 1],
+}
+```
 
 ### DPO Dataset
 
@@ -87,6 +122,120 @@ Required fields for DPO:
 * `response`: Contains chosen/rejected responses (must contain odd number of strings)
 * `sort`: Differentiates chosen/rejected (lower value=rejected, higher=chosen)
 * Each training sample is in JSON format, with multiple samples separated by newlines
+```json
+{
+    "system": "你是一个生活小助理",
+    "src": [
+        "你好。",
+        "哪一个富含蛋白质，床还是墙？"
+    ],
+    "tgt": ["你好呀，我是你的生活小助理。"],
+    "response": [
+        [
+            "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。"
+        ],
+        [
+            "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"
+        ]
+    ],
+    "sort": [
+        1,
+        0
+    ]
+}
+```
+
+### SFT VL Dataset
+
+We provide demo data for quick training, please download the [image](https://paddleformers.bj.bcebos.com/datasets/DoclingMatix.tar.gz) or [video](
+https://paddleformers.bj.bcebos.com/datasets/NExTVideo.tar.gz) data according to your needs and unzip it to the [demo](../examples/data/)  data directory. You can either use these samples or train with your own data.
+
+Required fields for SFT VL:
+
+
+* `text_info`: The list of text data, each element contains a `text` and a `tag`
+  * `text`: The text content from User question or System response
+  * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
+* `image_info`: The list of image data, each element contains a `image_url` and a `matched_text_index`
+  * `image_url`: The url to download image online or the path to access image locally
+  * `matched_text_index`: The index of matched text in `text_info`
+    * Default: `matched_text_index=0` means the image is matched with the first text, and will be palced before the first text
+* `is_system(optional)`: The system flag (1=system configuration, 0=no system configuration)
+  * system configuration = `text_info[0]` if `is_system=1`
+
+Notes:
+* Each training sample is in JSON format, with multiple samples separated by newlines
+* Video data is supported by replacing the `image_info` with `video_info`
+  * the `image_url` can be a video url or video path
+* Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
+
+Here is a multi-image example of SFT VL dataset:
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./DoclingMatix/218/0.png"},
+        {"matched_text_index": 0, "image_url": "./DoclingMatix/218/1.png"}
+    ],
+    "text_info": [
+        {"text": "What is the purpose of the resolution discussed in the text?", "tag": "mask"},
+        {"text": "The purpose of the resolution is to approve the redevelopment contract of the Philadelphia Redevelopment Authority for the redevelopment and urban renewal of a portion of the Haddington Urban Renewal Area, Unit Nos. 2 and 3, and to authorize the Redevelopment Authority to execute the redevelopment contract with Danielle M. Carson-Varns.", "tag": "no_mask"},
+        {"text": "Who introduced Resolution No. 160204 to the City Council?", "tag": "mask"},
+        {"text": "Councilmember Blackwell introduced Resolution No. 160204 to the City Council.", "tag": "no_mask"},
+        ...
+    ]
+}
+```
+
+Here is a video example of SFT VL dataset:
+```json
+{
+    "video_info": [
+        {"matched_text_index": 0, "image_url": "./NExTVideo/1027/4789497818.mp4"}
+    ],
+    "text_info": [
+        {"text": "how does the man sit on the grass?\nA. kneel\nB. one leg in the air\nC. sitting on bicycle seat\nD. legs spread out\nE. squatting down\n Answer with the option's letter from the given choices directly.", "tag": "mask"},
+        {"text": "D", "tag": "no_mask"}
+    ]
+}
+```
+
+Here is a system configuration example of SFT VL dataset:
+```json
+{
+    "is_system": 1,
+    "text_info": [
+        {"text": "Your role as ...", "tag": "mask"},
+        {"text": "好的", "tag": "no_mask"},
+        {"text": "What is written...", "tag": "mask"},
+        {"text": "<think>So I've got...", "tag": "no_mask"},
+        ...
+    ]
+    "image_info": [...]
+}
+```
+
+## chatml Format
+
+The chatml Format is used for training thinking models and function call training:
+
+Demo data for thinking models:
+
+```json
+[
+    {"messages": [{"role": "system", "content": "You are a good coder."}, {"role": "user", "content": "Given an integer array nums and an integer target value target, find two integers in the array whose sum equals the target value target, and return their array indices. You may assume that each input will have exactly one solution, and you may not use the same element twice. You can return the answer in any order. Example 1: Input: nums = [2,7,11,15], target = 9\nOutput: [0,1]\nExplanation: Because nums[0] + nums[1] == 9, return [0, 1]."}, {"role": "assistant", "content": "<think>We are going to use a hash map (dictionary) to store the numbers we have seen so far along with their indices.\n For each number in the array, we calculate the complement (target - current number).\n If the complement exists in the hash map, that means we have found the two numbers that add up to the target.\n We then return the current index and the index of the complement from the hash map.\n Since we are guaranteed exactly one solution, we can return immediately when we find it.\n</think>\nTo solve this problem efficiently, we can use a hash map to store each number's index as we iterate through the array. For each number, we calculate its complement (target minus the current number). If the complement exists in the hash map, we immediately return the current index and the complement's index. This approach ensures we find the solution in linear time.\n\n### Approach\n1. **Initialization**: Create an empty dictionary to store numbers and their indices.\n2. **Iterate through the array**: For each number in the array:\n   - Calculate the complement (target - current number).\n   - Check if the complement exists in the dictionary.\n   - If found, return the current index and the complement's index.\n   - Otherwise, add the current number and its index to the dictionary.\n3. **Result**: Since the problem guarantees exactly one solution, we will always find it during iteration.\n\n### Solution Code\n```python\ndef twoSum(nums, target):\n    num_map = {}\n    for i, num in enumerate(nums):\n        complement = target - num\n        if complement in num_map:\n            return [num_map[complement], i]\n        num_map[num] = i\n```\n\n### Explanation\n- **Initialization**: The dictionary `num_map` will track each number encountered and its index.\n- **Iteration**: For each number `num` at index `i`:\n  - Compute `complement = target - num`.\n  - If `complement` is in `num_map`, return `[num_map[complement], i]` since these two numbers sum to the target.\n  - Otherwise, store `num` with its index in `num_map` for future checks.\n- **Efficiency**: This approach runs in O(n) time, where n is the number of elements, as each dictionary operation (insertion and lookup) is O(1) on average. The space complexity is O(n) to store the dictionary.\n"}]}
+]
+```
+
+- Note: The demo datasets provided in `examples/data/sft_think-train.jsonl` and `examples/data/sft_think-eval.jsonl` are derived from the [OpenCodeReasoning dataset](https://huggingface.co/datasets/nvidia/OpenCodeReasoning), published by NVIDIA. This dataset is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0).
+
+Demo data for function call training:
+
+```json
+[
+    {"messages": [{"role": "user", "content": "I'm feeling a bit down. Can you tell me a joke to cheer me up?"}, {"role": "assistant", "content": "<think>Okay, let me try to figure out how to approach this. The user is feeling down and asks for a joke to cheer up. I need to connect this request to the appropriate function call. Looking at the available tools, there's a function called get_random_joke which is designed exactly for this purpose. Since the user's main need is to feel better, providing a joke makes sense. The function doesn't require any parameters, so it's straightforward to call it without any additional arguments.\n</think>", "tool_calls": [{"type": "function", "function": {"name": "get_random_joke", "arguments": {}}}]}, {"role": "tool", "content": [{"joke": "Why don't scientists trust atoms? Because they make up everything!"}]}, {"role": "assistant", "content": "Sure, here's a joke for you: \"Why don't scientists trust atoms? Because they make up everything!\" I hope that brings a smile to your face."}], "tools": [{"type": "function", "function": {"name": "get_random_joke", "description": "Get a random joke", "parameters": {"type": "object", "properties": {}, "required": []}}}, {"type": "function", "function": {"name": "generate_random_number", "description": "Generate a random number within a specified range", "parameters": {"type": "object", "properties": {"min": {"type": "number", "description": "The minimum value of the range"}, "max": {"type": "number", "description": "The maximum value of the range"}}, "required": ["min", "max"]}}}]}
+]
+```
+
 
 ## alpaca Format
 

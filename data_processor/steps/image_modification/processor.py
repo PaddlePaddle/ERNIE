@@ -29,11 +29,7 @@ from itertools import groupby
 
 import numpy as np
 
-base_dir = os.path.dirname(__file__)
-sys.path.append(os.path.abspath(os.path.join(base_dir, "../../")))
-
-
-from data_processor.steps.image_modification.render_timestamp import render_frame_timestamp
+from data_processor.utils.render_timestamp import render_frame_timestamp
 from data_processor.utils.constant import DATATYPE_2_ID, IDTYPES_2_ID, IMAGETYPES_2_ID
 from data_processor.utils.image_enhance import ImageEnhance
 from data_processor.utils.logger_utils import logger
@@ -47,6 +43,9 @@ except Exception as e:
     get_downloadable_image = None
 
 from paddleformers.transformers.image_utils import ChannelDimension
+
+base_dir = os.path.dirname(__file__)
+sys.path.append(os.path.abspath(os.path.join(base_dir, "../../")))
 
 VisionExample = namedtuple(
     "Example",
@@ -66,35 +65,8 @@ VisionExample = namedtuple(
     ],
 )
 
-Example = namedtuple("Example", ["src", "ids", "lossmask", "token_type_ids"])
-
-
 logger = logging.getLogger(__name__)
 logging.getLogger("PIL").setLevel(logging.WARNING)
-
-
-def crop_fn(image, upscale_image_size, crop_positions, image_type_id, timestamp, render_timestamp=False):
-    """pickle_fn_crop
-
-    image pillow image
-    crop_positions [[left, top, right, bottom], ...]
-    """
-
-    if upscale_image_size is not None and image.size != upscale_image_size:
-        image = image.resize(upscale_image_size)
-
-    # add timestamp
-    if render_timestamp and image_type_id == IMAGETYPES_2_ID["video"]:
-        assert timestamp >= 0, f"When render timestamp is true，meta need timestamp, timestamp is : {timestamp}"
-        image = render_frame_timestamp(image, timestamp)
-    crop_imgs = []
-    for crop_position in crop_positions:
-
-        if len(crop_position) != 0:
-            crop_imgs.append(image.crop(crop_position))
-        else:
-            crop_imgs.append(image)
-    return crop_imgs
 
 
 class ImageModificationProcessor(ProcessorBase):
@@ -119,114 +91,20 @@ class ImageModificationProcessor(ProcessorBase):
         self.im_patch_id = vocab[special_tokens_info["image_placeholder"]]
         self.eos_token = self.tokenizer.special_tokens_map.get("eos_token", "</s>")
         self.cls_token = self.tokenizer.special_tokens_map.get("cls_token", "<mask:0>")
-        self.sep_token = self.tokenizer.special_tokens_map.get("sep_token", "<|endofprompt|>")
+        self.sep_token = self.tokenizer.special_tokens_map.get(
+            "sep_token", "<|endofprompt|>"
+        )
         self.eos_token_id = vocab[self.eos_token]
         self.cls_token_id = vocab[self.cls_token]
         self.sep_token_id = vocab[self.sep_token]
         self.sft_shift_by_one = args.sft_shift_by_one
-        self.chat_template = "deepseek"
-        self.should_shift_by_one = self.is_training and (self.is_pretraining or self.sft_shift_by_one)
-
-    def lm_example_to_feature(self, example):
-        """
-        lm example to feature
-        """
-        if example.lossmask is not None:
-            labels = [self.tokenizer.ignored_index if j == 0 else i for i, j in zip(example.ids, example.lossmask)]
-        else:
-            labels = example.ids
-        input_ids = np.array(example.ids, dtype=np.int64)
-        labels = np.array(labels, dtype=np.int64)
-        if not self.is_pretraining:
-            replace_token_id = self.cls_token_id
-            if self.chat_template == "ernie":
-                replace_token_id = self.cls_token_id
-            elif self.chat_template == "deepseek":
-                replace_token_id = self.sep_token_id
-            else:
-                raise NotImplementedError(f"{self.chat_template} is not supported now.")
-            # the label of cls_token is eos_token in sft
-            labels[labels == replace_token_id] = self.eos_token_id
-        features = OrderedDict(
-            src_id=example.src,
-            images=None,
-            input_ids=input_ids[:-1] if self.should_shift_by_one else input_ids,
-            labels=labels[1:] if self.should_shift_by_one else labels,
-            data_type=DATATYPE_2_ID["lm"],
-            token_type_ids=np.array(np.zeros_like(example.ids) + IDTYPES_2_ID["text"], dtype="int64"),
-            data_not_valid=np.array([0], dtype="float32"),
-            image_type_ids=None,
+        self.chat_template = "ernie_vl"
+        self.should_shift_by_one = self.is_training and (
+            self.is_pretraining or self.sft_shift_by_one
         )
-        return features
-
-    def image_handling_for_crop(self, example, download_fn):
-        """
-        image handling for crop
-        """
-        images = []
-        for meta in example.meta:
-            if isinstance(meta, np.ndarray):
-                meta = json.loads(meta.tobytes().decode())
-            # get placeholder for the current meta first
-            num_images = 0
-
-            for img_one in meta:
-                num_images += len(img_one["args_crop_fn"]["crop_positions"])
-
-            # do the actual cropping
-            images_for_current_meta = [None for _ in range(num_images)]
-            offset_images = 0
-            for img_index, img_one in enumerate(meta):
-                img = download_fn(
-                    img_one["image_url"],
-                    need_exif_info=False,
-                )[0]
-
-                if "image_enhance_augs" in img_one:
-                    img = ImageEnhance.apply_effect(img, img_one["image_enhance_augs"])
-
-                assert len(img_one["args_crop_fn"]["crop_positions"]) == len(img_one["args_crop_fn"]["location"]), (
-                    f'len(img_one["args_crop_fn"]["crop_positions"]): '
-                    f'{len(img_one["args_crop_fn"]["crop_positions"])},'
-                    f'len(img_one["args_crop_fn"]["location"]): '
-                    f'{len(img_one["args_crop_fn"]["location"])}'
-                )
-
-                crop_img = crop_fn(
-                    img,
-                    upscale_image_size=img_one["args_crop_fn"]["upscale_image_size"],
-                    crop_positions=img_one["args_crop_fn"]["crop_positions"],
-                    image_type_id=example.image_type_ids[offset_images],
-                    timestamp=img_one.get("time_stamp", -1),
-                    render_timestamp=self.render_timestamp,
-                )
-
-                assert len(crop_img) == len(img_one["args_crop_fn"]["location"]), (
-                    f"len(crop_img): {len(crop_img)}, "
-                    f'len(img_one["args_crop_fn"]["location"]): {len(img_one["args_crop_fn"]["location"])}, '
-                    f'img_one["args_crop_fn"]["crop_positions"]: {img_one["args_crop_fn"]["crop_positions"]},'
-                    f'upscale_image_size: {img_one["args_crop_fn"]["upscale_image_size"]}'
-                )
-                for im, loc in zip(crop_img, img_one["args_crop_fn"]["location"]):
-                    images_for_current_meta[loc] = im
-                offset_images += len(img_one["args_crop_fn"]["crop_positions"])
-            images.extend(images_for_current_meta)
-
-        if len(images) > 0:
-            # rescale in modeli
-            images = self.image_preprocess.preprocess(
-                images,
-                return_tensors="np",
-                do_normalize=False,
-                do_rescale=False,
-            )["pixel_values"]
-            # logger.info(f'images after pre:{[np.array(i).shape for i in images]}')
-            # images = [np.array(i).transpose([2,0,1]) for i in images]
-            images = images.astype(self.image_dtype)
-        else:
-            images = None
-
-        return images
+        self.sft_replace_ids = args.sft_replace_ids
+        self.sft_image_rescale = args.sft_image_rescale
+        self.sft_image_normalize = args.sft_image_normalize
 
     def get_rope_index(
         self,
@@ -287,7 +165,9 @@ class ImageModificationProcessor(ProcessorBase):
         mrope_position_deltas = []
         if image_grid_thw is not None or video_grid_thw is not None:
             total_input_ids = input_ids
-            position_ids = np.ones([3, input_ids.shape[0], input_ids.shape[1]], dtype=input_ids.dtype)
+            position_ids = np.ones(
+                [3, input_ids.shape[0], input_ids.shape[1]], dtype=input_ids.dtype
+            )
             image_index, video_index = 0, 0
             for i, input_ids in enumerate(total_input_ids):
                 # TODO: CUDA error in some paddle version
@@ -336,34 +216,63 @@ class ImageModificationProcessor(ProcessorBase):
                     )
                     text_len = ed - st
 
-                    st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
+                    st_idx = (
+                        llm_pos_ids_list[-1].max() + 1
+                        if len(llm_pos_ids_list) > 0
+                        else 0
+                    )
 
-                    llm_pos_ids_list.append(np.arange(text_len).reshape([1, -1]).repeat(3, axis=0) + st_idx)
+                    llm_pos_ids_list.append(
+                        np.arange(text_len).reshape([1, -1]).repeat(3, axis=0) + st_idx
+                    )
 
-                    t_index = np.tile(np.arange(llm_grid_t).reshape([-1, 1]), ([1, llm_grid_h * llm_grid_w])).flatten()
+                    t_index = np.tile(
+                        np.arange(llm_grid_t).reshape([-1, 1]),
+                        ([1, llm_grid_h * llm_grid_w]),
+                    ).flatten()
                     h_index = np.tile(
-                        np.arange(llm_grid_h).reshape([1, -1, 1]), ([llm_grid_t, 1, llm_grid_w])
+                        np.arange(llm_grid_h).reshape([1, -1, 1]),
+                        ([llm_grid_t, 1, llm_grid_w]),
                     ).flatten()
                     w_index = np.tile(
-                        np.arange(llm_grid_w).reshape([1, 1, -1]), ([llm_grid_t, llm_grid_h, 1])
+                        np.arange(llm_grid_w).reshape([1, 1, -1]),
+                        ([llm_grid_t, llm_grid_h, 1]),
                     ).flatten()
 
-                    llm_pos_ids_list.append(np.stack([t_index, h_index, w_index]) + text_len + st_idx)
+                    llm_pos_ids_list.append(
+                        np.stack([t_index, h_index, w_index]) + text_len + st_idx
+                    )
                     st = ed + llm_grid_t * llm_grid_h * llm_grid_w
 
                 if st < len(input_tokens):
-                    st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
+                    st_idx = (
+                        llm_pos_ids_list[-1].max() + 1
+                        if len(llm_pos_ids_list) > 0
+                        else 0
+                    )
                     text_len = len(input_tokens) - st
-                    llm_pos_ids_list.append(np.arange(text_len).reshape([1, -1]).repeat(3, axis=0) + st_idx)
+                    llm_pos_ids_list.append(
+                        np.arange(text_len).reshape([1, -1]).repeat(3, axis=0) + st_idx
+                    )
 
-                llm_positions = np.concatenate(llm_pos_ids_list, axis=1).reshape([3, -1])
+                llm_positions = np.concatenate(llm_pos_ids_list, axis=1).reshape(
+                    [3, -1]
+                )
                 if False:  # _IS_NPU:
                     # NOTE: bool + id的混合索引赋值未生效，暂时绕过
-                    bool_indices = (attention_mask[i] == 1).unsqueeze(0).tile([position_ids.shape[0], 1])
-                    position_ids[:, i] = np.index_put(position_ids[:, i], [bool_indices], llm_positions.reshape([-1]))
+                    bool_indices = (
+                        (attention_mask[i] == 1)
+                        .unsqueeze(0)
+                        .tile([position_ids.shape[0], 1])
+                    )
+                    position_ids[:, i] = np.index_put(
+                        position_ids[:, i], [bool_indices], llm_positions.reshape([-1])
+                    )
                 else:
                     position_ids[..., i, attention_mask[i] == 1] = llm_positions
-                mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
+                mrope_position_deltas.append(
+                    llm_positions.max() + 1 - len(total_input_ids[i])
+                )
             mrope_position_deltas = np.expand_dims(np.array(mrope_position_deltas), 1)
             return position_ids, mrope_position_deltas
         else:
@@ -371,11 +280,19 @@ class ImageModificationProcessor(ProcessorBase):
                 position_ids = np.asarray(attention_mask, dtype="int64").cumsum(-1) - 1
                 position_ids.masked_fill_(mask=attention_mask == 0, value=1)
                 position_ids = position_ids.unsqueeze(0).tile([3, 1, 1])
-                max_position_ids = position_ids.max(0, keepdim=False)[0].max(-1, keepdim=True)[0]
+                max_position_ids = position_ids.max(0, keepdim=False)[0].max(
+                    -1, keepdim=True
+                )[0]
                 mrope_position_deltas = max_position_ids + 1 - attention_mask.shape[-1]
             else:
-                position_ids = np.arange(input_ids.shape[1]).reshape([1, 1, -1]).tile([3, input_ids.shape[0], 1])
-                mrope_position_deltas = np.zeros([input_ids.shape[0], 1], dtype=input_ids.dtype)
+                position_ids = (
+                    np.arange(input_ids.shape[1])
+                    .reshape([1, 1, -1])
+                    .tile([3, input_ids.shape[0], 1])
+                )
+                mrope_position_deltas = np.zeros(
+                    [input_ids.shape[0], 1], dtype=input_ids.dtype
+                )
             return position_ids, mrope_position_deltas
 
     def position_ids_for_rope_3d(self, feature):
@@ -383,27 +300,39 @@ class ImageModificationProcessor(ProcessorBase):
         get position id for 3d rope
         """
         if feature.get("images", None) is None or len(feature["images"]) == 0:
-            position_ids = np.repeat(np.arange(feature["input_ids"].shape[0])[:, np.newaxis], 3, axis=1)
+            position_ids = np.repeat(
+                np.arange(feature["input_ids"].shape[0])[:, np.newaxis], 3, axis=1
+            )
             feature["position_ids"] = position_ids
             return feature
 
         input_ids = copy.deepcopy(feature["input_ids"])
         grid_thw = feature["grid_thw"]
         # TODO: break if not training
-        token_type_ids = feature["token_type_ids"][:-1] if self.should_shift_by_one else feature["token_type_ids"]
+        token_type_ids = (
+            feature["token_type_ids"][:-1]
+            if self.should_shift_by_one
+            else feature["token_type_ids"]
+        )
         image_type_ids = feature["image_type_ids"]
 
         fake_image_token_id = -10000
         fake_video_token_id = -20000
 
-        input_ids[np.bitwise_and(token_type_ids == IDTYPES_2_ID["image"], input_ids == self.im_patch_id)] = (
-            fake_image_token_id
-        )
-        input_ids[np.bitwise_and(token_type_ids == IDTYPES_2_ID["video"], input_ids == self.im_patch_id)] = (
-            fake_video_token_id
-        )
+        input_ids[
+            np.bitwise_and(
+                token_type_ids == IDTYPES_2_ID["image"], input_ids == self.im_patch_id
+            )
+        ] = fake_image_token_id
+        input_ids[
+            np.bitwise_and(
+                token_type_ids == IDTYPES_2_ID["video"], input_ids == self.im_patch_id
+            )
+        ] = fake_video_token_id
 
-        visual_token_indices = np.nonzero(feature["input_ids"] == self.im_patch_id)  # [xxx, 1] -> [xxx]
+        visual_token_indices = np.nonzero(
+            feature["input_ids"] == self.im_patch_id
+        )  # [xxx, 1] -> [xxx]
         visual_token_indices = np.stack(visual_token_indices, axis=0).flatten()
 
         vision_start_indices = []
@@ -413,15 +342,22 @@ class ImageModificationProcessor(ProcessorBase):
         index_of_image_type_ids = 0
 
         for cur_grid_thw in grid_thw:
-            vision_start_indices.append(visual_token_indices[index_of_visual_token_indices])
+            vision_start_indices.append(
+                visual_token_indices[index_of_visual_token_indices]
+            )
             index_of_visual_token_indices += (
-                cur_grid_thw[0] * cur_grid_thw[1] * cur_grid_thw[2] // (self.image_preprocess.merge_size**2)
+                cur_grid_thw[0]
+                * cur_grid_thw[1]
+                * cur_grid_thw[2]
+                // (self.image_preprocess.merge_size**2)
             )
             if image_type_ids[index_of_image_type_ids] == IMAGETYPES_2_ID["image"]:
                 image_grid_thw.append(cur_grid_thw)
             else:
                 video_grid_thw.append(cur_grid_thw)
-                index_of_visual_token_indices //= self.image_preprocess.temporal_conv_size
+                index_of_visual_token_indices //= (
+                    self.image_preprocess.temporal_conv_size
+                )
 
         position_ids, position_ids_delta = self.get_rope_index(
             self.image_preprocess.merge_size,
@@ -449,7 +385,9 @@ class ImageModificationProcessor(ProcessorBase):
 
         # treat all padded image as normal frames
         image_type_ids = np.array(example.image_type_ids)
-        image_type_ids[image_type_ids == IMAGETYPES_2_ID["padded_image"]] = IMAGETYPES_2_ID["video"]
+        image_type_ids[image_type_ids == IMAGETYPES_2_ID["padded_image"]] = (
+            IMAGETYPES_2_ID["video"]
+        )
         image_type_ids = image_type_ids.tolist()
 
         metas = []
@@ -477,21 +415,22 @@ class ImageModificationProcessor(ProcessorBase):
 
                 random_resize_factor = img_one.get("random_resize_factor", 1)
                 image_enhance_augs = img_one.get("image_enhance_augs", None)
-                img = ImageEnhance.apply_effect(img, image_enhance_augs, random_resize_factor)
-
-                img = crop_fn(
-                    img,
-                    upscale_image_size=None,
-                    crop_positions=[[]],
-                    image_type_id=key,
-                    timestamp=img_one.get("time_stamp", -1),
-                    render_timestamp=self.render_timestamp,
+                img = ImageEnhance.apply_effect(
+                    img, image_enhance_augs, random_resize_factor
                 )
-                assert len(img) == 1
-                img = img[0]
+
+                # add timestamp
+                if self.render_timestamp and key == IMAGETYPES_2_ID["video"]:
+                    timestamp = img_one.get("time_stamp", -1)
+                    assert (
+                        timestamp >= 0
+                    ), f"When render timestamp is true，meta need timestamp, timestamp is : {timestamp}"
+                    img = render_frame_timestamp(img, timestamp)
 
                 imgs.append(img.convert("RGB"))
-                predetermined_grid_thw.append([img_one.get("grid_h", -1), img_one.get("grid_w", -1)])
+                predetermined_grid_thw.append(
+                    [img_one.get("grid_h", -1), img_one.get("grid_w", -1)]
+                )
                 uids.append(img_one.get("video_uid", random.random()))
 
             predetermined_grid_thw = np.array(predetermined_grid_thw)
@@ -501,8 +440,8 @@ class ImageModificationProcessor(ProcessorBase):
                 ret = self.image_preprocess.preprocess(
                     images=imgs,
                     videos=None,
-                    do_normalize=False,
-                    do_rescale=False,
+                    do_normalize=self.sft_image_normalize,
+                    do_rescale=self.sft_image_rescale,
                     predetermined_grid_thw=predetermined_grid_thw,
                     do_convert_rgb=True,
                     input_data_format=ChannelDimension.LAST,
@@ -520,15 +459,20 @@ class ImageModificationProcessor(ProcessorBase):
                 for uid, group in groupby(zip(uids, imgs), key=lambda x: x[0]):
                     grouped_imgs = [i[1] for i in group]
                     if predetermined_grid_thw is not None:
-                        cur_predetermined_grid_thw = predetermined_grid_thw[cnt : cnt + len(grouped_imgs)]
+                        cur_predetermined_grid_thw = predetermined_grid_thw[
+                            cnt : cnt + len(grouped_imgs)
+                        ]
                     else:
                         cur_predetermined_grid_thw = None
                     cnt += len(grouped_imgs)
                     ret = self.image_preprocess.preprocess(
                         images=None,
-                        videos=np.stack([np.array(img.convert("RGB")) for img in grouped_imgs], axis=0),
-                        do_normalize=False,
-                        do_rescale=False,
+                        videos=np.stack(
+                            [np.array(img.convert("RGB")) for img in grouped_imgs],
+                            axis=0,
+                        ),
+                        do_normalize=self.sft_image_normalize,
+                        do_rescale=self.sft_image_rescale,
                         predetermined_grid_thw=cur_predetermined_grid_thw,
                         do_convert_rgb=True,
                         input_data_format=ChannelDimension.LAST,
@@ -541,7 +485,9 @@ class ImageModificationProcessor(ProcessorBase):
             else:
                 raise ValueError(f"encounter unsupported image type! {key}")
 
-        pixel_values_list = np.concatenate(pixel_values_list, axis=0)  # .astype(self.image_dtype)
+        pixel_values_list = np.concatenate(
+            pixel_values_list, axis=0
+        )  # .astype(self.image_dtype)
         grid_thw_list = np.concatenate(grid_thw_list, axis=0)
 
         return pixel_values_list, grid_thw_list
@@ -553,21 +499,24 @@ class ImageModificationProcessor(ProcessorBase):
         download_fn = download_fn or get_downloadable_image
         try:
             assert isinstance(example, VisionExample), " only support VisionExample"
-            if self.variable_resolution:
-                images, grid_thw = self.image_handling_for_adaptive(example, download_fn=download_fn)
-            else:
-                images = self.image_handling_for_crop(example, download_fn=download_fn)
-                grid_thw = None
+            images, grid_thw = self.image_handling_for_adaptive(
+                example, download_fn=download_fn
+            )
             input_ids = np.array(example.ids, dtype=np.int64)
 
             token_type_ids = np.array(example.token_type_ids, dtype=np.int64)
             image_type_ids = np.array(example.image_type_ids, dtype=np.int64)
             # TODO: confirm this
-            image_type_ids[image_type_ids == IMAGETYPES_2_ID["padded_image"]] = IMAGETYPES_2_ID["video"]
+            image_type_ids[image_type_ids == IMAGETYPES_2_ID["padded_image"]] = (
+                IMAGETYPES_2_ID["video"]
+            )
 
             if example.lossmask is not None:
                 labels = np.array(
-                    [self.tokenizer.ignored_index if j == 0 else i for i, j in zip(example.ids, example.lossmask)],
+                    [
+                        self.tokenizer.ignored_index if j == 0 else i
+                        for i, j in zip(example.ids, example.lossmask)
+                    ],
                     dtype=np.int64,
                 )
 
@@ -577,19 +526,25 @@ class ImageModificationProcessor(ProcessorBase):
                 replace_token_id = self.cls_token_id
                 if self.chat_template == "ernie":
                     replace_token_id = self.cls_token_id
-                elif self.chat_template == "deepseek":
+                elif self.chat_template == "ernie_vl":
                     replace_token_id = self.sep_token_id
                 else:
-                    raise NotImplementedError(f"{self.chat_template} is not supported now.")
+                    raise NotImplementedError(
+                        f"{self.chat_template} is not supported now."
+                    )
                 # the label of cls_token is eos_token in sft
                 labels[labels == replace_token_id] = self.eos_token_id
+                if self.sft_replace_ids:
+                    input_ids[input_ids == replace_token_id] = self.eos_token_id
 
             features = OrderedDict(
                 src_id=example.src,
                 images=images,
                 input_ids=input_ids[:-1] if self.should_shift_by_one else input_ids,
                 labels=labels[1:] if self.should_shift_by_one else labels,
-                data_type=DATATYPE_2_ID["mm"] if images is not None else DATATYPE_2_ID["lm"],
+                data_type=(
+                    DATATYPE_2_ID["mm"] if images is not None else DATATYPE_2_ID["lm"]
+                ),
                 token_type_ids=token_type_ids,
                 image_type_ids=image_type_ids,
                 data_not_valid=0,
@@ -601,13 +556,19 @@ class ImageModificationProcessor(ProcessorBase):
                 raise e
             if self.variable_resolution:
                 images = np.zeros(
-                    [4, 3 * (self.image_preprocess.patch_size**2) * self.image_preprocess.temporal_conv_size],
+                    [4, 3 * (self.image_preprocess.patch_size**2)],
                     dtype=self.image_dtype,
                 )
                 grid_thw = np.array([[1, 2, 2]])
                 input_ids = np.array([self.im_patch_id] * 1 + [1])
-                labels = np.ones_like([self.im_patch_id] * 1 + [1]) * self.tokenizer.ignored_index
-                token_type_ids = np.array(1 * [IDTYPES_2_ID["image"]] + 1 * [IDTYPES_2_ID["text"]], dtype="int64")
+                labels = (
+                    np.ones_like([self.im_patch_id] * 1 + [1])
+                    * self.tokenizer.ignored_index
+                )
+                token_type_ids = np.array(
+                    1 * [IDTYPES_2_ID["image"]] + 1 * [IDTYPES_2_ID["text"]],
+                    dtype="int64",
+                )
                 image_type_ids = np.array(1 * [IMAGETYPES_2_ID["image"]])
                 features = OrderedDict(
                     src_id=example.src,
@@ -620,67 +581,10 @@ class ImageModificationProcessor(ProcessorBase):
                     data_not_valid=1,
                     grid_thw=grid_thw,
                 )
-            else:
-                images = np.zeros(
-                    [
-                        1,
-                        3,
-                        self.image_preprocess.crop_size["height"],
-                        self.image_preprocess.crop_size["width"],
-                    ],
-                    dtype=self.image_dtype,
-                )
-                input_ids = np.array([self.im_patch_id] * self.image_token_len + [1])
-                labels = np.ones_like([self.im_patch_id] * self.image_token_len + [1]) * self.tokenizer.ignored_index
-                token_type_ids = np.array(
-                    self.image_token_len * [IDTYPES_2_ID["image"]] + 2 * [IDTYPES_2_ID["text"]], dtype="int64"
-                )
-                image_type_ids = np.array(1 * [IMAGETYPES_2_ID["image"]])
-                features = OrderedDict(
-                    src_id=example.src,
-                    images=images,
-                    input_ids=input_ids,
-                    labels=labels,
-                    data_type=DATATYPE_2_ID["mm"],
-                    token_type_ids=token_type_ids,
-                    image_type_ids=image_type_ids,
-                    data_not_valid=1,
-                    grid_thw=None,
-                )
         finally:
             pass
 
         return features
-
-    def merge_consecutive_cls_token(self, ids, labels, token_type_ids):
-        """Merge consecutive CLS tokens into one"""
-        cls_token = self.tokenizer.special_tokens_map.get("cls_token", "<mask:0>")
-        cls_token_id = self.tokenizer.get_vocab()[cls_token]
-        sep_token = self.tokenizer.special_tokens_map.get("sep_token", "<|endofprompt|>")
-        sep_token_id = self.tokenizer.get_vocab()[sep_token]
-
-        ids = np.array(ids)
-        labels = np.array(labels)
-        token_type_ids = np.array(token_type_ids)
-
-        if not (len(ids) == len(labels) == len(token_type_ids) - 1):
-            raise ValueError("a, b, c must have the same length")
-
-        # 找出哪些位置不是重复的 cls_token_id（只保留第一个）
-        mask = np.ones_like(ids, dtype=bool)
-        if self.chat_template == "ernie":
-            mask[1:] = ~((ids[1:] == cls_token_id) & (ids[:-1] == cls_token_id))
-        elif self.chat_template == "deepseek":
-            mask[1:] = ~((ids[1:] == cls_token_id) & (ids[:-1] == sep_token_id))
-        else:
-            raise NotImplementedError(f"{self.chat_template} is not supported now.")
-
-        merged_ids = ids[mask]
-        merged_labels = labels[mask]
-        merged_token_type_ids = token_type_ids[:-1][mask]
-        merged_token_type_ids = np.append(merged_token_type_ids, token_type_ids[-1])  # 补上最后一个
-
-        return merged_ids, merged_labels, merged_token_type_ids
 
     def fill_empty_field_in_features(self, features):
         """
@@ -715,89 +619,44 @@ class ImageModificationProcessor(ProcessorBase):
             ret["task"] = "mm"
             ret["src"] = data.get("part", -1)  # dummy
             ret["part"] = data.get("part", -1)  # dummy
-            ret["lossmask"] = data["lossmask"] if "lossmask" in data else data["ds16_lossmask"]
+            ret["lossmask"] = (
+                data["lossmask"] if "lossmask" in data else data["ds16_lossmask"]
+            )
             ret["info"] = -1  # dummy
             ret["name"] = "dummy"  # dummy
             ret["data_type"] = DATATYPE_2_ID["mm"]
             ret["token_type_ids"] = (
-                data["token_type_ids"] if "token_type_ids" in data else data["ds16_tokenwise_type_id"]
+                data["token_type_ids"]
+                if "token_type_ids" in data
+                else data["ds16_tokenwise_type_id"]
             )
             ret["image_type_ids"] = (
-                data["image_type_ids"] if "image_type_ids" in data else data["ds16_imagewise_type_id"]
+                data["image_type_ids"]
+                if "image_type_ids" in data
+                else data["ds16_imagewise_type_id"]
             )
 
             return ret
 
-        def _text_key_formatting(data):
-            ret = {}
-            ret["ids"] = data["ids"] if "ids" in data else data["ds16"]
-            ret["src"] = data.get("part", -1)  # dummy
-            ret["lossmask"] = data["lossmask"] if "lossmask" in data else data["ds16_lossmask"]
-            ret["token_type_ids"] = (
-                data["token_type_ids"] if "token_type_ids" in data else data["ds16_tokenwise_type_id"]
-            )
-
-            return ret
-
-        # def _lm_key_formatting(data):
         assert isinstance(data, dict)
-        if "image_type_ids" in data or "ds16_imagewise_type_id" in data:
-            data = _vision_key_formatting(data)
-            ExampleClass = VisionExample
-        else:
-            # TODO: fix this
-            # assert 0, f"not support yet"
-            data = _text_key_formatting(data)
-            ExampleClass = Example
+        data = _vision_key_formatting(data)
 
-        return ExampleClass(**data)
-
-    def get_data_type(self, data):
-        """
-        放回这个数据的datatype
-        """
-        if isinstance(data, dict):
-            if "data_type" in data:
-                return data["data_type"]
-            elif "ds16_imagewise_type_id" in data:
-                return DATATYPE_2_ID["mm"]
-            else:
-                return DATATYPE_2_ID["lm"]
-        elif isinstance(data, Example):
-            return DATATYPE_2_ID["lm"]
-        elif isinstance(data, VisionExample):
-            return DATATYPE_2_ID["mm"]
-        else:
-            return getattr(data, "data_type", DATATYPE_2_ID["lm"])
+        return VisionExample(**data)
 
     def process(self, data, **kwargs):
         """
         process
         """
         # update should shift by one, To-Fix: do not this self
-        self.should_shift_by_one = self.is_training and (self.is_pretraining or self.sft_shift_by_one)
+        self.should_shift_by_one = self.is_training and (
+            self.is_pretraining or self.sft_shift_by_one
+        )
         # assert example.labels is None
-        data_type = self.get_data_type(data)
         if isinstance(data, dict):
             example = self.json_2_example(data)
         else:
             example = data
-        if data_type == DATATYPE_2_ID["lm"]:
-            features = self.lm_example_to_feature(example)
-        elif data_type == DATATYPE_2_ID["mm"]:
-            features = self.mm_example_to_feature(example, kwargs.get("download_fn", None))
-        else:
-            raise RuntimeError(f"unknown data_type: {data_type}")
-        if (
-            features["data_not_valid"] == 0
-            and self.is_training
-            and not self.is_pretraining
-            and self.should_shift_by_one
-        ):
-            # 去掉连续的<mask:0>
-            (features["input_ids"], features["labels"], features["token_type_ids"]) = self.merge_consecutive_cls_token(
-                features["input_ids"], features["labels"], features["token_type_ids"]
-            )
+        features = self.mm_example_to_feature(example, kwargs.get("download_fn", None))
 
         if self.rope_3d:
             features = self.position_ids_for_rope_3d(features)

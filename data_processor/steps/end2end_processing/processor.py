@@ -21,11 +21,9 @@ End2EndProcessor
 import copy
 import json
 
-from data_processor.steps.array_collation import ArrayCollationProcessor
 from data_processor.steps.coarse_processing import CoarseProcessor
 from data_processor.steps.image_modification import ImageModificationProcessor
-from data_processor.steps.input_ids_massaging import InputIdsMassageProcessor
-from data_processor.steps.pseudo_multiround_packing import PseudoMultiRoundProcessor
+from data_processor.steps.input_ids_messaging import InputIdsMassageProcessor
 from data_processor.steps.utterance_processing import UtteranceProcessor
 from data_processor.utils.processor_base import ProcessorBase
 
@@ -40,14 +38,16 @@ class End2EndProcessor(ProcessorBase):
         init
         """
         super().__init__(args)
-        self.utterance_process = UtteranceProcessor(args[0], tokenizer)
-        self.coarse_processor = CoarseProcessor(args[1])
-        self.input_ids_massage_processor = InputIdsMassageProcessor(args[2], tokenizer, image_preprocess)
-        self.pseudo_multiround_processor = PseudoMultiRoundProcessor(args[3], tokenizer)
-        self.image_modification_processor = ImageModificationProcessor(args[4], tokenizer, image_preprocess)
-        self.array_collation_processor = ArrayCollationProcessor(args[5], tokenizer)
-        self.batch_size = args[6].batch_size
-        self.load_args_from_api = args[6].load_args_from_api
+        self.utterance_process = UtteranceProcessor(args, tokenizer)
+        self.coarse_processor = CoarseProcessor(args)
+        self.input_ids_massage_processor = InputIdsMassageProcessor(
+            args, tokenizer, image_preprocess
+        )
+        self.image_modification_processor = ImageModificationProcessor(
+            args, tokenizer, image_preprocess
+        )
+        self.batch_size = args.batch_size
+        self.load_args_from_api = args.load_args_from_api
 
     def process(self, data, **kwargs):
         """
@@ -62,18 +62,28 @@ class End2EndProcessor(ProcessorBase):
         schema = self.utterance_process.process(data, **kwargs)
 
         # step2: coarse processing
-        schema = self.coarse_processor.process(schema, **kwargs)
+        if len(schema.get("video_info", [])) > 0:
+            schema = self.coarse_processor.process(schema, **kwargs)
 
         # step3:  ids massaging
         schemas = self.input_ids_massage_processor.process(schema, **kwargs)
 
-        # step4: multiround processing
-        if not self.is_training:
-            results = schemas
-            if self.input_ids_massage_processor.args.serialize_output:
-                results = json.loads(str(results))
-            assert len(results) == 1
-        rets = self.pseudo_multiround_processor.process(schemas, **kwargs)
+        # step4: schemas to rets
+        rets = []
+        if isinstance(schemas, str):
+            schemas = json.loads(schemas)
+        if schemas is None:
+            schemas = []
+        for schema in schemas:
+            rets.append(
+                {
+                    "meta": [schema["meta"]],
+                    "ds16": schema["feature"]["ids"],
+                    "ds16_lossmask": schema["feature"]["lossmask"],
+                    "ds16_tokenwise_type_id": schema["feature"]["ids_type"],
+                    "ds16_imagewise_type_id": schema["feature"]["image_wise_type"],
+                }
+            )
 
         # step5: image modification
         tensor = []
@@ -81,12 +91,6 @@ class End2EndProcessor(ProcessorBase):
             tensor.append(self.image_modification_processor.process(ret, **kwargs))
 
         return tensor
-
-    def collate(self, batch):
-        """
-        collate fn
-        """
-        return self.array_collation_processor.collate(batch)
 
     def streaming_get_batch(self, iterable):
         """
@@ -99,9 +103,9 @@ class End2EndProcessor(ProcessorBase):
 
             while len(buffer) >= self.batch_size:
                 yield self.collate(buffer[: self.batch_size])
-                buffer = buffer[self.batch_size: ]
+                buffer = buffer[self.batch_size :]
 
         # empty the buffer
         while len(buffer) != 0:
             yield self.collate(buffer[: self.batch_size])
-            buffer = buffer[self.batch_size: ]
+            buffer = buffer[self.batch_size :]

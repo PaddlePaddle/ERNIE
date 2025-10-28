@@ -29,28 +29,33 @@ class DataArguments:
             )
         },
     )
+    dataset_name: str = field(default="KnowledgeBasedSFTReader", metadata={"help": "."})
     train_dataset_type: str = field(
-        default="erniekit",
+        default=None,
         metadata={
             "help": "type of training datasets. \
         Multi-source dataset is supported, e.g., erniekit,erniekit."
         },
     )
     train_dataset_path: str = field(
-        default="examples/data/sft-train.jsonl",
+        default=None,
         metadata={
             "help": "path of training datasets. \
         Multi-source dataset is supported, e.g., ./sft-1.jsonl,./sft-2.jsonl."
         },
     )
     train_dataset_prob: str = field(
-        default="1.0",
+        default=None,
         metadata={
             "help": "probabilities of training datasets. \
         Multi-source dataset is supported, e.g., 0.8,0.2."
         },
     )
-    eval_dataset_type: str = field(default="erniekit", metadata={"help": "type of eval datasets."})
+    text_dataset_path: str = field(default=None, metadata={"help": "sft txt data path"})
+    text_dataset_prob: str = field(default=None, metadata={"help": "sft txt data prob"})
+    eval_dataset_type: str = field(
+        default="erniekit", metadata={"help": "type of eval datasets."}
+    )
     eval_dataset_path: str = field(
         default="examples/data/sft-eval.jsonl",
         metadata={"help": "path of eval datasets."},
@@ -86,7 +91,9 @@ class DataArguments:
     )
     random_shuffle: bool = field(
         default=True,
-        metadata={"help": "Whether to enable authorize code for privatization. Defaults to False."},
+        metadata={
+            "help": "Whether to enable authorize code for privatization. Defaults to False."
+        },
     )
     num_samples_each_epoch: int = field(
         default=6000000,

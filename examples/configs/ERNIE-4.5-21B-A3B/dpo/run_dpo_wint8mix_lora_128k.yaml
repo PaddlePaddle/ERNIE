@@ -53,7 +53,7 @@ attention_probs_dropout_prob: 0.1
 dropout_warmup_steps: 100
 
 # loss
-offset_alpha: 1.0
+offset_alpha: 0.0
 scale_loss: 8192
 
 # optimizer

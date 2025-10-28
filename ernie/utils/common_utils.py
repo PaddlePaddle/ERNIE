@@ -120,7 +120,7 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
             * max(training_args.data_parallel_degree, 1)
             * max(training_args.sharding_parallel_degree, 1)
         )
-        max_steps = int(np.ceil(train_batches / global_batch_size))
+        max_steps = train_batches / global_batch_size
 
         if max_samples != train_dataset.max_estimate_samples:
             max_steps *= max_samples / train_dataset.max_estimate_samples
@@ -128,9 +128,11 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
             train_dataset.used_samples *= max_samples / train_dataset.max_estimate_samples
             train_dataset.unused_samples *= max_samples / train_dataset.max_estimate_samples
 
+        max_steps = int(np.ceil(max_steps))
+
         res = {
             "num_train_epochs": int(training_args.num_train_epochs),
-            "max_steps": int(np.ceil(max_steps)),
+            "max_steps": max_steps,
             "train_tokens": int(train_tokens),
             "global_batch_size": int(global_batch_size),
             "gradient_accumulation_steps": training_args.gradient_accumulation_steps,

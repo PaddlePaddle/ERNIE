@@ -29,11 +29,9 @@ class MMSpecialTokensConfig:
     """_summary_"""
 
     use_ocr_specialtoken = True
-    use_crop_specialtoken = True
     coor_num = 1001
     image_placeholder = "<|IMAGE_PLACEHOLDER|>"
     audio_placeholder = "<|AUDIO_PLACEHOLDER|>"
-    crop = ["<|CROP_COL_SEP|>", "<|CROP_ROW_SEP|>", "<|IMAGE_SEP|>"]
     ocr_coor = [f"<|LOC_{i}|>" for i in range(coor_num)]
     ocr_begin_end = ["<|LOC_BEGIN|>", "<|LOC_END|>", "<|LOC_SEP|>"]
     mm_begin_end = ["<|BOI|>", "<|EOI|>", "<|BOA|>", "<|EOA|>", "<|BOV|>", "<|EOV|>"]
@@ -47,5 +45,11 @@ class MMSpecialTokensConfig:
         """
         return {
             k: getattr(cls, k)
-            for k in ["image_placeholder", "audio_placeholder", "crop", "ocr_coor", "ocr_begin_end", "mm_begin_end"]
+            for k in [
+                "image_placeholder",
+                "audio_placeholder",
+                "ocr_coor",
+                "ocr_begin_end",
+                "mm_begin_end",
+            ]
         }

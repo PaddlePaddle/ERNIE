@@ -29,7 +29,11 @@ from paddle.distributed.fleet import get_hybrid_communicate_group as get_hcg
 from paddle.distributed.fleet.layers.mpu.mp_layers import (
     VocabParallelEmbedding,
 )
-from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer, SharedLayerDesc
+from paddle.distributed.fleet.meta_parallel import (
+    LayerDesc,
+    PipelineLayer,
+    SharedLayerDesc,
+)
 from paddle.distributed.fleet.utils import recompute
 from paddleformers.transformers.model_utils import PipelinePretrainedModel
 from paddleformers.utils.log import logger
@@ -49,6 +53,7 @@ from .modeling_moe import (
     RMSNorm,
     _parse_moe_group,
 )
+from .modeling_moe import mtp_hidden_states_set_zero
 
 input_ids_for_mtp = deque()
 
@@ -61,7 +66,7 @@ def get_attr(layer, name):
         return get_attr(layer._layer, name)
 
 
-def parse_args(args):
+def parse_args(args, mtp_enable=False):
     """
     Parses input arguments and converts them into model-ready format.
 
@@ -86,18 +91,32 @@ def parse_args(args):
             All returned tensors have stop_gradient=True.
     """
     if isinstance(args, tuple):
-        if len(args) == 3:
-            hidden_states, attention_mask, position_ids = args
+        if not mtp_enable:
+            nbatch_pack_offset = None
+
+        if len(args) == 4:
+            hidden_states, attention_mask, position_ids, nbatch_pack_offset = args
+        elif len(args) == 3:
+            if mtp_enable:
+                hidden_states, attention_mask, nbatch_pack_offset = args
+                position_ids = None
+            else:
+                hidden_states, attention_mask, position_ids = args
         elif len(args) == 2:
-            hidden_states, attention_mask = args
+            if mtp_enable:
+                hidden_states, nbatch_pack_offset = args
+                attention_mask = None
+            else:
+                hidden_states, attention_mask = args
             position_ids = None
         elif len(args) == 1:
             (hidden_states,) = args
             attention_mask = None
             position_ids = None
+            nbatch_pack_offset = None
     else:
         hidden_states = args
-        attention_mask, position_ids = None, None
+        attention_mask, position_ids, nbatch_pack_offset = None, None, None
     # need position_ids to compute value for PPO.
     if position_ids is not None:
         position_ids.stop_gradient = True
@@ -105,7 +124,10 @@ def parse_args(args):
     if attention_mask is not None:
         attention_mask.stop_gradient = True
 
-    return hidden_states, attention_mask, position_ids
+    if nbatch_pack_offset is not None:
+        nbatch_pack_offset.stop_gradient = True
+
+    return hidden_states, attention_mask, position_ids, nbatch_pack_offset
 
 
 def return_args(hidden_states, attention_mask=None, position_ids=None):
@@ -140,7 +162,6 @@ def return_args(hidden_states, attention_mask=None, position_ids=None):
         ret += (position_ids.clone(),)
     if len(ret) == 1:
         ret = ret[0]
-
     return ret
 
 
@@ -175,7 +196,8 @@ def get_pp_vp_split_layers(config, skip_recompute_num=-1):
     vp_size = max(config.virtual_pp_degree, 1)
 
     assert pp_size > 1, (
-        "Only support pipeline parallel, " f"pp_size must be greater than 1, but got pp_size: {pp_size}"
+        "Only support pipeline parallel, "
+        f"pp_size must be greater than 1, but got pp_size: {pp_size}"
     )
     layer_num = config.num_hidden_layers + config.add_tail_layers
 
@@ -201,7 +223,10 @@ def get_pp_vp_split_layers(config, skip_recompute_num=-1):
     )
 
     chunk_size = layer_num // (pp_size * vp_size)
-    chunk_list = [list(range(i * chunk_size, (i + 1) * chunk_size)) for i in range(pp_size * vp_size)]
+    chunk_list = [
+        list(range(i * chunk_size, (i + 1) * chunk_size))
+        for i in range(pp_size * vp_size)
+    ]
 
     stage_chunk_list = [[] for _ in range(pp_size)]
     for i in range(pp_size * vp_size):
@@ -235,9 +260,12 @@ def create_skip_config_for_refined_recompute(layer_idx, config):
         return config
     skip_config = dict()
 
-    if len(config.refined_recompute) > 0 and config.recompute_granularity not in ["full"]:
+    if len(config.refined_recompute) > 0 and config.recompute_granularity not in [
+        "full"
+    ]:
         raise ValueError(
-            "Selective recompute only support full recompute now, " "please set recompute_granularity to `full`."
+            "Selective recompute only support full recompute now, "
+            "please set recompute_granularity to `full`."
         )
 
     for op_name, skip_num in config.refined_recompute.items():
@@ -301,7 +329,9 @@ class Ernie4_5_EmbeddingPipe(nn.Layer):
             - Automatically generates position_ids if not provided
             - Supports sequence parallel redistribution of embeddings
         """
-        input_ids, attention_mask, position_ids = parse_args(args)
+        input_ids, attention_mask, position_ids, nbatch_pack_offset = parse_args(
+            args, self.config.num_nextn_predict_layers > 0
+        )
         input_ids.stop_gradient = True
         emb = self.embed_tokens(input_ids).astype(self.embed_tokens.weight.dtype)
         if self.config.num_nextn_predict_layers > 0:
@@ -311,10 +341,11 @@ class Ernie4_5_EmbeddingPipe(nn.Layer):
                     emb = emb.reshape([-1, emb.shape[-1]])
                     emb = ScatterOp.apply(emb)
             else:
-                inputs_embeds_extra = emb[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
+                inputs_embeds_extra = emb[
+                    :, -self.config.num_nextn_predict_layers :, :
+                ]  # [B, S, D]
                 inputs_embeds = emb[:, : -self.config.num_nextn_predict_layers, :]
                 inputs_embeds_ori = inputs_embeds
-                batch_size, seq_length, _ = inputs_embeds.shape
 
                 if self.sequence_parallel:
                     inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[-1]])
@@ -322,10 +353,16 @@ class Ernie4_5_EmbeddingPipe(nn.Layer):
                 mtp_emb_res = [inputs_embeds]
                 for depth in range(self.config.num_nextn_predict_layers):
                     inputs_embeds_mtp = paddle.concat(
-                        [inputs_embeds_ori[:, (depth + 1) :, :], inputs_embeds_extra[:, : (depth + 1), :]], axis=1
+                        [
+                            inputs_embeds_ori[:, (depth + 1) :, :],
+                            inputs_embeds_extra[:, : (depth + 1), :],
+                        ],
+                        axis=1,
                     )
                     if self.sequence_parallel:
-                        inputs_embeds_mtp = inputs_embeds_mtp.reshape([-1, inputs_embeds_mtp.shape[-1]])
+                        inputs_embeds_mtp = inputs_embeds_mtp.reshape(
+                            [-1, inputs_embeds_mtp.shape[-1]]
+                        )
                         inputs_embeds_mtp = ScatterOp.apply(inputs_embeds_mtp)
 
                     mtp_emb_res.append(inputs_embeds_mtp)
@@ -353,9 +390,9 @@ class Ernie4_5_EmbeddingPipe(nn.Layer):
         if attention_mask is not None:
             ret += (attention_mask.clone(),)
         if position_ids is not None:
-            if self.config.num_nextn_predict_layers > 0:
-                position_ids = position_ids[..., : -self.config.num_nextn_predict_layers]
             ret += (position_ids.clone(),)
+        if nbatch_pack_offset is not None:
+            ret += (nbatch_pack_offset.clone(),)
         if len(ret) == 1:
             ret = ret[0]
         return ret
@@ -394,7 +431,9 @@ class MTPEmbeddingPipe(Ernie4_5_EmbeddingPipe):
         assert len(input_ids_for_mtp) > 0, "input_ids for mtp is empty"
         hidden_states = args[0]
         input_ids = input_ids_for_mtp.popleft()
-        input_embeds = self.embed_tokens(input_ids).astype(self.embed_tokens.weight.dtype)
+        input_embeds = self.embed_tokens(input_ids).astype(
+            self.embed_tokens.weight.dtype
+        )
         return (hidden_states, input_embeds)
 
 
@@ -464,36 +503,55 @@ class Ernie4_5_DecoderLayerPipe(Ernie4_5_DecoderLayer):
                 - Tuple containing (output_states, attention_mask, position_ids)
                 - Single tensor of output_states if no masks/positions provided
         """
-
-        if self.config.num_nextn_predict_layers > 0 and not self.config.enable_mtp_magic_send:
+        if (
+            self.config.num_nextn_predict_layers > 0
+            and not self.config.enable_mtp_magic_send
+        ):
             res = args[0]
             tensor_list = paddle.split(res, self.config.num_nextn_predict_layers + 1)
             inputs_embeds = tensor_list[-self.config.num_nextn_predict_layers :]
-            args = tuple(tensor_list[: -self.config.num_nextn_predict_layers]) + args[1:]
+            args = (
+                tuple(tensor_list[: -self.config.num_nextn_predict_layers]) + args[1:]
+            )
         else:
             res = None
 
-        hidden_states, attention_mask, position_ids = parse_args(args)
+        hidden_states, attention_mask, position_ids, nbatch_pack_offset = parse_args(
+            args, self.config.num_nextn_predict_layers > 0
+        )
 
+        max_seq_len = hidden_states.shape[1]
+        if self.config.sequence_parallel:
+            max_seq_len = hidden_states.shape[0] * self.config.tensor_parallel_degree
         if attention_mask is None:
             tgt_mask = None
             attn_mask_start_row_indices = None
         elif attention_mask.dtype == paddle.int32:
             tgt_mask = None
-            attn_mask_start_row_indices = attention_mask
+            attn_mask_start_row_indices = attention_mask[:, :, :max_seq_len]
         else:
-            tgt_mask = attention_mask
+            tgt_mask = attention_mask[:, :, :max_seq_len, :max_seq_len]
             attn_mask_start_row_indices = None
-            assert len(tgt_mask.shape) == 4, f"Attention mask should be 4D tensor, but got {tgt_mask.shape}."
+            assert (
+                len(tgt_mask.shape) == 4
+            ), f"Attention mask should be 4D tensor, but got {tgt_mask.shape}."
+
+        position_ids_decoder = None
+        if position_ids is not None:
+            position_ids_decoder = position_ids[:, :max_seq_len]
 
         has_gradient = not hidden_states.stop_gradient
-        if self.config.recompute and self.config.recompute_granularity == "full" and has_gradient:
+        if (
+            self.config.recompute
+            and self.config.recompute_granularity == "full"
+            and has_gradient
+        ):
             hidden_states = recompute(
                 super().forward,
                 hidden_states,
                 attention_mask=tgt_mask,
                 attn_mask_start_row_indices=attn_mask_start_row_indices,
-                position_ids=position_ids,
+                position_ids=position_ids_decoder,
                 output_gate_logits=False,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
@@ -502,7 +560,7 @@ class Ernie4_5_DecoderLayerPipe(Ernie4_5_DecoderLayer):
                 hidden_states=hidden_states,
                 attention_mask=tgt_mask,
                 attn_mask_start_row_indices=attn_mask_start_row_indices,
-                position_ids=position_ids,
+                position_ids=position_ids_decoder,
                 output_gate_logits=False,
             )
 
@@ -512,6 +570,8 @@ class Ernie4_5_DecoderLayerPipe(Ernie4_5_DecoderLayer):
             ret += (attention_mask.clone(),)
         if position_ids is not None:
             ret += (position_ids.clone(),)
+        if nbatch_pack_offset is not None:
+            ret += (nbatch_pack_offset.clone(),)
         if len(ret) == 1:
             (ret,) = ret
         if self.config.num_nextn_predict_layers > 0:
@@ -556,19 +616,23 @@ class RMSNormPipe(RMSNorm):
         """
         if self.config.num_nextn_predict_layers > 0:
             if self.config.enable_mtp_magic_send:
-                assert len(args) == self.config.num_nextn_predict_layers + 1, "the length is not valid in mtp"
+                assert (
+                    len(args) == self.config.num_nextn_predict_layers + 1
+                ), "the length is not valid in mtp"
                 mtp_outputs = []
                 for hidden_states in args:
                     mtp_outputs.append(super().forward(hidden_states))
                 return mtp_outputs
             else:
-                tensor_list = paddle.split(args[0], self.config.num_nextn_predict_layers + 1)
+                tensor_list = paddle.split(
+                    args[0], self.config.num_nextn_predict_layers + 1
+                )
                 mtp_outputs = []
                 for hidden_states in tensor_list:
                     mtp_outputs.append(super().forward(hidden_states))
                 return mtp_outputs
         else:
-            hidden_states, _, _ = parse_args(args)
+            hidden_states, _, _, _ = parse_args(args)
             hidden_states = super().forward(hidden_states)
             return hidden_states
 
@@ -612,19 +676,23 @@ class LayerNormPipe(LayerNorm):
         """
         if self.config.num_nextn_predict_layers > 0:
             if self.config.enable_mtp_magic_send:
-                assert len(args) == self.config.num_nextn_predict_layers + 1, "the length is not valid in mtp"
+                assert (
+                    len(args) == self.config.num_nextn_predict_layers + 1
+                ), "the length is not valid in mtp"
                 mtp_outputs = []
                 for hidden_states in args:
                     mtp_outputs.append(super().forward(hidden_states))
                 return mtp_outputs
             else:
-                tensor_list = paddle.split(args[0], self.config.num_nextn_predict_layers + 1)
+                tensor_list = paddle.split(
+                    args[0], self.config.num_nextn_predict_layers + 1
+                )
                 mtp_outputs = []
                 for hidden_states in tensor_list:
                     mtp_outputs.append(super().forward(hidden_states))
                 return mtp_outputs
         else:
-            hidden_states, _, _ = parse_args(args)
+            hidden_states, _, _, _ = parse_args(args)
             hidden_states = super().forward(hidden_states)
             return hidden_states
 
@@ -656,16 +724,29 @@ class MTPLayer(nn.Layer):
         ), "Adding MTPLayer must assign value to num_nextn_predict_layers"
 
         self.mtp_block = paddle.nn.LayerList(
-            [Ernie4_5_DecoderLayer(config, layer_idx) for layer_idx in range(self.config.num_nextn_predict_layers)]
+            [
+                Ernie4_5_DecoderLayer(config, layer_idx)
+                for layer_idx in range(self.config.num_nextn_predict_layers)
+            ]
         )
         Norm = RMSNorm if config.use_rmsnorm else LayerNorm
-        self.mtp_hidden_norm = paddle.nn.LayerList([Norm(config) for _ in range(self.config.num_nextn_predict_layers)])
-        self.mtp_emb_norm = paddle.nn.LayerList([Norm(config) for _ in range(self.config.num_nextn_predict_layers)])
+        self.mtp_hidden_norm = paddle.nn.LayerList(
+            [Norm(config) for _ in range(self.config.num_nextn_predict_layers)]
+        )
+        self.mtp_emb_norm = paddle.nn.LayerList(
+            [Norm(config) for _ in range(self.config.num_nextn_predict_layers)]
+        )
 
-        LinearFN = paddle.incubate.nn.FusedLinear if config.fuse_linear else paddle.nn.Linear
+        LinearFN = (
+            paddle.incubate.nn.FusedLinear if config.fuse_linear else paddle.nn.Linear
+        )
         self.mtp_linear_proj = paddle.nn.LayerList(
             [
-                LinearFN(self.config.hidden_size * 2, self.config.hidden_size, bias_attr=config.use_bias)
+                LinearFN(
+                    self.config.hidden_size * 2,
+                    self.config.hidden_size,
+                    bias_attr=config.use_bias,
+                )
                 for _ in range(self.config.num_nextn_predict_layers)
             ]
         )
@@ -689,11 +770,16 @@ class MTPLayer(nn.Layer):
 
     def forward_impl(self, *args):
         """forward_impl"""
-        _, attention_mask, position_ids = parse_args(args)
+        _, attention_mask, position_ids, nbatch_pack_offset = parse_args(
+            args, self.config.num_nextn_predict_layers > 0
+        )
+
         if self.config.enable_mtp_magic_send:
             assert isinstance(args, tuple), "Input for MTPLayer must be tuple"
             hidden_states, inputs_embeds = args
-            inputs_embeds_extra = inputs_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
+            inputs_embeds_extra = inputs_embeds[
+                :, -self.config.num_nextn_predict_layers :, :
+            ]  # [B, S, D]
             inputs_embeds = inputs_embeds[:, : -self.config.num_nextn_predict_layers, :]
             inputs_embeds_ori = inputs_embeds
         else:
@@ -702,33 +788,91 @@ class MTPLayer(nn.Layer):
             hidden_states = tensor_list[0]
             inputs_embeds_cur_depth_list = tensor_list[1:]
 
+        max_seq_len = hidden_states.shape[1]
+        if self.config.sequence_parallel:
+            max_seq_len = hidden_states.shape[0] * self.config.tensor_parallel_degree
+
+        if attention_mask is None:
+            tgt_mask = None
+            attn_mask_start_row_indices = None
+        elif attention_mask.dtype == paddle.int32:
+            tgt_mask = None
+            attn_mask_start_row_indices = attention_mask
+        else:
+            tgt_mask = attention_mask
+            attn_mask_start_row_indices = None
+            assert (
+                len(tgt_mask.shape) == 4
+            ), f"Attention mask should be 4D tensor, but got {tgt_mask.shape}."
+
         output_list = [hidden_states]
         for depth in range(self.config.num_nextn_predict_layers):
+            if position_ids is not None:
+                position_ids = position_ids[:, depth + 1 : max_seq_len + depth + 1]
+            if attention_mask is not None:
+                if attention_mask.dtype == paddle.int32:
+                    tgt_mask = None
+                    attn_mask_start_row_indices = attention_mask[
+                        :, :, depth + 1 : max_seq_len + depth + 1
+                    ]
+                else:
+                    tgt_mask = attention_mask[
+                        :,
+                        :,
+                        depth + 1 : max_seq_len + depth + 1,
+                        depth + 1 : max_seq_len + depth + 1,
+                    ]
+                    attn_mask_start_row_indices = None
+                    assert (
+                        len(tgt_mask.shape) == 4
+                    ), f"Attention mask should be 4D tensor, but got {tgt_mask.shape}."
             if self.config.enable_mtp_magic_send:
                 inputs_embeds_cur_depth = paddle.concat(
-                    [inputs_embeds_ori[:, (depth + 1) :, :], inputs_embeds_extra[:, : (depth + 1), :]], axis=1
+                    [
+                        inputs_embeds_ori[:, (depth + 1) :, :],
+                        inputs_embeds_extra[:, : (depth + 1), :],
+                    ],
+                    axis=1,
                 )
 
                 if self.config.sequence_parallel or self.config.submatrix_parallel:
-                    inputs_embeds_cur_depth = inputs_embeds_cur_depth.reshape([-1, inputs_embeds_cur_depth.shape[-1]])
+                    inputs_embeds_cur_depth = inputs_embeds_cur_depth.reshape(
+                        [-1, inputs_embeds_cur_depth.shape[-1]]
+                    )
                     inputs_embeds_cur_depth = ScatterOp.apply(inputs_embeds_cur_depth)
             else:
                 inputs_embeds_cur_depth = inputs_embeds_cur_depth_list[depth]
 
+            nbatch_pack_offset_cur_depth = nbatch_pack_offset[
+                :, depth + 1 : max_seq_len + depth + 1
+            ]
+            if self.config.sequence_parallel:
+                nbatch_pack_offset_cur_depth = nbatch_pack_offset_cur_depth.reshape(
+                    (-1,)
+                )
+                nbatch_pack_offset_cur_depth = ScatterOp.apply(
+                    nbatch_pack_offset_cur_depth
+                )
+
+            hidden_states = mtp_hidden_states_set_zero(
+                hidden_states, nbatch_pack_offset_cur_depth
+            )
             # Norm&Concat
-            inputs_embeds_cur_depth_norm = self.mtp_emb_norm[depth](inputs_embeds_cur_depth)
+            inputs_embeds_cur_depth_norm = self.mtp_emb_norm[depth](
+                inputs_embeds_cur_depth
+            )
             hidden_states_norm = self.mtp_hidden_norm[depth](hidden_states)
 
             inputs_embeds_cur_depth = self.mtp_linear_proj[depth](
-                paddle.concat([inputs_embeds_cur_depth_norm, hidden_states_norm], axis=-1)
+                paddle.concat(
+                    [inputs_embeds_cur_depth_norm, hidden_states_norm], axis=-1
+                )
             )
 
             decoder_layer = self.mtp_block[depth]
-            past_key_value = None
-            attn_mask_start_row_indices = attention_mask
             layer_outputs = decoder_layer(
                 inputs_embeds_cur_depth,
-                None,  # attention_mask
+                tgt_mask,  # attention_mask
                 attn_mask_start_row_indices,  # attn_mask_start_row_indices
                 position_ids,  # position_ids
                 None,  # token-type
@@ -778,7 +922,7 @@ class Ernie4_5_MoeLMHeadPipe(Ernie4_5_MoeLMHead):
                 logits.append(super().forward(_hidden_states))
             return logits
         else:
-            hidden_states, _, _ = parse_args(args)
+            hidden_states, _, _, _ = parse_args(args)
             logits = super().forward(hidden_states)  # 返回tensor
             return logits
 
@@ -828,7 +972,9 @@ class ErniePretrainingCriterionPipe(ErniePretrainingCriterion):
         if self.config.num_nextn_predict_layers > 0:
             mtp_logits = logits[1:]
             logits = logits[0]
-            loss, loss_sum = super().forward(logits, labels, loss_mask, mtp_logits=mtp_logits)
+            loss, loss_sum = super().forward(
+                logits, labels, loss_mask, mtp_logits=mtp_logits
+            )
             if not self.training:
                 return loss_sum
             return loss
@@ -845,20 +991,37 @@ class Ernie4_5_MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     """
 
     config_class = Ernie4_5_MoeConfig
-    _get_tensor_parallel_mappings = Ernie4_5_PretrainedModel._get_tensor_parallel_mappings
+    _get_tensor_parallel_mappings = (
+        Ernie4_5_PretrainedModel._get_tensor_parallel_mappings
+    )
     _init_weights = Ernie4_5_PretrainedModel._init_weights
     _keep_in_fp32_modules = Ernie4_5_PretrainedModel._keep_in_fp32_modules
     _tied_weights_keys = ["lm_head.weight"]
 
     @classmethod
     def _prepare_pipeline_inputs_func(cls, inputs):
-        first_stage_keys = ["input_ids", "attn_mask_start_row_indices", "position_ids"]
+        first_stage_keys = [
+            "input_ids",
+            "attn_mask_start_row_indices",
+            "position_ids",
+            "nbatch_pack_offset",
+        ]
         if type(inputs) is dict or type(inputs) is OrderedDict:
             if "attention_mask" in inputs:
-                first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
+                first_stage_keys = [
+                    "input_ids",
+                    "attention_mask",
+                    "position_ids",
+                    "nbatch_pack_offset",
+                ]
         else:  # inputs is list
             if "attention_mask" in inputs[0]:
-                first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
+                first_stage_keys = [
+                    "input_ids",
+                    "attention_mask",
+                    "position_ids",
+                    "nbatch_pack_offset",
+                ]
         last_stage_keys = ["labels", "loss_mask"]
 
         def get_expected_keys(inputs, keys):
@@ -891,7 +1054,9 @@ class Ernie4_5_MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             config (Ernie4_5_MoeConfig): Model configuration.
         """
         new_initializer_range = math.sqrt(0.3333 / config.hidden_size)
-        logger.info(f"change initializer-range from {config.initializer_range} to {new_initializer_range}")
+        logger.info(
+            f"change initializer-range from {config.initializer_range} to {new_initializer_range}"
+        )
         config.initializer_range = new_initializer_range
 
         if config.moe_group == "mp":
@@ -899,7 +1064,9 @@ class Ernie4_5_MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         if config.moe_group in {"mp", "model", "tp", "mpdp"}:
             assert config.sequence_parallel
-            logger.info(f"disable FFN tensor model parallel, moe-group={config.moe_group}")
+            logger.info(
+                f"disable FFN tensor model parallel, moe-group={config.moe_group}"
+            )
             config.disable_ffn_model_parallel = True
 
         config.moe_group_origin = config.moe_group
@@ -924,12 +1091,17 @@ class Ernie4_5_MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         if config.tie_word_embeddings:
             self.add_sequential_layer(
                 SharedLayerDesc(
-                    "model_shared_weight", Ernie4_5_EmbeddingPipe, shared_weight_attr="embedding_weight", config=config
+                    "model_shared_weight",
+                    Ernie4_5_EmbeddingPipe,
+                    shared_weight_attr="embedding_weight",
+                    config=config,
                 ),
                 "ernie",
             )
         else:
-            self.add_sequential_layer(LayerDesc(Ernie4_5_EmbeddingPipe, config=config), "ernie")
+            self.add_sequential_layer(
+                LayerDesc(Ernie4_5_EmbeddingPipe, config=config), "ernie"
+            )
 
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
@@ -962,18 +1134,26 @@ class Ernie4_5_MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.add_sequential_layer(LayerDesc(MTPLayer, config=config), "ernie")
 
         self.add_sequential_layer(
-            LayerDesc(RMSNormPipe if config.use_rmsnorm else LayerNormPipe, config=config), "ernie.norm"
+            LayerDesc(
+                RMSNormPipe if config.use_rmsnorm else LayerNormPipe, config=config
+            ),
+            "ernie.norm",
         )
 
         if config.tie_word_embeddings:
             self.add_sequential_layer(
                 SharedLayerDesc(
-                    "model_shared_weight", Ernie4_5_MoeLMHeadPipe, shared_weight_attr="embedding_weight", config=config
+                    "model_shared_weight",
+                    Ernie4_5_MoeLMHeadPipe,
+                    shared_weight_attr="embedding_weight",
+                    config=config,
                 ),
                 "lm_head",
             )
         else:
-            self.add_sequential_layer(LayerDesc(Ernie4_5_MoeLMHeadPipe, config=config), "lm_head")
+            self.add_sequential_layer(
+                LayerDesc(Ernie4_5_MoeLMHeadPipe, config=config), "lm_head"
+            )
 
         # NOTE(shenliang03): recompute_interval is nouse for pipeline parallel
         recompute_interval = 0
@@ -985,17 +1165,21 @@ class Ernie4_5_MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         )
         try:
             result = ast.literal_eval(seg_method)
-            if type(result) == list:
+            if isinstance(result, list):
                 seg_method = result
-        except:
+        except Exception:
             pass
 
         if (
             seg_method == "layer:Ernie4_5_DecoderLayer|EmptyLayer"
-            and (config.num_hidden_layers + config.add_tail_layers) % get_hcg().topology().get_dim_size("pipe") != 0
+            and (config.num_hidden_layers + config.add_tail_layers)
+            % get_hcg().topology().get_dim_size("pipe")
+            != 0
         ):
             seg_method = "uniform"
-        logger.info(f"using recompute_interval={recompute_interval}, seg_method={seg_method}")
+        logger.info(
+            f"using recompute_interval={recompute_interval}, seg_method={seg_method}"
+        )
 
         PipelineLayer.__init__(
             self,

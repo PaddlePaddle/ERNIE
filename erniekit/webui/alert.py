@@ -49,20 +49,20 @@ ALERTS = {
     },
     "export_split_start": {
         "info": {
-            "zh": "开始执行erniekit sever， 请稍候",
-            "en": "start run erniekit sever export",
+            "zh": "开始执行erniekit server， 请稍候",
+            "en": "start run erniekit server export",
         }
     },
     "export_split_non_existent": {
         "error": {
-            "zh": "执行erniekit sever失败, 输入文件夹本地不存在，请检查文件配置",
-            "en": "run erniekit sever failed，input folder does not exist,please check file config",
+            "zh": "执行erniekit server失败, 输入文件夹本地不存在，请检查文件配置",
+            "en": "run erniekit server failed，input folder does not exist,please check file config",
         }
     },
     "export_split_success": {
         "info": {
-            "zh": "erniekit sever执行完成",
-            "en": "erniekit sever export completed",
+            "zh": "erniekit server执行完成",
+            "en": "erniekit server export completed",
         }
     },
     "export_split_find_exceed_file": {
@@ -72,7 +72,12 @@ ALERTS = {
             "which exceeds the {} GB limit. Starting the splitting process...",
         }
     },
-    "export_split_fail": {"error": {"zh": "erniekit sever执行失败", "en": "erniekit sever export failed"}},
+    "export_split_fail": {
+        "error": {
+            "zh": "erniekit server执行失败",
+            "en": "erniekit server export failed",
+        }
+    },
     "preview_data_non_json": {
         "error": {
             "zh": " 文件 {} 不是有效的JSON/JSONL格式，已跳过",
@@ -152,9 +157,14 @@ ALERTS = {
             "en": "If max steps is greater than 0, the setting of training epochs will not take effect.",
         }
     },
-    "thought_model_notice": {"info": {"zh": "该模型不建议微调", "en": "This model should not be fine-tuned"}},
+    "thought_model_notice": {
+        "info": {"zh": "该模型不建议微调", "en": "This model should not be fine-tuned"}
+    },
     "custom_model_notice": {
-        "info": {"zh": "自定义模型，请自主填入模型路径", "en": "Custom models, please fill in your own model paths"}
+        "info": {
+            "zh": "自定义模型，请自主填入模型路径",
+            "en": "Custom models, please fill in your own model paths",
+        }
     },
     "compute_type_fp8_notice": {
         "warning": {
@@ -162,11 +172,62 @@ ALERTS = {
             "en": "Please note that fp8 only supports GPU environments of H-card type",
         }
     },
+    "dataset_none_data": {
+        "warning": {
+            "zh": "数据集{}: 缺失相关数据({})",
+            "en": "Dataset {}: Missing relevant data ({})",
+        }
+    },
+    "merge_is_running": {
+        "warning": {
+            "zh": "当前有合并任务正在执行中，请先等待其完成，或手动停止后再进行操作",
+            "en": "A merge task is currently running. Please either wait for it to finish or stop it manually before proceeding.",
+        }
+    },
+    "split_is_running": {
+        "warning": {
+            "zh": "当前split任务正在进行中，请等待完成或停止后再执行",
+            "en": "Current split task is being performed, wait until it completes or stop it first",
+        }
+    },
+    "allow_switch_button": {
+        "info": {
+            "zh": "命令成功启动，预览命令行按钮之间切换不影响命令执行",
+            "en": "Command started successfully, switching between preview commands does not affect execution",
+        }
+    },
+    "model_is_None": {
+        "warning": {"zh": "模型路径不能为空", "en": "Model path can not be none"}
+    },
+    "generate_log": {
+        "warning": {
+            "zh": "生成日志失败",
+            "en": "Failed to generate log",
+        }
+    },
+    "role_setting": {
+        "append": {
+            "zh": "你现在扮演: {}",
+            "en": "You are now playing: {}",
+        }
+    },
+    "thought_process": {"append": {"zh": "思考过程", "en": "Thought Process"}},
+    "chatbot_api": {
+        "text": {"zh": "API调用失败: {}", "en": "API call failed: {}"},
+        "multimodal": {
+            "zh": "多模态API调用失败: {}",
+            "en": "Multimodal API call failed: {}",
+        },
+        "thought": {"zh": "思考过程生成失败: {}", "en": "Thoughts API call failed: {}"},
+        "multimodal_thought": {
+            "zh": "多模态思考过程生成失败: {}",
+            "en": "Multimodal API call failed: {}",
+        },
+    },
 }
 
 
 class Alerts:
-
     def __init__(self, language="zh"):
         self.language = language
         self.manager = None
@@ -182,7 +243,7 @@ class Alerts:
             lang (str, optional): Language code to override default (default: None)
 
         Returns:
-            str: Localized alert message if found, empty string otherwise
+            str: Localized alert message if found, empty string otherwise.
         """
 
         try:

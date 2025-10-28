@@ -19,7 +19,7 @@ from .pretraining_trainer import (
 )
 
 __all__ = [
-    'PretrainingTrainer',
-    'PreTrainingArguments',
-    'WeightedDistributedSampler',
+    "PretrainingTrainer",
+    "PreTrainingArguments",
+    "WeightedDistributedSampler",
 ]

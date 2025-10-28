@@ -12,34 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Eval Ernie Model. """
+"""Eval Ernie Model."""
 
+import json
 import os
 from functools import partial
 from typing import Any, Optional
 
 import paddle
+from paddleformers.transformers import (
+    AutoConfig,
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+)
 from paddleformers.trainer import (
     IntervalStrategy,
     RuntimeTimer,
     get_last_checkpoint,
     set_seed,
 )
+
 from paddleformers.trainer.trainer_utils import ShardingOption
-from paddleformers.transformers.model_utils import unwrap_model
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 
 from ernie.configuration import Ernie4_5_MoeConfig
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
-from ernie.utils.common_utils import (
-    check_refined_recompute,
-    save_stop_info,
-)
+from ernie.utils.common_utils import check_refined_recompute, save_stop_info
+from ernie.utils.download_utils import check_download_repo
+from ernie.utils.load_utils import resolve_weight_source
 
 from ..hparams import get_eval_args, read_args
+
 from ..train.sft.trainer import ErnieMoETrainer
+from ..utils.process import is_valid_model_dir
 
 
 def run_eval(args: Optional[dict[str, Any]] = None) -> None:
@@ -56,7 +65,8 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         if finetuning_args.pipeline_parallel_degree > 1:
             assert (
                 hasattr(finetuning_args, "pipeline_parallel_config")
-                and "disable_partial_send_recv" in finetuning_args.pipeline_parallel_config
+                and "disable_partial_send_recv"
+                in finetuning_args.pipeline_parallel_config
             ), "Should set '--pipeline_parallel_config disable_partial_send_recv' in bash script for pp with sp."
         if finetuning_args.tensor_parallel_degree <= 1:
             finetuning_args.sequence_parallel = False
@@ -88,7 +98,11 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
                 finetuning_args.release_grads = False
 
     # checkpoint O1 quantization is open by default.
-    if not finetuning_args.disable_ckpt_quant and finetuning_args.ckpt_quant_stage == "O0" and not model_args.lora:
+    if (
+        not finetuning_args.disable_ckpt_quant
+        and finetuning_args.ckpt_quant_stage == "O0"
+        and not model_args.lora
+    ):
         finetuning_args.ckpt_quant_stage = "O1"
     elif finetuning_args.disable_ckpt_quant:
         finetuning_args.ckpt_quant_stage = "O0"
@@ -107,24 +121,27 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     )
 
     last_checkpoint = None
-    if os.path.isdir(finetuning_args.output_dir) and not finetuning_args.overwrite_output_dir:
-        uc_async_save = (
-            finetuning_args.unified_checkpoint and "async_save" in finetuning_args.unified_checkpoint_config
+    if os.path.isdir(finetuning_args.output_dir):
+        # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
+        if is_valid_model_dir(finetuning_args.output_dir):
+            last_checkpoint = finetuning_args.output_dir
+        # If not a model directory but still a valid path, try to find the latest checkpoint
+        else:
+            last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
+    if last_checkpoint is not None:
+        logger.info(
+            f"Checkpoint detected, starting model eval from checkpoint: {last_checkpoint}"
         )
-        last_checkpoint = get_last_checkpoint(
-            finetuning_args.output_dir,
-            signal_folder=finetuning_args.output_signal_dir,
-            uc_async_save=uc_async_save,
-        )
-        if last_checkpoint is not None and finetuning_args.resume_from_checkpoint is None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
 
-    if last_checkpoint is not None and model_args.continue_training and not model_args.lora:
+    if (
+        last_checkpoint is not None
+        and model_args.continue_training
+        and not model_args.lora
+    ):
         model_args.continue_training = False
-        logger.info(f"Checkpoint detected, resuming training at {last_checkpoint}. Set `continue_training` to False.")
+        logger.info(
+            f"Checkpoint detected, resuming training at {last_checkpoint}. Set `continue_training` to False."
+        )
 
     # Set the dtype for loading model
     dtype = paddle.get_default_dtype()
@@ -135,10 +152,27 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             dtype = "bfloat16"
 
     logger.info("Start to load model ...")
-    model_class = Ernie4_5_MoeForCausalLM
-    if finetuning_args.pipeline_parallel_degree > 1:
-        model_class = Ernie4_5_MoeForCausalLMPipe
-    if model_args.moe_group.lower() in {"data", "dp"} and finetuning_args.data_parallel_degree > 1:
+
+    # Detect torch model.
+    is_local = os.path.isfile(model_args.model_name_or_path) or os.path.isdir(
+        model_args.model_name_or_path
+    )
+
+    weight_source = {
+        "convert_from_hf": False,
+        "save_to_hf": False,
+    }
+    if is_local:
+        config_path = os.path.join(model_args.model_name_or_path, "config.json")
+        with open(config_path, "r", encoding="utf-8") as f:
+            config_dict = json.load(f)
+        if "torch_dtype" in config_dict:
+            weight_source["convert_from_hf"] = True
+
+    if (
+        model_args.moe_group.lower() in {"data", "dp"}
+        and finetuning_args.data_parallel_degree > 1
+    ):
         finetuning_args.use_expert_parallel = True
 
     # fuse_softmax_mask only support for rocm.
@@ -149,7 +183,11 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             )
             model_args.fuse_softmax_mask = False
 
-    check_refined_recompute(finetuning_args.refined_recompute, finetuning_args.sequence_parallel, lora=model_args.lora)
+    check_refined_recompute(
+        finetuning_args.refined_recompute,
+        finetuning_args.sequence_parallel,
+        lora=model_args.lora,
+    )
 
     runtime_timer.start("basemodel loading time")
     if finetuning_args.weight_quantize_algo is not None:
@@ -158,8 +196,13 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
                 "weight_only_int4": [".*mlp.experts.*"],
                 "weight_only_int8": [
                     ".*self_attn.qkv_proj.*",
+                    ".*self_attn.q_proj.*",
+                    ".*self_attn.k_proj.*",
+                    ".*self_attn.v_proj.*",
                     ".*self_attn.o_proj.*",
                     ".*mlp.up_gate_proj.*",
+                    ".*mlp.gate_proj.*",
+                    ".*mlp.up_proj.*",
                     ".*mlp.down_proj.*",
                 ],
             }
@@ -185,13 +228,93 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
                 }
             )
     else:
-        quantization_config = dict(weight_quantize_algo=finetuning_args.weight_quantize_algo)
+        quantization_config = dict(
+            weight_quantize_algo=finetuning_args.weight_quantize_algo
+        )
 
-    model_config = Ernie4_5_MoeConfig.from_pretrained(
+    model_args.model_name_or_path = check_download_repo(
         model_args.model_name_or_path,
-        dtype=dtype,
-        quantization_config=quantization_config,
+        download_hub=model_args.download_hub,
     )
+
+    try:
+        from paddleformers.utils.download import (
+            DownloadSource,
+        )  # test if paddleformers is the newest
+    except Exception:
+        DownloadSource = None
+
+    download_source_kwargs = {}
+    if DownloadSource is None:
+        if model_args.download_hub == "huggingface":
+            download_source_kwargs["from_hf_hub"] = True
+        elif model_args.download_hub == "aistudio":
+            download_source_kwargs["from_aistudio"] = True
+        elif model_args.download_hub == "modelscope":
+            download_source_kwargs["from_modelscope"] = True
+    else:
+        download_source_kwargs["download_hub"] = model_args.download_hub
+
+    weight_source = resolve_weight_source(
+        model_args.model_name_or_path,
+        download_source_kwargs=download_source_kwargs,
+    )
+
+    if weight_source["convert_from_hf"]:
+        finetuning_args.use_huggingface_model = True
+        model_args.pp_seg_method = "layer:DecoderLayer|EmptyLayer"
+        logger.info("loading model from HuggingFace")
+
+    if finetuning_args.use_huggingface_model:
+        model_class = AutoModelForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = AutoModelForCausalLMPipe
+    else:
+        model_class = Ernie4_5_MoeForCausalLM
+        if finetuning_args.pipeline_parallel_degree > 1:
+            model_class = Ernie4_5_MoeForCausalLMPipe
+
+    convert_from_kwargs = {
+        (
+            "convert_from_hf"
+            if paddleformers_version >= "0.3"
+            else "convert_from_torch"
+        ): weight_source["convert_from_hf"]
+    }
+    if paddleformers_version >= "0.3":
+        finetuning_args.save_to_hf = (
+            weight_source["save_to_hf"] and finetuning_args.use_huggingface_model
+        )
+
+    if finetuning_args.use_huggingface_model:
+        if (
+            model_args.use_attn_mask_start_row_indices
+            and model_args.use_sparse_flash_attn
+        ):
+            _attn_implementation = "flashmask"
+        else:
+            _attn_implementation = "sdpa"
+        model_config = AutoConfig.from_pretrained(
+            model_args.model_name_or_path,
+            _attn_implementation=_attn_implementation,
+            dtype=dtype,
+            quantization_config=quantization_config,
+            use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
+            use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
+            loss_subbatch_sequence_length=32768,
+            num_nextn_predict_layers=model_args.num_nextn_predict_layers,
+            **convert_from_kwargs,
+            **download_source_kwargs,
+        )
+    else:
+        model_config = Ernie4_5_MoeConfig.from_pretrained(
+            model_args.model_name_or_path,
+            dtype=dtype,
+            quantization_config=quantization_config,
+            **convert_from_kwargs,
+            **download_source_kwargs,
+        )
+
     model_config.tensor_parallel_degree = finetuning_args.tensor_parallel_degree
     model_config.tensor_parallel_rank = finetuning_args.tensor_parallel_rank
     model_config.recompute = finetuning_args.recompute
@@ -223,29 +346,47 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     model_config.moe_orthogonal_loss_lambda = model_args.moe_orthogonal_loss_lambda
     model_config.moe_z_loss_lambda = model_args.moe_z_loss_lambda
     model_config.moe_use_hard_gate = model_args.moe_use_hard_gate
-    model_config.moe_multimodal_dispatch_use_allgather = model_args.moe_multimodal_dispatch_use_allgather
+    model_config.moe_multimodal_dispatch_use_allgather = (
+        model_args.moe_multimodal_dispatch_use_allgather
+    )
     model_config.hidden_dropout_prob = finetuning_args.hidden_dropout_prob
-    model_config.attention_probs_dropout_prob = finetuning_args.attention_probs_dropout_prob
+    model_config.attention_probs_dropout_prob = (
+        finetuning_args.attention_probs_dropout_prob
+    )
     model_config.num_acc_steps = finetuning_args.gradient_accumulation_steps
-    model_config.num_nextn_predict_layers = finetuning_args.num_nextn_predict_layers
+    model_config.num_nextn_predict_layers = model_args.num_nextn_predict_layers
     model_config.multi_token_pred_lambda = finetuning_args.multi_token_pred_lambda
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
         model_config.moe_use_aux_free = model_args.moe_use_aux_free
+    if (
+        model_config.get("moe_num_experts", None) is None
+        or model_config.get("moe_num_experts", 0) == 0
+    ):
+        model_config.moe_group = (
+            "dummy" if model_args.moe_group == "mp" else model_args.moe_group
+        )
 
     if model_args.continue_training or finetuning_args.weight_quantize_algo is not None:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
+            **convert_from_kwargs,
+            **download_source_kwargs,
         )
     else:
-        model = model_class.from_config(model_config, dtype=dtype)
+        model = model_class.from_config(
+            model_config,
+            dtype=dtype,
+        )
+
+    if model.config.head_dim is None:
+        del model.config.head_dim
 
     paddle.device.cuda.empty_cache()
     logger.info("Loading model successfully !")
     logger.debug(f"Model config: {model.config}")
     logger.info(f"{runtime_timer.log()}")
-
     if (
         finetuning_args.pipeline_parallel_degree > 1
         and finetuning_args.weight_quantize_algo is not None
@@ -256,8 +397,13 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             weights when using Pipeline Parallelism (PP)."
         )
 
-    tokenizer = Ernie4_5_Tokenizer.from_pretrained(
+    tokenizer_cls = (
+        AutoTokenizer if weight_source["convert_from_hf"] else Ernie4_5_Tokenizer
+    )
+    tokenizer = tokenizer_cls.from_pretrained(
         model_args.model_name_or_path,
+        **convert_from_kwargs,
+        **download_source_kwargs,
     )
 
     logger.info("Start to create dataset ...")
@@ -271,9 +417,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     from ernie.dataset.finetuning import collate_fn
 
     if data_args.dataset_type == "map":
-        from ernie.dataset.finetuning import (
-            create_indexed_dataset as create_dataset,
-        )
+        from ernie.dataset.finetuning import create_indexed_dataset as create_dataset
     else:
         from ernie.dataset.finetuning import create_dataset
     dataset_config.update(
@@ -299,7 +443,12 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     logger.info("Creating dataset successfully ...")
 
-    data_collator = partial(collate_fn, tokenizer=tokenizer, model_args=model_args, max_seq_len=data_args.max_seq_len)
+    data_collator = partial(
+        collate_fn,
+        tokenizer=tokenizer,
+        model_args=model_args,
+        max_seq_len=data_args.max_seq_len,
+    )
 
     if model_args.lora:
         logger.info("Start to wrap model with LoRA config ...")
@@ -319,38 +468,38 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     if finetuning_args.save_strategy == IntervalStrategy.EPOCH:
         finetuning_args.save_strategy = IntervalStrategy.STEPS
-        finetuning_args.save_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
+        finetuning_args.save_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
     if finetuning_args.evaluation_strategy == IntervalStrategy.EPOCH:
         finetuning_args.evaluation_strategy = IntervalStrategy.STEPS
-        finetuning_args.eval_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
+        finetuning_args.eval_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
     if finetuning_args.logging_strategy == IntervalStrategy.EPOCH:
         finetuning_args.logging_strategy = IntervalStrategy.STEPS
-        finetuning_args.logging_steps = int(finetuning_args.max_steps / finetuning_args.num_train_epochs)
-
-    if not model_args.use_sparse_head_and_loss_fn and not finetuning_args.prediction_loss_only:
-        unwraped_model = unwrap_model(model)
-        if hasattr(model, "compute_metrics"):
-            compute_metrics = model.compute_metrics
-        elif hasattr(unwraped_model, "compute_metrics"):
-            # NOTE(liuting): if model is LoRAModel, we need to unwrap it first.
-            compute_metrics = unwraped_model.compute_metrics
-        else:
-            compute_metrics = None
-    else:
-        compute_metrics = None
+        finetuning_args.logging_steps = int(
+            finetuning_args.max_steps / finetuning_args.num_train_epochs
+        )
 
     trainer = ErnieMoETrainer(
         model=model,
         args=finetuning_args,
         train_dataset=None,
-        eval_dataset=(eval_dataset if finetuning_args.do_eval and finetuning_args.should_load_dataset else None),
+        eval_dataset=(
+            eval_dataset
+            if finetuning_args.do_eval and finetuning_args.should_load_dataset
+            else None
+        ),
         tokenizer=tokenizer,
         do_generation=False,
         data_args=data_args,
         data_collator=data_collator,
     )
     trainable_parameters = [
-        p for p in model.parameters() if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
+        p
+        for p in model.parameters()
+        if not p.stop_gradient or ("quantization_linear" in p.name and "w_1" in p.name)
     ]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
 

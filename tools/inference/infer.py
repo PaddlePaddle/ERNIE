@@ -24,8 +24,10 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
+from paddleformers.transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM
 from paddleformers.trainer import RuntimeTimer
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 from tqdm import tqdm
 
 from ernie.configuration import Ernie4_5_MoeConfig
@@ -33,6 +35,7 @@ from ernie.dataset.data_utils import convert_to_input_ids
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import infer_save_test_case
+from ernie.utils.download_utils import check_download_repo
 
 
 def deserialize_from_file(fp):
@@ -122,7 +125,11 @@ def get_parser():
         default=None,
         help="weight_only_int8",
     )
-    parser.add_argument("--input_file", type=str, default="./examples/inference/data/query-demo.jsonl")
+    parser.add_argument("--download_hub", type=str, default=None)
+    parser.add_argument("--convert_from_hf", type=bool, default=False)
+    parser.add_argument(
+        "--input_file", type=str, default="./examples/inference/data/query-demo.jsonl"
+    )
     parser.add_argument("--output_file", type=str, default="predict.json")
     parser.add_argument("--save_output_file_flush", type=int, default=10)
     return parser
@@ -158,6 +165,11 @@ class Predictor:
             model (Optional): Pre-initialized model
             kwargs: Additional model initialization parameters
         """
+        args.model_name_or_path = check_download_repo(
+            args.model_name_or_path,
+            download_hub=args.download_hub,
+        )
+
         self.runtime_timer = RuntimeTimer("Predictor")
         self.num_input_tokens = 0
         self.num_output_tokens = 0
@@ -178,11 +190,41 @@ class Predictor:
             hcg = fleet.get_hybrid_communicate_group()
             self.tensor_parallel_rank = hcg.get_model_parallel_rank()
 
+        try:
+            from paddleformers.utils.download import (
+                DownloadSource,
+            )  # test if paddleformers is the newest
+        except Exception:
+            DownloadSource = None
+
+        download_source_kwargs = {}
+        if DownloadSource is None:
+            if args.download_hub == "huggingface":
+                download_source_kwargs["from_hf_hub"] = True
+            elif args.download_hub == "aistudio":
+                download_source_kwargs["from_aistudio"] = True
+            elif args.download_hub == "modelscope":
+                download_source_kwargs["from_modelscope"] = True
+        else:
+            download_source_kwargs["download_hub"] = args.download_hub
+
+        convert_from_kwargs = {
+            (
+                "convert_from_hf"
+                if paddleformers_version >= "0.3"
+                else "convert_from_torch"
+            ): args.convert_from_hf
+        }
         # init model & tokenizer
-        self.tokenizer = Ernie4_5_Tokenizer.from_pretrained(args.model_name_or_path)
+        tokenizer_cls = AutoTokenizer if args.convert_from_hf else Ernie4_5_Tokenizer
+        self.tokenizer = tokenizer_cls.from_pretrained(
+            args.model_name_or_path, **convert_from_kwargs, **download_source_kwargs
+        )
         self.tokenizer.padding_side = "left"
         paddle.set_default_dtype(self.args.dtype)
-        self.config = Ernie4_5_MoeConfig.from_pretrained(
+
+        config_cls = AutoConfig if args.convert_from_hf else Ernie4_5_MoeConfig
+        self.config = config_cls.from_pretrained(
             args.model_name_or_path,
             quantization_config=dict(
                 weight_quantize_algo=args.weight_quantize_algo,
@@ -199,11 +241,20 @@ class Predictor:
             tensor_parallel_degree=self.tensor_parallel_degree,
             tensor_parallel_rank=self.tensor_parallel_rank,
             use_flash_attention=True,
-            moe_group="dummy",
+            _attn_implementation="sdpa",
+            moe_group="mp" if self.tensor_parallel_degree > 1 else "dummy",
+            num_nextn_predict_layers=1,
+            **convert_from_kwargs,
+            **download_source_kwargs,
         )
-        self.model = Ernie4_5_MoeForCausalLM.from_pretrained(
+        model_cls = (
+            AutoModelForCausalLM if args.convert_from_hf else Ernie4_5_MoeForCausalLM
+        )
+        self.model = model_cls.from_pretrained(
             args.model_name_or_path,
             config=self.config,
+            **convert_from_kwargs,
+            **download_source_kwargs,
         )
         gc.collect()
         paddle.device.cuda.empty_cache()
@@ -236,10 +287,18 @@ class Predictor:
         inputs["position_ids"] = []
         for item in input_ids:
             cur_len = len(item)
-            inputs["input_ids"].append([self.tokenizer.pad_token_id] * (max_len - cur_len) + item)
-            inputs["position_ids"].append([0] * (max_len - cur_len) + list(range(cur_len)))
-        inputs["input_ids"] = paddle.to_tensor(np.array(inputs["input_ids"], dtype="int64"))
-        inputs["position_ids"] = paddle.to_tensor(np.array(inputs["position_ids"], dtype="int64"))
+            inputs["input_ids"].append(
+                [self.tokenizer.pad_token_id] * (max_len - cur_len) + item
+            )
+            inputs["position_ids"].append(
+                [0] * (max_len - cur_len) + list(range(cur_len))
+            )
+        inputs["input_ids"] = paddle.to_tensor(
+            np.array(inputs["input_ids"], dtype="int64")
+        )
+        inputs["position_ids"] = paddle.to_tensor(
+            np.array(inputs["position_ids"], dtype="int64")
+        )
         return inputs
 
     def postprocess(self, infer_data):
@@ -306,7 +365,10 @@ class Predictor:
         input_map = self.preprocess(batch_dials)
         infer_result = self.infer(input_map)
         self.num_output_tokens += (
-            ((infer_result != self.tokenizer.eos_token_id) & (infer_result != self.tokenizer.cls_token_id))
+            (
+                (infer_result != self.tokenizer.eos_token_id)
+                & (infer_result != self.tokenizer.cls_token_id)
+            )
             .sum()
             .item()
         )
@@ -365,7 +427,11 @@ def main():
                 conversation_data = in_dial + [{"role": "bot", "content": out_resp}]
                 test_case.append(conversation_data)
 
-            if args.save_output_file_flush > 0 and idx % args.save_output_file_flush == 0 and idx > 0:
+            if (
+                args.save_output_file_flush > 0
+                and idx % args.save_output_file_flush == 0
+                and idx > 0
+            ):
                 if paddle.distributed.get_rank() == 0:
                     infer_save_test_case(
                         test_case[idx - args.save_output_file_flush : idx],
@@ -393,7 +459,11 @@ def main():
         if args.save_output_file_flush == 0:
             infer_save_test_case(test_case, args.output_file)
         else:
-            write_case_idx = len(test_case) // args.save_output_file_flush * args.save_output_file_flush
+            write_case_idx = (
+                len(test_case)
+                // args.save_output_file_flush
+                * args.save_output_file_flush
+            )
             if len(test_case) % args.save_output_file_flush == 0:
                 write_case_idx -= args.save_output_file_flush
             infer_save_test_case(test_case[write_case_idx:], args.output_file)

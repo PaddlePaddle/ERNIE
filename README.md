@@ -1,17 +1,49 @@
-<!-- filepath: [README.md](http://_vscodecontentref_/0) -->
-
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/9ad1ffce-2310-4f80-a3cd-7a117bfb4f17" width="300px"></a>
 </p>
 
 <div align="center">
 
-[ERNIE Bot](https://ernie.baidu.com/) | [AI Studio](https://aistudio.baidu.com/modelsoverview) | [Hugging Face](https://huggingface.co/baidu)
+[ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview)
 
-📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)
+📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)  | 🛠️ [Training](./docs/erniekit.md)  | ⚡️ [Deploy](https://github.com/PaddlePaddle/FastDeploy)
+
+<a href="https://trendshift.io/repositories/14169" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14169" alt="PaddlePaddle%2FERNIE | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 </div>
+
+## 📣 Recent updates
+
+**[2025-10] 🔥 Released ERNIEKit v1.4:**
+
+- **New Features**
+    - VL Modle Training: Support SFT for [PaddleOCR-VL-0.9B]((https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B)) model. More details in [PaddleOCR-VL-0.9B SFT](./docs/paddleocr_vl_sft.md).
+    - Dataflow : Support padding-free startegy.
+        - Packing data within a batch into a sequence to avoid padding, thereby reducing GPU memory usage and accelerating training.
+
+**[2025-09] 🔥 Released ERNIEKit v1.3:**
+
+- **New Features**
+    - [ERNIE-4.5-21B-A3B-Thinking] Supports SFT training and function call training for ERNIE-4.5-21B-A3B-Thinking (https://huggingface.co/baidu/ERNIE-4.5-21B-A3B-Thinking).
+
+- **Bug Fixes:**
+    - [VL Model Training] Optimization of multimodal video data processing speed (#1266).
+
+**[2025-09] 🔥 Released ERNIEKit v1.2:**
+
+- **New Features**
+    - [WebUI] Added support for training and conversation functionalities with ERNIE 28b/424b VL models.
+    - [VL Model Training] Introduced support for query-response format in training data.
+    - [Command-Line Tool] Added iluvatar GPU hardware support.
+
+- **Bug Fixes:**
+    - [AutoParallel] Fix use_intermediate_api pp+recompute+moe bug (#1250)
+    - [AutoParallel] Fix save checkpoint bug (#1242)
+    - [VL Model Training] Fix lora 128k training bug (#1234)
+
+**[2025-09] 🔥 Released ERNIEKit v1.1:** ERNIEKit now supports SFT/LoRA for ERNIE-4.5-VL series.
+
+**[2025-06] 🔥 Released ERNIEKit v1.0:** We're excited to announce ERNIEKit v1.0, the most powerful and efficient toolkit yet for developing with the latest ERNIE models!
 
 ## Introduction to ERNIE 4.5
 
@@ -40,7 +72,7 @@ We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising
   </thead>
   <tbody class="ant-table-tbody">
     <tr>
-      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;">Large Language Model (LLMs)</td>
+      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;">Large Language Models (LLMs)</td>
       <td style="border: 1px solid #ddd;">ERNIE-4.5-300B-A47B-Base</td>
       <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
       <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
@@ -83,7 +115,7 @@ We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising
 </table>
 </div>
 
-_Note:All models (including pre-trained weights and inference code) have been released on [Hugging Face](https://huggingface.co/baidu), and [AI Studio](https://aistudio.baidu.com/index). Check our [blog](https://yiyan.baidu.com/blog/posts/ernie4.5) for more details.
+_Note: All models (including pre-trained weights and inference code) have been released on [🤗Hugging Face](https://huggingface.co/baidu), and [AI Studio](https://aistudio.baidu.com/index). Check our [blog](https://yiyan.baidu.com/blog/posts/ernie4.5) for more details._
 
 </br>
 
@@ -97,12 +129,6 @@ Our model family is characterized by three key innovations:
 
 3. **Modality-Specific Post-Training:** To meet the diverse requirements of real-world applications, we fine-tuned variants of the pre-trained model for specific modalities. Our LLMs are optimized for general-purpose language understanding and generation. The VLMs focuses on visuallanguage understanding and supports both thinking and non-thinking modes. Each model employed a combination of *Supervised Fine-tuning (SFT)*, *Direct Preference Optimization (DPO)* or a modified reinforcement learning method named *Unified Preference Optimization (UPO)* for post-training.
 
-All released models (including pretrained weights and inference code) are now fully open source. For relationships between different model architectures, see the diagram below. Additional technical details are available in the technical report.
-
-<div align="center">
-<img src="https://github.com/user-attachments/assets/44060b7a-6dbe-442b-80e8-b399cab1ce84" width="1080" height="636" >
-</div>
-
 </br>
 
 ## Performance and Benchmark Results
@@ -111,36 +137,36 @@ ERNIE-4.5-300B-A47B-Base surpasses DeepSeek-V3-671B-A37B-Base on 22 out of 28 be
 
 ERNIE-4.5-300B-A47B, the post trained model, demonstrates significant strengths in instruction following and knowledge tasks, as evidenced by the state-of-the-art scores on benchmarks such as IFEval, Multi-IF, SimpleQA, and ChineseSimpleQA. The lightweight model ERNIE-4.5-21B-A3B achieves competitive performance compared to Qwen3-30B-A3B, despite having approximately 30% fewer total parameters.
 
-In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visual perception, document and chart understanding, and visual knowledge, performing strongly across a range of established benchmarks. Under the thinking mode, ERNIE-4.5-VL not only demonstrates enhanced reasoning abilities compared to the non-thinking mode, but also retains the strong perception capabilities of the latter. ERNIE-4.5-VL-424B-A47B delivers consistently strong results across the various multimodal evaluation benchmarks. Its thinking mode offers a distinct advantage on challenging benchmarks such as MathVista, MMMU, and VisualPuzzle, while maintaining competitive performance on perception-focused datasets like CV-Bench and RealWorldQA. The lightweight vision-language model ERNIE-4.5-28B-A3B achieves competitive or even superior performance compared to Qwen2.5-VL-7B and Qwen2.5-VL-32B across most benchmarks, despite using significantly fewer activation parameters. Notably, our lightweight model also supports both thinking and non-thinking modes, offering functionalities consistent with ERNIE-4.5-VL-424B-A47B.
+In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visual perception, document and chart understanding, and visual knowledge, performing strongly across a range of established benchmarks. Under the thinking mode, ERNIE-4.5-VL not only demonstrates enhanced reasoning abilities compared to the non-thinking mode, but also retains the strong perception capabilities of the latter. ERNIE-4.5-VL-424B-A47B delivers consistently strong results across the full multimodal evaluation suite. Its thinking mode provides a distinct advantage on reasoning-centric tasks, narrowing or even surpassing the gap to OpenAI-o1 on challenging benchmarks such as MathVista, MMMU, and VisualPuzzle, while maintaining competitive performance on perception-focused datasets like CV-Bench and RealWorldQA. The lightweight vision-language model ERNIE-4.5-VL-28B-A3B achieves competitive or even superior performance compared to Qwen2.5-VL-7B and Qwen2.5-VL-32B across most benchmarks, despite using significantly fewer activation parameters. Notably, our lightweight model also supports both thinking and non-thinking modes, offering functionalities consistent with ERNIE-4.5-VL-424B-A47B.
 
 ### Performace of ERNIE-4.5 pre-trained models
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/a31a0101-4d47-4e76-97f6-332a0cff7098" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/base_model_benchmark.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained model ERNIE-4.5-300B-A47B
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/2b5657ef-b61f-44c2-a945-106cf919d5bf" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/chat_model_benchmark1.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained model ERNIE-4.5-21B-A3B
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/a89d9414-16ea-4afa-8888-bbc1ca51f509" style="max-width: 80%; height: auto;">
+<img src="https://github.com/user-attachments/assets/5bacaae8-ef27-494d-8c65-589ba187a084" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained multimodal models in thinking mode
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/d91f898d-3b5c-4628-ad3a-c1d231ae415a" style="max-width: 80%; height: auto;">
+<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/vl_model_thinking_benchmark.png" style="max-width: 80%; height: auto;">
 </div>
 
 ### Performance of post-trained multimodal models in non-thinking mode
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/4874712f-47b0-413a-b51c-f9536ca03d51" style="max-width: 80%; height: auto;">
+<img src="https://github.com/user-attachments/assets/3ad69a9d-1233-48be-a7c4-b816d3aa17ca" style="max-width: 80%; height: auto;">
 </div>
 
 </br>
@@ -193,6 +219,9 @@ erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
 ```
 
 For detailed guides on installation, CLI usage, WebUI, multi-node training, and advanced features, please refer to [ERNIEKit Training Document](./docs/erniekit.md).
+
+For detailed guides on High-performance pre-training, please refer to [Pre-Training Document](./examples/pre-training/README.md).
+
 
 **ERNIEKit WebUI demo:**
 
@@ -253,6 +282,12 @@ Discover best-practice guides showcasing ERNIE’s capabilities across multiple 
 
 </br>
 
+## Community
+
+| PaddlePaddle WeChat official account |  Join the tech discussion group |
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/864a45ec-0773-44b2-a2f1-c0e21e157792" width="150"> | <img src="https://github.com/user-attachments/assets/52e05674-7143-4207-8b19-67247fe88f55" width="150"> |
+
 ## License
 
 The ERNIE 4.5 models are provided under the Apache License 2.0. This license permits commercial use, subject to its terms and conditions.
@@ -265,7 +300,7 @@ If you find ERNIE 4.5 useful or wish to use it in your projects, please kindly c
 ```bibtex
 @misc{ernie2025technicalreport,
       title={ERNIE 4.5 Technical Report},
-      author={Baidu ERNIE Team},
+      author={Baidu-ERNIE-Team},
       year={2025},
       eprint={},
       archivePrefix={arXiv},

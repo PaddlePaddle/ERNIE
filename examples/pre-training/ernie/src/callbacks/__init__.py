@@ -18,13 +18,17 @@ from .moe_correction_bias_adjust_callback import MoECorrectionBiasAdjustCallback
 from .moe_logging_callback import GlobalRNGCallback, MoeLoggingCallback
 from .sp_grad_sync_callback import SPGradSyncCallback
 from .tensorboard_callback import TensorBoardCallback
+from .fp8_quant_weight_callback import FP8QuantWeightCallback
+from .ortho_loss_callback import OrthogonalCallback
 
 __all__ = [
-    'TensorBoardCallback',
-    'LoggingCallback',
-    'GCCallback',
-    'GlobalRNGCallback',
-    'MoeLoggingCallback',
-    'SPGradSyncCallback',
-    'MoECorrectionBiasAdjustCallback',
+    "TensorBoardCallback",
+    "LoggingCallback",
+    "GCCallback",
+    "GlobalRNGCallback",
+    "MoeLoggingCallback",
+    "SPGradSyncCallback",
+    "MoECorrectionBiasAdjustCallback",
+    "FP8QuantWeightCallback",
+    "OrthogonalCallback",
 ]

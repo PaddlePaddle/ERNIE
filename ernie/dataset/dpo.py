@@ -26,7 +26,7 @@ from scipy.linalg import block_diag
 
 from ernie.dataset.base import MultiSourceDataset
 from ernie.dataset.data_utils import (
-    get_markup_tokens,
+    postprocess_fc_sequence,
 )
 
 LOGGER_COUNT = 0
@@ -41,6 +41,7 @@ class Example:
     source: str
     session_start_index: int
     score_delta: float
+    is_function_call: bool
 
 
 @dataclass
@@ -82,25 +83,38 @@ def create_dataset(**dataset_config):
             - Dynamic sequence generation
             - Session-aware processing (when enabled)
     """
-    task_dataset_path = [path for path in str(dataset_config["task_group"]).replace(" ", "").split(',') if path != '']
+    task_dataset_path = [
+        path
+        for path in str(dataset_config["task_group"]).replace(" ", "").split(",")
+        if path != ""
+    ]
     task_dataset_prob = [
-        float(prob) for prob in str(dataset_config["task_group_prob"]).replace(" ", "").split(',') if prob != ''
+        float(prob)
+        for prob in str(dataset_config["task_group_prob"]).replace(" ", "").split(",")
+        if prob != ""
     ]
     sub_dataset_type = [
-        type_ for type_ in str(dataset_config["sub_dataset_type"]).replace(" ", "").split(',') if type_ != ''
+        type_
+        for type_ in str(dataset_config["sub_dataset_type"]).replace(" ", "").split(",")
+        if type_ != ""
     ]
 
     if not (len(task_dataset_path) == len(task_dataset_prob) == len(sub_dataset_type)):
-        raise ValueError("The len of dataset path, prob, type are inconsistent, please check the configuration.")
+        raise ValueError(
+            "The len of dataset path, prob, type are inconsistent, please check the configuration."
+        )
 
     if len(task_dataset_path) == 0:
-        raise ValueError("The len of dataset path is zero, please check the configuration.")
+        raise ValueError(
+            "The len of dataset path is zero, please check the configuration."
+        )
 
     example_dataset = MultiSourceDataset(
         task_dataset_path=task_dataset_path,
         task_dataset_prob=task_dataset_prob,
         sub_dataset_type=sub_dataset_type,
         process_fn=process_session_example,
+        process_fn_fc=process_fc,
     )
     sequence_dataset = SequenceDataset(
         dataset=example_dataset,
@@ -113,10 +127,56 @@ def create_dataset(**dataset_config):
         random_shuffle=dataset_config["random_shuffle"],
         greedy_intokens=dataset_config["greedy_intokens"],
         buffer_size=dataset_config["buffer_size"],
-        use_attn_mask_start_row_indices=dataset_config.pop("use_attn_mask_start_row_indices", True),
+        use_attn_mask_start_row_indices=dataset_config.pop(
+            "use_attn_mask_start_row_indices", True
+        ),
         mask_out_eos_token=dataset_config["mask_out_eos_token"],
     )
     return sequence_dataset
+
+
+def process_fc(data, input_file):
+    multi_turns_messages = data["messages"]
+    tools_list = data["tools"]
+    label = data["label"] if "label" in data else None
+
+    # be default, all assistant output should be learned, labels are all 1
+    if label is None:
+        label = []
+        for index, turn in enumerate(multi_turns_messages):
+            # if "assistant" in turn["role"]:
+            if index % 2 == 1:
+                label.append(1)
+
+    def split_dpo_messages(full_messages):
+        chosen_m, rejected_m = deepcopy(full_messages), deepcopy(full_messages)
+        chosen_m[-1] = full_messages[-1]["preferred_output"]
+        rejected_m[-1] = full_messages[-1]["non_preferred_output"]
+        return chosen_m, rejected_m
+
+    assistant_index = 0
+    for index, turn in enumerate(multi_turns_messages):
+        is_assistant_turn = (
+            turn["role"] == "assistant"
+            if "role" in turn
+            else "non_preferred_output" in turn
+        )
+        if is_assistant_turn:
+            if label[assistant_index]:
+                chosen_m, rejected_m = split_dpo_messages(
+                    multi_turns_messages[: index + 1]
+                )
+                ex = Example(
+                    chosen={"messages": chosen_m, "tools": tools_list},
+                    rejected={"messages": rejected_m, "tools": tools_list},
+                    session_start_index=0,  # single turn
+                    score_delta=1.0,
+                    source=input_file,
+                    is_function_call=True,
+                )
+                yield ex
+
+            assistant_index += 1
 
 
 def collate_fn(
@@ -171,26 +231,38 @@ def collate_fn(
         input_dict["attention_mask"] = []
         use_attn_mask_start_row_indices = False
     else:
-        raise ValueError("attention_mask and attn_mask_start_row_indices are both None.")
+        raise ValueError(
+            "attention_mask and attn_mask_start_row_indices are both None."
+        )
     sequence_sum_flatten = 0
     for i, sequences in enumerate(batch):
-        difference = max_seq_len - sum([len(sequence.input_ids) for sequence in sequences])
+        difference = max_seq_len - sum(
+            [len(sequence.input_ids) for sequence in sequences]
+        )
 
-        input_dict["input_ids"].append(sum([sequence.input_ids for sequence in sequences], []) + [0] * difference)
+        input_dict["input_ids"].append(
+            sum([sequence.input_ids for sequence in sequences], []) + [0] * difference
+        )
         input_dict["position_ids"].append(
-            sum([sequence.position_ids for sequence in sequences], []) + [0] * difference
+            sum([sequence.position_ids for sequence in sequences], [])
+            + [0] * difference
         )
         input_dict["chosen_labels"].append(
-            sum([sequence.chosen_labels for sequence in sequences], []) + [0] * difference
+            sum([sequence.chosen_labels for sequence in sequences], [])
+            + [0] * difference
         )
         input_dict["rejected_labels"].append(
-            sum([sequence.rejected_labels for sequence in sequences], []) + [0] * difference
+            sum([sequence.rejected_labels for sequence in sequences], [])
+            + [0] * difference
         )
         if use_attn_mask_start_row_indices:
             start_row_indices = []
             sequence_sum = 0
             for sequence in sequences:
-                start_row_indices += [indice + sequence_sum for indice in sequence.attn_mask_start_row_indices]
+                start_row_indices += [
+                    indice + sequence_sum
+                    for indice in sequence.attn_mask_start_row_indices
+                ]
                 sequence_sum += len(sequence.input_ids)
             input_dict["attn_mask_start_row_indices"].append(
                 [start_row_indices + list(range(start_row_indices[-1], max_seq_len))]
@@ -202,7 +274,9 @@ def collate_fn(
                     # pad to max_loength
                     np.pad(
                         # block attention_mask
-                        block_diag(*[sequence.attention_mask for sequence in sequences]),
+                        block_diag(
+                            *[sequence.attention_mask for sequence in sequences]
+                        ),
                         pad_width=((0, difference), (0, difference)),
                         mode="constant",
                         constant_values=False,
@@ -217,10 +291,16 @@ def collate_fn(
                 response_index = [
                     i,
                     sequence_sum_flatten,
-                    sequence.response_index[1] - sequence.response_index[0] + sequence_sum_flatten,
-                    sequence.response_index[2] - sequence.response_index[0] + sequence_sum_flatten,
+                    sequence.response_index[1]
+                    - sequence.response_index[0]
+                    + sequence_sum_flatten,
+                    sequence.response_index[2]
+                    - sequence.response_index[0]
+                    + sequence_sum_flatten,
                 ]
-                sequence_sum_flatten += sequence.response_index[2] - sequence.response_index[0]
+                sequence_sum_flatten += (
+                    sequence.response_index[2] - sequence.response_index[0]
+                )
             elif use_fused_head_and_loss_fn:
                 response_index = [
                     i,
@@ -287,20 +367,31 @@ def process_session_example(data, input_file):
             f"But got response_length:{len(data['response'])} sort_length:{len(data['sort'])}."
         )
     if data["sort"][0] == data["sort"][1]:
-        raise ValueError(f"Sort field must be different." f" But got 'sort':{data['sort']}")
+        raise ValueError(
+            f"Sort field must be different." f" But got 'sort':{data['sort']}"
+        )
     if isinstance(data["response"][0], str) and isinstance(data["response"][1], str):
         data["response"] = [[data["response"][0]], [data["response"][1]]]
     for response in data["response"]:
         if not isinstance(response, list):
-            raise ValueError(f"Session level response should be List[List[str]], but got List of {type(response)}")
+            raise ValueError(
+                f"Session level response should be List[List[str]], but got List of {type(response)}"
+            )
         if len(response) % 2 != 1:
-            raise ValueError("The number of responses should be even, but an odd number of responses were obtained.")
+            raise ValueError(
+                "The number of responses should be even, but an odd number of responses were obtained."
+            )
         for r in response:
             if len(r.strip()) < 1:
-                raise ValueError(f"Response field must be longer than 1." f" But got 'response':{data['response']}.")
+                raise ValueError(
+                    f"Response field must be longer than 1."
+                    f" But got 'response':{data['response']}."
+                )
 
     if len(data["response"][0]) < 1 or len(data["response"][1]) < 1:
-        raise ValueError(f"Ignore empty response." f" But got 'response':{data['response']}.")
+        raise ValueError(
+            f"Ignore empty response." f" But got 'response':{data['response']}."
+        )
     if data["sort"][0] > data["sort"][1]:
         chosen = data["response"][0]
         rejected = data["response"][1]
@@ -321,7 +412,6 @@ def process_session_example(data, input_file):
     if "system" in data:
         if not isinstance(data["system"], str):
             raise ValueError("System field must be a string.")
-    is_system = 1 if "system" in data else 0
 
     # convert to OpenAI format
     data["messages"] = []
@@ -333,7 +423,11 @@ def process_session_example(data, input_file):
             data["messages"].append({"role": "assistant", "content": data["tgt"][idx]})
 
     chosen_m, rejected_m = data["messages"], deepcopy(data["messages"])
-    session_start_index = len(data["messages"])
+    session_start_index = (
+        len(data["messages"])
+        if data["messages"][0]["role"] != "system"
+        else len(data["messages"]) - 1
+    )
     for idx in range(len(chosen)):
         if idx % 2 == 0:
             # assistant
@@ -350,6 +444,7 @@ def process_session_example(data, input_file):
         session_start_index=session_start_index,
         source=input_file,
         score_delta=1.0,
+        is_function_call=False,
     )
 
 
@@ -428,7 +523,6 @@ class SequenceDataset(IterableDataset):
         self.sys_start_token = getattr(tokenizer, "sys_start_token", None)
         self.sys_end_token = getattr(tokenizer, "sys_end_token", None)
 
-        self._setup_markup()
         self.max_seq_len = max_seq_len
         self.max_prompt_len = max_prompt_len
         if self.max_prompt_len > self.max_seq_len:
@@ -450,12 +544,18 @@ class SequenceDataset(IterableDataset):
         self.begin_of_response = self.tokenizer.tokenize("\nAssistant: ")
         self.end_of_response = "<|end_of_sentence|>"
         self.begin_token = "<|begin_of_sentence|>"  # Same effect as sys_start_token
-        self.newline_token = self.tokenizer.tokenize("\n")  # Same effect as sys_end_token
+        self.newline_token = self.tokenizer.tokenize(
+            "\n"
+        )  # Same effect as sys_end_token
 
         if not is_valid:
             for task in self.example_dataset._task_group:
-                task["target_num_each_epoch"] = int(task["prob"] * num_samples_each_epoch)
-                inner_dataset = InfiniteDataset(task["dataset"], self.rng, self.random_shuffle)
+                task["target_num_each_epoch"] = int(
+                    task["prob"] * num_samples_each_epoch
+                )
+                inner_dataset = InfiniteDataset(
+                    task["dataset"], self.rng, self.random_shuffle
+                )
                 task["iterator"] = iter(inner_dataset)
                 task["num_examples"] = len(inner_dataset.data)
                 logger.info(
@@ -495,7 +595,9 @@ class SequenceDataset(IterableDataset):
                 examples = [ex for ex in task["dataset"]]
                 self.origin_dataset_num += len(examples)
             else:
-                examples = [next(task["iterator"]) for _ in range(task["target_num_each_epoch"])]
+                examples = [
+                    next(task["iterator"]) for _ in range(task["target_num_each_epoch"])
+                ]
             if self.random_shuffle:
                 epoch_rng.shuffle(examples)
             if worker_info is not None:
@@ -571,16 +673,18 @@ class SequenceDataset(IterableDataset):
             if len(left_len_list) > 0:
                 max_left_len_index = left_len_list.argmax()
 
-            if len(left_len_list) == 0 or left_len_list[max_left_len_index] < sequence_len:
+            if (
+                len(left_len_list) == 0
+                or left_len_list[max_left_len_index] < sequence_len
+            ):
                 sequence_pack.append([sequence])
-                left_len_list = np.append(left_len_list, np.array([self.max_seq_len - sequence_len]))
+                left_len_list = np.append(
+                    left_len_list, np.array([self.max_seq_len - sequence_len])
+                )
             else:
                 sequence_pack[max_left_len_index].append(sequence)
                 left_len_list[max_left_len_index] -= sequence_len
         return sequence_pack
-
-    def _setup_markup(self):
-        self.tokenizer.markup_tokens = get_markup_tokens()
 
     def __postprocess_before_concat(self, example):
         """Process multi-turn conversation data into tokenized sequences with dynamic truncation.
@@ -605,11 +709,19 @@ class SequenceDataset(IterableDataset):
 
         cur_len = 0
 
-        num_reserved_tokens_for_each_turn = 8
-
         # encoded_messages: List[List[int]]
-        chosen_encoded_messages = self.tokenizer.encode_chat_inputs(example.chosen)
-        rejected_encoded_messages = self.tokenizer.encode_chat_inputs(example.rejected)
+        if example.is_function_call:
+            chosen_encoded_messages = postprocess_fc_sequence(
+                self.tokenizer, example.chosen
+            )
+            rejected_encoded_messages = postprocess_fc_sequence(
+                self.tokenizer, example.rejected
+            )
+        else:
+            chosen_encoded_messages = self.tokenizer.encode_chat_inputs(example.chosen)
+            rejected_encoded_messages = self.tokenizer.encode_chat_inputs(
+                example.rejected
+            )
 
         # chosen/rejected response
         response_token_ids_list = []
@@ -650,12 +762,14 @@ class SequenceDataset(IterableDataset):
 
         # create at least one turn
         turn_index = len(chosen_encoded_messages) - 1
-        knowledge_tokens = []
         while turn_index >= 0:
             if turn_index == len(chosen_encoded_messages) - 1:
                 cur_turn_token = chosen_encoded_messages[turn_index][0]
             else:
-                cur_turn_token = chosen_encoded_messages[turn_index][0] + chosen_encoded_messages[turn_index][1]
+                cur_turn_token = (
+                    chosen_encoded_messages[turn_index][0]
+                    + chosen_encoded_messages[turn_index][1]
+                )
 
             if cur_len + len(cur_turn_token) > self.max_seq_len:
                 break
@@ -666,7 +780,7 @@ class SequenceDataset(IterableDataset):
 
         # at least one turn
         if turn_index == len(chosen_encoded_messages) - 1:
-            sub_src = example.chosen[0]["content"].strip()[:5]
+            sub_src = example.chosen["messages"][0]["content"].strip()[:5]
             global LOGGER_COUNT
             LOGGER_COUNT += 1
             if LOGGER_COUNT <= 5:
@@ -680,7 +794,13 @@ class SequenceDataset(IterableDataset):
             logger.warning(f"[SKIP] Example is too long: {example}")
             return (None,) * 5
 
-        return prompt_token_ids, response_token_ids_list, response_label_ids_list, response_len_list, cur_len
+        return (
+            prompt_token_ids,
+            response_token_ids_list,
+            response_label_ids_list,
+            response_len_list,
+            cur_len,
+        )
 
     def _postprocess_sequence(self, example):
         """Assemble processed components into final training sequence with attention controls.
@@ -708,16 +828,22 @@ class SequenceDataset(IterableDataset):
                 - score_delta (float): Score delta between chosen and rejected responses
         """
         # sequence: system + knowledge_tokens + prompt + chosen + reject
-        prompt_token_ids, response_token_ids_list, response_label_ids_list, response_len_list, cur_len = (
-            self.__postprocess_before_concat(example)
-        )
+        (
+            prompt_token_ids,
+            response_token_ids_list,
+            response_label_ids_list,
+            response_len_list,
+            cur_len,
+        ) = self.__postprocess_before_concat(example)
 
         # The sequnece is too long, just return None
         if prompt_token_ids is None:
             return None
         # 1.concat all tokens
         # 1.1 input_ids
-        input_ids = prompt_token_ids + response_token_ids_list[0] + response_token_ids_list[1]
+        input_ids = (
+            prompt_token_ids + response_token_ids_list[0] + response_token_ids_list[1]
+        )
         if cur_len != len(input_ids):
             logger.warning(f"[SKIP] code bug: {example}")
             return None
@@ -733,8 +859,16 @@ class SequenceDataset(IterableDataset):
         )
 
         # 1.3 labels
-        chosen_labels = [0] * (prompt_len - 1) + response_label_ids_list[0] + [0] * len(response_token_ids_list[1])
-        rejected_labels = [0] * (prompt_len - 1) + [0] * len(response_token_ids_list[0]) + response_label_ids_list[1]
+        chosen_labels = (
+            [0] * (prompt_len - 1)
+            + response_label_ids_list[0]
+            + [0] * len(response_token_ids_list[1])
+        )
+        rejected_labels = (
+            [0] * (prompt_len - 1)
+            + [0] * len(response_token_ids_list[0])
+            + response_label_ids_list[1]
+        )
 
         # 1.4 response index
         # support use_sparse_head_and_loss_fn only
@@ -743,7 +877,9 @@ class SequenceDataset(IterableDataset):
         # 1.5 attention mask
         if self.use_attn_mask_start_row_indices:
             attn_mask_start_row_indices = (
-                [cur_len] * (prompt_len) + [prompt_len + chosen_len] * chosen_len + [cur_len] * rejected_len
+                [cur_len] * (prompt_len)
+                + [prompt_len + chosen_len] * chosen_len
+                + [cur_len] * rejected_len
             )
             attention_mask = None
         else:

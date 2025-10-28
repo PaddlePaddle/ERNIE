@@ -21,7 +21,6 @@ import lang as la
 
 
 class Manager:
-
     def __init__(self):
         self._id_to_elem = {}
         self.specific_id_to_elem = {}
@@ -127,7 +126,9 @@ class Manager:
         self._component_values[module_id][elem_id] = initial_value
 
         if self._debug:
-            print(f"[Manager] 注册组件: {full_id} ({type(elem).__name__}), 初始值: {initial_value}")
+            print(
+                f"[Manager] 注册组件: {full_id} ({type(elem).__name__}), 初始值: {initial_value}"
+            )
 
     def get_elem_by_id(self, module_id, elem_id):
         """
@@ -216,6 +217,9 @@ class Manager:
             elif isinstance(elem, gr.HTML):
                 if "value" in lang_config:
                     update_kwargs["value"] = lang_config["value"]
+            elif isinstance(elem, gr.File):
+                if "label" in lang_config:
+                    update_kwargs["label"] = lang_config["label"]
             else:
                 if "label" in lang_config:
                     update_kwargs["label"] = lang_config["label"]
@@ -231,7 +235,7 @@ class Manager:
 
     def setup_language_switching(self, language, demo, alert):
         """
-        Configure language switching event handlers and initial state.
+        Configure language switching event handlers and initial state
 
         Args:
             self: Instance reference
@@ -249,6 +253,7 @@ class Manager:
                 (
                     gr.Textbox,
                     gr.Dropdown,
+                    gr.State,
                     gr.Slider,
                     gr.Checkbox,
                     gr.CheckboxGroup,
@@ -256,6 +261,9 @@ class Manager:
                     gr.Chatbot,
                     gr.Button,
                     gr.HTML,
+                    gr.File,
+                    gr.DownloadButton,
+                    gr.Group,
                 ),
             )
         ]
@@ -272,16 +280,26 @@ class Manager:
                         if len(parts) >= 2:
                             module_id, elem_id = parts[0], ".".join(parts[1:])
                             if isinstance(comp, gr.Chatbot):
-                                if values and input_components.index(comp) < len(values):
-                                    self._component_values[module_id][elem_id] = values[input_components.index(comp)]
+                                if values and input_components.index(comp) < len(
+                                    values
+                                ):
+                                    self._component_values[module_id][elem_id] = values[
+                                        input_components.index(comp)
+                                    ]
                             else:
-                                if values and input_components.index(comp) < len(values):
-                                    self._component_values[module_id][elem_id] = values[input_components.index(comp)]
+                                if values and input_components.index(comp) < len(
+                                    values
+                                ):
+                                    self._component_values[module_id][elem_id] = values[
+                                        input_components.index(comp)
+                                    ]
                         break
             updates = self.change_lang(lang)
             return [updates.get(comp, comp) for comp in all_components]
 
-        language.change(fn=update_fn, inputs=[language] + input_components, outputs=all_components)
+        language.change(
+            fn=update_fn, inputs=[language] + input_components, outputs=all_components
+        )
 
         if self.demo:
             initial_values = []
@@ -291,7 +309,9 @@ class Manager:
                         parts = full_id.split(".")
                         if len(parts) >= 2:
                             module_id, elem_id = parts[0], ".".join(parts[1:])
-                            initial_values.append(self._component_values[module_id].get(elem_id, None))
+                            initial_values.append(
+                                self._component_values[module_id].get(elem_id, None)
+                            )
                         break
 
             demo.load(
@@ -324,7 +344,8 @@ class Manager:
         """
         source_full_id = f"{source_module_id}.{source_elem_id}"
         dependent_full_ids = [
-            f"{mod_id}.{elem_id}" for mod_id, elem_id in zip(dependent_module_ids, dependent_elem_ids)
+            f"{mod_id}.{elem_id}"
+            for mod_id, elem_id in zip(dependent_module_ids, dependent_elem_ids)
         ]
 
         self._dependencies[source_full_id] = {
@@ -404,10 +425,24 @@ class Manager:
 
             if isinstance(
                 elem,
-                (gr.Textbox, gr.Dropdown, gr.Slider, gr.Checkbox, gr.CheckboxGroup, gr.Radio, gr.Number, gr.HTML),
+                (
+                    gr.Textbox,
+                    gr.Dropdown,
+                    gr.Slider,
+                    gr.Checkbox,
+                    gr.CheckboxGroup,
+                    gr.Radio,
+                    gr.Number,
+                    gr.HTML,
+                    gr.State,
+                    gr.File,
+                    gr.Group,
+                ),
             ):
                 elem.change(
-                    fn=lambda value, mid=module_id, eid=elem_id: self._update_component_value(mid, eid, value),
+                    fn=lambda value, mid=module_id, eid=elem_id: self._update_component_value(
+                        mid, eid, value
+                    ),
                     inputs=[elem],
                     outputs=[],
                 )
@@ -430,6 +465,10 @@ class Manager:
                         elem.value = initial_value
                     elif isinstance(elem, gr.HTML):
                         elem.value = initial_value
+                    elif isinstance(elem, gr.State):
+                        elem.value = initial_value
+                    elif isinstance(elem, gr.File):
+                        elem.value = initial_value
 
     def _update_component_value(self, module_id, elem_id, value):
         """
@@ -441,11 +480,16 @@ class Manager:
             elem_id (str): Unique identifier for the component
             value (Any): New value to set
         """
-        if module_id in self._component_values and elem_id in self._component_values[module_id]:
+        if (
+            module_id in self._component_values
+            and elem_id in self._component_values[module_id]
+        ):
             old_value = self._component_values[module_id][elem_id]
             self._component_values[module_id][elem_id] = value
             if self._debug and old_value != value:
-                print(f"[Manager] Value updated: {module_id}.{elem_id} = {old_value} → {value}")
+                print(
+                    f"[Manager] Value updated: {module_id}.{elem_id} = {old_value} → {value}"
+                )
         else:
             print(f"[Manager] Error: Unregistered component {module_id}.{elem_id}")
 
@@ -472,7 +516,9 @@ class Manager:
         dependent_ids = dependency_info["dependent_ids"]
         update_callback = dependency_info["callback"]
 
-        all_components = [self.get_elem_by_id(*id.split(".", 1)) for id in [full_id] + dependent_ids]
+        all_components = [
+            self.get_elem_by_id(*id.split(".", 1)) for id in [full_id] + dependent_ids
+        ]
         all_components = [c for c in all_components if c is not None]
 
         def dropdown_change_handler(selected_value):
@@ -481,7 +527,9 @@ class Manager:
             output_updates = [updates.get(comp, comp) for comp in all_components]
             return output_updates
 
-        source_elem.change(fn=dropdown_change_handler, inputs=[source_elem], outputs=all_components)
+        source_elem.change(
+            fn=dropdown_change_handler, inputs=[source_elem], outputs=all_components
+        )
 
         if self.demo:
             initial_value = self._component_values[module_id].get(dropdown_id)

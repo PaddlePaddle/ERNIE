@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import copy
 import random
 from dataclasses import dataclass
 from typing import List
 
 import numpy as np
 from paddle.io import IterableDataset, get_worker_info
+from paddleformers.transformers.tokenizer_utils import PretrainedTokenizer
 from paddleformers.utils.log import logger
 
 from ernie.dataset.base import MultiSourceDataset
 from ernie.dataset.data_utils import (
     Example,
-    get_markup_tokens,
     pad_batch_data,
+    postprocess_fc_sequence,
 )
-from ernie.dataset.pvp import EBMarkUpRouter
 
 LOGGER_COUNT = 0
 
@@ -52,26 +52,40 @@ def create_dataset(**dataset_config):
     Returns:
         SequenceDataset: Configured sequence dataset for SFT tasks
     """
-    task_dataset_path = [path for path in str(dataset_config["task_group"]).replace(" ", "").split(',') if path != '']
+    task_dataset_path = [
+        path
+        for path in str(dataset_config["task_group"]).replace(" ", "").split(",")
+        if path != ""
+    ]
     task_dataset_prob = [
-        float(prob) for prob in str(dataset_config["task_group_prob"]).replace(" ", "").split(',') if prob != ''
+        float(prob)
+        for prob in str(dataset_config["task_group_prob"]).replace(" ", "").split(",")
+        if prob != ""
     ]
     sub_dataset_type = [
-        type_ for type_ in str(dataset_config["sub_dataset_type"]).replace(" ", "").split(',') if type_ != ''
+        type_
+        for type_ in str(dataset_config["sub_dataset_type"]).replace(" ", "").split(",")
+        if type_ != ""
     ]
 
     if not (len(task_dataset_path) == len(task_dataset_prob) == len(sub_dataset_type)):
-        raise ValueError("The len of dataset path, prob, type are inconsistent, please check the configuration.")
+        raise ValueError(
+            "The len of dataset path, prob, type are inconsistent, please check the configuration."
+        )
 
     if len(task_dataset_path) == 0:
-        raise ValueError("The len of dataset path is zero, please check the configuration.")
+        raise ValueError(
+            "The len of dataset path is zero, please check the configuration."
+        )
 
     example_dataset = MultiSourceDataset(
         task_dataset_path=task_dataset_path,
         task_dataset_prob=task_dataset_prob,
         sub_dataset_type=sub_dataset_type,
         process_fn=process_example,
+        process_fn_fc=process_fc,
     )
+
     sequence_dataset = SequenceDataset(
         dataset=example_dataset,
         tokenizer=dataset_config["tokenizer"],
@@ -121,6 +135,8 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
             - loss_mask: Mask for computing loss
     """
     input_keys = ["input_ids", "labels", "loss_mask"]
+    if model_args.num_nextn_predict_layers > 0:
+        input_keys.append("nbatch_pack_offset")
     if model_args.use_attn_mask_start_row_indices:
         input_keys.append("attn_mask_start_row_indices")
     else:
@@ -131,10 +147,13 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
         token_ids = [sum(original_token_ids, [])]
         loss_mask = [sum([seq.loss_mask for seq in batch_sequence], [])]
         labels = [sum([seq.labels for seq in batch_sequence], [])]
-
         # padding
-        padded_token_ids = pad_batch_data(token_ids, pad_idx=tokenizer.pad_token_id, max_seq_len=max_seq_len)
-        padded_labels = pad_batch_data(labels, pad_idx=tokenizer.pad_token_id, max_seq_len=max_seq_len)
+        padded_token_ids = pad_batch_data(
+            token_ids, pad_idx=tokenizer.pad_token_id, max_seq_len=max_seq_len
+        )
+        padded_labels = pad_batch_data(
+            labels, pad_idx=tokenizer.pad_token_id, max_seq_len=max_seq_len
+        )
         padded_loss_mask = pad_batch_data(loss_mask, pad_idx=0, max_seq_len=max_seq_len)
         padded_labels = np.where(padded_loss_mask == 1, padded_labels, -100)
         return_list.append(
@@ -145,14 +164,63 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
             ]
         )
 
+        if model_args.num_nextn_predict_layers > 0:
+            # each sequence end index
+            batch_sequence_len = [len(sequence) for sequence in original_token_ids]
+            nbatch_pack_offset = [0] * sum(batch_sequence_len)
+            prefix_sum = 0
+            for sequence_len in batch_sequence_len[:-1]:
+                prefix_sum += sequence_len
+                nbatch_pack_offset[prefix_sum - 1] = 1
+            padded_nbatch_pack_offset = pad_batch_data(
+                [nbatch_pack_offset], pad_idx=0, max_seq_len=max_seq_len
+            )
+            return_list[-1].append(padded_nbatch_pack_offset)
+
         if model_args.use_attn_mask_start_row_indices:
-            return_list[-1].append(gen_attn_mask_start_row_indices(original_token_ids, max_seq_len))
+            return_list[-1].append(
+                gen_attn_mask_start_row_indices(original_token_ids, max_seq_len)
+            )
         else:
             return_list[-1].append(gen_self_attn_mask(original_token_ids, max_seq_len))
 
     return_list = [np.concatenate(tensor_list) for tensor_list in zip(*return_list)]
     input_dict = dict(zip(input_keys, return_list))
     return input_dict
+
+
+def process_fc(data, input_file):
+    multi_turns_messages = data["messages"]
+    tools_list = data["tools"] if "tools" in data else None
+    label = data["label"] if "label" in data else None
+
+    system = ""
+    is_system = False
+    if "system" in multi_turns_messages[0]["role"]:
+        system = multi_turns_messages[0]["content"]
+        is_system = True
+
+    # be default, all assistant output should be learned, labels are all 1
+    if label is None:
+        label = []
+        for index, turn in enumerate(multi_turns_messages):
+            if "assistant" in turn["role"]:
+                label.append(1)
+
+    assistant_index = 0
+    for index, turn in enumerate(multi_turns_messages):
+        if "assistant" in turn["role"] and label[assistant_index]:
+            message = copy.deepcopy(multi_turns_messages[: index + 1])
+            ex = Example(
+                request={"messages": message, "tools": tools_list},
+                system=system,
+                label=[1],
+                is_system=is_system,
+                source=input_file,
+                is_function_call=True,
+            )
+            yield ex
+            assistant_index += 1
 
 
 def process_example(data, input_file):
@@ -290,7 +358,6 @@ class SequenceDataset(IterableDataset):
         self.break_turn_token = tokenizer.cls_token  # "<cls>"
         self.sys_start_token = getattr(tokenizer, "sys_start_token", None)
         self.sys_end_token = getattr(tokenizer, "sys_end_token", None)
-        self._setup_markup()
         self.max_seq_len = max_seq_len
         self.is_valid = is_valid
         self.random_seed = random_seed
@@ -303,15 +370,33 @@ class SequenceDataset(IterableDataset):
         self.begin_of_query = self.tokenizer.tokenize("User: ")
         self.begin_of_response = self.tokenizer.tokenize("\nAssistant: ")
         self.end_of_response = "<|end_of_sentence|>"
-        self.end_of_response_id = self.tokenizer._convert_token_to_id([self.end_of_response])[0]
         self.begin_token = "<|begin_of_sentence|>"  # Same effect as sys_start_token
-        self.begin_token_id = self.tokenizer._convert_token_to_id([self.begin_token])[0]
-        self.newline_token = self.tokenizer.tokenize("\n")  # Same effect as sys_end_token
+        if isinstance(self.tokenizer, PretrainedTokenizer):
+            self.end_of_response_id = self.tokenizer._convert_token_to_id(
+                [self.end_of_response]
+            )[0]
+            self.begin_token_id = self.tokenizer._convert_token_to_id(
+                [self.begin_token]
+            )[0]
+        else:
+            self.end_of_response_id = self.tokenizer.convert_tokens_to_ids(
+                [self.end_of_response]
+            )[0]
+            self.begin_token_id = self.tokenizer.convert_tokens_to_ids(
+                [self.begin_token]
+            )[0]
+        self.newline_token = self.tokenizer.tokenize(
+            "\n"
+        )  # Same effect as sys_end_token
 
         if not is_valid:
             for task in self.example_dataset._task_group:
-                task["target_num_each_epoch"] = int(task["prob"] * num_samples_each_epoch)
-                inner_dataset = InfiniteDataset(task["dataset"], self.rng, self.random_shuffle)
+                task["target_num_each_epoch"] = int(
+                    task["prob"] * num_samples_each_epoch
+                )
+                inner_dataset = InfiniteDataset(
+                    task["dataset"], self.rng, self.random_shuffle
+                )
                 task["iterator"] = iter(inner_dataset)
                 task["num_examples"] = len(inner_dataset.data)
                 logger.info(
@@ -334,9 +419,13 @@ class SequenceDataset(IterableDataset):
             # Set max estimate samples to dataset num examples in default
             if len(self.example_dataset._task_group) > 1:
                 for task in self.example_dataset._task_group:
-                    self.max_estimate_samples += np.ceil(task["num_examples"] * task["prob_origin"])
+                    self.max_estimate_samples += np.ceil(
+                        task["num_examples"] * task["prob_origin"]
+                    )
             else:
-                self.max_estimate_samples = self.example_dataset._task_group[0]['num_examples']
+                self.max_estimate_samples = self.example_dataset._task_group[0][
+                    "num_examples"
+                ]
         self.epoch_index = 0
 
     def __iter_func(self):
@@ -357,7 +446,9 @@ class SequenceDataset(IterableDataset):
                 examples = [ex for ex in task["dataset"]]
                 self.origin_dataset_num += len(examples)
             else:
-                examples = [next(task["iterator"]) for _ in range(task["target_num_each_epoch"])]
+                examples = [
+                    next(task["iterator"]) for _ in range(task["target_num_each_epoch"])
+                ]
             if self.random_shuffle:
                 epoch_rng.shuffle(examples)
             if worker_info is not None:
@@ -365,7 +456,9 @@ class SequenceDataset(IterableDataset):
             examples_all.extend(examples)
         if self.random_shuffle:
             epoch_rng.shuffle(examples_all)
-        logger.info(f"prepare SequenceDataset done: total number of examples is {len(examples_all)}")
+        logger.info(
+            f"prepare SequenceDataset done: total number of examples is {len(examples_all)}"
+        )
 
         batch_sequence, cur_len = [], 0
 
@@ -416,12 +509,13 @@ class SequenceDataset(IterableDataset):
                     i += 1
                 else:
                     # Running greedy strategy in examples.
-                    generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
+                    generate_packs = self._generate_greedy_packs(
+                        examples, actual_example_num_list
+                    )
                     for pack in generate_packs:
                         if len(pack) > 0:
                             yield pack
                     examples = [example]
-                    actual_num_examples_list = [actual_example_num]
                     i = 1
 
                 if self.estimate:
@@ -430,7 +524,9 @@ class SequenceDataset(IterableDataset):
                     if self.used_estimate_samples >= self.max_estimate_samples:
                         # Yield left packs before estimation ends
                         if len(examples) > 0:
-                            generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
+                            generate_packs = self._generate_greedy_packs(
+                                examples, actual_example_num_list
+                            )
                             for pack in generate_packs:
                                 if len(pack) > 0:
                                     yield pack
@@ -439,7 +535,9 @@ class SequenceDataset(IterableDataset):
                         yield []
 
             if len(examples) > 0:
-                generate_packs = self._generate_greedy_packs(examples, actual_example_num_list)
+                generate_packs = self._generate_greedy_packs(
+                    examples, actual_example_num_list
+                )
                 for pack in generate_packs:
                     if len(pack) > 0:
                         yield pack
@@ -458,15 +556,6 @@ class SequenceDataset(IterableDataset):
             while True:
                 yield from self.__iter_func()
 
-    def _setup_markup(self):
-        """Initialize markup tokens and router for special token handling."""
-        self.eb_markup_rounter = EBMarkUpRouter(
-            self.tokenizer,
-            break_token=self.break_token,
-            break_turn_token=self.break_turn_token,
-        )
-        self.tokenizer.markup_tokens = get_markup_tokens()
-
     def _postprocess_sequence(self, example, actual_example_num):
         """Process code completion examples into token sequences.
 
@@ -477,8 +566,10 @@ class SequenceDataset(IterableDataset):
         Returns:
             Sequence: Processed sequence or None if invalid.
         """
-
-        encoded_messages = self.tokenizer.encode_chat_inputs(example.request)
+        if example.is_function_call:
+            encoded_messages = postprocess_fc_sequence(self.tokenizer, example.request)
+        else:
+            encoded_messages = self.tokenizer.encode_chat_inputs(example.request)
 
         num_reserved_tokens_for_each_dialog = 1  # only break_turn_token or end_token
         num_reserved_tokens_for_each_turn = 8
@@ -499,7 +590,9 @@ class SequenceDataset(IterableDataset):
             tokens = tokens_src + tokens_target + tokens
 
             loss_mask = (
-                [0] * (len(tokens_src) - 1) + [example.label[turn_index]] * (len(tokens_target) + 1) + loss_mask
+                [0] * (len(tokens_src) - 1)
+                + [example.label[turn_index]] * (len(tokens_target) + 1)
+                + loss_mask
             )
             assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
 
@@ -508,7 +601,10 @@ class SequenceDataset(IterableDataset):
             turn_index -= 1
 
         # Not even one turn can be added, so need to do warning and skip this example
-        if len(tokens) <= num_reserved_tokens_for_each_dialog + num_reserved_tokens_for_each_turn:
+        if (
+            len(tokens)
+            <= num_reserved_tokens_for_each_dialog + num_reserved_tokens_for_each_turn
+        ):
             try:
                 # For print log
                 sub_src = example.src[0].strip()[:5]
@@ -516,9 +612,11 @@ class SequenceDataset(IterableDataset):
                 global LOGGER_COUNT
                 LOGGER_COUNT += 1
                 if LOGGER_COUNT <= 5:
-                    logger.warning(f"even one turn, example_output:'{{'src':[{sub_src}, ……],'tgt':[……{sub_tgt}]}}'")
-            except:
-                logger.warning(f"[SKIP] wrong example: {example}")
+                    logger.warning(
+                        f"even one turn, example_output:'{{'src':[{sub_src}, ……],'tgt':[……{sub_tgt}]}}'"
+                    )
+            except Exception:
+                logger.warning("[SKIP] wrong example")
 
             return None
 
@@ -537,7 +635,10 @@ class SequenceDataset(IterableDataset):
 
         # end_of_response is a special token that indicates the end of the turn.
         # end_token is a special token that indicates the end of the answer.
-        labels = [l if l != self.end_of_response_id else self.tokenizer.eos_token_id for l in labels]
+        labels = [
+            label if label != self.end_of_response_id else self.tokenizer.eos_token_id
+            for label in labels
+        ]
 
         pos_ids = list(range(len(tokens)))
 
@@ -567,13 +668,17 @@ class SequenceDataset(IterableDataset):
         """
 
         left_len = np.zeros([len(examples)]) - 1
-        left_len[0] = self.max_seq_len  # At the beginning, only the first pack is valid.
+        left_len[0] = (
+            self.max_seq_len
+        )  # At the beginning, only the first pack is valid.
         generate_packs = [[] for i in range(len(examples))]
         index = 0
         left_index = 0
 
         while index < len(examples):
-            sequence = self._postprocess_sequence(examples[index], actual_example_num_list[index])
+            sequence = self._postprocess_sequence(
+                examples[index], actual_example_num_list[index]
+            )
             if sequence is None:
                 if self.estimate:
                     self.unused_samples += actual_example_num_list[index]

@@ -2,11 +2,6 @@
 
 **ERNIEKit** is an industrial-grade development toolkit for ERNIE 4.5. It provides training and compression capabilities, including Pre-Training, Supervised Fine-Tuning (SFT), Low-Rank Adaptation (LoRA), Direct Preference Optimization (DPO), and Quantization-Aware Training (QAT) and Post-Training Quantization (PTQ) techniques. It includes practical applications and tutorials for leveraging ERNIE models.
 
-
-## News
-
-**[2025-06] 🔥 Released ERNIEKit v2.0:** We're excited to announce ERNIEKit v2.0, the most powerful and efficient toolkit yet for developing with the latest ERNIE models!
-
 ## 1. Features
 
 * 🚀 **Industrial-grade High-Performance Pre-Training**
@@ -39,17 +34,17 @@ Support NVDIA GPU, [Kunlunxin XPU](./devices/README_XPU.md) and [Ascend NPU](./d
 
 **Docker-Based Installation (Recommended)**
 
-To ensure environment consistency across different hardware configurations, we recommend using our pre-configured Docker images. These images include CUDA, cuDNN, and NCCL dependencies with PaddlePaddle v3.1 pre-installed:
+To ensure environment consistency across different hardware configurations, we recommend using our pre-configured Docker images. These images include CUDA, cuDNN, and NCCL dependencies with PaddlePaddle v3.2 pre-installed:
 
 ```bash
 # Choose based on your CUDA version requirements:
-docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.1.0-gpu-cuda12.9-cudnn9.9
-docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.1.0-gpu-cuda12.6-cudnn9.5
+docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.2.0-gpu-cuda12.9-cudnn9.9
+docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.2.0-gpu-cuda12.6-cudnn9.5
 ```
 
 **Source Code Installation**
 
-If not using Docker, ensure your environment meets the prerequisites in 2.1. ERNIEKit requires PaddlePaddle v3.1+. See official [PaddlePaddle Installation Guide](https://www.paddlepaddle.org.cn/install/quick) for details.
+If not using Docker, ensure your environment meets the prerequisites in 2.1. ERNIEKit requires PaddlePaddle v3.2+. See official [PaddlePaddle Installation Guide](https://www.paddlepaddle.org.cn/install/quick) for details.
 
 
 Verify installation with:
@@ -69,9 +64,12 @@ PaddlePaddle is installed successfully! Let's start deep learning with PaddlePad
 
 ```bash
 git clone https://github.com/PaddlePaddle/ERNIE
+cd ERNIE
 python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e . # We recommend install in editable mode
 ```
+
+You can also build docker image yourself which includes all the dependencies listed in `requirements.txt`. Please refer to [build docker](../docker/docker-cuda/README.md) for more details.
 
 ### 2.4 Install FastDeploy
 
@@ -85,38 +83,49 @@ ERNIEKit supports training for the following models. Before initiating training 
 1. Environment setup is completed
 2. Your hardware meets the minimum resource requirements
 
-| Model                          | Post-Training Method | Seq Length | Min Resources       | Recommended Config |
-|--------------------------------|----------------------|------------|---------------------|---------------------|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT         | 8K       | 96x80G A/H GPUs     | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_8k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT         | 32K      | 112x80G A/H GPUs    | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_32k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT(FP8)    |    8K   | 16x80G H GPUs + 2TB CPU RAM     | [run_sft_fp8_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_fp8_8k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT(FP8)    | 32K      | 16x80G H GPUs + 2TB CPU RAM      | [run_sft_fp8_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_fp8_32k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA(wint4/8) | 8K       | 4x80G A/H GPUs     |[run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_8k.sh) |
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | SFT-LoRA(wint4/8) | 32K      | 8x80G A/H GPUs     |[run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_32k.sh) |
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO         | 8K       | 112x80G A/H GPUs   | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_8k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO         | 32K      | 112x80G A/H GPUs   | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_32k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO-LoRA    | 8K       | 16x80G A/H GPUs    | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_lora_8k.sh)|
-| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | DPO-LoRA    | 32K      | 16x80G A/H GPUs    | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-300B-A47B/dpo/run_dpo_lora_32k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 8K       | 8x80G A/H GPUs     | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT         | 32K      | 8x80G A/H GPUs     | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_32k.sh)|
-| ERNIE-4.5-21B-A3B-B base/ERNIE-4.5-21B-A3B | SFT         | 128K     | 8x80G A/H GPUs     | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_128k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 8K       | 2x80G A/H GPUs     | [run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | SFT-LoRA(wint4/8) | 32K      | 2x80G A/H GPUs     | [run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_32k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 8K       | 8x80G A/H GPUs     | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 32K      | 8x80G A/H GPUs     | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_32k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO         | 128K     | 8x80G A/H GPUs     | [run_dpo_128k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_128k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 8K       | 2x80G A/H GPUs     | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_8k.sh)|
-| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | DPO-LoRA    | 32K      | 2x80G A/H GPUs     | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_32k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 8K       | 1x80G A/H GPU      | [run_sft_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_8k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 32K      | 1x80G A/H GPU      | [run_sft_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_32k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT         | 128K     | 1x80G A/H GPU      | [run_sft_128k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_128k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT-LoRA(wint4/8) | 8K       | 1x80G A/H GPU      | [run_sft_wint8mix_lora_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_wint8mix_lora_8k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | SFT-LoRA(wint4/8) | 32K      | 1x80G A/H GPU      | [run_sft_wint8mix_lora_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/sft/run_sft_wint8mix_lora_32k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO         | 8K       | 1x80G A/H GPU      | [run_dpo_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_8k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO         | 32K      | 1x80G A/H GPU      | [run_dpo_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_32k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO         | 128K     | 1x80G A/H GPU      | [run_dpo_128k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_128k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO-LoRA    | 8K       | 1x80G A/H GPU      | [run_dpo_lora_8k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_lora_8k.sh)|
-| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | DPO-LoRA    | 32K      | 1x80G A/H GPU      | [run_dpo_lora_32k.sh](../examples/scripts/ERNIE-4.5-0.3B/dpo/run_dpo_lora_32k.sh)|
+| Model                          |Multimodal Model | Post-Training Method | Seq Length | Min Resources       | Recommended Config |
+|--------------------------------|-----------------|----------------------|------------|---------------------|---------------------|
+| ERNIE-4.5-VL-424B-A47B-Base/ERNIE-4.5-VL-424B-A47B | ✅ | SFT-LORA         | 8K       | 16x80G A/H GPUs     | [run_sft_lora_8k.yaml](../examples/configs/ERNIE-4.5-VL-424B-A47B/sft/run_sft_lora_8k.yaml)|
+| ERNIE-4.5-VL-424B-A47B-Base/ERNIE-4.5-VL-424B-A47B | ✅ | SFT-LORA         | 32K       | 16x80G A/H GPUs     | [run_sft_lora_32k.yaml](../examples/configs/ERNIE-4.5-VL-424B-A47B/sft/run_sft_lora_32k.yaml)|
+| ERNIE-4.5-VL-424B-A47B-Base/ERNIE-4.5-VL-424B-A47B | ✅ | SFT-LORA(wint4/8)         | 8K       | 8x80G A/H GPUs     | [run_sft_wint8mix_lora_8k.yaml](../examples/configs/ERNIE-4.5-VL-424B-A47B/sft/run_sft_wint8mix_lora_8k.yaml)|
+| ERNIE-4.5-VL-424B-A47B-Base/ERNIE-4.5-VL-424B-A47B | ✅ | SFT-LORA(wint4/8)         | 32K       | 8x80G A/H GPUs     | [run_sft_wint8mix_lora_32k.yaml](../examples/configs/ERNIE-4.5-VL-424B-A47B/sft/run_sft_wint8mix_lora_32k.yaml)|
+| ERNIE-4.5-VL-424B-A47B-Base/ERNIE-4.5-VL-424B-A47B | ✅ | SFT-LORA(wint4/8)         | 128K       | 16x80G A/H GPUs     | [run_sft_wint8mix_lora_128k.yaml](../examples/configs/ERNIE-4.5-VL-424B-A47B/sft/run_sft_wint8mix_lora_128k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | SFT         | 8K       | 96x80G A/H GPUs     | [run_sft_8k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/sft/run_sft_8k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | SFT         | 32K      | 112x80G A/H GPUs    | [run_sft_32k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/sft/run_sft_32k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | SFT(FP8)    |    8K   | 16x80G H GPUs + 2TB CPU RAM     | [run_sft_fp8_8k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/sft/run_sft_fp8_8k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | SFT(FP8)    | 32K      | 16x80G H GPUs + 2TB CPU RAM      | [run_sft_fp8_32k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/sft/run_sft_fp8_32k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | SFT-LoRA(wint4/8) | 8K       | 4x80G A/H GPUs     |[run_sft_wint8mix_lora_8k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_8k.yaml) |
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | SFT-LoRA(wint4/8) | 32K      | 8x80G A/H GPUs     |[run_sft_wint8mix_lora_32k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/sft/run_sft_wint8mix_lora_32k.yaml) |
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | DPO         | 8K       | 112x80G A/H GPUs   | [run_dpo_8k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/dpo/run_dpo_8k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | DPO         | 32K      | 112x80G A/H GPUs   | [run_dpo_32k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/dpo/run_dpo_32k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | DPO-LoRA    | 8K       | 16x80G A/H GPUs    | [run_dpo_lora_8k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/dpo/run_dpo_lora_8k.yaml)|
+| ERNIE-4.5-300B-A47B-Base/ERNIE-4.5-300B-A47B | ❌ | DPO-LoRA    | 32K      | 16x80G A/H GPUs    | [run_dpo_lora_32k.yaml](../examples/configs/ERNIE-4.5-300B-A47B/dpo/run_dpo_lora_32k.yaml)|
+| ERNIE-4.5-VL-28B-A3B-Base/ERNIE-4.5-VL-28B-A3B | ✅ | SFT         | 8K       | 8x80G A/H GPUs     | [run_sft_8k.yaml](../examples/configs/ERNIE-4.5-VL-28B-A3B/sft/run_sft_8k.yaml)|
+| ERNIE-4.5-VL-28B-A3B-Base/ERNIE-4.5-VL-28B-A3B | ✅ | SFT         | 32K       | 8x80G A/H GPUs     | [run_sft_32k.yaml](../examples/configs/ERNIE-4.5-VL-28B-A3B/sft/run_sft_32k.yaml)|
+| ERNIE-4.5-VL-28B-A3B-Base/ERNIE-4.5-VL-28B-A3B | ✅ | SFT         | 128K       | 8x80G A/H GPUs     | [run_sft_128k.yaml](../examples/configs/ERNIE-4.5-VL-28B-A3B/sft/run_sft_128k.yaml)|
+| ERNIE-4.5-VL-28B-A3B-Base/ERNIE-4.5-VL-28B-A3B | ✅ | SFT-LoRA         | 8K       | 4x80G A/H GPUs     | [run_sft_lora_8k.yaml](../examples/configs/ERNIE-4.5-VL-28B-A3B/sft/run_sft_lora_8k.yaml)|
+| ERNIE-4.5-VL-28B-A3B-Base/ERNIE-4.5-VL-28B-A3B | ✅ | SFT-LoRA         | 32K       | 4x80G A/H GPUs     | [run_sft_lora_32k.yaml](../examples/configs/ERNIE-4.5-VL-28B-A3B/sft/run_sft_lora_32k.yaml)|
+| ERNIE-4.5-VL-28B-A3B-Base/ERNIE-4.5-VL-28B-A3B | ✅ | SFT-LoRA         | 128K       | 4x80G A/H GPUs     | [run_sft_lora_128k.yaml](../examples/configs/ERNIE-4.5-VL-28B-A3B/sft/run_sft_lora_128k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | SFT         | 8K       | 8x80G A/H GPUs     | [run_sft_8k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/sft/run_sft_8k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | SFT         | 32K      | 8x80G A/H GPUs     | [run_sft_32k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/sft/run_sft_32k.yaml)|
+| ERNIE-4.5-21B-A3B-B base/ERNIE-4.5-21B-A3B | ❌ | SFT         | 128K     | 8x80G A/H GPUs     | [run_sft_128k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/sft/run_sft_128k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | SFT-LoRA(wint4/8) | 8K       | 1x80G A/H GPUs     | [run_sft_wint8mix_lora_8k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_8k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | SFT-LoRA(wint4/8) | 32K      | 1x80G A/H GPUs     | [run_sft_wint8mix_lora_32k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/sft/run_sft_wint8mix_lora_32k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | DPO         | 8K       | 8x80G A/H GPUs     | [run_dpo_8k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/dpo/run_dpo_8k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | DPO         | 32K      | 8x80G A/H GPUs     | [run_dpo_32k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/dpo/run_dpo_32k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | DPO         | 128K     | 8x80G A/H GPUs     | [run_dpo_128k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/dpo/run_dpo_128k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | DPO-LoRA    | 8K       | 1x80G A/H GPUs     | [run_dpo_lora_8k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_8k.yaml)|
+| ERNIE-4.5-21B-A3B-Base/ERNIE-4.5-21B-A3B | ❌ | DPO-LoRA    | 32K      | 1x80G A/H GPUs     | [run_dpo_lora_32k.yaml](../examples/configs/ERNIE-4.5-21B-A3B/dpo/run_dpo_lora_32k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | SFT         | 8K       | 1x80G A/H GPU      | [run_sft_8k.yaml](../examples/configs/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | SFT         | 32K      | 1x80G A/H GPU      | [run_sft_32k.yaml](../examples/configs/ERNIE-4.5-0.3B/sft/run_sft_32k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | SFT         | 128K      | 1x80G A/H GPU      | [run_sft_128k.yaml](../examples/configs/ERNIE-4.5-0.3B/sft/run_sft_128k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | SFT-LoRA(wint4/8)         | 8K      | 1x80G A/H GPU      | [run_sft_wint8mix_lora_8k.yaml](../examples/configs/ERNIE-4.5-0.3B/sft/run_sft_wint8mix_lora_8k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | SFT-LoRA(wint4/8)         | 32K      | 1x80G A/H GPU      | [run_sft_wint8mix_lora_32k.yaml](../examples/configs/ERNIE-4.5-0.3B/sft/run_sft_wint8mix_lora_32k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | DPO         | 8K       | 1x80G A/H GPU      | [run_dpo_8k.yaml](../examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_8k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | DPO         | 32K      | 1x80G A/H GPU      | [run_dpo_32k.yaml](../examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_32k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | DPO         | 128K      | 1x80G A/H GPU      | [run_dpo_128k.yaml](../examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_128k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | DPO-LoRA    | 8K       | 1x80G A/H GPU      | [run_dpo_lora_8k.yaml](../examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_lora_8k.yaml)|
+| ERNIE-4.5-0.3B-Base/ERNIE-4.5-0.3B | ❌ | DPO-LoRA    | 32K      | 1x80G A/H GPU      | [run_dpo_lora_32k.yaml](../examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_lora_32k.yaml)|
 
 
 ### 3.2 Data Preparation

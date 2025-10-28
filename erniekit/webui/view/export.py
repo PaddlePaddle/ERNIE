@@ -27,7 +27,7 @@ def build(manager):
     """
     Export component
     Args:
-        manager (object): An object for unified management of components
+        manager (object): An object for unified management of components.
     """
 
     default_max_shard_size = config.get_default_user_dict("export", "max_shard_size")
@@ -51,7 +51,6 @@ def build(manager):
             stop_btn = gr.Button(variant="stop")
 
         with gr.Column() as output_container:
-
             command_preview = gr.Code(
                 language="shell",
                 lines=15,

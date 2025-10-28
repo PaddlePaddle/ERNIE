@@ -15,6 +15,7 @@
 import os
 import subprocess
 import sys
+import shlex
 from copy import deepcopy
 from typing import Any, Optional
 
@@ -22,7 +23,7 @@ from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.log import logger
 
 from ..hparams import get_server_args, read_args
-from ..utils.process import terminate_process_tree
+from ..utils.process import terminate_process_tree, is_valid_model_dir
 
 
 def run_server(args: Optional[dict[str, Any]] = None) -> None:
@@ -34,32 +35,78 @@ def run_server(args: Optional[dict[str, Any]] = None) -> None:
 
     last_checkpoint = None
     if os.path.isdir(finetuning_args.output_dir):
-        last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
-        if last_checkpoint is not None:
-            server_model_path = last_checkpoint
-            logger.info(
-                f"Checkpoint detected, launch server from {last_checkpoint} \
-                (Only Full checkpoint is supported)"
-            )
+        # Check if the output directory is a valid model directory (contains .safetensors or .pdparams files)
+        if is_valid_model_dir(finetuning_args.output_dir):
+            last_checkpoint = finetuning_args.output_dir
+        # If not a model directory but still a valid path, try to find the latest checkpoint
         else:
-            logger.info(f"No Checkpoint detected, launch server from {model_args.model_name_or_path}.")
+            last_checkpoint = get_last_checkpoint(finetuning_args.output_dir)
+    if last_checkpoint is not None:
+        server_model_path = last_checkpoint
+        logger.info(
+            f"Checkpoint detected, launch server from {last_checkpoint} \
+                    (Only Full checkpoint is supported)"
+        )
+    else:
+        logger.info(
+            f"No Checkpoint detected, launch server from {model_args.model_name_or_path}."
+        )
+
+    logger.info(
+        "The optimal configuration for model deployment can be referred: https://github.com/PaddlePaddle/FastDeploy/tree/develop/docs/zh/optimal_deployment"
+    )
 
     env = deepcopy(os.environ)
-    command = (
-        "python -m fastdeploy.entrypoints.openai.api_server "
-        f"--model {server_model_path} "
-        f"--tensor-parallel-size {finetuning_args.server_tp_degree} "
-        f"--host {server_args.host} "
-        f"--port {server_args.port} "
-        f"--metrics-port {server_args.metrics_port} "
-        f"--engine-worker-queue-port {server_args.engine_worker_queue_port} "
-        f"--use-warmup {server_args.use_warmup} "
-        f"--max-model-len {server_args.max_model_len} "
-        f"--max-num-seqs {server_args.max_num_seqs} "
-        f"--gpu-memory-utilization {server_args.gpu_memory_utilization} "
-        f"--block-size {server_args.block_size} "
-        f"--kv-cache-ratio {server_args.kv_cache_ratio} "
-    ).split()
+    if server_args.enable_mm:
+        limit_mm_per_prompt = shlex.quote(server_args.limit_mm_per_prompt)
+        command = (
+            "python -m fastdeploy.entrypoints.openai.api_server "
+            f"--model {server_model_path} "
+            f"--tensor-parallel-size {finetuning_args.server_tp_degree} "
+            f"--host {server_args.host} "
+            f"--port {server_args.port} "
+            f"--metrics-port {server_args.metrics_port} "
+            f"--engine-worker-queue-port {server_args.engine_worker_queue_port} "
+            f"--use-warmup {server_args.use_warmup} "
+            f"--max-model-len {server_args.max_model_len} "
+            f"--max-num-seqs {server_args.max_num_seqs} "
+            f"--gpu-memory-utilization {server_args.gpu_memory_utilization} "
+            f"--block-size {server_args.block_size} "
+            f"--kv-cache-ratio {server_args.kv_cache_ratio} "
+            f"--quantization {server_args.quantization} "
+            f"--enable-mm "
+            f"--limit-mm-per-prompt {limit_mm_per_prompt} "
+            f"--reasoning-parser {server_args.reasoning_parser} "
+            f"--enable-chunked-prefill "
+            f"--max-num-batched-tokens {server_args.max_num_batched_tokens} "
+        )
+        if server_args.load_choices == "default_v1":
+            command += "--load_choices default_v1 "
+        command = shlex.split(command)
+    else:
+        command = (
+            "python -m fastdeploy.entrypoints.openai.api_server "
+            f"--model {server_model_path} "
+            f"--tensor-parallel-size {finetuning_args.server_tp_degree} "
+            f"--host {server_args.host} "
+            f"--port {server_args.port} "
+            f"--metrics-port {server_args.metrics_port} "
+            f"--engine-worker-queue-port {server_args.engine_worker_queue_port} "
+            f"--use-warmup {server_args.use_warmup} "
+            f"--max-model-len {server_args.max_model_len} "
+            f"--max-num-seqs {server_args.max_num_seqs} "
+            f"--gpu-memory-utilization {server_args.gpu_memory_utilization} "
+            f"--block-size {server_args.block_size} "
+            f"--kv-cache-ratio {server_args.kv_cache_ratio} "
+            f"--quantization {server_args.quantization} "
+        )
+        if server_args.load_choices == "default_v1":
+            command += "--load_choices default_v1 "
+        if server_args.reasoning_parser == "ernie_x1":
+            command += "--reasoning-parser ernie_x1 "
+        if server_args.tool_call_parser == "ernie_x1":
+            command += "--tool-call-parser ernie_x1 "
+        command = command.split()
 
     process = subprocess.Popen(
         command,

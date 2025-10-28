@@ -35,9 +35,9 @@ We provide demo data for multimodal tasks, which can be found at data/multimodal
 
 The prefix field controls whether the model enters "thinking" mode:
 
-- <think>\n\n</think>\n\n: disables thinking mode (default)
+- `<think>\n\n</think>\n\n`: disables thinking mode (default)
 
-- <think>: enables thinking mode
+- `<think>`: enables thinking mode
 
 ## 2. Inference
 

@@ -15,7 +15,7 @@
 PADDLE_MODEL_PATH=${1:-}
 TORCH_MODEL_PATH=${2:-}
 
-python examples/paddle2torch/tran_4_5t.py \
+python tools/paddle2torch/tran_4_5t.py \
     --src_dir $PADDLE_MODEL_PATH \
     --dest_dir $TORCH_MODEL_PATH \
     --src_prefix "ernie." \
