@@ -63,17 +63,30 @@ def initialize_lora_model(
                 model_args.lora_alpha = 4
             else:
                 model_args.lora_alpha = 2 * model_args.lora_rank
-        lora_config = LoRAConfig(
-            target_modules=target_modules,
-            r=model_args.lora_rank,
-            lora_alpha=model_args.lora_alpha,
-            rslora=model_args.rslora,
-            lora_plus_scale=model_args.lora_plus_scale,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            dtype=dtype,
-            head_dim=model.config.hidden_size // model.config.num_attention_heads,
-            base_model_name_or_path=model_args.model_name_or_path,
-        )
+        if training_args.use_huggingface_model:
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=model_args.lora_alpha,
+                rslora=model_args.rslora,
+                lora_plus_scale=model_args.lora_plus_scale,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+                head_dim=model.config.text_config.hidden_size // model.config.text_config.num_attention_heads,
+                base_model_name_or_path=model_args.model_name_or_path,
+            )
+        else:
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=model_args.lora_alpha,
+                rslora=model_args.rslora,
+                lora_plus_scale=model_args.lora_plus_scale,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+                head_dim=model.config.hidden_size // model.config.num_attention_heads,
+                base_model_name_or_path=model_args.model_name_or_path,
+            )
         model = LoRAModel(model, lora_config)
     else:
         model = LoRAModel.from_pretrained(

@@ -750,7 +750,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        print("before mlp hidden_states: ", hidden_states)
+
 
         if isinstance(self.mlp, MOELayer):
             if is_multimodel_token_task is not None:
@@ -763,19 +763,16 @@ class Ernie4_5_DecoderLayer(nn.Layer):
                 and token_type_ids is not None
                 and not is_multimodel_token_cpu
             ):
-                print("---------run mlp text-------")
                 hidden_states, _, router_loss, gate_logits = self.mlp_text()(
                     hidden_states, None
                 )  # run this
             else:
-                print("---------run mlp-------")
                 hidden_states, _, router_loss, gate_logits = self.mlp(
                     hidden_states, token_type_ids
                 )
         else:
             hidden_states = self.mlp(hidden_states)
             gate_logits, router_loss = None, None
-        print("after mlp hidden_states: ", hidden_states)
 
         with self.model_parallel_dropout():
             hidden_states = self.residual_add2(hidden_states, residual)

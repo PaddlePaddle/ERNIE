@@ -43,7 +43,6 @@ from ernie.callbacks import (
     VitTrainableCallback,
 )
 from ernie.configuration import Ernie4_5_VLMoeConfig
-# from paddleformers.transformers.ernie4_5_vl.model.configuration import Ernie4_5_VLMoeConfig
 from ernie.dataset.text_sft_reader.sft_task import KnoverDataset, create_pyreader
 from ernie.dataset.vl_sft_reader import (
     MixExampleSetJson,
@@ -395,6 +394,7 @@ def run_vl_sft(
         finetuning_args.save_to_hf = False
     if convert_from_hf:
         finetuning_args.save_to_hf = True
+        finetuning_args.use_huggingface_model = True
         cfg = AutoConfig.from_pretrained(
             os.path.join(model_args.model_name_or_path),
             quantization_config=quantization_config,
@@ -528,7 +528,6 @@ def run_vl_sft(
                 config=cfg,
                 convert_from_hf=convert_from_hf,
             )
-    print("pzl: model: ", model)
     if convert_from_hf:
         logger.info(f"vision_model: {model.model.vision_tower}")
     else:
@@ -814,9 +813,9 @@ def run_vl_sft(
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
         trainer.save_model(finetuning_args.output_dir)
-        # trainer.log_metrics("train", metrics)
-        # trainer.save_metrics("train", metrics)
-        # trainer.save_state()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
     # Evaluate and tests model
     if finetuning_args.do_eval:
