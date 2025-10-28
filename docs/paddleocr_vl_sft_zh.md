@@ -140,7 +140,7 @@ ERNIEKit 默认使用机器上的全部 GPU，可以通过环境变量 `CUDA_VIS
 GPU 的数目 `GPU_num` 会影响训练超参数 `learning_rate & packing_size & gradient_accumulation_steps` 配置。理论上，每个更新步使用的样本数目 `sample_num = G*B*A`，近似与学习率 `learning_rate` 成正线形关系，因此，当 GPU 数目增加 `N` 倍变为 `N*GPU` 时，有两种调整方式：
 1. 保持 `sample_num` 不变
     - 将 `packing_size` 减少 `x` 倍，变成 `packing_size/x`
-    - 将 `gradient_accumulation_steps` 减少 `y` 倍，变成 `gradient_accumulation_steps/y` 
+    - 将 `gradient_accumulation_steps` 减少 `y` 倍，变成 `gradient_accumulation_steps/y`
     - 满足 `x*y = N` 即可
 2. 将 `learning_rate` 增加 `N` 倍，变成 `N*learning_rate`
 
@@ -181,6 +181,8 @@ tensorboard --logdir ./PaddleOCR-VL-SFT-Bengali/tensorboard_logs/ --port 8084
 ```bash
 python -m pip install -U "paddleocr[doc-parser]"
 python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
+python -m pip install --force-reinstall opencv-python-headless
+python -m pip install numpy==1.26.4
 ```
 
 ### 7.2. 推理模型准备
@@ -188,8 +190,8 @@ python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors
 从 PaddleOCR-VL 中拷贝必要的推理配置文件到 SFT 训练完成后保存的模型目录中
 
 ```bash
-cp PaddlePaddle/PaddleOCR-VL/chat-template.jinja PaddleOCR-VL-SFT-Bengali
-cp PaddlePaddle/PaddleOCR-VL/inference.yaml PaddleOCR-VL-SFT-Bengali
+cp PaddlePaddle/PaddleOCR-VL/chat_template.jinja PaddleOCR-VL-SFT-Bengali
+cp PaddlePaddle/PaddleOCR-VL/inference.yml PaddleOCR-VL-SFT-Bengali
 ```
 
 ### 7.3. 推理数据集准备
@@ -217,6 +219,8 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 # GT = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 # Excepted Answer = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 ```
+
+上述命令会在 PaddleOCR-VL-SFT-Bengali_response 目录下保存结果和可视化图片，其中预测结果保存在以 `.md` 结尾的文件中。更多关于paddleocr工具的推理能力，请参考：https://www.paddleocr.ai/latest/version3.x/pipeline_usage/PaddleOCR-VL.html。
 
 ## 8. 注意事项
 
@@ -276,4 +280,29 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
         {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
     ]
 }
+```
+
+### 常见问题
+
+如果你使用上述命令过程中遇到下面的问题，一般是因为cv2和环境的冲突，可以通过安装 `opencv-python-headless` 来解决问题
+
+**问题表现**
+
+```
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 181, in <module>
+    bootstrap()
+  File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 153, in bootstrap
+    native_module = importlib.import_module("cv2")
+  File "/usr/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+```
+
+**解决方案**
+
+```
+python -m pip install --force-reinstall opencv-python-headless
+python -m pip install numpy==1.26.4
 ```
