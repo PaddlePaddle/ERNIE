@@ -43,7 +43,7 @@ docker run --gpus all --name erniekit-ft-paddleocr-vl -v $PWD:/paddle --shm-size
 拉取 ERNIEKit 并安装依赖：
 
 ```bash
-git clone https://github.com/PaddlePaddle/ERNIE
+git clone https://github.com/PaddlePaddle/ERNIE -b release/v1.4
 cd ERNIE
 python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e .
