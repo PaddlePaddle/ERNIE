@@ -48,8 +48,8 @@ cd ERNIE
 python -m pip install -r requirements/gpu/requirements.txt
 python -m pip install -e .
 python -m pip install tensorboard
-pyhton -m pip install opencv-python-headless
-pyhton -m pip install numpy==1.26.4
+python -m pip install opencv-python-headless
+python -m pip install numpy==1.26.4
 ```
 
 更多安装方式请参考 [ERNIEKit-安装文档](./erniekit.md#2-installation)。
