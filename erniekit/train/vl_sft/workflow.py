@@ -48,7 +48,7 @@ from ernie.dataset.vl_sft_reader import (
 from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
 from paddleformers.transformers.ernie4_5_vl import (
-    Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_formers,
+    Ernie4_5_VLMoeForConditionalGenerationModel as Ernie4_5_VLMoeForConditionalGeneration_formers,
 )
 from ernie.modeling_moe_vl import (
     Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_erniekit,
