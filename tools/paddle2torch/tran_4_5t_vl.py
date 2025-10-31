@@ -41,7 +41,6 @@ def convert_pdparams_to_safetensors(pdparams_path, safetensors_path, config):
     print("pdparams_path:", pdparams_path)
     # Load the PaddlePaddle model state dictionary
     torch_state_dict = {}
-    weight_map = {}
     pd_tensors = load_file(pdparams_path)
     for key, param in pd_tensors.items():
         if param.dtype != 'float32':
