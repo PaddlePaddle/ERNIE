@@ -204,6 +204,10 @@ class PreTrainingArguments(TrainingArguments):
     use_ortho_loss_callback: bool = field(
         default=False, metadata={"help": "whether use ortho loss callback"}
     )
+    num_nextn_predict_layers: int = field(
+        default=0,
+        metadata={"help": "The number of nextn predict layers."},
+    )
 
     @property
     def need_data(self):
