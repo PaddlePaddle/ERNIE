@@ -478,6 +478,7 @@ def run_sft(
         "mix_strategy": data_args.mix_strategy,
         "encode_one_turn": data_args.encode_one_turn,
         "use_template": data_args.use_template,
+        "is_pretraining": True if model_args.stage.lower() == "pt" else False,
     }
     from paddleformers.datasets.finetuning import collate_fn
 
@@ -525,7 +526,7 @@ def run_sft(
     data_collator = partial(
         collate_fn,
         tokenizer=tokenizer,
-        finetuning_args=finetuning_args,
+        training_args=finetuning_args,
         model_args=model_args,
         max_seq_len=data_args.max_seq_len + model_config.num_nextn_predict_layers,
     )
