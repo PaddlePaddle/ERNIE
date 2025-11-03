@@ -51,7 +51,7 @@ def _training_function(config: dict[str, Any]) -> None:
         check_path(data_args.train_dataset_path)
         check_path(data_args.eval_dataset_path)
 
-    if model_args.stage == "SFT":
+    if model_args.stage == "SFT" or model_args.stage == "PT":
         with paddle.amp.auto_cast(enable=False):
             run_sft(model_args, data_args, generating_args, finetuning_args)
     elif model_args.stage == "VL-SFT":
