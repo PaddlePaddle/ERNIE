@@ -25,24 +25,82 @@ This is where SFT (Supervised Fine-Tuning) becomes necessary to enhance the mode
 
 ## 2. Environment Setup
 
-Please refer to the installation steps in the [ERNIEKit Installation Guide]((./erniekit.md#2-installation)) to set up the training environment.
+Please ensure that you install ERNIE and its related dependencies in an environment with CUDA 12 or a later version. To avoid potential environment issues, we recommend building a container based on the official PaddlePaddle image.
+
+### 2.1. Build the Container
+
+The image already includes the PaddlePaddle framework, so no additional installation is required.
+
+```bash
+docker run --gpus all --name erniekit-ft-paddleocr-vl -v $PWD:/paddle --shm-size=128g --network=host -it ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddle:3.2.0-gpu-cuda12.6-cudnn9.5 /bin/bash
+```
+
+### 2.2. Install ERNIEKit
+
+Clone ERNIEKit and install dependencies:
+
+```bash
+git clone https://github.com/PaddlePaddle/ERNIE
+cd ERNIE
+python -m pip install -r requirements/gpu/requirements.txt
+python -m pip install -e .
+python -m pip install tensorboard
+python -m pip install opencv-python-headless
+python -m pip install numpy==1.26.4
+```
+
+For more installation methods, please refer to the [ERNIEKit Installation Guide]((./erniekit.md#2-installation)).
 
 ## 3. Model and Dataset Preparation
 
-### 3.1 Model Preparation
+### 3.1. Model Preparation
 The PaddleOCR-VL-0.9B model can be downloaded from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files).
 
-```
+```bash
 huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/PaddleOCR-VL
 ```
 
-### 3.2 Dataset Preparation
+### 3.2. Dataset Preparation
 
-You can build your fine-tuning dataset according to the [SFT VL Dataset Format]((./datasets.md#sft-vl-dataset)). For your convenience, we also provide a quick-start [Bengali training dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:
+For the training dataset format, please refer to [SFT VL Dataset Format]((./datasets.md#sft-vl-dataset)). Required fields are as follows:
+* `text_info`: The list of text data, each element contains a `text` and a `tag`
+  * `text`: The text content from User question or System response
+  * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
+* `image_info`: The list of image data, each element contains a `image_url` and a `matched_text_index`
+  * `image_url`: The url to download image online or the path to access image locally
+  * `matched_text_index`: The index of matched text in `text_info`
+    * Default: `matched_text_index=0` means the image is matched with the first text, and will be palced before the first text
 
-```
+Notes:
+* Each training sample is in JSON format, with multiple samples separated by newlines
+* Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
+
+For your convenience, we also provide a quick-start [Bengali training dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:
+
+```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 ```
+
+Bengali training example:
+
+<p align="center">
+  <img src="./assets/bengali_train_example.png" width="400px"></a>
+</p>
+
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+    ],
+    "text_info": [
+        {"text": "OCR:", "tag": "mask"},
+        {"text": "দডর মথ বধ বকসট একনজর দখই চনত পরল তর অনমন\nঠক পনতই লকয রখছ\nর নচ থকই চচয বলল কশর, “এইই; পযছ! পযছ!'\nওপর", "tag": "no_mask"},
+    ]
+}
+```
+
+Tables, formulas, and charts use a special data format. For details, please refer to [8.1. Table/Formula/Chart Data Format](#81-tableformulachart-data-format)
 
 ## 4. Training Configuration
 
@@ -64,9 +122,11 @@ We provide a [configuration](../examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft
 - `learning_rate=5e-6`: Learning rate, which determines the magnitude of each parameter update.
 
 ## 5. SFT Training
+
 Start the training using the following command:
 
-```
+```bash
+CUDA_VISIBLE_DEVICES=0 \
 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
         model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=./ocr_vl_sft-train_Bengali.jsonl \
@@ -86,12 +146,15 @@ The number of GPUs `GPU_num` affects the configuration of training hyperparamete
 
 You can visualize the training process using `tensorboard`. Launch it with the following command (the command below sets the `port` to 8084; please adjust it to an available port as needed):
 
-```
-pip install tensorboard
+```bash
 tensorboard --logdir /PaddleOCR-VL-SFT-Bengali/tensorboard_logs/ --port 8084
 ```
 
 After the service starts successfully, you can view the training logs by entering `ip:port` in your browser (You can find the machine’s IP address using the `hostname -i` command).
+
+Loss curve as follows:
+
+![SFT-loss](./assets/PaddleOCR-Bengali-SFT-Loss.png)
 
 ## 6. Output Directory Structure
 After training, the model will be saved in the path specified by `output_dir=./PaddleOCR-VL-SFT-Bengali`. The directory contains:
@@ -111,71 +174,134 @@ After training, the model will be saved in the path specified by `output_dir=./P
 
 ## 7. Inference
 
-### 7.1 Inference Environment Setup
+### 7.1. Inference Environment Setup
 
-Install PaddleX for inference:
+Install PaddleOCR for inference:
 
-```
-python -m pip install paddlex
+```bash
+python -m pip install -U "paddleocr[doc-parser]"
 python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cu126/safetensors/safetensors-0.6.2.dev0-cp38-abi3-linux_x86_64.whl
+python -m pip install --force-reinstall opencv-python-headless
+python -m pip install numpy==1.26.4
 ```
 
-### 7.2 Inference Model Preparation
+### 7.2. Inference Model Preparation
 Copy the necessary inference configuration files from the original PaddleOCR-VL model to the directory where the SFT-trained model is saved:
 
 ```
-cp PaddlePaddle/PaddleOCR-VL/chat-template.jinja PaddleOCR-VL-SFT-Bengali
-cp PaddlePaddle/PaddleOCR-VL/inference.yaml PaddleOCR-VL-SFT-Bengali
+cp PaddlePaddle/PaddleOCR-VL/chat_template.jinja PaddleOCR-VL-SFT-Bengali
+cp PaddlePaddle/PaddleOCR-VL/inference.yml PaddleOCR-VL-SFT-Bengali
 ```
 
-### 7.3 Inference Dataset Preparation
+### 7.3. Inference Dataset Preparation
 We provide a [Bengali test dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl)) that can be used for inference to observe the fine-tuning results. Download it using the following command:
 
-```
+```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
 ```
 
-### 7.4 Single-Sample Inference
+### 7.4. Single-Sample Inference
 
-Execute the following Python code to load the model and perform inference on a single sample:
+Bengali test image：
+<p align="center">
+  <img src="./assets/bengali_test_example.png" width="400px"></a>
+</p>
 
-```python
-from paddlex import create_model
+Use the following command for single-sample inference:
 
-model = create_model("PaddleOCR-VL-0.9B", model_dir="PaddleOCR-VL-SFT-Bengali")
+```bash
+paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/dataset/bengali_sft/5b/7a/5b7a5c1c-207a-4924-b5f3-82890dc7b94a.png \
+    --vl_rec_model_name "PaddleOCR-VL-0.9B" \
+    --vl_rec_model_dir "./PaddleOCR-VL-SFT-Bengali" \
+    --save_path="./PaddleOCR-VL-SFT-Bengali_response"
 
-# one sample
-sample= {"image": "https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/dataset/bengali_sft/5b/7a/5b7a5c1c-207a-4924-b5f3-82890dc7b94a.png", "query": "OCR:"}
-# GT： নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
-
-res = next(model.predict(sample, max_new_tokens=2048, use_cache=True))
-res.print()
-
+# GT = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
 # Excepted Answer = নট চলল রফযনর পঠ সওযর\nহয গলয গলয ভব এখন দটত, মঝ মঝ খবর নয যদও লগ যয\nঝগড\nদরগর কছ চল এল
-
 ```
 
-### 7.5 Dataset Inference
+The above command will save the results and visualization images in the PaddleOCR-VL-SFT-Bengali_response directory, where the prediction results are stored in files with the `.md` extension. For more information on the inference capabilities of the paddleocr tool, please refer to: https://www.paddleocr.ai/latest/version3.x/pipeline_usage/PaddleOCR-VL.html.
 
-Execute the following Python code to load the model and perform inference on the test dataset:
+## 8. Notes
 
-```python
-import json
-import jsonlines
-from paddlex import create_model
+### 8.1. Table/Formula/Chart Data Format
 
-model = create_model("PaddleOCR-VL-0.9B", model_dir="PaddleOCR-VL-SFT-Bengali")
+In particular, the following formats are used for specific data types:
 
-with open("./ocr_vl_sft-test_Bengali.jsonl", 'r') as f:
-    sample_list = [json.loads(line) for line in f]
+Table Data: OTSL format
 
-for sample in sample_list:
-    sample['image'] = sample['image_info'][0]['image_url']
-    sample['query'] = "OCR:"
-    res = next(model.predict(sample, max_new_tokens=2048, use_cache=True))
-    sample['response'] = res['result']
+<p align="center">
+  <img src="./assets/table_example.png" width="400px"></a>
+</p>
 
-with jsonlines.open("ocr_vl_sft-test_Bengali_response.jsonl", mode='w') as writer:
-    writer.write_all(sample_list)
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Table Recognition:", "tag": "mask"},
+        {"text": "<fcel>分组<fcel>频数<fcel>频率<nl><fcel>[41,51)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl><fcel>[51,61)<fcel>1<fcel>\\( \\frac{1}{30} \\)<nl><fcel>[61,71)<fcel>4<fcel>\\( \\frac{4}{30} \\)<nl><fcel>[71,81)<fcel>6<fcel>\\( \\frac{6}{30} \\)<nl><fcel>[81,91)<fcel>10<fcel>\\( \\frac{10}{30} \\)<nl><fcel>[91,101)<fcel>5<fcel>\\( \\frac{5}{30} \\)<nl><fcel>[101,111)<fcel>2<fcel>\\( \\frac{2}{30} \\)<nl>", "tag": "no_mask"},
+    ]
+}
+```
 
+Formula Data: LaTeX format
+
+<p align="center">
+  <img src="./assets/formula_example.jpg" width="200px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
+    ],
+    "text_info": [
+        {"text": "Formula Recognition:", "tag": "mask"},
+        {"text": "\\[t_{n}\\in[0,\\infty]\\]", "tag": "no_mask"},
+    ]
+}
+```
+
+Chart Data: Markdown format
+
+<p align="center">
+  <img src="./assets/chart_example.png" width="400px"></a>
+</p>
+
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "./assets/chart_example.png"},
+    ],
+    "text_info": [
+        {"text": "Chart Recognition:", "tag": "mask"},
+        {"text": "  | 22Q3 | 22Q3yoy\n电商 | 85 | 100%\n川渝 | 140 | 8%\n云贵陕 | 95 | 12%\n外围地区 | 45 | 20%", "tag": "no_mask"},
+    ]
+}
+```
+
+### Common Issues
+
+If you encounter the following problem while using the above command, it is generally due to a conflict between cv2 and the environment. This can be resolved by installing `opencv-python-headless`.
+
+**Error message**
+
+```
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 181, in <module>
+    bootstrap()
+  File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 153, in bootstrap
+    native_module = importlib.import_module("cv2")
+  File "/usr/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+```
+
+**Solution**
+
+```shell
+python -m pip install --force-reinstall opencv-python-headless
+python -m pip install numpy==1.26.4
 ```

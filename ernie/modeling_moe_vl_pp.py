@@ -510,7 +510,9 @@ def shard_data_in_pp_group(
         if not input_is_parallel:
             if dp_src_rank == this_rank:
                 assert images.ndim == 4, images.shape
-                full_image_shape = paddle.shape(images).cuda().astype("int32")
+                full_image_shape = (
+                    paddle.shape(images).to(paddle.device.get_device()).astype("int32")
+                )
             else:
                 full_image_shape = paddle.empty([4], dtype="int32")
             dist.broadcast(full_image_shape, dp_src_rank, group=dp_group)
@@ -1637,7 +1639,11 @@ class Ernie4_5_VLMoeForConditionalGenerationPipe(
                     this_rank = dist.get_rank()
                     if src_rank == this_rank:
                         assert images.ndim == 4, images.shape
-                        full_image_shape = paddle.shape(images).cuda().astype("int32")
+                        full_image_shape = (
+                            paddle.shape(images)
+                            .to(paddle.device.get_device())
+                            .astype("int32")
+                        )
                     else:
                         full_image_shape = paddle.empty([4], dtype="int32")
                     dist.broadcast(full_image_shape, src_rank, group=pp_sd_group)

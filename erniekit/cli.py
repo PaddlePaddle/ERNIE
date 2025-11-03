@@ -185,7 +185,7 @@ def main():
         if current_device == "iluvatar_gpu":
             current_device = "gpu"
         command = (
-            f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
+            f"python -u -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
             f"--{current_device}s {visible_cards} --master {master_ip}:{master_port} "
             f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
         )
