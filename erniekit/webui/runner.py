@@ -17,16 +17,21 @@ Process execution management, initiation, and supervision
 """
 
 import asyncio
+import glob
+import subprocess
 import os
 import re
-import subprocess
+import threading
+import pandas as pd
 
-from erniekit.webui import common
+from visualdl import LogReader
+
+import erniekit.webui.common as common
 from erniekit.webui.alert import alert
+from erniekit.webui.common import config
 
 
 class CommandRunner:
-
     def __init__(self):
         self.current_process = None
         self.process_lock = asyncio.Lock()
@@ -35,7 +40,10 @@ class CommandRunner:
         self.track_progress = True
         self.current = 0
         self.total = 0
+        self.percentage = 0
         self.progress_line_buffer = {}
+        self.loss_tracker = LossTracker()
+        self._loss_monitoring_active = False
 
     async def execute(self, command: str):
         """
@@ -51,10 +59,14 @@ class CommandRunner:
         self.lines_history = []
         self.progress_line_buffer = {}
         separator = "\n" + "-" * 50 + "\n"
-        start_text = alert.get("progress", "run_command").format(separator, command) + "\n"
+        start_text = (
+            alert.get("progress", "run_command").format(separator, command) + "\n"
+        )
         self.lines_history.extend([start_text])
+        self._loss_monitoring_active = True
+        self.loss_tracker.start_monitoring()
 
-        yield "\n".join(self.lines_history), 0, 0
+        yield "\n".join(self.lines_history), 0
 
         print("\n" + start_text, flush=True)
         process = None
@@ -67,6 +79,7 @@ class CommandRunner:
                 command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env
             )
             self.current_process = process
+            self.percentage = 0
 
             buffer = b""
             while True:
@@ -92,25 +105,34 @@ class CommandRunner:
                         self._parse_progress(line_clean)
 
                         if should_update:
-                            yield "\n".join(self.lines_history), self.current, self.total
-
+                            yield (
+                                "\n".join(self.lines_history),
+                                self.compute_percentage(self.current, self.total),
+                            )
         except Exception as e:
             error_msg = alert.get("progress", "execution_error").format(str(e))
             self.lines_history.append(error_msg)
             print(error_msg, flush=True)
-            yield "\n".join(self.lines_history), self.current, self.total
+            yield (
+                "\n".join(self.lines_history),
+                self.compute_percentage(self.current, self.total),
+            )
 
         finally:
             self._flush_progress_buffer()
-
             if process:
                 return_code = await process.wait()
                 if return_code == 0:
                     success_msg = alert.get("progress", "progress_success")
                     self.lines_history.append(f"\n{success_msg}")
                     print(f"\n{success_msg}", flush=True)
-                    yield "\n".join(self.lines_history), self.current, self.total
+                    yield (
+                        "\n".join(self.lines_history),
+                        self.compute_percentage(self.current, self.total),
+                    )
+
             self.current_process = None
+            self.loss_tracker.stop_monitoring()
 
     def _extract_next_line(self, buffer):
         """
@@ -196,7 +218,9 @@ class CommandRunner:
             percent = int(percent_match.group(1))
             return percent == 0 or percent == 100 or percent % 10 == 0
 
-        return "100%" in line or "complete" in line.lower() or "finished" in line.lower()
+        return (
+            "100%" in line or "complete" in line.lower() or "finished" in line.lower()
+        )
 
     def _update_progress_in_history(self, progress_key, line):
         """
@@ -264,7 +288,9 @@ class CommandRunner:
 
             try:
                 if process.returncode is not None:
-                    progress_end_msg = "\n" + alert.get("progress", "progress_end") + "\n"
+                    progress_end_msg = (
+                        "\n" + alert.get("progress", "progress_end") + "\n"
+                    )
                     self.lines_history.append(progress_end_msg)
                     return "\n".join(self.lines_history)
 
@@ -277,13 +303,17 @@ class CommandRunner:
 
                 if process.returncode is None:
                     process.kill()
-                    force_terminated_msg = "\n" + alert.get("progress", "force_terminated") + "\n"
+                    force_terminated_msg = (
+                        "\n" + alert.get("progress", "force_terminated") + "\n"
+                    )
                     print(force_terminated_msg)
                     self.lines_history.append(force_terminated_msg)
                     await process.wait()
 
                 self.was_terminated_by_user = True
-                user_terminated_msg = "\n" + alert.get("progress", "user_terminated") + "\n"
+                user_terminated_msg = (
+                    "\n" + alert.get("progress", "user_terminated") + "\n"
+                )
                 self.lines_history.append(user_terminated_msg)
                 print(user_terminated_msg)
             except Exception as e:
@@ -309,3 +339,263 @@ class CommandRunner:
         self.current_output = ""
         self.progress_line_buffer = {}
         return ""
+
+    def is_running(self) -> bool:
+        """
+        Check if there is an active process being executed.
+
+        Args:
+            self: Instance reference
+
+        Returns:
+            bool: True if there is an active process, False otherwise
+        """
+        process = self.current_process
+        return process is not None and process.returncode is None
+
+    def compute_percentage(self, current, total):
+        """
+        Calculate the percentage of progress.
+
+        Args:
+        self: Instance reference
+        current: Current progress value
+        total: Total progress value
+
+        Returns:
+        float: The computed percentage. Returns the existing percentage if total is 0.
+        """
+
+        if total == 0:
+            return self.percentage
+        progress_ratio = current / total
+        self.percentage = progress_ratio * 100
+
+        return self.percentage
+
+    def get_plot(self):
+        """
+        Retrieve the plot data.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        The plot data obtained from the loss tracker.
+        """
+
+        self.loss_tracker.update_loss_config()
+        return self.loss_tracker.get_plot_data()
+
+    def is_loss_monitoring_active(self):
+        """
+        Check if loss monitoring is active.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        bool: True if loss monitoring is active and there is an active process, False otherwise.
+        """
+        return self._loss_monitoring_active and self.is_running()
+
+
+class LossTracker:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.log_path = None
+        self.log_module = None
+        self.log_tag = None
+        self.loss_history = []
+        self.step_history = []
+        self.monitoring_task = None
+        self.is_monitoring = False
+        self.last_logging_path = None
+        self.latest_plot_data = pd.DataFrame({"Step": [0], "Loss": [0]})
+
+    def start_monitoring(self):
+        """
+        Start the loss monitoring coroutine.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        None
+        """
+        if self.monitoring_task is None or self.monitoring_task.done():
+            self.is_monitoring = True
+            self.monitoring_task = asyncio.create_task(self._monitoring_loop())
+
+    def stop_monitoring(self):
+        """
+        Stop the loss monitoring coroutine and clear history data.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        None
+        """
+        self.is_monitoring = False
+        if self.monitoring_task and not self.monitoring_task.done():
+            self.monitoring_task.cancel()
+        self.clear_history_data()
+
+    async def _monitoring_loop(self):
+        """
+        Background monitoring loop that periodically reads plot data.
+
+        Continuously checks for new data while monitoring is active,
+        with a 3-second interval between checks.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        None
+        """
+
+        try:
+            while self.is_monitoring:
+                try:
+                    plot_data = self._read_plot_data()
+                    if plot_data is not None:
+                        self.latest_plot_data = plot_data
+                except Exception as e:
+                    print("Loss Tracker Error: ", e)
+                await asyncio.sleep(3)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            print("Loss Tracker Error: ", e)
+        finally:
+            self.is_monitoring = False
+
+    def update_loss_config(self):
+        """
+        Update log configuration parameters including path, module and tag.
+
+        Retrieves user configurations and sets default values if none are provided.
+        Automatically finds the latest log file if no path is specified.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        None
+        """
+
+        user_log_path = config.get_default_user_dict("basic", "log_path")
+        user_log_module = config.get_default_user_dict("basic", "log_module")
+        user_log_tag = config.get_default_user_dict("basic", "log_tag")
+        logging_dir = config.get_default_user_dict("train", "logging_dir")
+
+        try:
+            if self.log_path is None and logging_dir != self.last_logging_path:
+                if user_log_path is None:
+                    search_pattern = os.path.join(logging_dir, "*.log")
+                    log_files = glob.glob(search_pattern)
+
+                    if log_files:
+                        latest_file = max(log_files, key=os.path.getmtime)
+                        self.log_path = os.path.abspath(latest_file)
+                        self.last_logging_path = logging_dir
+                    else:
+                        self.log_path = None
+                else:
+                    self.log_path = os.path.join(logging_dir, user_log_path)
+                    self.last_logging_path = logging_dir
+
+            if user_log_module is None:
+                self.log_module = "scalar"
+            else:
+                self.log_module = user_log_module
+
+            if user_log_tag is None:
+                self.log_tag = "train/loss"
+            else:
+                self.log_tag = user_log_tag
+        except Exception:
+            self.log_path = None
+            self.log_module = "scalar"
+            self.log_tag = "train/loss"
+
+    def _read_plot_data(self):
+        """
+        Read and process plot data from the log file (internal method)
+
+        Reads log data using the configured parameters and returns it in
+        a DataFrame format with steps and corresponding loss values.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        pandas.DataFrame: DataFrame containing "Step" and "Loss" columns.
+        Returns default empty data if log path is None or error occurs.
+        """
+
+        try:
+            if self.log_path is None:
+                return pd.DataFrame({"Step": [0], "Loss": [0]})
+
+            reader = LogReader(file_path=self.log_path)
+            data = reader.get_data(self.log_module, self.log_tag)
+
+            with self.lock:
+                self.loss_history = []
+                self.step_history = []
+
+                for item in data:
+                    value = item.value
+                    step = item.id
+                    self.loss_history.append(value)
+                    self.step_history.append(step)
+
+                if not self.loss_history:
+                    return pd.DataFrame({"Step": [0], "Loss": [0]})
+
+                return pd.DataFrame(
+                    {"Step": self.step_history, "Loss": self.loss_history}
+                )
+
+        except Exception as e:
+            print("Loss Tracker Error: ", e)
+            return pd.DataFrame({"Step": [0], "Loss": [0]})
+
+    def get_plot_data(self):
+        """
+        Retrieve the latest plot data.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        pandas.DataFrame: The most recently updated plot data containing
+        "Step" and "Loss" columns.
+        """
+
+        return self.latest_plot_data
+
+    def clear_history_data(self):
+        """
+        Clear all historical data and reset log path and plot data.
+
+        Uses a lock to ensure thread-safe data clearing.
+
+        Args:
+        self: Instance reference
+
+        Returns:
+        None
+        """
+
+        with self.lock:
+            self.step_history = []
+            self.loss_history = []
+            self.latest_plot_data = self.get_plot_data()
+
+    def reset_latest_plot_data(self):
+        self.latest_plot_data = pd.DataFrame({"Step": [0], "Loss": [0]})
+        self.log_path = None

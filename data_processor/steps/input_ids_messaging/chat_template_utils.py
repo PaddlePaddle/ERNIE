@@ -171,8 +171,8 @@ def apply_chat_training_template(
                 )
                 if label == 0:
                     new_text_info[-1]["tag"] = "mask"
-    video_start_cnt = len([1 for i in new_text_info if i["text"] == video_end_token])
-    video_end_cnt = len([1 for i in new_text_info if i["text"] == video_start_token])
+    video_start_cnt = len([1 for i in new_text_info if i["text"] == video_start_token])
+    video_end_cnt = len([1 for i in new_text_info if i["text"] == video_end_token])
     image_start_cnt = len([1 for i in new_text_info if i["text"] == image_start_token])
     image_end_cnt = len([1 for i in new_text_info if i["text"] == image_end_token])
     assert (

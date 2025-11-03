@@ -35,9 +35,6 @@ DATASET_TYPE_TO_DATA_TYPE = {
     for dataset_type in dataset_types
 }
 
-# data_type to augment function
-AUGMENT_FN = {"image": "AugmentImage"}
-
 # determined by dataset_type
 PROCESS_FN_TO_DATASET_TYPE = {
     "VideoProcess": ["video"],

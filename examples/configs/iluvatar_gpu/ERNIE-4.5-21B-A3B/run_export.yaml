@@ -1,0 +1,31 @@
+### model
+model_name_or_path: baidu/ERNIE-4.5-21B-A3B-Paddle
+fine_tuning: LoRA
+
+### split
+max_shard_size: 5
+hf_hub_id: null
+output_dir: ./output
+
+### performance
+tensor_parallel_degree: 4
+pipeline_parallel_degree: 2
+sharding_parallel_degree: 1
+sharding: stage1
+sequence_parallel: True
+compute_type: bf16
+fp16_opt_level: O2
+
+# device
+device: iluvatar_gpu
+use_flash_attention: true
+use_sparse_head_and_loss_fn: false
+use_attn_mask_start_row_indices: false
+use_sparse_flash_attn: false
+tensor_parallel_output: false
+pipeline_parallel_config: disable_partial_send_recv enable_clear_every_step_cache disable_batch_p2p_comm
+greedy_intokens: 1
+fuse_rope: 1
+moe_multimodal_dispatch_use_allgather: "v2-alltoall"
+fuse_rms_norm: false
+

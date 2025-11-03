@@ -25,12 +25,31 @@ def initialize_lora_model(
     logger.info("Start to wrap model with LoRA config ...")
     if model_args.lora_path is None or resume_from_checkpoint:
         # If resume from checkpoint, LoRA adatper will be overwritten in the checkpoint loading process.
-        target_modules = [
-            ".*qkv_proj.*",
-            ".*o_proj.*",
-            ".*up_gate_proj.*",
-            ".*down_proj.*",
-        ]
+        if training_args.use_huggingface_model:
+            target_modules = [
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*o_proj.*",
+                ".*up_proj.*",
+                ".*gate_proj.*",
+                ".*down_proj.*",
+                ".*spatial_linear.0.*",
+                ".*spatial_linear.2.*",
+                ".*temporal_linear.0.*",
+                ".*temporal_linear.2.*",
+            ]
+        else:
+            target_modules = [
+                ".*qkv_proj.*",
+                ".*o_proj.*",
+                ".*up_gate_proj.*",
+                ".*down_proj.*",
+                ".*spatial_linear.0.*",
+                ".*spatial_linear.2.*",
+                ".*temporal_linear.0.*",
+                ".*temporal_linear.2.*",
+            ]
         if model_args.rslora_plus:
             model_args.rslora = True
             model_args.lora_plus_scale = 4

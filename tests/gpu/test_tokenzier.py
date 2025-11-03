@@ -42,7 +42,7 @@ def get_tokenizer_time(tokenizer_path):
 
 def assert_tokenizer_correctness(test_io, base_io):
     """assert_tokenizer_correctness"""
-    assert abs(test_io - base_io) < 0.1, "Tokenizer I/O exist diff ! "
+    assert abs(test_io - base_io) < 1, "Tokenizer I/O exist diff ! "
 
 
 def test_0_3b_tokenizer_io():

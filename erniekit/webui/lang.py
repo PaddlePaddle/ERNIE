@@ -56,7 +56,10 @@ LOCALES = {
     },
     "model_name": {
         "zh": {"label": "模型名称", "info": "模型名称，Customization为自定义模型"},
-        "en": {"label": "model name", "info": "Model name, Customization means a custom model"},
+        "en": {
+            "label": "model name",
+            "info": "Model name, Customization means a custom model",
+        },
     },
     "model_name_or_path": {
         "zh": {"label": "模型路径", "info": "模型的具体路径"},
@@ -118,7 +121,11 @@ LOCALES = {
         "en": {"label": "temperature", "info": "Settings related to temperature"},
     },
     "eval_dataset_path": {
-        "zh": {"label": "评测数据路径", "info": "关于评测数据路径的相关设置", "placeholder": "多个路径请以 , 隔开"},
+        "zh": {
+            "label": "评测数据路径",
+            "info": "关于评测数据路径的相关设置",
+            "placeholder": "多个路径请以 , 隔开",
+        },
         "en": {
             "label": "eval dataset path",
             "info": "Settings related to eval dataset path",
@@ -126,7 +133,11 @@ LOCALES = {
         },
     },
     "eval_dataset_prob": {
-        "zh": {"label": "评测数据概率", "info": "关于评测数据概率的相关设置", "placeholder": "多个概率请以 , 隔开"},
+        "zh": {
+            "label": "评测数据概率",
+            "info": "关于评测数据概率的相关设置",
+            "placeholder": "多个概率请以 , 隔开",
+        },
         "en": {
             "label": "eval dataset prob",
             "info": "Settings related to eval dataset prob",
@@ -143,7 +154,10 @@ LOCALES = {
     },
     "max_shard_size": {
         "zh": {"label": "最大分块大小(GB)", "info": "单个模型文件的最大大小"},
-        "en": {"label": "max shard size(GB)", "info": "Settings related to max shard size"},
+        "en": {
+            "label": "max shard size(GB)",
+            "info": "Settings related to max shard size",
+        },
     },
     "output_dir_view": {
         "zh": {"label": "导出目录", "info": "保存导出模型的文件夹路径"},
@@ -177,7 +191,11 @@ LOCALES = {
         },
     },
     "train_dataset_prob": {
-        "zh": {"label": "训练数据概率", "info": "关于训练数据概率的相关设置", "placeholder": "多个概率请以 , 隔开"},
+        "zh": {
+            "label": "训练数据概率",
+            "info": "关于训练数据概率的相关设置",
+            "placeholder": "多个概率请以 , 隔开",
+        },
         "en": {
             "label": "train dataset prob",
             "info": "Settings related to train dataset prob",
@@ -322,7 +340,10 @@ LOCALES = {
         "en": {"label": "logging steps", "info": "Number of steps between two logs."},
     },
     "save_strategy": {
-        "zh": {"label": "checkpoint保存策略", "info": "关于checkpoint保存策略的相关设置"},
+        "zh": {
+            "label": "checkpoint保存策略",
+            "info": "关于checkpoint保存策略的相关设置",
+        },
         "en": {
             "label": "checkpoint save strategy",
             "info": "Settings related to checkpoint save strategy",
@@ -501,12 +522,12 @@ LOCALES = {
             "info": "Selecting an option will overwrite the training configuration",
         },
     },
-    "train_preview_btn": {
+    "train_dataset_preview_btn": {
         "zh": {
             "value": "预览训练数据集",
         },
         "en": {
-            "value": "Preview train dataset",
+            "value": "Preview Train Dataset",
         },
     },
     "preview_command_btn": {
@@ -514,7 +535,7 @@ LOCALES = {
             "value": "预览命令行",
         },
         "en": {
-            "value": "Preview command",
+            "value": "Preview Command",
         },
     },
     "start_btn": {
@@ -653,164 +674,14 @@ LOCALES = {
             "info": "The available GPU number of this machine",
         },
     },
-    "train_dataset_setting_tab": {
-        "zh": {"label": "训练数据集设置"},
-        "en": {
-            "label": "Training Dataset Settings",
-        },
+    "dataset_preview_title": {
+        "zh": {"value": "### 数据集预览"},
+        "en": {"value": "### Dataset Preview"},
     },
-    "eval_dataset_setting_tab": {
-        "zh": {"label": "评估数据集设置"},
-        "en": {
-            "label": "Evaluation Dataset Settings",
-        },
+    "page_info": {
+        "zh": {"value": "第 {} 页，共 {} 页"},
+        "en": {"value": "Page {}, Total Pages {}"},
     },
-    "train_existed_dataset_path": {
-        "zh": {"label": "内置数据集路径", "info": "训练使用的内置数据集路径", "placeholder": "多个路径请以 , 隔开"},
-        "en": {
-            "label": "Built-in Dataset Path",
-            "info": "Path of the built-in dataset for training",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "train_existed_dataset_prob": {
-        "zh": {
-            "label": "内置数据集概率",
-            "info": "训练时使用内置数据集的概率权重",
-            "placeholder": "多个概率请以 , 隔开",
-        },
-        "en": {
-            "label": "Built-in Dataset Probability",
-            "info": "Probability weight of using the built-in dataset",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "train_existed_preview_btn": {
-        "zh": {"value": "预览内置数据集"},
-        "en": {
-            "value": "Preview Built-in Dataset",
-        },
-    },
-    "train_customize_dataset_type": {
-        "zh": {"label": "数据类型", "info": "训练数据集的数据类型", "placeholder": "多个类型请以 , 隔开"},
-        "en": {
-            "label": "Data Type",
-            "info": "Data type for the training dataset",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "train_customize_dataset_prob": {
-        "zh": {
-            "label": "自定义数据集概率",
-            "info": "训练时使用自定义数据集的概率权重",
-            "placeholder": "多个概率请以 , 隔开",
-        },
-        "en": {
-            "label": "Custom Dataset Probability",
-            "info": "Probability weight of using the custom dataset during training",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "train_existed_dataset_type": {
-        "zh": {"label": "数据类型", "info": "训练数据集的数据类型选择", "placeholder": "多个类型请以 , 隔开"},
-        "en": {
-            "label": "Data Type",
-            "info": "Data type selection for the training dataset",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "train_customize_dataset_path": {
-        "zh": {
-            "label": "自定义数据集路径",
-            "info": "训练使用的自定义数据集的存储路径",
-            "placeholder": "多个路径请以 , 隔开",
-        },
-        "en": {
-            "label": "Custom Dataset Path",
-            "info": "Storage path of the custom dataset for training",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "eval_customize_dataset_path": {
-        "zh": {
-            "label": "自定义数据集路径",
-            "info": "评估使用的自定义数据集的存储路径",
-            "placeholder": "多个路径请以 , 隔开",
-        },
-        "en": {
-            "label": "Custom Dataset Path",
-            "info": "Storage path of the custom dataset for evaluation",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "eval_customize_dataset_prob": {
-        "zh": {
-            "label": "自定义数据集概率",
-            "info": "评估时使用自定义数据集的概率权重",
-            "placeholder": "多个概率请以 , 隔开",
-        },
-        "en": {
-            "label": "Custom Dataset Probability",
-            "info": "Probability weight of using the custom dataset during evaluation",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "eval_customize_dataset_type": {
-        "zh": {"label": "数据类型", "info": "评估数据集的数据类型", "placeholder": "多个类型请以 , 隔开"},
-        "en": {
-            "label": "Data Type",
-            "info": "Data type for the evaluation dataset",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "eval_existed_dataset_type": {
-        "zh": {"label": "数据类型", "info": "评估数据集的数据类型选择", "placeholder": "多个类型请以 , 隔开"},
-        "en": {
-            "label": "Data Type",
-            "info": "Data type selection for the evaluation dataset",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "eval_existed_dataset_path": {
-        "zh": {"label": "内置数据集路径", "info": "评估使用的内置数据集路径", "placeholder": "多个路径请以 , 隔开"},
-        "en": {
-            "label": "Built-in Dataset Path",
-            "info": "Path of the built-in dataset for evaluation",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "eval_existed_dataset_prob": {
-        "zh": {
-            "label": "内置数据集概率",
-            "info": "评估时使用内置数据集的概率权重",
-            "placeholder": "多个概率请以 , 隔开",
-        },
-        "en": {
-            "label": "Built-in Dataset Probability",
-            "info": "Probability weight for using the built-in dataset",
-            "placeholder": "please separate them with ,",
-        },
-    },
-    "eval_customize_preview_btn": {
-        "zh": {"value": "预览自定义数据集"},
-        "en": {
-            "value": "Preview Custom Dataset",
-        },
-    },
-    "eval_existed_preview_btn": {
-        "zh": {"value": "预览内置数据集"},
-        "en": {
-            "value": "Preview Built-in Dataset",
-        },
-    },
-    "train_customize_preview_btn": {
-        "zh": {"value": "预览自定义数据集"},
-        "en": {
-            "value": "Preview Custom Dataset",
-        },
-    },
-    "dataset_preview_title": {"zh": {"value": "### 数据集预览"}, "en": {"value": "### Dataset Preview"}},
-    "page_info": {"zh": {"value": "第 {} 页，共 {} 页"}, "en": {"value": "Page {}, Total Pages {}"}},
     "dataset_info": {
         "zh": {"value": "（**数据集** {}/{}） 当前预览地址: {}"},
         "en": {"value": "(**Dataset** {}/{})  Current preview path: {}"},
@@ -835,41 +706,6 @@ LOCALES = {
         "zh": {"value": "上一个数据集"},
         "en": {"value": "Pre Dataset"},
     },
-    "eval_customize_select_dataset_type": {
-        "zh": {"label": "可选数据类型", "info": "数据类型的可选类型"},
-        "en": {
-            "label": "Selectable Data Types",
-            "info": "Optional type for data types",
-        },
-    },
-    "train_customize_select_dataset_type": {
-        "zh": {"label": "可选数据类型", "info": "数据类型的可选类型"},
-        "en": {"label": "Selectable Data Types", "info": "Optional type for data types"},
-    },
-    "train_builtin_dataset_tab": {
-        "zh": {"label": "设置内置数据集"},
-        "en": {
-            "label": "Setting built-in Datasets",
-        },
-    },
-    "train_customize_dataset_tab": {
-        "zh": {"label": "设置自定义数据集"},
-        "en": {
-            "label": "Setting customized Datasets",
-        },
-    },
-    "eval_builtin_dataset_tab": {
-        "zh": {"label": "设置内置数据集"},
-        "en": {
-            "label": "Setting built-in Datasets",
-        },
-    },
-    "eval_customize_dataset_tab": {
-        "zh": {"label": "设置自定义数据集"},
-        "en": {
-            "label": "Setting customized Datasets",
-        },
-    },
     "chat_info": {
         "zh": {
             "value": chat_info_html.format(
@@ -888,12 +724,177 @@ LOCALES = {
         "zh": {"label": "模型库", "info": "选择模型的下载库"},
         "en": {"label": "Choose Path", "info": "Choose different paths"},
     },
+    "eval_dataset_btn": {
+        "zh": {
+            "value": "设置评估数据集",
+        },
+        "en": {
+            "value": "Setting Eval Dataset",
+        },
+    },
+    "train_dataset_btn": {
+        "zh": {
+            "value": "设置训练数据集",
+        },
+        "en": {
+            "value": "Setting Train Dataset",
+        },
+    },
+    "text_dataset_btn": {
+        "zh": {
+            "value": "设置文本数据集",
+        },
+        "en": {
+            "value": "Setting Text Dataset",
+        },
+    },
+    "add_dataset_btn": {
+        "zh": {
+            "value": "添加数据集",
+        },
+        "en": {
+            "value": "Add Dataset",
+        },
+    },
+    "save_dataset_btn": {
+        "zh": {
+            "value": "保存数据集并退出",
+        },
+        "en": {
+            "value": "Save Dataset And Exit",
+        },
+    },
+    "delete_dataset_btn": {
+        "zh": {
+            "value": "删除数据集",
+        },
+        "en": {
+            "value": "Delete Dataset",
+        },
+    },
+    "eval_dataset_preview_btn": {
+        "zh": {
+            "value": "预览评估数据集",
+        },
+        "en": {
+            "value": "Preview Eval Dataset",
+        },
+    },
+    "text_dataset_preview_btn": {
+        "zh": {
+            "value": "预览文本数据集",
+        },
+        "en": {
+            "value": "Preview Text Dataset",
+        },
+    },
+    "dataset": {"zh": {"label": "数据集"}, "en": {"label": "Datasets"}},
+    "dataset_type": {
+        "zh": {"label": "数据集类型"},
+        "en": {
+            "label": "Dataset Types",
+        },
+    },
+    "dataset_path": {
+        "zh": {"label": "数据集路径"},
+        "en": {
+            "label": "Dataset Path",
+        },
+    },
+    "dataset_prob": {
+        "zh": {"label": "数据集概率"},
+        "en": {
+            "label": "Dataset Probability",
+        },
+    },
+    "dataset_tip": {
+        "zh": {
+            "value": "### Tips: 请选择相应的数据集，其中Customization为自定义数据集，填入数据集地址和数据集概率"
+        },
+        "en": {
+            "value": "### Tips: Please select the appropriate dataset, where Customization means custom datasets"
+        },
+    },
+    "open_close_plot_btn": {
+        "zh": {"value": "打开/关闭Loss曲线"},
+        "en": {"value": "Open/Close Loss Plot"},
+    },
+    "file_input": {
+        "zh": {"label": "点击上传文件"},
+        "en": {"label": "Click to upload files"},
+    },
+    "thought_checkbox": {
+        "zh": {
+            "label": "开启多模思考模式",
+        },
+        "en": {
+            "label": "Enable VL Thought Mode",
+        },
+    },
+    "pp_need_data_degree": {
+        "zh": {
+            "label": "pp_need_data_degree",
+        },
+        "en": {
+            "label": "pp_need_data_degree",
+        },
+    },
+    "virtual_pp_degree": {
+        "zh": {
+            "label": "virtual_pp_degree",
+        },
+        "en": {
+            "label": "virtual_pp_degree",
+        },
+    },
+    "modality_ratio": {
+        "zh": {
+            "label": "多模态数据比例",
+            "info": "多模和纯文数据配比的配置项",
+        },
+        "en": {
+            "label": "modality ratio",
+            "info": "Configuration item for multi-modal and pure text data ratio",
+        },
+    },
+    "generate_log_btn": {
+        "zh": {"label": "生成对话日志"},
+        "en": {"label": "Generate Chat Log"},
+    },
+    "download_log_btn": {
+        "zh": {"label": "下载对话日志"},
+        "en": {"label": "Download Chat Log"},
+    },
+    "chat_role_setting": {
+        "zh": {"label": "角色设置"},
+        "en": {"label": "Role Setting"},
+    },
+    "img_url_input": {
+        "zh": {
+            "label": "URL图片",
+            "placeholder": "多个路径请以 ; 隔开, 比如url1;url2;url3",
+        },
+        "en": {
+            "label": "URL Image",
+            "placeholder": "Multiple URLs separated by ;, e.g., url1;url2;url3",
+        },
+    },
+    "video_url_input": {
+        "zh": {
+            "label": "URL视频",
+            "placeholder": "多个路径请以 ; 隔开, 比如url1;url2;url3",
+        },
+        "en": {
+            "label": "URL Video",
+            "placeholder": "Multiple URLs separated by ;, e.g., url1;url2;url3",
+        },
+    },
 }
 
 
 def get(key, lang=None, prop=None):
     """
-    Retrieves the Chinese translation based on the given key.
+    Retrieves the Chinese translation based on the given key
 
     Args:
         key (str): The key used to look up the translation.

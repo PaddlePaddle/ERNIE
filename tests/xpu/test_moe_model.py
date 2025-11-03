@@ -308,6 +308,19 @@ def test_sft_lora_fd_server():
     run_check_fastdeploy_infer(process_server, process_chat)
 
 
+def test_sft_lora_128K():
+    clean_output_dir()
+    yaml_path = os.path.join(SFT_CONFIG_PATH, "run_sft_lora_128k.yaml")
+    config = default_args(yaml_path).copy()
+    config["max_steps"] = 3
+    config["save_steps"] = 2
+    config["model_name_or_path"] = MODEL_PATH
+
+    ret_code, err_log = run_update_config_training(config)
+    attach_log_file()
+    assert_result(ret_code, err_log)
+
+
 # The following annotated configurations are currently not supported.
 # def test_sft_wint8mix_lora():
 #     clean_output_dir()

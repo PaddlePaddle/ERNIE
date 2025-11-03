@@ -13,14 +13,6 @@
 # limitations under the License.
 
 """input_ids_messaging"""
-from data_processor.steps.input_ids_messaging.args import (
-    InputIdsMassageArguments,
-    InputIdsMassageInferArguments,
-)
 from data_processor.steps.input_ids_messaging.processor import InputIdsMassageProcessor
 
-__all__ = [
-    "InputIdsMassageArguments",
-    "InputIdsMassageInferArguments",
-    "InputIdsMassageProcessor",
-]
+__all__ = ["InputIdsMassageProcessor"]
