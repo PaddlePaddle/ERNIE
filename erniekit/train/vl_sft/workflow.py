@@ -542,10 +542,7 @@ def run_vl_sft(
                 config=cfg,
                 convert_from_hf=convert_from_hf,
             )
-    if convert_from_hf:
-        logger.info(f"vision_model: {model.model.vision_tower}")
-    else:
-        logger.info(f"vision_model: {model.vision_model}")
+    logger.info(f"vision_model: {model.vision_model}")
 
     if model.config.head_dim is None:
         del model.config.head_dim

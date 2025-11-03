@@ -85,12 +85,9 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
                     layer.mlp, "moe_statics"
                 ), "make sure update to latest ernie-core, too use AuxFree Balance"
                 usages[layer.layer_idx] = (
-                    layer.mlp.moe_statics().expert_usage
+                    layer.mlp.moe_statics.expert_usage
                 )  # usage list
-                # biases[layer.layer_idx] = layer.mlp.moe_statics().e_score_correction_bias
-                biases[layer.layer_idx] = paddle.concat(
-                    layer.mlp.moe_statics().e_score_correction_bias, axis=0
-                )
+                biases[layer.layer_idx] = layer.mlp.moe_statics.e_score_correction_bias
 
         model.apply(get_stat)
         keys, tensor_list = zip(*sorted(usages.items(), key=lambda x: x[0]))
@@ -132,7 +129,7 @@ class MoECorrectionBiasAdjustCallback(TrainerCallback):
                 if not isinstance(layer.mlp, MOELayer_pf):
                     return
                 with paddle.no_grad():
-                    if layer.mlp.gate().weight.stop_gradient:
+                    if layer.mlp.gate.weight.stop_gradient:
                         update_dict[layer.layer_idx][0, :] = 0
                     biases[layer.layer_idx].add_(update_dict[layer.layer_idx])
                     usages[layer.layer_idx].data.zero_()
