@@ -106,6 +106,8 @@ docker exec -it paddle-ixuca-dev bash
 
 4. Install paddlepaddle & paddle-iluvatar-gpu
 ```bash
+ln -sf /usr/local/bin/python3 /usr/local/bin/python
+
 # Install PaddlePaddle CPU package
 python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cpu/paddlepaddle/paddlepaddle-3.3.0.dev20251023-cp310-cp310-linux_x86_64.whl
 
@@ -116,9 +118,12 @@ Nightly version link:
 https://www.paddlepaddle.org.cn/packages/nightly/ixuca/
 ```
 
-4. Install requirements
+4. Install ERNIEKit
 ```bash
-pip install paddleformers
+git clone https://github.com/PaddlePaddle/ERNIE.git
+cd ERNIE
+python -m pip install -r requirements/gpu/requirements.txt
+python -m pip install -e . # We recommend install in editable mode
 ```
 
 ### (2) Start post-traning：(This will take a relatively long time)
