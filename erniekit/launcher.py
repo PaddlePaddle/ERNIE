@@ -18,6 +18,18 @@ from erniekit.eval.eval import run_eval
 from erniekit.export.export import run_export
 from erniekit.export.split import run_split
 from erniekit.train.tuner import run_tuner
+from erniekit.utils.process import detect_device
+
+if detect_device() == "iluvatar_gpu":
+    import paddle
+
+    paddle.set_flags(
+        {
+            "FLAGS_enable_ixattnbkd": True,
+            "FLAGS_enable_ixdnn_attn": False,
+            "FLAGS_imp_mode": 1,
+        }
+    )
 
 
 def launch():
@@ -30,13 +42,13 @@ def launch():
     else:
         raise ValueError("len(sys.argv) mush be larger than 1")
 
-    if command == 'train':
+    if command == "train":
         run_tuner()
-    elif command == 'export':
+    elif command == "export":
         run_export()
-    elif command == 'split':
+    elif command == "split":
         run_split()
-    elif command == 'eval':
+    elif command == "eval":
         run_eval()
     else:
         raise ValueError(f"Unknown command : {command}")

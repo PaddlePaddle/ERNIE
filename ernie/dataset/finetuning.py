@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import copy
 import random
 from dataclasses import dataclass
 from typing import List
 
 import numpy as np
 from paddle.io import IterableDataset, get_worker_info
+from paddleformers.transformers.tokenizer_utils import PretrainedTokenizer
 from paddleformers.utils.log import logger
 
 from ernie.dataset.base import MultiSourceDataset
 from ernie.dataset.data_utils import (
     Example,
     pad_batch_data,
+    postprocess_fc_sequence,
 )
 
 LOGGER_COUNT = 0
@@ -81,7 +83,9 @@ def create_dataset(**dataset_config):
         task_dataset_prob=task_dataset_prob,
         sub_dataset_type=sub_dataset_type,
         process_fn=process_example,
+        process_fn_fc=process_fc,
     )
+
     sequence_dataset = SequenceDataset(
         dataset=example_dataset,
         tokenizer=dataset_config["tokenizer"],
@@ -115,7 +119,13 @@ def create_indexed_dataset(data_file_prefix):
     return indexed_dataset
 
 
-def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: int):
+def collate_fn(
+    batch: List[List[Sequence]],
+    tokenizer,
+    finetuning_args,
+    model_args,
+    max_seq_len: int,
+):
     """Convert batch of sequences into training tensors.
 
     Args:
@@ -131,7 +141,7 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
             - loss_mask: Mask for computing loss
     """
     input_keys = ["input_ids", "labels", "loss_mask"]
-    if model_args.num_nextn_predict_layers > 0:
+    if finetuning_args.num_nextn_predict_layers > 0:
         input_keys.append("nbatch_pack_offset")
     if model_args.use_attn_mask_start_row_indices:
         input_keys.append("attn_mask_start_row_indices")
@@ -160,7 +170,7 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
             ]
         )
 
-        if model_args.num_nextn_predict_layers > 0:
+        if finetuning_args.num_nextn_predict_layers > 0:
             # each sequence end index
             batch_sequence_len = [len(sequence) for sequence in original_token_ids]
             nbatch_pack_offset = [0] * sum(batch_sequence_len)
@@ -183,6 +193,40 @@ def collate_fn(batch: List[List[Sequence]], tokenizer, model_args, max_seq_len: 
     return_list = [np.concatenate(tensor_list) for tensor_list in zip(*return_list)]
     input_dict = dict(zip(input_keys, return_list))
     return input_dict
+
+
+def process_fc(data, input_file):
+    multi_turns_messages = data["messages"]
+    tools_list = data["tools"] if "tools" in data else None
+    label = data["label"] if "label" in data else None
+
+    system = ""
+    is_system = False
+    if "system" in multi_turns_messages[0]["role"]:
+        system = multi_turns_messages[0]["content"]
+        is_system = True
+
+    # be default, all assistant output should be learned, labels are all 1
+    if label is None:
+        label = []
+        for index, turn in enumerate(multi_turns_messages):
+            if "assistant" in turn["role"]:
+                label.append(1)
+
+    assistant_index = 0
+    for index, turn in enumerate(multi_turns_messages):
+        if "assistant" in turn["role"] and label[assistant_index]:
+            message = copy.deepcopy(multi_turns_messages[: index + 1])
+            ex = Example(
+                request={"messages": message, "tools": tools_list},
+                system=system,
+                label=[1],
+                is_system=is_system,
+                source=input_file,
+                is_function_call=True,
+            )
+            yield ex
+            assistant_index += 1
 
 
 def process_example(data, input_file):
@@ -332,11 +376,21 @@ class SequenceDataset(IterableDataset):
         self.begin_of_query = self.tokenizer.tokenize("User: ")
         self.begin_of_response = self.tokenizer.tokenize("\nAssistant: ")
         self.end_of_response = "<|end_of_sentence|>"
-        self.end_of_response_id = self.tokenizer._convert_token_to_id(
-            [self.end_of_response]
-        )[0]
         self.begin_token = "<|begin_of_sentence|>"  # Same effect as sys_start_token
-        self.begin_token_id = self.tokenizer._convert_token_to_id([self.begin_token])[0]
+        if isinstance(self.tokenizer, PretrainedTokenizer):
+            self.end_of_response_id = self.tokenizer._convert_token_to_id(
+                [self.end_of_response]
+            )[0]
+            self.begin_token_id = self.tokenizer._convert_token_to_id(
+                [self.begin_token]
+            )[0]
+        else:
+            self.end_of_response_id = self.tokenizer.convert_tokens_to_ids(
+                [self.end_of_response]
+            )[0]
+            self.begin_token_id = self.tokenizer.convert_tokens_to_ids(
+                [self.begin_token]
+            )[0]
         self.newline_token = self.tokenizer.tokenize(
             "\n"
         )  # Same effect as sys_end_token
@@ -518,8 +572,10 @@ class SequenceDataset(IterableDataset):
         Returns:
             Sequence: Processed sequence or None if invalid.
         """
-
-        encoded_messages = self.tokenizer.encode_chat_inputs(example.request)
+        if example.is_function_call:
+            encoded_messages = postprocess_fc_sequence(self.tokenizer, example.request)
+        else:
+            encoded_messages = self.tokenizer.encode_chat_inputs(example.request)
 
         num_reserved_tokens_for_each_dialog = 1  # only break_turn_token or end_token
         num_reserved_tokens_for_each_turn = 8
@@ -566,7 +622,7 @@ class SequenceDataset(IterableDataset):
                         f"even one turn, example_output:'{{'src':[{sub_src}, ……],'tgt':[……{sub_tgt}]}}'"
                     )
             except Exception:
-                logger.warning(f"[SKIP] wrong example: {example}")
+                logger.warning("[SKIP] wrong example")
 
             return None
 

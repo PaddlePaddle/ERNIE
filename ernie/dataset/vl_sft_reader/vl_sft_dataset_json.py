@@ -223,6 +223,8 @@ class ExampleSet:
         prompt_list,
         shuffle_json: bool = False,
         process_fn=None,
+        data_rank=-1,
+        data_size=-1,
     ):
         self.args = args
         self._file_name = file_name
@@ -240,8 +242,108 @@ class ExampleSet:
                 self.exs = [json.loads(line) for line in fin]
         else:
             raise ValueError(f"Unsupported file type: {self._file_name}")
+
+        if not self.args.pp_need_data_degree:
+            assert data_size > 0
+            self.exs = self.exs[data_rank::data_size]
+        else:
+            self.exs = self.exs[
+                self.args.pipeline_parallel_rank :: self.args.pp_need_data_degree
+            ]
+
+        def trans_query_response_type(ex):
+            text_idx, image_idx, video_idx = 0, 0, 0
+            text_info = []
+            image_info = []
+            video_info = []
+            order_type = []
+            order_index = []
+            order_mask = []
+
+            system = ex.get("system", "")
+            query = ex.get("query", "")
+            response = ex.get("response", "")
+            images = ex.get("images", [])
+            videos = ex.get("videos", [])
+            history = ex.get("history", [])
+            history.append([query, response])
+
+            new_ex = {}
+            if system:
+                new_ex["system"] = system
+
+            for q_r in history:
+                mask_flag = True
+                assert (
+                    len(q_r) == 2
+                ), f"query and response must be a pair, but got {q_r}"
+                for text in q_r:
+                    parts = re.split(r"(<image>|<video>)", text)
+                    for part in parts:
+                        if part == "<image>":
+                            try:
+                                image_info.append(
+                                    {
+                                        "matched_text_index": text_idx,
+                                        "image_url": images[image_idx],
+                                    }
+                                )
+                            except Exception:
+                                raise ValueError(
+                                    "number of <image> token should match len(images)"
+                                )
+                            order_type.append("image")
+                            order_index.append(image_idx)
+                            order_mask.append(int(mask_flag))
+                            image_idx += 1
+                        elif part == "<video>":
+                            try:
+                                video_info.append(
+                                    {
+                                        "matched_text_index": text_idx,
+                                        "video_url": videos[video_idx],
+                                    }
+                                )
+                            except Exception:
+                                raise ValueError(
+                                    "number of <video> token should match len(videos)"
+                                )
+                            order_type.append("video")
+                            order_index.append(video_idx)
+                            order_mask.append(int(mask_flag))
+                            video_idx += 1
+                        elif part:
+                            text_info.append(
+                                {
+                                    "text": part,
+                                    "tag": "mask" if mask_flag else "no_mask",
+                                }
+                            )
+                            order_type.append("text")
+                            order_index.append(text_idx)
+                            order_mask.append(int(mask_flag))
+                            text_idx += 1
+                    mask_flag = not mask_flag
+            new_ex["text_info"] = text_info
+            if image_info:
+                new_ex["image_info"] = image_info
+            if video_info:
+                new_ex["video_info"] = video_info
+            new_ex["order"] = {
+                "type": order_type,
+                "index": order_index,
+                "mask": order_mask,
+            }
+
+            return new_ex
+
         new_exs = []
         for ex in self.exs:
+            if "text_info" not in ex:
+                if "query" in ex and "response" in ex:
+                    ex = trans_query_response_type(ex)
+                else:
+                    raise ValueError(f"Unsupported data format: {self._file_name}")
             for key in ["image_info", "video_info"]:
                 if key not in ex:
                     continue
@@ -289,27 +391,19 @@ class ExampleSet:
                     np.random.shuffle(self.exs)
                     print(f"{self.src} after shuffle: {list_md5(self.exs)}")
 
-        idx, cur = 0, 0
+        idx = 0
         for meta in self.exs:
-            if cur % self.args.pp_need_data_degree == self.args.pipeline_parallel_rank:
-                ret = Example(
-                    meta=meta,
-                    src=self.src,
-                    task="lm",
-                    prompt=None,
-                    labels=None,
-                )
-
-                # (LiuTing) todo: can be optimized in pp data shard strategy.
-                # import os
-                # print(f"Ting: worker shard iter. PID: {os.getpid()}")
-                # print(f"Ting: worker shard iter. cur: {cur}, ret: {ret}")
-                ret = self.process_fn(ret)
-                ret.update(data_id=idx, example_id=idx)
-                idx += 1
-
-                yield ret
-            cur += 1
+            ret = Example(
+                meta=meta,
+                src=self.src,
+                task="lm",
+                prompt=None,
+                labels=None,
+            )
+            ret = self.process_fn(ret)
+            ret.update(data_id=idx, example_id=idx)
+            idx += 1
+            yield ret
 
 
 class SFTMultimodalDatasetJson(IterableDataset):
@@ -335,6 +429,7 @@ class SFTMultimodalDatasetJson(IterableDataset):
         dp_size=None,
         batch_size=1,
         data_processor=None,
+        need_prefix=True,
         **kwargs,
     ):
         self.args = args
@@ -407,6 +502,8 @@ class SFTMultimodalDatasetJson(IterableDataset):
 
         self.data_processor = data_processor
 
+        self.need_prefix = need_prefix
+
         self.task_group = {}
         self.task_group_iter = {}
         self.lengths = {}
@@ -457,7 +554,10 @@ class SFTMultimodalDatasetJson(IterableDataset):
             # think-data
             pass
         else:
-            meta["prefix"] = "<think>\n\n</think>\n\n"
+            if self.need_prefix:
+                meta["prefix"] = "<think>\n\n</think>\n\n"
+            else:
+                meta["prefix"] = ""
         return meta
 
     def _load(self, shuffle_json=True):
@@ -483,6 +583,8 @@ class SFTMultimodalDatasetJson(IterableDataset):
                 prompt_list=None,
                 shuffle_json=shuffle_json,
                 process_fn=process_fn,
+                data_rank=self.data_rank,
+                data_size=self.data_size,
             )
 
             self.task_group[part.src] = part
@@ -650,6 +752,9 @@ class SFTMultimodalDatasetJson(IterableDataset):
         indices = []
         for i, _ in enumerate(self.task_group):
             sample_size = int(self.weight_list[i] * self.length)
+            print(
+                f"Take {sample_size} samples from {self.task_group[i]._file_name} (total length: {len(self.task_group[i].exs)}) to construct current sample list"
+            )
             indices.extend([i] * sample_size)
         return indices
 

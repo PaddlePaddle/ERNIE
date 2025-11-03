@@ -20,6 +20,7 @@ from ..hparams import get_train_args, read_args
 from .dpo import run_dpo
 from .sft import run_sft
 from .vl_sft import run_vl_sft
+from .ocr_vl_sft import run_ocr_vl_sft
 
 
 def check_path(path):
@@ -56,6 +57,11 @@ def _training_function(config: dict[str, Any]) -> None:
     elif model_args.stage == "VL-SFT":
         with paddle.amp.auto_cast(enable=False):
             run_vl_sft(
+                model_args, data_args, preprocess_args, generating_args, finetuning_args
+            )
+    elif model_args.stage == "OCR-VL-SFT":
+        with paddle.amp.auto_cast(enable=False):
+            run_ocr_vl_sft(
                 model_args, data_args, preprocess_args, generating_args, finetuning_args
             )
     elif model_args.stage == "DPO":

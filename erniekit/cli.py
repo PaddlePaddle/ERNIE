@@ -173,7 +173,7 @@ def main():
         env = deepcopy(os.environ)
         args_to_pass = " ".join(shlex.quote(arg) for arg in sys.argv[1:])
         command = (
-            f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
+            f"python -u -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
             f"--{current_device}s {visible_cards} --master {master_ip}:{master_port} "
             f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
         )

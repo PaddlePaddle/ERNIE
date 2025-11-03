@@ -24,6 +24,7 @@ from paddle.distributed import fleet
 from paddleformers.datasets import IterDataset
 from paddleformers.trainer import get_last_checkpoint
 from paddleformers.utils.log import logger
+from paddleformers import __version__ as paddleformers_version
 from paddleformers.utils.tools import get_env_device
 from .trainer import SFTTrainer
 
@@ -45,6 +46,7 @@ from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
 from ernie.modeling_moe_vl import Ernie4_5_VLMoeForConditionalGeneration
 from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
+from ernie.utils.common_utils import check_refined_recompute
 from ernie.modeling_moe_vl_pp import Ernie4_5_VLMoeForConditionalGenerationPipe
 from ernie.utils.misc import global_training_logs
 from ernie.utils.mm_data_utils import MMSpecialTokensConfig
@@ -116,6 +118,12 @@ def run_vl_sft(
     preprocess_args.batch_size = finetuning_args.batch_size
     finetuning_args.max_seq_len = data_args.max_seq_len
     finetuning_args.max_seq_length = data_args.max_seq_len
+    if data_args.max_seq_len < 32768:
+        model_args.use_sparse_head_and_loss_fn = False
+        model_args.use_recompute_loss_fn = False
+    else:
+        model_args.use_sparse_head_and_loss_fn = True
+        model_args.use_recompute_loss_fn = True
 
     # create output dir
     os.makedirs(finetuning_args.output_dir, exist_ok=True)
@@ -152,6 +160,16 @@ def run_vl_sft(
 
         PipelineParallel.timer_printer = lambda _: None
 
+    # checkpoint O1 quantization is open by default.
+    if (
+        not finetuning_args.disable_ckpt_quant
+        and finetuning_args.ckpt_quant_stage == "O0"
+        and not model_args.lora
+    ):
+        finetuning_args.ckpt_quant_stage = "O1"
+    elif finetuning_args.disable_ckpt_quant:
+        finetuning_args.ckpt_quant_stage = "O0"
+
     finetuning_args.resume_from_checkpoint = get_resume_checkpoint_path(finetuning_args)
     if (
         finetuning_args.resume_from_checkpoint is not None
@@ -166,7 +184,6 @@ def run_vl_sft(
 
     # hacking data processor
     preprocess_args.max_seq_length = data_args.max_seq_len
-    preprocess_args.data_filelist = None
     preprocess_args.serialize_output = False
     logger.info(preprocess_args)
 
@@ -258,6 +275,59 @@ def run_vl_sft(
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    if (
+        last_checkpoint is not None
+        and model_args.continue_training
+        and not model_args.lora
+    ):
+        model_args.continue_training = False
+        logger.info(
+            f"Checkpoint detected, resuming training at {last_checkpoint}. Set `continue_training` to False."
+        )
+
+    check_refined_recompute(
+        finetuning_args.refined_recompute,
+        finetuning_args.sequence_parallel,
+        lora=model_args.lora,
+    )
+
+    if finetuning_args.weight_quantize_algo is not None:
+        if finetuning_args.weight_quantize_algo == "weight_only_mix":
+            weight_quantize_algo = {
+                "weight_only_int4": [".*mlp.experts.*"],
+                "weight_only_int8": [
+                    ".*self_attn.qkv_proj.*",
+                    ".*self_attn.o_proj.*",
+                    ".*mlp.up_gate_proj.*",
+                    ".*mlp.down_proj.*",
+                ],
+            }
+        else:
+            weight_quantize_algo = finetuning_args.weight_quantize_algo
+        quantization_config = dict(
+            weight_quantize_algo=weight_quantize_algo,
+            ignore_modules=[".*out_linear.*"],
+            apply_hadamard=finetuning_args.apply_hadamard,
+            hadamard_block_size=finetuning_args.hadamard_block_size,
+            quant_input_grad=finetuning_args.quant_input_grad,
+            quant_weight_grad=finetuning_args.quant_weight_grad,
+            apply_online_actscale_step=finetuning_args.apply_online_actscale_step,
+            actscale_moving_rate=finetuning_args.actscale_moving_rate,
+            fp8_format_type=finetuning_args.fp8_format_type,
+        )
+        if finetuning_args.weight_quantize_algo == "fp8linear":
+            quantization_config.update(
+                {
+                    "dense_quant_type": "tensor_wise_fp8",
+                    "moe_quant_type": "tensor_wise_fp8",
+                    "quantization": "mix_quant",
+                }
+            )
+    else:
+        quantization_config = dict(
+            weight_quantize_algo=finetuning_args.weight_quantize_algo
+        )
+
     # Define the metrics of tasks.
     def compute_metrics(p):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
@@ -301,8 +371,11 @@ def run_vl_sft(
         logger.info(f"disable moe flag when using moe-group={model_args.moe_group}")
         finetuning_args.use_moe = False
 
+    if paddleformers_version >= "0.3":
+        finetuning_args.save_to_hf = False
     cfg = Ernie4_5_VLMoeConfig.from_pretrained(
-        os.path.join(model_args.model_name_or_path)
+        os.path.join(model_args.model_name_or_path),
+        quantization_config=quantization_config,
     )
     cfg.use_cache = False
     cfg.max_sequence_length = data_args.max_seq_len
@@ -310,6 +383,7 @@ def run_vl_sft(
     cfg.token_balance_seqlen = (
         data_args.max_seq_len * finetuning_args.per_device_train_batch_size
     )
+    cfg.per_device_train_batch_size = finetuning_args.per_device_train_batch_size
     cfg.fp16_opt_level = finetuning_args.fp16_opt_level
     cfg.moe_group = model_args.moe_group  # pp mp use sharding group as moe group
     cfg.dtype = dtype
@@ -357,6 +431,19 @@ def run_vl_sft(
     ).repeat_interleave(cfg.vision_config.patch_size**2 * 1, -1)
 
     cfg.use_flash_attention = model_args.use_flash_attention
+    cfg.use_sparse_flash_attn = model_args.use_sparse_flash_attn
+    cfg.use_attn_mask_start_row_indices = model_args.use_attn_mask_start_row_indices
+    cfg.use_recompute_moe = model_args.use_recompute_moe
+    cfg.recompute = finetuning_args.recompute
+    cfg.recompute_granularity = model_args.recompute_granularity
+    cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
+    cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
+    cfg.loss_subbatch_seqlen = model_args.loss_subbatch_seqlen
+    cfg.pp_seg_method = model_args.pp_seg_method
+    cfg.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
+    cfg.moe_multimodal_dispatch_use_allgather = (
+        model_args.moe_multimodal_dispatch_use_allgather
+    )
     cfg.use_mem_eff_attn = model_args.use_mem_eff_attn
     cfg.use_flash_attn_with_mask = model_args.use_flash_attn_with_mask
     cfg.hidden_dropout_prob = finetuning_args.hidden_dropout_prob
@@ -384,7 +471,10 @@ def run_vl_sft(
                 finetuning_args.pp_need_data
             ), "balanced image preprocess must use with pp_need_data"
 
-        if finetuning_args.from_scratch:
+        if (
+            finetuning_args.from_scratch
+            and finetuning_args.weight_quantize_algo is None
+        ):
             model = Ernie4_5_VLMoeForConditionalGenerationPipe(cfg)
 
         else:
@@ -395,7 +485,10 @@ def run_vl_sft(
         if finetuning_args.pp_need_data_degree:
             model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
     else:
-        if finetuning_args.from_scratch:
+        if (
+            finetuning_args.from_scratch
+            and finetuning_args.weight_quantize_algo is None
+        ):
             model = Ernie4_5_VLMoeForConditionalGeneration(cfg)
         else:
             model = Ernie4_5_VLMoeForConditionalGeneration.from_pretrained(
@@ -403,6 +496,9 @@ def run_vl_sft(
                 config=cfg,
             )
     logger.info(f"vision_model: {model.vision_model}")
+
+    if model.config.head_dim is None:
+        del model.config.head_dim
 
     if image_preprocess is not None and hasattr(model, "add_image_preprocess"):
         model.add_image_preprocess(image_preprocess)
@@ -545,10 +641,10 @@ def run_vl_sft(
                 "worker_index": paddle.distributed.get_rank(),
                 "prefetch_factor": finetuning_args.prefetch_factor,
                 "task_group": train_task_group_text,
-                "in_tokens": True,  # True for Text SFT
+                "in_tokens": finetuning_args.packing,  # Text SFT packing option
+                "batch_size": finetuning_args.per_device_train_batch_size,
                 "tokenizer": tokenizer,
                 "number_of_samples_each_epoch": data_args.num_samples_each_epoch,
-                "pseudo_strategy": finetuning_args.pseudo_strategy,
                 "example_from_same_task_prob": finetuning_args.example_from_same_task_prob,
                 "pseudo_sampling_prob": finetuning_args.pseudo_sampling_prob,
                 "trigger_data_prob": finetuning_args.trigger_data_prob,
@@ -597,7 +693,19 @@ def run_vl_sft(
         im_prefix_length=256,
         rng=random.Random(2024),
         combine_batch=1,
+        packing=finetuning_args.packing,
     )
+
+    if model_args.lora:
+        from ernie.utils.peft_utils import initialize_lora_model
+
+        model = initialize_lora_model(
+            model=model,
+            training_args=finetuning_args,
+            model_args=model_args,
+            resume_from_checkpoint=last_checkpoint is not None,
+            dtype=dtype,
+        )
 
     callbacks = []
     callbacks += [GlobalRNGCallback()]
@@ -650,6 +758,8 @@ def run_vl_sft(
         callbacks=callbacks,
         modality_ratio=modality_ratio,
         processing_class=image_preprocess_save,
+        batch_size=finetuning_args.per_device_train_batch_size,
+        packing=finetuning_args.packing,
     )
     if vit_trainable_callback is not None:
         vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager

@@ -1,5 +1,4 @@
 import os
-import paddle
 from safetensors.numpy import load_file
 from safetensors.torch import save_file as save_safetensors
 import torch
@@ -40,24 +39,20 @@ def convert_pdparams_to_safetensors(pdparams_path, safetensors_path, config):
     """
     print("----------------------------------------------------------------")
     print("pdparams_path:", pdparams_path)
-    paddle.set_device('cpu')
     # Load the PaddlePaddle model state dictionary
     torch_state_dict = {}
-    weight_map = {}
     pd_tensors = load_file(pdparams_path)
     for key, param in pd_tensors.items():
         if param.dtype != 'float32':
             param = (param.astype(np.uint32) << 16).view(np.float32)
         if key.endswith('.weight') and \
             "embed_tokens" not in key and \
+            "lm_head" not in key and \
             ".gate." not in key and \
             param.ndim == 2:
             param = param.T  # Transpose the parameter
-        # vision model参数为float16
         tensor = torch.from_numpy(param)
-        if 'vision' in key:
-            tensor = tensor.to(torch.float16)
-        elif 'mlp.gate.weight' not in key and 'mlp.moe_statics.e_score_correction_bias' not in key:
+        if 'mlp.gate.weight' not in key and 'mlp.moe_statics.e_score_correction_bias' not in key:
             tensor = tensor.to(torch.bfloat16)
 
         key = key.replace('ernie.', 'model.')

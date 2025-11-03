@@ -14,18 +14,30 @@
 
 
 import numpy as np
+import math
+import contextlib
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed.fleet.utils import recompute
-from paddle.nn.functional.flash_attention import flashmask_attention
+from paddle.nn.functional.flash_attention import (
+    flashmask_attention,
+    flash_attn_unpadded,
+)
+from paddle.distributed import fleet
 from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.utils.log import logger
+
+from ..sequence_parallel_utils import (
+    SliceVarlenOp,
+    AllGatherVarlenOpV2,
+)
 
 from ..distributed import get_hcg
 from .activation import ACT2FN
 from .configuration import DFNRopeVisionTransformerConfig
+from erniekit.utils.process import detect_device
 
 
 class _AllToAll(paddle.autograd.PyLayer):
@@ -171,6 +183,8 @@ class VisionFlashAttention2(nn.Layer):
         self.qkv = nn.Linear(dim, dim * 3, bias_attr=True)
         self.proj = nn.Linear(dim, dim)
         self.head_dim = dim // num_heads  # must added
+        self.device = detect_device()
+        self.softmax_scale = self.head_dim**-0.5
 
     def forward(
         self,
@@ -178,6 +192,8 @@ class VisionFlashAttention2(nn.Layer):
         startend_row_indices: paddle.Tensor,
         rotary_pos_emb: paddle.Tensor = None,
         attn_sep=False,
+        cu_seqlens=None,
+        max_seqlen=None,
     ) -> paddle.Tensor:
         """
         Args:
@@ -209,13 +225,25 @@ class VisionFlashAttention2(nn.Layer):
             axis=0
         )
 
-        attn_output = flashmask_attention(
-            q.astype("bfloat16").unsqueeze(0),
-            k.astype("bfloat16").unsqueeze(0),
-            v.astype("bfloat16").unsqueeze(0),
-            startend_row_indices=startend_row_indices,
-            causal=False,
-        )
+        if self.device == "iluvatar_gpu":
+            attn_output = flash_attn_unpadded(
+                q,
+                k,
+                v,
+                cu_seqlens,
+                cu_seqlens,
+                max_seqlen,
+                max_seqlen,
+                scale=self.softmax_scale,
+            )[0].squeeze(0)
+        else:
+            attn_output = flashmask_attention(
+                q.astype("bfloat16").unsqueeze(0),
+                k.astype("bfloat16").unsqueeze(0),
+                v.astype("bfloat16").unsqueeze(0),
+                startend_row_indices=startend_row_indices,
+                causal=False,
+            )
         attn_output = attn_output.reshape([seq_length, -1])
 
         if attn_sep:
@@ -335,7 +363,13 @@ class DFNRopeVisionBlock(nn.Layer):
         self.config = config
 
     def forward(
-        self, hidden_states, startend_row_indices, rotary_pos_emb, attn_sep=False
+        self,
+        hidden_states,
+        startend_row_indices,
+        rotary_pos_emb,
+        attn_sep=False,
+        cu_seqlens=None,
+        max_seqlen=None,
     ) -> paddle.Tensor:
         """
         Args:
@@ -351,6 +385,8 @@ class DFNRopeVisionBlock(nn.Layer):
             startend_row_indices=startend_row_indices,
             rotary_pos_emb=rotary_pos_emb,
             attn_sep=attn_sep,
+            cu_seqlens=cu_seqlens,
+            max_seqlen=max_seqlen,
         )
         hidden_states = hidden_states + self.mlp(self.norm2(hidden_states))
         return hidden_states
@@ -373,6 +409,10 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
             patch_size=config.patch_size,
             in_channels=config.in_channels,
             embed_dim=config.embed_dim,
+        )
+
+        self.attn_sep = (
+            getattr(config, "attn_sep", False) and config.tensor_parallel_degree > 1
         )
 
         head_dim = config.embed_dim // config.num_heads
@@ -472,6 +512,7 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
         cu_seqlens_rm_first = cu_seqlens[1:]
         cu_seqlens_rm_last = cu_seqlens[:-1]
         repeats = cu_seqlens_rm_first - cu_seqlens_rm_last
+        max_seqlen = repeats.max().item()
 
         startend_row_indices_lts = paddle.repeat_interleave(
             cu_seqlens_rm_first, repeats
@@ -495,7 +536,13 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
                 and idx < vit_num_recompute_layers
             ):
                 hidden_states = recompute(
-                    blk, hidden_states, startend_row_indices, rotary_pos_emb, attn_sep
+                    blk,
+                    hidden_states,
+                    startend_row_indices,
+                    rotary_pos_emb,
+                    attn_sep,
+                    cu_seqlens,
+                    max_seqlen,
                 )
             else:
                 hidden_states = blk(
@@ -503,23 +550,69 @@ class DFNRopeVisionTransformerPretrainedModel(PretrainedModel):
                     startend_row_indices=startend_row_indices,
                     rotary_pos_emb=rotary_pos_emb,
                     attn_sep=attn_sep,
+                    cu_seqlens=cu_seqlens,
+                    max_seqlen=max_seqlen,
                 )
 
         ret = self.ln(hidden_states)  # add norm
         return ret
 
-    def extract_feature(
-        self, hidden_states: paddle.Tensor, grid_thw: paddle.Tensor
-    ) -> paddle.Tensor:
-        """
-        Args:
-            hidden_states (paddle.Tensor): input tensor
-            grid_thw (paddle.Tensor): grid thw of input
+    def extract_feature(self, images, grid_thw):
+        """extract feature"""
+        if self.config.tensor_parallel_degree <= 1:
+            return self._extract_feature(images, grid_thw)
+        else:
+            grid_thw = grid_thw.clone()
+            # logger.info("use sp extract feature")
+            images_indices = []
+            hcg = fleet.get_hybrid_communicate_group()
+            group = hcg.get_model_parallel_group()
+            parallelism = group.nranks
+            image_size_per_rank = paddle.zeros([parallelism], dtype="int64")
+            images_indices = image_size_per_rank
 
-        Returns:
-            paddle.Tensor: output tensor
-        """
-        return self.forward(hidden_states, grid_thw)
+            num_pad = 0
+            if self.attn_sep:
+                seqlen = images.shape[0]
+                num_pad = math.ceil(seqlen / parallelism) * parallelism - seqlen
+                images = paddle.nn.functional.pad(images, [0, num_pad, 0, 0], value=0)
+                images_indices = [
+                    images.shape[0] // parallelism for _ in range(parallelism)
+                ]
+                images = SliceVarlenOp.apply(images, images_indices)
+            else:
+                images = SliceVarlenOp.apply(images, images_indices)
+                images = images.detach()
+
+            if len(images):
+                image_features = self._extract_feature(
+                    images, grid_thw, num_pad=num_pad
+                )
+            else:
+                image_features = paddle.empty(
+                    [0, self.config.hidden_size],
+                    dtype=self.patch_embed.proj.weight.dtype,
+                )
+                image_features.stop_gradient = (
+                    self.patch_embed.proj.weight.stop_gradient
+                )
+
+            image_features = AllGatherVarlenOpV2.apply(image_features, images_indices)
+            if self.attn_sep:
+                image_features = image_features[:seqlen, :]
+
+            return image_features
+
+    def _extract_feature(self, images, grid_thw, num_pad=0):
+        """extract feature"""
+        ctx = (
+            paddle.no_grad
+            if getattr(self.config, "freeze_vision", False)
+            else contextlib.nullcontext
+        )
+        with ctx():
+            image_features = self.forward(images, grid_thw, num_pad)
+        return image_features
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
