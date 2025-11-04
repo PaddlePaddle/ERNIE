@@ -172,6 +172,7 @@ class InputIdsMassageProcessor(ProcessorBase):
 
         return {
             "all_item_list": all_item_list,
+            "tools": user_input["tools"],
             "is_system": bool(user_input.get("is_system", 0)),
         }
 

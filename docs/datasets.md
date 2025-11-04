@@ -178,11 +178,45 @@ Here is a multi-image example of SFT VL dataset:
     ],
     "text_info": [
         {"text": "What is the purpose of the resolution discussed in the text?", "tag": "mask"},
-        {"text": "The purpose of the resolution is to approve the redevelopment contract of the Philadelphia Redevelopment Authority for the redevelopment and urban renewal of a portion of the Haddington Urban Renewal Area, Unit Nos. 2 and 3, and to authorize the Redevelopment Authority to execute the redevelopment contract with Danielle M. Carson-Varns.", "tag": "no_mask"},
-        {"text": "Who introduced Resolution No. 160204 to the City Council?", "tag": "mask"},
-        {"text": "Councilmember Blackwell introduced Resolution No. 160204 to the City Council.", "tag": "no_mask"},
+        {"text": "The purpose of the resolution is to approve the redevelopment contract of the Philadelphia Redevelopment Authority for the redevelopment and urban renewal of a portion of the Haddington Urban Renewal Area, Unit Nos. 2 and 3, and to authorize the Redevelopment Authority to execute the redevelopment contract with Danielle M. Carson-Varns.", "tag": "no_mask", "tools": [{"type": "function", "function": {"name": "get_stock_price", "description": "Get the current stock price of a company", "parameters": {"type": "object", "properties": {"company": {"type": "string", "description": "The name of the company"}}, "required": ["company"]}}}, {"type": "function", "function": {"name": "get_movie_details", "description": "Get details about a movie", "parameters": {"type": "object", "properties": {"title": {"type": "string", "description": "The title of the movie"}}, "required": ["title"]}}}]},
+        {"text": "Councilmember Blackwell introduced Resolution No. 160204 to the City Council.", "tag": "mask"},
+        {"text": ""}
         ...
-    ]
+    ],
+
+    {"video_info": [{"matched_text_index": 0, "image_url": "./NExTVideo/1027/4789497818.mp4"}], "text_info": [{"text": "how does the man sit on the grass?\nA. kneel\nB. one leg in the air\nC. sitting on bicycle seat\nD. legs spread out\nE. squatting down\n Answer with the option's letter from the given choices directly.", "tag": "mask"}, {"text": "D", "tool_calls": [{"type": "function", "function": {"name": "get_stock_price", "arguments": {"company": "Microsoft"}}}], "tag": "no_mask"}], }
+
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "image_zoom_in_tool",
+                "description": "Zoom in on a specific region of an image by cropping it based on a bounding box (bbox) and an optional object label.",
+                "parameters": {
+                "type": "object",
+                "properties": {
+                    "bbox_2d": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "description": "The bounding box of the region to zoom in, as [x1, y1, x2, y2], where (x1, y1) is the top-left corner and (x2, y2) is the bottom-right corner, and the values of x1, y1, x2, y2 are all normalized to the range 0–1000 based on the original image dimensions."
+                    },
+                    "label": {
+                    "type": "string",
+                    "description": "The name or label of the object in the specified bounding box (optional)."
+                    }
+                },
+                "required": [
+                    "bbox_2d"
+                ]
+                },
+                "strict": false
+            }
+        }
+    ],
 }
 ```
 

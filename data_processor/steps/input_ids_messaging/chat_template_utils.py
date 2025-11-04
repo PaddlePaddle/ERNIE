@@ -19,6 +19,7 @@ chat template utils
 """
 
 import io
+import json
 
 from PIL import Image
 
@@ -65,6 +66,15 @@ def apply_chat_training_template(
         if item_id == 0:
             new_text_info.append(
                 {"text": cls_token, "tag": "mask", "text_type": "special_token"}
+            )
+            new_text_info.append(
+                {"text": "<tool_list>", "tag": "mask"}
+            )
+            new_text_info.append(
+                {"text": json.dumps(data["tools"]), "tag": "mask"}
+            )
+            new_text_info.append(
+                {"text": "</tool_list>", "tag": "mask"}
             )
             if is_system:
                 pass
@@ -155,7 +165,20 @@ def apply_chat_training_template(
                     if label == 0:
                         sub_item["tag"] = "mask"
 
+                tool_calls = None
+                if "tool_calls" in sub_item:
+                    tool_calls = sub_item.pop("tool_calls")
                 new_text_info.append(sub_item)
+                if tool_calls:
+                    tool_call = tool_calls[0]["function"]
+                    new_text_info.append({"text": '<tool_call>\n{"name": "', "tgt": "no_mask"})
+                    new_text_info.append({"text": tool_call["name"], "tgt": "no_mask"})
+                    new_text_info.append({"text": '", "arguments": ', "tgt": "no_mask"})
+                    if isinstance(tool_call["arguments"], str):
+                        new_text_info.append({"text": tool_call["arguments"], "tgt": "no_mask"})
+                    else:
+                        new_text_info.append({"text": json.dumps(tool_call["arguments"]), "tgt": "no_mask"})
+                    new_text_info.append({"text": '}\n</tool_call>\n', "tgt": "no_mask"})
 
         if item_id % 2 == 0:
             if is_system and item_id == 0:
