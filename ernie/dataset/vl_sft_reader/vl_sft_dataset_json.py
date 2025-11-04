@@ -640,7 +640,7 @@ class SFTMultimodalDatasetJson(IterableDataset):
             for idx, _ in enumerate(raw_meta["text_info"]):
                 raw_meta["text_info"][idx]["text"] = raw_meta["text_info"][idx][
                     "text"
-                ].strip()
+                ]
                 if raw_meta["text_info"][idx]["tag"] == "no_mask":
                     raw_meta = self.reformat_meta(raw_meta)
                     raw_meta["text_info"][idx]["text"] = process_markdown_table(

@@ -15,7 +15,7 @@
 import json
 import sys
 
-from typing import List
+from typing import List, Dict
 
 
 def thinking_merge(reasoning_content, content):
@@ -36,7 +36,7 @@ def convert_jsonl(input_file, output_file):
             try:
                 data = json.loads(line.strip())
                 messages = data["prompt"]
-                video_info = []
+                image_info = []
                 text_info = []
                 for i, message in enumerate(messages):
                     # user / tool
@@ -48,7 +48,7 @@ def convert_jsonl(input_file, output_file):
                             have_text = False
                             for item in message["content"]:
                                 if item["type"] == "image_url":
-                                    video_info.append(
+                                    image_info.append(
                                         {
                                             "matched_text_index": i,
                                             "image_url": item["image_url"]["url"],
@@ -90,7 +90,10 @@ def convert_jsonl(input_file, output_file):
                         )
 
                 # tgt
-                candidate = data["candidates"]
+                assert isinstance(data["candidates"], List)
+                assert len(data["candidates"]) == 1
+                candidate = data["candidates"][0][0]
+                assert isinstance(candidate, Dict)
                 if "role" in candidate and candidate["role"] == "assistant":
                     text_info.append(
                         {
@@ -104,7 +107,7 @@ def convert_jsonl(input_file, output_file):
 
                 # 写入新的JSONL格式
                 new_data = {
-                    "video_info": video_info,
+                    "image_info": image_info,
                     "text_info": text_info,
                     "tools": data["tools"],
                 }
