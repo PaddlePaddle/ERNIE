@@ -490,9 +490,14 @@ class ExampleToFeature(ProcessorBase):
             split_token_num = sum(truncate_ids == split_token_id)
             if split_token_num < min_num:
                 raise ValueError(
-                    f"The data is too long and cannot be truncated, ids: \
-                        {len(ids)}, len images: {len(meta['image_info'])}, \
-                        ids == self.image_token_id {sum(np.array(ids) ==self.image_token_id)}"
+                    f"The data is too long and cannot be truncated.\n"
+                    f"Current sequence stats:\n"
+                    f"  - ids length: {len(ids)}\n"
+                    f"  - number of images: {len(meta['image_info'])}\n"
+                    f"  - image token count (id == {self.image_token_id}): {sum(np.array(ids) == self.image_token_id)}\n"
+                    f"To resolve this, consider one of the following:\n"
+                    f"  (1) increase `max_seq_len`\n"
+                    f"  (2) shorten the input by reducing text length, decreasing image count, or lowering image resolution."
                 )
             indices = np.where(truncate_ids == split_token_id)[0]
             truncate_pos = indices[-1]
