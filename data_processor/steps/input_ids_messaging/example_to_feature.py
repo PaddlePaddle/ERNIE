@@ -495,9 +495,7 @@ class ExampleToFeature(ProcessorBase):
                     f"  - ids length: {len(ids)}\n"
                     f"  - number of images: {len(meta['image_info'])}\n"
                     f"  - image token count (id == {self.image_token_id}): {sum(np.array(ids) == self.image_token_id)}\n"
-                    f"To resolve this, consider one of the following:\n"
-                    f"  (1) increase `max_seq_len`\n"
-                    f"  (2) shorten the input by reducing text length, decreasing image count, or lowering image resolution."
+                    f"To resolve this, consider increase `max_seq_len`"
                 )
             indices = np.where(truncate_ids == split_token_id)[0]
             truncate_pos = indices[-1]
