@@ -26,10 +26,10 @@ from paddleformers.trainer.trainer_callback import TrainerCallback
 from ernie.modeling_moe import Ernie4_5_DecoderLayer
 from ernie.moe.moe_layer import MOELayer
 
-from paddleformers.transformers.ernie4_5_vl.model.modeling_moe import (
+from paddleformers.transformers.ernie4_5_moe_vl.model.modeling_moe import (
     Ernie4_5_DecoderLayer as Ernie4_5_DecoderLayer_pf,
 )
-from paddleformers.transformers.ernie4_5_vl.model.moe.moe_layer import (
+from paddleformers.transformers.ernie4_5_moe_vl.model.moe.moe_layer import (
     MOELayer as MOELayer_pf,
 )
 
