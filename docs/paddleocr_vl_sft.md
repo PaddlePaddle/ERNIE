@@ -6,19 +6,15 @@ English | [简体中文](./paddleocr_vl_sft_zh.md)
 
 PaddleOCR-VL, a SOTA and resource-efficient model tailored for document parsing. Its core component is PaddleOCR-VL-0.9B, a compact yet powerful vision-language model (VLM) that integrates a NaViT-style dynamic resolution visual encoder with the ERNIE-4.5-0.3B language model to enable accurate element recognition. This innovative model efficiently supports 109 languages and excels in recognizing complex elements (e.g., text, tables, formulas, and charts), while maintaining minimal resource consumption. Through comprehensive evaluations on widely used public benchmarks and in-house benchmarks, PaddleOCR-VL achieves SOTA performance in both page-level document parsing and element-level recognition. It significantly outperforms existing solutions, exhibits strong competitiveness against top-tier VLMs, and delivers fast inference speeds. These strengths make it highly suitable for practical deployment in real-world scenarios.
 
-While PaddleOCR-VL-0.9B excels in common scenarios, its performance often faces limitations in many specific or complex business applications. For instance:
+While PaddleOCR-VL-0.9B performs excellently in common scenarios, its recognition capabilities may face bottlenecks in specific or complex business applications. For example:
 
-- Domain-Specific Applications
-    - Finance & Accounting: Recognizing documents such as invoices, receipts, bank statements, and financial reports
-    - Healthcare: Processing medical records, lab reports, handwritten prescriptions, and pharmaceutical instructions
-    - Legal Sector: Identifying text in contracts, legal instruments, court filings, and certificates.
-- Non-Standard Text and Typography
-    - Handwriting Recognition: Deciphering handwritten forms, notes, letters, and questionnaires.
-    - Stylized & Artistic Fonts: Recognizing text on posters, billboards, product packaging, and menus.
-    - Historical & Archival Documents: Processing ancient manuscripts, old newspapers, and historical archives.
-- Task-Specific Structured Output
-    - Table Recognition & Structuring: Converting tables within images into structured formats like Excel, CSV, or JSON.
-    - Mathematical Formula Recognition: Identifying mathematical equations in textbooks or research papers and exporting them into formats like LaTeX.
+- Non-standard text and symbols
+    - Artistic or stylized fonts: Recognizing text on posters, billboards, product packaging, cards/documents, and seals.
+    - Specialized symbols: Such as the recognition of symbols in organic chemistry.
+- Specific tasks and output formats
+    - Fine-grained text localization and grounding outputs.
+    - Flowchart recognition with structured output.
+- Data for specific low-resource languages: such as Tibetan, Bengali, etc.
 
 This is where SFT (Supervised Fine-Tuning) becomes necessary to enhance the model’s accuracy and robustness for these specialized tasks.
 
@@ -91,7 +87,7 @@ Bengali training example:
 ```json
 {
     "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+        {"matched_text_index": 0, "image_url": "./assets/bengali_train_example.png"},
     ],
     "text_info": [
         {"text": "OCR:", "tag": "mask"},
@@ -232,7 +228,7 @@ Table Data: OTSL format
 ```json
 {
     "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+        {"matched_text_index": 0, "image_url": "./assets/table_example.png"},
     ],
     "text_info": [
         {"text": "Table Recognition:", "tag": "mask"},
@@ -250,7 +246,7 @@ Formula Data: LaTeX format
 ```json
 {
     "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
+        {"matched_text_index": 0, "image_url": "./assets/formula_example.jpg"},
     ],
     "text_info": [
         {"text": "Formula Recognition:", "tag": "mask"},
