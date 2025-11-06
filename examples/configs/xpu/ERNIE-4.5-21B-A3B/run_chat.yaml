@@ -6,6 +6,7 @@ output_dir: None
 ### server
 max_model_len: 131072
 port: 8188
+quantization: wint4
 
 ### chat
 max_new_tokens: 8192

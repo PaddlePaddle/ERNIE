@@ -141,6 +141,16 @@ class ImageModificationProcessorArguments(BasePreprocessArguments):
     sft_shift_by_one: bool = field(
         default=False, metadata={"help": "SFT data_processor shift-by-one"}
     )
+    sft_replace_ids: bool = field(
+        default=False,
+        metadata={"help": "SFT replace sep_token with eos_token in input_ids"},
+    )
+    sft_image_rescale: bool = field(
+        default=False, metadata={"help": "SFT delay image rescale"}
+    )
+    sft_image_normalize: bool = field(
+        default=False, metadata={"help": "SFT delay image normalize"}
+    )
 
     def __post_init__(self):
         super().__post_init__()

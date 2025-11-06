@@ -353,7 +353,7 @@ def run_sft(
             use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
             use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
             loss_subbatch_sequence_length=32768,
-            num_nextn_predict_layers=model_args.num_nextn_predict_layers,
+            num_nextn_predict_layers=finetuning_args.num_nextn_predict_layers,
             **convert_from_kwargs,
             **download_source_kwargs,
         )
@@ -401,7 +401,7 @@ def run_sft(
     model_config.moe_multimodal_dispatch_use_allgather = (
         model_args.moe_multimodal_dispatch_use_allgather
     )
-    model_config.num_nextn_predict_layers = model_args.num_nextn_predict_layers
+    model_config.num_nextn_predict_layers = finetuning_args.num_nextn_predict_layers
     model_config.hidden_dropout_prob = finetuning_args.hidden_dropout_prob
     model_config.attention_probs_dropout_prob = (
         finetuning_args.attention_probs_dropout_prob
@@ -519,6 +519,7 @@ def run_sft(
     data_collator = partial(
         collate_fn,
         tokenizer=tokenizer,
+        finetuning_args=finetuning_args,
         model_args=model_args,
         max_seq_len=data_args.max_seq_len + model_config.num_nextn_predict_layers,
     )

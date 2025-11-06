@@ -189,6 +189,11 @@ class PreTrainingArguments(TrainingArguments):
         default=True,
         metadata={"help": "whether to use data packing strategy."},
     )
+    packing_size: int = field(default=1, metadata={"help": "Packing size per Squence."})
+    padding: bool = field(
+        default=True,
+        metadata={"help": "Wheather to padd the sequence to the max squence length."},
+    )
     global_logging_interval: int = field(
         default=1,
         metadata={"help": "the logging interval of global_training_logs"},

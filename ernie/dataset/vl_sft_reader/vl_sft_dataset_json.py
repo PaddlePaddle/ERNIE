@@ -223,6 +223,8 @@ class ExampleSet:
         prompt_list,
         shuffle_json: bool = False,
         process_fn=None,
+        data_rank=-1,
+        data_size=-1,
     ):
         self.args = args
         self._file_name = file_name
@@ -240,6 +242,14 @@ class ExampleSet:
                 self.exs = [json.loads(line) for line in fin]
         else:
             raise ValueError(f"Unsupported file type: {self._file_name}")
+
+        if not self.args.pp_need_data_degree:
+            assert data_size > 0
+            self.exs = self.exs[data_rank::data_size]
+        else:
+            self.exs = self.exs[
+                self.args.pipeline_parallel_rank :: self.args.pp_need_data_degree
+            ]
 
         def trans_query_response_type(ex):
             text_idx, image_idx, video_idx = 0, 0, 0
@@ -381,42 +391,19 @@ class ExampleSet:
                     np.random.shuffle(self.exs)
                     print(f"{self.src} after shuffle: {list_md5(self.exs)}")
 
-        idx, cur = 0, 0
+        idx = 0
         for meta in self.exs:
-            if self.args.pp_need_data_degree > 0:
-                if (
-                    cur % self.args.pp_need_data_degree
-                    == self.args.pipeline_parallel_rank
-                ):
-                    ret = Example(
-                        meta=meta,
-                        src=self.src,
-                        task="lm",
-                        prompt=None,
-                        labels=None,
-                    )
-
-                    ret = self.process_fn(ret)
-                    ret.update(data_id=idx, example_id=idx)
-                    idx += 1
-
-                    yield ret
-                cur += 1
-            else:
-                ret = Example(
-                    meta=meta,
-                    src=self.src,
-                    task="lm",
-                    prompt=None,
-                    labels=None,
-                )
-
-                ret = self.process_fn(ret)
-                ret.update(data_id=idx, example_id=idx)
-                idx += 1
-
-                yield ret
-                cur += 1
+            ret = Example(
+                meta=meta,
+                src=self.src,
+                task="lm",
+                prompt=None,
+                labels=None,
+            )
+            ret = self.process_fn(ret)
+            ret.update(data_id=idx, example_id=idx)
+            idx += 1
+            yield ret
 
 
 class SFTMultimodalDatasetJson(IterableDataset):
@@ -442,6 +429,7 @@ class SFTMultimodalDatasetJson(IterableDataset):
         dp_size=None,
         batch_size=1,
         data_processor=None,
+        need_prefix=True,
         **kwargs,
     ):
         self.args = args
@@ -514,6 +502,8 @@ class SFTMultimodalDatasetJson(IterableDataset):
 
         self.data_processor = data_processor
 
+        self.need_prefix = need_prefix
+
         self.task_group = {}
         self.task_group_iter = {}
         self.lengths = {}
@@ -564,7 +554,10 @@ class SFTMultimodalDatasetJson(IterableDataset):
             # think-data
             pass
         else:
-            meta["prefix"] = "<think>\n\n</think>\n\n"
+            if self.need_prefix:
+                meta["prefix"] = "<think>\n\n</think>\n\n"
+            else:
+                meta["prefix"] = ""
         return meta
 
     def _load(self, shuffle_json=True):
@@ -590,6 +583,8 @@ class SFTMultimodalDatasetJson(IterableDataset):
                 prompt_list=None,
                 shuffle_json=shuffle_json,
                 process_fn=process_fn,
+                data_rank=self.data_rank,
+                data_size=self.data_size,
             )
 
             self.task_group[part.src] = part
@@ -757,6 +752,9 @@ class SFTMultimodalDatasetJson(IterableDataset):
         indices = []
         for i, _ in enumerate(self.task_group):
             sample_size = int(self.weight_list[i] * self.length)
+            print(
+                f"Take {sample_size} samples from {self.task_group[i]._file_name} (total length: {len(self.task_group[i].exs)}) to construct current sample list"
+            )
             indices.extend([i] * sample_size)
         return indices
 

@@ -102,6 +102,9 @@ class ImageModificationProcessor(ProcessorBase):
         self.should_shift_by_one = self.is_training and (
             self.is_pretraining or self.sft_shift_by_one
         )
+        self.sft_replace_ids = args.sft_replace_ids
+        self.sft_image_rescale = args.sft_image_rescale
+        self.sft_image_normalize = args.sft_image_normalize
 
     def get_rope_index(
         self,
@@ -437,8 +440,8 @@ class ImageModificationProcessor(ProcessorBase):
                 ret = self.image_preprocess.preprocess(
                     images=imgs,
                     videos=None,
-                    do_normalize=False,
-                    do_rescale=False,
+                    do_normalize=self.sft_image_normalize,
+                    do_rescale=self.sft_image_rescale,
                     predetermined_grid_thw=predetermined_grid_thw,
                     do_convert_rgb=True,
                     input_data_format=ChannelDimension.LAST,
@@ -468,8 +471,8 @@ class ImageModificationProcessor(ProcessorBase):
                             [np.array(img.convert("RGB")) for img in grouped_imgs],
                             axis=0,
                         ),
-                        do_normalize=False,
-                        do_rescale=False,
+                        do_normalize=self.sft_image_normalize,
+                        do_rescale=self.sft_image_rescale,
                         predetermined_grid_thw=cur_predetermined_grid_thw,
                         do_convert_rgb=True,
                         input_data_format=ChannelDimension.LAST,
@@ -531,6 +534,8 @@ class ImageModificationProcessor(ProcessorBase):
                     )
                 # the label of cls_token is eos_token in sft
                 labels[labels == replace_token_id] = self.eos_token_id
+                if self.sft_replace_ids:
+                    input_ids[input_ids == replace_token_id] = self.eos_token_id
 
             features = OrderedDict(
                 src_id=example.src,

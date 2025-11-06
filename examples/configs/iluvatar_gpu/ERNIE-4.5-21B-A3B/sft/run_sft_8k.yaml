@@ -49,7 +49,7 @@ weight_decay: 0.1
 adam_epsilon: 1.0e-8
 adam_beta1: 0.9
 adam_beta2: 0.95
-offload_optim: false
+offload_optim: true
 
 # performance
 tensor_parallel_degree: 4
