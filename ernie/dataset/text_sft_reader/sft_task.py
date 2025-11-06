@@ -17,7 +17,7 @@
 import numpy as np
 from paddle.io import IterableDataset
 
-from .finetuning import KnowledgeBasedSFTReader
+from .finetuning import KnowledgeBasedSFTReader, FunctionCallSFTReader
 
 
 DATATYPE_2_ID = {"mm": 0, "lm": 1, "audio": 2}
@@ -39,6 +39,8 @@ def create_pyreader(config_dataset):
     """
     if config_dataset["dataset_name"] == "KnowledgeBasedSFTReader":
         data_reader = KnowledgeBasedSFTReader(**config_dataset)
+    elif config_dataset["dataset_name"] == "FunctionCallSFTReader":
+        data_reader = FunctionCallSFTReader(**config_dataset)
     else:
         raise ValueError(f"Unknown dataset: {config_dataset['dataset_name']}")
     return data_reader
