@@ -711,7 +711,6 @@ class Ernie4_5_DecoderLayer(nn.Layer):
             is_multimodel_token_cpu = None
             has_dense_experts_token_task = None
         hidden_states = self.input_layernorm(hidden_states)
-
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
         if (

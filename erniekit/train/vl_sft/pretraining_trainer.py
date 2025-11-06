@@ -22,6 +22,7 @@ __all__ = [
 
 
 import contextlib
+import json
 import math
 import os
 import re
@@ -1651,11 +1652,11 @@ class PretrainingTrainer(Trainer):
 
         """
         super().save_model(output_dir)
-        # if self.args.should_save:
-        #     with open(
-        #         os.path.join(output_dir, "static_name_to_dyg_name.json"), "w"
-        #     ) as of:
-        #         of.write(json.dumps(self.static_name_to_dyg_name))
+        if self.args.should_save:
+            with open(
+                os.path.join(output_dir, "static_name_to_dyg_name.json"), "w"
+            ) as of:
+                of.write(json.dumps(self.static_name_to_dyg_name))
 
     def _load_rng_state(self, checkpoint):
         """Loads the rng state from a checkpoint."""

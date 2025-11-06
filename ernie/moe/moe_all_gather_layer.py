@@ -1155,6 +1155,7 @@ class MOEAllGatherLayerV2(MOELayer):
         combined_output = self.combine_expert_output(
             expert_out_to_combine, local_combine_weights, local_scatter_index
         )
+
         if self.shared_experts is not None:
             shared_out = self.shared_experts(input)
             combined_output += shared_out
@@ -1549,7 +1550,6 @@ class MOEAllGatherLayerV2(MOELayer):
             len(true_experts),
         )
 
-        # experts_weights = []
         for iexpert, chunk in enumerate(dispatched_input):
             if chunk is None:
                 # QuantizationLoRALinear can not call `.weight`.
