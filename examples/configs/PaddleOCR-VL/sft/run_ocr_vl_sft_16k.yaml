@@ -1,0 +1,97 @@
+### data
+train_dataset_type: "erniekit"
+eval_dataset_type: "erniekit"
+train_dataset_path: "./examples/data/ocr_vl_sft-train_Bengali.jsonl"
+train_dataset_prob: "1.0"
+eval_dataset_path: "./examples/data/ocr_vl_sft-test_Bengali.jsonl"
+eval_dataset_prob: "1.0"
+max_seq_len: 16384
+num_samples_each_epoch: 6000000
+use_pic_id: False
+sft_replace_ids: True
+sft_image_normalize: True
+sft_image_rescale: True
+image_dtype: "float32"
+
+### model
+model_name_or_path: PaddlePaddle/PaddleOCR-VL
+fine_tuning: Full
+fuse_rope: True
+use_sparse_head_and_loss_fn: True
+multimodal: True
+use_flash_attention: True
+
+### finetuning
+# base
+stage: OCR-VL-SFT
+seed: 23
+do_train: True
+# do_eval: True
+distributed_dataloader: False
+dataloader_num_workers: 1
+prefetch_factor: 10
+batch_size: 1
+packing_size: 8
+packing: True
+padding: False
+num_train_epochs: 2
+max_steps: 926
+# max_evaluate_steps: 10000
+# eval_steps: 10000
+# evaluation_strategy: steps
+save_steps: 200
+save_total_limit: 5
+save_strategy: steps
+logging_steps: 1
+release_grads: True
+gradient_accumulation_steps: 8
+logging_dir: ./PaddleOCR-VL-SFT-Bengali/tensorboard_logs/
+output_dir: ./PaddleOCR-VL-SFT-Bengali
+disable_tqdm: True
+
+# train
+warmup_steps: 10
+learning_rate: 5.0e-6
+lr_scheduler_type: cosine
+min_lr: 5.0e-7
+layerwise_lr_decay_bound: 1.0
+from_scratch: 0
+
+# optimizer
+weight_decay: 0.1
+adam_epsilon: 1.0e-8
+adam_beta1: 0.9
+adam_beta2: 0.95
+
+# performance
+tensor_parallel_degree: 1
+pipeline_parallel_degree: 1
+sharding_parallel_degree: 1
+sharding: stage1
+sequence_parallel: False
+pipeline_parallel_config: enable_delay_scale_loss enable_release_grads disable_partial_send_recv
+recompute: True
+recompute_granularity: "full"
+recompute_use_reentrant: True
+compute_type: bf16
+fp16_opt_level: O2
+disable_ckpt_quant: True
+# amp_master_grad: True
+amp_custom_white_list:
+  - lookup_table
+  - lookup_table_v2
+  - flash_attn
+  - matmul
+  - matmul_v2
+  - fused_gemm_epilogue
+amp_custom_black_list:
+  - reduce_sum
+  - softmax_with_cross_entropy
+  - c_softmax_with_cross_entropy
+  - elementwise_div
+  - sin
+  - cos
+unified_checkpoint: True
+# unified_checkpoint_config: async_save
+convert_from_hf: True
+save_to_hf: True
