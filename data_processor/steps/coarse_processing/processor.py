@@ -179,7 +179,8 @@ class CoarseProcessor(ProcessorBase):
                 )  # make video into image frame element
 
         schema = omini_convert_sequence_to_schema(new_sequence)
-        schema["tools"] = oral_schema["tools"]
+        if "tools" in oral_schema:
+            schema["tools"] = oral_schema["tools"]
         return schema
 
 

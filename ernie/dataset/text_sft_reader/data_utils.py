@@ -337,7 +337,8 @@ def sampling_pseudo_examples(
         example = gen_example(task_id, task_id_counter, exact_total_task_id_counter)
         if (
             not same_source_flag and rng.random() > pseudo_sampling_prob
-        ):
+        ) or example.disable_pseudo_multi_turn:
+
             yield example, {
                 example.source: 1
             }, task_id_counter, exact_total_task_id_counter

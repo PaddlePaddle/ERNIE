@@ -696,8 +696,8 @@ def run_vl_sft(
         packing=finetuning_args.packing,
     )
 
-    for i in train_dataset:
-        print(i)
+    for item in train_dataset:
+        print(item)
 
     # if model_args.lora:
     #     from ernie.utils.peft_utils import initialize_lora_model
