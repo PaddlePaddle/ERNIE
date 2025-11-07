@@ -1000,7 +1000,7 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
         # add system info
         if self.add_sys_token:
             system_info = example.system
-            if isinstance(examples.tools, str):
+            if isinstance(example.tools, str):
                 tools_info = example.tools
             else:
                 tools_info = json.dumps(example.tools)
