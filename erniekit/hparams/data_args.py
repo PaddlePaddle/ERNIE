@@ -29,7 +29,7 @@ class DataArguments:
             )
         },
     )
-    dataset_name: str = field(default="FunctionCallSFTReader", metadata={"help": "."})
+    dataset_name: str = field(default="KnowledgeBasedSFTReader", metadata={"help": "."})
     train_dataset_type: str = field(
         default=None,
         metadata={

@@ -590,6 +590,7 @@ class BaseReader:
                             task["target_num_each_epoch"] - same_source_num
                         )
 
+                        # [[1], [1], [1], [1], [1], [1], [1], [1], [1], [1]]
                         task_indices = [[task["task_id"]]] * non_same_source_num
 
                         idx = 0
@@ -598,9 +599,11 @@ class BaseReader:
                             if idx + n_shot > same_source_num:
                                 n_shot = same_source_num - idx
 
+                            # [[1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [2, 2, 2]]
                             task_indices.append([task["task_id"]] * n_shot)
                             idx += n_shot
 
+                        # [[1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [2, 2, 2], [3], [3], [4, 4, 4]]
                         weighted_task_indices.extend(task_indices)
 
                     if shuffle:
@@ -982,7 +985,7 @@ class KnowledgeBasedSFTReader(BaseReader):
         return return_list
 
 
-class FunctionCallSFTReader(BaseReader):
+class FunctionCallSFTReader(KnowledgeBasedSFTReader):
     """
     Knowledge Based SFT Reader
     """
@@ -997,10 +1000,14 @@ class FunctionCallSFTReader(BaseReader):
         # add system info
         if self.add_sys_token:
             system_info = example.system
+            if isinstance(examples.tools, str):
+                tools_info = example.tools
+            else:
+                tools_info = json.dumps(example.tools)
             system_tokens = (
                 [self.begin_token]
                 + tokenizer.tokenize("\n<tool_list>\n")
-                + tokenizer.tokenize(json.dumps(example.tools))
+                + tokenizer.tokenize(tools_info)
                 + tokenizer.tokenize("\n</tool_list>\n")
                 + tokenizer.tokenize(system_info)
                 + self.newline_token
@@ -1010,7 +1017,6 @@ class FunctionCallSFTReader(BaseReader):
             tokens = tokens + system_tokens
             loss_mask = loss_mask + [0] * (len(system_tokens))
             assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
-
 
         for index, turn in enumerate(example.messages):
             if "assistant" in turn["role"]:
@@ -1024,16 +1030,8 @@ class FunctionCallSFTReader(BaseReader):
                     tool = example.messages[index-1]["content"]
                     if isinstance(tool, str):
                         pass
-                    elif isinstance(tool, Dict):
-                        tool = json.dumps(tool)
-                    elif isinstance(tool, List):
-                        tool = tool[0]
-                        assert isinstance(tool, Dict), f"tool: {tool}"
-                        tool = json.dumps(tool)
                     else:
-                        logger.error(f"not supported tool : {tool}")
-                        break
-                    
+                        tool = json.dumps(tool)
                     tokens_src = tokenizer.tokenize("\n<tool_output>\n")
                     tokens_src = tokens_src + tokenizer.tokenize(tool)
                     tokens_src = tokens_src + tokenizer.tokenize("\n</tool_output>\n")
@@ -1047,30 +1045,33 @@ class FunctionCallSFTReader(BaseReader):
                     tool_calls = turn["tool_calls"]
 
                 if tool_calls:
-                    if "type" in tool_calls[0] and tool_calls[0]["type"] == "function":
-                        tool_call = tool_calls[0]["function"]
-                    else:
-                        tool_call = tool_calls[0]
-                    tokens_target += tokenizer.tokenize('<tool_call>\n{"name": "')
-                    tokens_target += tokenizer.tokenize(tool_call["name"])
-                    tokens_target += tokenizer.tokenize('", "arguments": ')
-                    if isinstance(tool_call["arguments"], str):
-                        tokens_target += tokenizer.tokenize(tool_call["arguments"])
-                    else:
-                        tokens_target += tokenizer.tokenize(json.dumps(tool_call["arguments"]))
-                    tokens_target += tokenizer.tokenize('}\n</tool_call>\n')
+                    if isinstance(tool_calls, str):
+                        tool_calls = json.loads(tool_calls)
+                    if not isinstance(tool_calls, list):  # parallel function call
+                        tool_calls = [tool_calls]
 
-                # 判断下序列有没有超长
-                # is_parts_a_truncated, is_parts_b_truncated = self._truncate_seq_pair(
-                #     tokens_src,
-                #     tokens_target,
-                #     self.max_seq_len
-                #     + 1
-                #     - previous_cur_len
-                #     - resever_multi_turn_break_length,
-                # )
-                # if is_parts_b_truncated or is_parts_a_truncated:
-                #     break
+                    for tool_call in tool_calls:
+                        if "type" in tool_call and tool_call["type"] == "function":
+                            tool_call = tool_call["function"]
+                        tokens_target += tokenizer.tokenize('<tool_call>\n{"name": "')
+                        tokens_target += tokenizer.tokenize(tool_call["name"])
+                        tokens_target += tokenizer.tokenize('", "arguments": ')
+                        if isinstance(tool_call["arguments"], str):
+                            tokens_target += tokenizer.tokenize(tool_call["arguments"])
+                        else:
+                            tokens_target += tokenizer.tokenize(json.dumps(tool_call["arguments"]))
+                        tokens_target += tokenizer.tokenize('}\n</tool_call>\n')
+
+                is_parts_a_truncated, is_parts_b_truncated = self._truncate_seq_pair(
+                    tokens_src,
+                    tokens_target,
+                    self.max_seq_len
+                    + 1
+                    - previous_cur_len
+                    - resever_multi_turn_break_length,
+                )
+                if is_parts_b_truncated or is_parts_a_truncated:
+                    break
 
                 tokens_src = tokens_src + self.begin_of_response
                 break_token_multi_turn = [self.end_of_response]
@@ -1138,172 +1139,6 @@ class FunctionCallSFTReader(BaseReader):
 
         return records
 
-    def _pad_batch_records(self, batch_records, simplify=False):
-        """
-        simplify
-        """
-
-        batch_record_token_ids = [
-            record.token_ids for record in batch_records
-        ]  # leave one token for tgt_ids
-
-        if not self.in_tokens:
-            pad_length = round_up_to_multiple_of_8(
-                sum(map(len, batch_record_token_ids))
-            )
-
-        batch_token_ids = [sum(batch_record_token_ids, [])]
-
-        if not self.rope_3d:
-            batch_position_ids = [record.position_ids for record in batch_records]
-            batch_position_ids = [sum(batch_position_ids, [])]
-            batch_position_ids_extra = [
-                record.position_ids_extra for record in batch_records
-            ]
-            batch_position_ids_extra = [sum(batch_position_ids_extra, [])]
-        else:
-            batch_position_ids = [
-                np.array(record.position_ids) for record in batch_records
-            ]
-            batch_position_ids = np.concatenate(batch_position_ids)
-            batch_position_ids_extra = [
-                np.array(record.position_ids_extra) for record in batch_records
-            ]
-            batch_position_ids_extra = np.concatenate(batch_position_ids_extra)
-
-        batch_loss_mask = [record.loss_mask for record in batch_records]
-        batch_loss_mask = [sum(batch_loss_mask, [])]
-
-        batch_labels = [record.label for record in batch_records]
-        batch_labels = [sum(batch_labels, [])]
-
-        batch_task_id_counter = self.batch_task_id_counter
-        batch_exact_total_task_id_counter = self.batch_exact_total_task_id_counter
-
-        max_task_id = self.num_tasks - 1
-        max_exact_total_task_id = self.num_tasks - 1
-
-        task_ids = [0] * (max_task_id + 1)
-        exact_total_task_ids = [0] * (max_exact_total_task_id + 1)
-
-        for task_id, consumed_cnt in batch_task_id_counter.items():
-            task_ids[task_id] = consumed_cnt
-        for task_id, consumed_cnt in batch_exact_total_task_id_counter.items():
-            exact_total_task_ids[task_id] = consumed_cnt
-
-        batch_task_ids = [task_ids]
-        batch_exact_total_task_ids = [exact_total_task_ids]
-
-        ##############################
-        def pad_sequence(sequences, padding_value=0, fix_len=None):
-            """Fill sequences(np.ndarray) into a fixed-length matrix."""
-            # don't use any paddle.Tensor in collate-fn
-            #   which prevent leakage in multi-process
-            max_size = sequences[0].shape
-            trailing_dims = tuple(max_size[1:])
-            # print("trailing_dims: ", trailing_dims)
-
-            max_len = max([s.shape[0] for s in sequences])
-            if fix_len is not None:
-                if fix_len < max_len:
-                    logger.warning(f"truncating example from {max_len} to {fix_len}")
-                max_len = fix_len
-            out_dims = (len(sequences), max_len) + trailing_dims
-            out_tensor = np.full(out_dims, padding_value, dtype=sequences[0].dtype)
-            for i, tensor in enumerate(sequences):
-                tensor = tensor[:max_len]
-                length = tensor.shape[0]
-                out_tensor[i, :length, ...] = tensor
-            return out_tensor
-
-        # padding
-        if self.rope_3d:
-            padded_position_ids_extra = pad_sequence(
-                np.array([batch_position_ids_extra]),
-                padding_value=[0, 0, 0],
-                fix_len=self.max_seq_len if self.in_tokens else pad_length,
-            )
-        else:
-            padded_position_ids_extra = pad_batch_data(
-                batch_position_ids_extra,
-                pad_idx=0,
-                max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
-            )
-
-        padded_token_ids = pad_batch_data(
-            batch_token_ids,
-            pad_idx=self.pad_id,
-            return_input_mask=False,
-            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
-        )
-        # padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=0, max_seq_len=self.max_seq_len)
-
-        padded_batch_loss_mask = pad_batch_data(
-            batch_loss_mask,
-            pad_idx=0,
-            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
-        )
-        padded_batch_labels = pad_batch_data(
-            batch_labels,
-            pad_idx=self.pad_id,
-            max_seq_len=self.max_seq_len if self.in_tokens else pad_length,
-        )
-        # add in-batch mask
-        if not simplify:
-            input_mask = self._gen_self_attn_mask_for_glm_flatten(
-                batch_record_token_ids,
-                self.max_seq_len if self.in_tokens else pad_length,
-            )
-
-        padded_batch_task_ids = pad_batch_data(
-            batch_task_ids, pad_idx=0, max_seq_len=self.num_tasks
-        )
-        padded_batch_exact_total_task_ids = pad_batch_data(
-            batch_exact_total_task_ids, pad_idx=0, max_seq_len=self.num_tasks
-        )
-
-        inbatch_pack_offset = [0]
-        for item in batch_record_token_ids:
-            inbatch_pack_offset.append(inbatch_pack_offset[-1] + len(item))
-        inbatch_pack_offset[-1] = (
-            self.max_seq_len if self.in_tokens else pad_length
-        )  # include padding in the last interval
-        padded_inbatch_pack_offset = np.reshape(
-            np.array(
-                inbatch_pack_offset
-                + [-1]
-                * (
-                    (self.max_seq_len if self.in_tokens else pad_length)
-                    + 1
-                    - len(inbatch_pack_offset)
-                ),
-                dtype=np.int64,
-            ),
-            [1, -1],
-        )
-        # Note(gongenlei): rm padded_position_ids. padded_position_ids is same as padded_position_ids_extra
-        if not simplify:
-            return_list = [
-                padded_token_ids,
-                padded_position_ids_extra,
-                input_mask,
-                padded_inbatch_pack_offset,
-                padded_batch_labels,
-                padded_batch_loss_mask,
-                padded_batch_task_ids,
-                padded_batch_exact_total_task_ids,
-            ]
-        else:
-            return_list = [
-                padded_token_ids.astype("int64"),
-                padded_position_ids_extra.astype("int64"),
-                padded_inbatch_pack_offset.astype("int64"),
-                padded_batch_labels.astype("int64"),
-                padded_batch_loss_mask.astype("bool"),
-                padded_batch_exact_total_task_ids.astype("int64"),
-            ]
-        return return_list
-
     def _read_jsonl(self, input_file):
         """Reads jsonl file."""
         with open(input_file, "r") as f:
@@ -1332,13 +1167,13 @@ class FunctionCallSFTReader(BaseReader):
                         "messages",
                         "tools",
                         "label",
-                        "is_system",
-                        "source",
-                        "system",
                         "disable_pseudo_multi_turn",
                         "is_memory",
+                        "is_system",
+                        "source",
                         "is_q2code",
                         "math_is_end",
+                        "system",
                         "prefix",
                     ]
                     Example = namedtuple("Example", names)
@@ -1370,6 +1205,10 @@ class FunctionCallSFTReader(BaseReader):
                 if "math_is_end" not in data:
                     data["math_is_end"] = 2
 
+                if self.add_sys_token:
+                    if data["system"] != "":
+                        data["disable_pseudo_multi_turn"] = 1
+
                 try:
                     data["prefix"] = ""
                     example = Example(
@@ -1377,13 +1216,13 @@ class FunctionCallSFTReader(BaseReader):
                             "messages": data["messages"],
                             "tools": data["tools"],
                             "label": data["label"],
-                            "is_system": data["is_system"],
-                            "source": input_file,
-                            "system": data["system"],
                             "disable_pseudo_multi_turn": data["disable_pseudo_multi_turn"],
                             "is_memory": data["is_memory"],
+                            "is_system": data["is_system"],
+                            "source": input_file,
                             "is_q2code": data["is_q2code"],
                             "math_is_end": data["math_is_end"],
+                            "system": data["system"],
                             "prefix": data["prefix"],
                         }
                     )
@@ -1394,148 +1233,6 @@ class FunctionCallSFTReader(BaseReader):
                 cnt += 1
 
             return examples
-
-    def data_generator(self):
-        """
-        Method to generate data.
-
-        Args:
-            None
-
-        Returns:
-            A generator that returns a batch of data each time it is called.
-        """
-        phase = "train" if not self.is_valid else "valid"
-        shuffle = True if not self.is_valid else False
-        total_data_num_each_epoch = 0
-        if phase == "train":
-            tasks = self.task_group
-            # filter the task with a prob of zero
-            tasks = [task for task in tasks if task["prob"] > 0]
-            # num_tasks = len(tasks) * self.dp_worldsize
-            self.num_tasks = (
-                len(tasks) * self.dp_worldsize
-                if self.use_train_part_sharding
-                else len(tasks)
-            )
-            total_probs = sum(float(task["prob"]) for task in tasks)
-
-            # reset the data status when the number of tasks is different
-            if len(self.state.get("saved_task_ids", [])) != self.num_tasks:
-                self.state = {}
-
-            for task_id, task in enumerate(tasks):
-                task_id = (
-                    task_id * self.dp_worldsize + self.dp_worldrank
-                    if self.use_train_part_sharding
-                    else task_id
-                )
-                task["task_id"] = task_id
-                task["prob"] = float(task["prob"]) / total_probs
-                examples = self._read_jsonl(task["filepath"])
-                task["target_num_each_epoch"] = int(
-                    float(task["prob"]) * self.number_of_samples_each_epoch
-                )
-                total_data_num_each_epoch += task["target_num_each_epoch"]
-
-                task["total_num_examples"] = len(examples)
-
-                consumed_data = self.state.get("saved_task_ids", [])
-                consumed_data = (
-                    consumed_data[task["task_id"]] if len(consumed_data) > 0 else 0
-                )
-                print(f"task_id: {task['task_id']}: {consumed_data}")
-
-                task_sampler = RandomNoReplacementSampler(
-                    examples, task["task_id"], self.random_seed
-                )
-                task_sampler.set_data_status(consumed_data)
-                task["task_sampler"] = task_sampler
-                task["sampler"] = task_sampler.getter()
-
-                print(
-                    task["filepath"],
-                    " task probs: ",
-                    task["prob"],
-                    " ori number of examples:",
-                    task["total_num_examples"],
-                    " target_num_each_epoch:",
-                    task["target_num_each_epoch"],
-                    " target_num_total_epoch: ",
-                    task["target_num_each_epoch"] * self.epoch,
-                    f"sampler start from epoch:{task_sampler.epoch} offset:{task_sampler.offset}",
-                )
-
-            print("total_probs should be 1, current is ", total_probs)
-        else:
-            examples = self._read_jsonl(self.task_group)
-        print("examples", examples[0])
-
-        self.current_example = 0
-        self.current_epoch = 0
-
-        def wrapper():
-            all_dev_batches = []
-            consumed_data_num = sum(self.state.get("saved_task_ids", []))
-            init_epoch = consumed_data_num // total_data_num_each_epoch
-            offset = consumed_data_num % total_data_num_each_epoch
-            print(f"data generator resuming from epoch:{init_epoch}, offset{offset}")
-            for epoch_index in range(
-                init_epoch, 100000 if phase == "train" else self.epoch
-            ):
-                self.current_epoch = epoch_index
-                if phase == "train":
-                    weighted_task_indices = []  # weighted task_ids
-
-                    if shuffle:
-                        rng = np.random.RandomState(self.random_seed + epoch_index)
-
-                    for task in tasks:
-                        task_indices = [[task["task_id"]]] * task["target_num_each_epoch"]
-                        weighted_task_indices.extend(task_indices)
-                    if shuffle:
-                        rng.shuffle(weighted_task_indices)
-
-                    sample_from_same_source_flags = []
-                    flatten_weighted_task_indices = []
-                    # for item in weighted_task_indices:
-                    #     sample_from_same_source_flags.extend(
-                    #         [int(len(item) > 1)] * len(item)
-                    #     )
-                    #     flatten_weighted_task_indices.extend(item)
-                    sample_from_same_source_flags = [0] * len(weighted_task_indices)
-                    flatten_weighted_task_indices = [0] * len(weighted_task_indices)
-
-                    weighted_task_indices = flatten_weighted_task_indices
-                    assert len(weighted_task_indices) == len(
-                        sample_from_same_source_flags
-                    ), "采样列表应该具有相同源的条目数量"
-
-                    if epoch_index == init_epoch:
-                        weighted_task_indices = weighted_task_indices[offset:]
-                        sample_from_same_source_flags = sample_from_same_source_flags[
-                            offset:
-                        ]
-
-                num_batch_to_yield = self.dp_worldsize
-                rank_to_yield = self.dp_worldrank
-                if self.use_train_part_sharding:
-                    num_batch_to_yield = 1
-                    rank_to_yield = 0
-                for batch_data in self._prepare_batch_data(
-                    tasks,
-                    weighted_task_indices,
-                    sample_from_same_source_flags,
-                    self.batch_size,
-                    phase=phase,
-                ):
-                    if len(all_dev_batches) < num_batch_to_yield:
-                        all_dev_batches.append(batch_data)
-                    if len(all_dev_batches) == num_batch_to_yield:
-                        yield all_dev_batches[rank_to_yield]
-                        all_dev_batches = []
-
-        return wrapper
 
     def _prepare_batch_data(
             self,

@@ -420,33 +420,6 @@ def sampling_pseudo_examples(
         if not (example.is_q2code == 1 or example.math_is_end == 0):
             total_len_wo_k += len_wo_k
 
-
-def get_length_fc(example, tokenizer, add_number=4):
-    """
-    Calculate the total sample length.
-        add_number: Reserved length for [START], [MASK], [SEP], [CLS]
-
-    Returns:
-        cur_len_w_k (int): Total length including K.
-        cur_len_wo_k (int): Total length excluding K.
-    """
-    cur_len_w_k = 0
-    cur_len_wo_k = 0
-    src = ""
-    tgt = ""
-    for item in example.messages:
-        if item["role"] == "user" or item["role"] == "tool":
-            src = item["content"]
-        elif item["role"] == "assistant":
-            tgt = item["content"]
-            
-            cur_len_wo_k += (
-                len(tokenizer.tokenize(src)) + len(tokenizer.tokenize(tgt)) + add_number
-            )
-    cur_len_w_k = cur_len_wo_k
-
-    return cur_len_w_k, cur_len_wo_k
-
 def sampling_pseudo_examples_fc(
     tasks,
     weighted_task_indices,
@@ -490,13 +463,13 @@ def sampling_pseudo_examples_fc(
             - task_id_counter (Dict[int, int]): Task ID counter.
             - exact_total_task_id_counter (Dict[int, int]): Exact total task ID counter.
     """
-    previous_pseudo_example_list = [] # 存储历史伪多轮数据
-    current_pseudo_example_list = [] # 存储当前伪多轮数据
-    total_len_wo_k = 0 # 累计长度（不含特定标记）
-    total_example_num = 0 # 累积示例数量
+    previous_pseudo_example_list = []
+    current_pseudo_example_list = []
+    total_len_wo_k = 0
+    total_example_num = 0
 
-    task_id_counter = defaultdict(int) # 统计任务id的次数
-    exact_total_task_id_counter = defaultdict(int) # 统计任务id的精准次数
+    task_id_counter = defaultdict(int)
+    exact_total_task_id_counter = defaultdict(int)
 
     def gen_example(task_id, task_id_counter, exact_total_task_id_counter):
         task_id_local = (
@@ -515,7 +488,6 @@ def sampling_pseudo_examples_fc(
         weighted_task_indices, sample_from_same_source_flags
     ):
         example = gen_example(task_id, task_id_counter, exact_total_task_id_counter)
-        # 条件：如果示例不来自同源且随机数大于 pseudo_sampling_prob（伪采样概率），则直接返回示例。
         yield example, {
             example.source: 1
         }, task_id_counter, exact_total_task_id_counter

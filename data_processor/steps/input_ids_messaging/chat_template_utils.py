@@ -71,9 +71,14 @@ def apply_chat_training_template(
                 new_text_info.append(
                     {"text": "\n<tool_list>\n", "tag": "mask"}
                 )
-                new_text_info.append(
-                    {"text": json.dumps(data["tools"]), "tag": "mask"}
-                )
+                if isinstance(data["tools"], str):
+                    new_text_info.append(
+                        {"text": data["tools"], "tag": "mask"}
+                    )
+                else:
+                    new_text_info.append(
+                        {"text": json.dumps(data["tools"]), "tag": "mask"}
+                    )
                 new_text_info.append(
                     {"text": "\n</tool_list>\n", "tag": "mask"}
                 )
@@ -92,6 +97,7 @@ def apply_chat_training_template(
         for sub_item_idx, sub_item in enumerate(item):
             # is image
             if isinstance(sub_item, list):
+                # If the next one is a tool response
                 if sub_item_idx + 1 < len(item) and "tool_response" in item[sub_item_idx + 1] and item[sub_item_idx + 1]["tool_response"] == True:
                     new_text_info.append({"text": "\n<tool_output>\n", "tag": "mask"})
                 for image_item_idx, image_item in enumerate(sub_item):
@@ -195,15 +201,10 @@ def apply_chat_training_template(
                 if "tool_response" in sub_item and sub_item["tool_response"] == True:
                     tool_response = sub_item.pop("tool_response")
                 if tool_response:
-                    if isinstance(sub_item, str):
-                        pass
-                    elif isinstance(sub_item, Dict):
-                        sub_item = json.dumps(tool_response)
-                    elif isinstance(sub_item, List):
-                        sub_item = json.dumps(tool_response)
-                    else:
-                        logger.error(f"not supported tool : {tool}")
-                        break
+                    assert isinstance(sub_item["text"], str)
+                    # If the previous one is not an image / video
+                    if sub_item_idx - 1 > 0 and not isinstance(item[sub_item_idx - 1], list):
+                        new_text_info.append({"text": "\n<tool_output>\n", "tag": "mask"})
                     new_text_info.append(sub_item)
                     new_text_info.append({"text": "\n</tool_output>\n", "tag": "mask"})
                 else:

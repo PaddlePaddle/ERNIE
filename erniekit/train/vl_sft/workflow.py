@@ -696,7 +696,7 @@ def run_vl_sft(
         packing=finetuning_args.packing,
     )
 
-    for item in train_dataset:
+    for item in text_sft_dataset:
         print(item)
 
     # if model_args.lora:
