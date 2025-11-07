@@ -138,6 +138,10 @@ export PADDLE_XCCL_BACKEND=iluvatar_gpu
 
 rm -rf erniekit_dist_log/ output/ vdl_log/
 
+# ERNIE-4.5-0.3B sft
+erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
+
+# ERNIE-4.5-21B sft
 erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-21B-A3B/sft/run_sft_8k.yaml
 ```
 
@@ -151,6 +155,10 @@ export PADDLE_XCCL_BACKEND=iluvatar_gpu
 
 rm -rf erniekit_dist_log/ output/ vdl_log/
 
+# ERNIE-4.5-0.3B sft-lora
+erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-0.3B/sft/run_sft_lora_8k.yaml
+
+# ERNIE-4.5-21B sft-lora
 erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-21B-A3B/sft/run_sft_lora_8k.yaml
 ```
 
