@@ -16,7 +16,7 @@
 - **python version：** 3.10
 
 **Note: This example uses an 8-card machine: To verify if your machine is Iluvatar GPU, simply enter the command in the system environment and see if there is any output:**
-```
+```bash
 ixsmi
 #example：$ ixsmi
 Timestamp    Thu Jul 10 16:59:37 2025
@@ -86,136 +86,80 @@ Timestamp    Thu Jul 10 16:59:37 2025
 ### (1)  Environment Preparation: (This will take you 5-15 minutes)
 
 1. Pull the Image
-```
+```bash
 docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-ixuca:latest
 ```
 
 2. Install the driver kmd on host
-```
+```bash
 wget https://ai-rank.bj.bcebos.com/Iluvatar/corex-driver-linux64-4.3.0.rc.9.20250624_x86_64_10.2.run
 bash corex-driver-linux64-4.3.0.rc.9.20250624_x86_64_10.2.run
 ```
 
 3. Start the Container
-```
+```bash
 docker run -itd --name paddle-ixuca-dev -v /usr/src:/usr/src -v /lib/modules:/lib/modules \
-    -v /dev:/dev -v /home:/home --privileged --cap-add=ALL --pid=host \
+    -v /dev:/dev -v /home:/home --privileged --cap-add=ALL --pid=host --network=host \
     ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-ixuca:latest
 docker exec -it paddle-ixuca-dev bash
 ```
 
 4. Install paddlepaddle & paddle-iluvatar-gpu
-```
+```bash
+ln -sf /usr/local/bin/python3 /usr/local/bin/python
+
 # Install PaddlePaddle CPU package
-python -m pip install paddlepaddle==3.1.0a0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+python -m pip install https://paddle-whl.bj.bcebos.com/nightly/cpu/paddlepaddle/paddlepaddle-3.3.0.dev20251023-cp310-cp310-linux_x86_64.whl
 
 # Install PaddlePaddle iluvatar-gpu plugin package
-python -m pip install paddle-iluvatar-gpu==3.1.0 -i https://www.paddlepaddle.org.cn/packages/stable/ixuca/
+python -m pip install https://paddle-whl.bj.bcebos.com/nightly/ixuca/paddle-iluvatar-gpu/paddle_iluvatar_gpu-3.0.0.dev20251023-cp310-cp310-linux_x86_64.whl
 
 Nightly version link:
 https://www.paddlepaddle.org.cn/packages/nightly/ixuca/
 ```
 
-4. Install requirements
-```
-pip install paddleformers
+4. Install ERNIEKit
+```bash
+git clone https://github.com/PaddlePaddle/ERNIE.git
+cd ERNIE
+python -m pip install -r requirements/gpu/requirements.txt
+python -m pip install -e . # We recommend install in editable mode
 ```
 
 ### (2) Start post-traning：(This will take a relatively long time)
 
+SFT fine-tuning
+
+```bash
+export PATH=/usr/local/corex/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/corex/lib64:$LD_LIBRARY_PATH
+export LD_PRELOAD=/usr/local/corex/lib64/libcuda.so.1
+export PADDLE_XCCL_BACKEND=iluvatar_gpu
+
+rm -rf erniekit_dist_log/ output/ vdl_log/
+
+# ERNIE-4.5-0.3B sft
+erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
+
+# ERNIE-4.5-21B sft
+erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-21B-A3B/sft/run_sft_8k.yaml
+```
+
 SFT-LoRA fine-tuning
 
-```
-#!/bin/bash
-
-unset PADDLE_TRAINERS_NUM
-unset PADDLE_ELASTIC_JOB_ID
-unset PADDLE_TRAINER_ENDPOINTS
-unset DISTRIBUTED_TRAINER_ENDPOINTS
-unset FLAGS_START_PORT
-unset PADDLE_ELASTIC_TIMEOUT
-export PYTHONPATH=$(dirname "$0")/../../../..:$PYTHONPATH
-export FLAGS_set_to_1d=False
-export FLAGS_dataloader_use_file_descriptor=False
-
-export PADDLE_XCCL_BACKEND=iluvatar_gpu
+```bash
+export PATH=/usr/local/corex/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/corex/lib64:$LD_LIBRARY_PATH
 export LD_PRELOAD=/usr/local/corex/lib64/libcuda.so.1
+export PADDLE_XCCL_BACKEND=iluvatar_gpu
 
-export FLAGS_embedding_deterministic=1
+rm -rf erniekit_dist_log/ output/ vdl_log/
 
-model_path="ERNIE-4.5-21B-A3B-Paddle"
-task="sft_lora_8k"
-paddle_log_dir="${model_path}_${task}_log"
-vdl_log_dir="${model_path}_${task}_vdl"
-output_dir="${model_path}_${task}_checkpoint"
+# ERNIE-4.5-0.3B sft-lora
+erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-0.3B/sft/run_sft_lora_8k.yaml
 
-rm -rf ${log_dir}
-
-python3 -m paddle.distributed.launch \
-    --log_dir ${paddle_log_dir} \
-    --gpus 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 \
-    examples/post-training/sft/train.py \
-    --logging_dir ${vdl_log_dir} \
-    --model_name_or_path ${model_path} \
-    --output_dir ${output_dir} \
-    --per_device_train_batch_size 1 \
-    --per_device_eval_batch_size 1 \
-    --train_dataset_path "examples/data/ARC-Challenge/train.json,examples/data/boolq/train.json,examples/data/piqa/train.json,examples/data/winogrande/train.json,examples/data/hellaswag/train.json,examples/data/ARC-Easy/train.json" \
-    --train_dataset_prob "0.2,0.1,0.1,0.2,0.2,0.2" \
-    --train_dataset_type "erniekit,erniekit,erniekit,erniekit,erniekit,erniekit" \
-    --eval_dataset_path "examples/data/ARC-Challenge/dev.json,examples/data/boolq/dev.json,examples/data/piqa/dev.json,examples/data/winogrande/dev.json,examples/data/hellaswag/dev.json,examples/data/ARC-Easy/dev.json" \
-    --eval_dataset_prob "0.2,0.1,0.1,0.2,0.2,0.2" \
-    --eval_dataset_type "erniekit,erniekit,erniekit,erniekit,erniekit,erniekit" \
-    --max_steps 500 \
-    --max_evaluate_steps 10000 \
-    --eval_accumulation_steps 100 \
-    --num_train_epochs 1 \
-    --save_steps 500 \
-    --logging_steps 1 \
-    --eval_steps 500 \
-    --weight_decay 0.01 \
-    --do_train \
-    --do_eval \
-    --evaluation_strategy steps \
-    --device iluvatar_gpu \
-    --tensor_parallel_degree 4 \
-    --pipeline_parallel_degree 4 \
-    --sharding_parallel_degree 1 \
-    --sharding stage1 \
-    --max_seq_len 8192 \
-    --seed 23 \
-    --gradient_accumulation_steps 2 \
-    --warmup_steps 2000 \
-    --lr_scheduler_type "linear" \
-    --learning_rate 3e-4 \
-    --num_samples_each_epoch 6000000 \
-    --bf16 \
-    --fp16_opt_level O2 \
-    --amp_custom_white_list "lookup_table" "lookup_table_v2" "flash_attn" "matmul" "matmul_v2" "fused_gemm_epilogue" \
-    --amp_custom_black_list "reduce_sum" "softmax_with_cross_entropy" "c_softmax_with_cross_entropy" "elementwise_div" "sin" "cos" \
-    --disable_tqdm True \
-    --recompute 1 \
-    --offload_optim 0 \
-    --recompute_granularity "full" \
-    --dataloader_num_workers 1 \
-    --distributed_dataloader 1 \
-    --use_flash_attention 1 \
-    --use_sparse_head_and_loss_fn 0 \
-    --use_attn_mask_start_row_indices 0 \
-    --use_sparse_flash_attn 0 \
-    --tensor_parallel_output 0 \
-    --pipeline_parallel_config "disable_partial_send_recv enable_clear_every_step_cache disable_batch_p2p_comm" \
-    --greedy_intokens 1 \
-    --lr_scheduler linear \
-    --sequence_parallel 1 \
-    --release_grads 1 \
-    --recompute_use_reentrant True \
-    --fuse_rope 1 \
-    --moe_multimodal_dispatch_use_allgather "v2-alltoall" \
-    --lora \
-    --lora_rank 32 \
-    --fuse_rms_norm False \
-    --moe_group mp
+# ERNIE-4.5-21B sft-lora
+erniekit train examples/configs/iluvatar_gpu/ERNIE-4.5-21B-A3B/sft/run_sft_lora_8k.yaml
 ```
 
 
