@@ -137,7 +137,6 @@ def run_vl_sft(
     """
     main function
     """
-
     preprocess_args.batch_size = finetuning_args.batch_size
     finetuning_args.max_seq_len = data_args.max_seq_len
     finetuning_args.max_seq_length = data_args.max_seq_len
