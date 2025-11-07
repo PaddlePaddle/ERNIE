@@ -28,9 +28,12 @@ import ujson as json
 from paddleformers.trainer import TrainerState
 from paddleformers.trainer.trainer import TRAINER_STATE_NAME
 
-from typing import List, Dict
 
-from .data_utils import RandomNoReplacementSampler, sampling_pseudo_examples, sampling_pseudo_examples_fc
+from .data_utils import (
+    RandomNoReplacementSampler,
+    sampling_pseudo_examples,
+    sampling_pseudo_examples_fc,
+)
 from ernie.dataset.data_utils import pad_batch_data, round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
@@ -1021,13 +1024,13 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
         for index, turn in enumerate(example.messages):
             if "assistant" in turn["role"]:
                 # 前一轮是user
-                if "user" in example.messages[index-1]["role"]:
-                    src = example.messages[index-1]["content"]
+                if "user" in example.messages[index - 1]["role"]:
+                    src = example.messages[index - 1]["content"]
                     tokens_src = self.begin_of_query + tokenizer.tokenize(src)
 
                 # 前一轮是tool response
-                if "tool" in example.messages[index-1]["role"]:
-                    tool = example.messages[index-1]["content"]
+                if "tool" in example.messages[index - 1]["role"]:
+                    tool = example.messages[index - 1]["content"]
                     if isinstance(tool, str):
                         pass
                     else:
@@ -1035,10 +1038,10 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                     tokens_src = tokenizer.tokenize("\n<tool_output>\n")
                     tokens_src = tokens_src + tokenizer.tokenize(tool)
                     tokens_src = tokens_src + tokenizer.tokenize("\n</tool_output>\n")
-                
+
                 # assistant
                 tokens_target = tokenizer.tokenize(turn["content"])
-                
+
                 # assistant里面可能会有tool call
                 tool_calls = None
                 if "tool_calls" in turn:
@@ -1059,8 +1062,10 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                         if isinstance(tool_call["arguments"], str):
                             tokens_target += tokenizer.tokenize(tool_call["arguments"])
                         else:
-                            tokens_target += tokenizer.tokenize(json.dumps(tool_call["arguments"]))
-                        tokens_target += tokenizer.tokenize('}\n</tool_call>\n')
+                            tokens_target += tokenizer.tokenize(
+                                json.dumps(tool_call["arguments"])
+                            )
+                        tokens_target += tokenizer.tokenize("}\n</tool_call>\n")
 
                 is_parts_a_truncated, is_parts_b_truncated = self._truncate_seq_pair(
                     tokens_src,
@@ -1080,8 +1085,8 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                 tokens = tokens + cur_tokens + break_token_multi_turn
 
                 loss_mask = (
-                    loss_mask + 
-                    [0] * (len(tokens_src) - 1)
+                    loss_mask
+                    + [0] * (len(tokens_src) - 1)
                     + [1] * (len(tokens_target) + 1)
                     + [0] * len(break_token_multi_turn)
                 )
@@ -1191,7 +1196,7 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                         data["system"] = data["messages"][0]["content"]
                     else:
                         data["is_system"] = 0
-                        data['system'] = ''
+                        data["system"] = ""
 
                 if "disable_pseudo_multi_turn" not in data:
                     data["disable_pseudo_multi_turn"] = 0
@@ -1216,7 +1221,9 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                             "messages": data["messages"],
                             "tools": data["tools"],
                             "label": data["label"],
-                            "disable_pseudo_multi_turn": data["disable_pseudo_multi_turn"],
+                            "disable_pseudo_multi_turn": data[
+                                "disable_pseudo_multi_turn"
+                            ],
                             "is_memory": data["is_memory"],
                             "is_system": data["is_system"],
                             "source": input_file,
@@ -1235,83 +1242,83 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
             return examples
 
     def _prepare_batch_data(
-            self,
-            tasks,
-            weighted_task_indices,
-            sample_from_same_source_flags,
-            batch_size,
-            phase=None,
+        self,
+        tasks,
+        weighted_task_indices,
+        sample_from_same_source_flags,
+        batch_size,
+        phase=None,
+    ):
+        """generate batch records"""
+        batch_records, max_len = [], 0
+        cur_len_so_far = 0
+        for index, (
+            example,
+            source_to_num_opt,
+            task_id_counter,
+            exact_total_task_id_counter,
+        ) in enumerate(
+            sampling_pseudo_examples_fc(
+                tasks,
+                weighted_task_indices,
+                sample_from_same_source_flags,
+                self.tokenizer,
+                self.global_rng,
+                self.max_seq_len,
+                self.pseudo_sampling_prob,
+                self.trigger_data_prob,
+                self.use_anti_k_sampling,
+                self.drop_history_with_k,
+                self.use_train_part_sharding,
+                self.dp_worldsize,
+                self.dp_worldrank,
+            )
         ):
-            """generate batch records"""
-            batch_records, max_len = [], 0
-            cur_len_so_far = 0
-            for index, (
-                example,
-                source_to_num_opt,
-                task_id_counter,
-                exact_total_task_id_counter,
-            ) in enumerate(
-                sampling_pseudo_examples_fc(
-                    tasks,
-                    weighted_task_indices,
-                    sample_from_same_source_flags,
-                    self.tokenizer,
-                    self.global_rng,
-                    self.max_seq_len,
-                    self.pseudo_sampling_prob,
-                    self.trigger_data_prob,
-                    self.use_anti_k_sampling,
-                    self.drop_history_with_k,
-                    self.use_train_part_sharding,
-                    self.dp_worldsize,
-                    self.dp_worldrank,
-                )
-            ):
-                if phase == "train":
-                    self.current_example += sum(source_to_num_opt.values())
-                for k, v in source_to_num_opt.items():
-                    self.source_to_num_opt[k] += v
+            if phase == "train":
+                self.current_example += sum(source_to_num_opt.values())
+            for k, v in source_to_num_opt.items():
+                self.source_to_num_opt[k] += v
 
-                records = self._convert_example_to_record(
-                    example, self.max_seq_len, self.tokenizer, index
-                )
-                if len(records) == 0:
+            records = self._convert_example_to_record(
+                example, self.max_seq_len, self.tokenizer, index
+            )
+            if len(records) == 0:
 
-                    for k, v in task_id_counter.items():
-                        self.batch_task_id_counter[k] += v
-                    for k, v in exact_total_task_id_counter.items():
-                        self.batch_exact_total_task_id_counter[k] += v
+                for k, v in task_id_counter.items():
+                    self.batch_task_id_counter[k] += v
+                for k, v in exact_total_task_id_counter.items():
+                    self.batch_exact_total_task_id_counter[k] += v
 
-                for record in records:
-                    max_len = max(max_len, len(record.token_ids))
-                    if self.in_tokens:
-                        assert (
-                            batch_size == 1
-                        ), "batch_size is always set to 1 for batch-based iterator"
-                        to_append = (
-                            cur_len_so_far + len(record.token_ids)
-                        ) <= self.max_seq_len
-                    else:
-                        to_append = len(batch_records) < batch_size
-                    if to_append:
-                        batch_records.append(record)
-                        cur_len_so_far += len(record.token_ids)
-                    else:
-                        yield self._pad_batch_records(batch_records, self.simplify)
-                        self.batch_task_id_counter = defaultdict(int)
-                        self.batch_exact_total_task_id_counter = defaultdict(int)
-                        batch_records, max_len = [record], len(record.token_ids)
-                        cur_len_so_far = len(record.token_ids)
+            for record in records:
+                max_len = max(max_len, len(record.token_ids))
+                if self.in_tokens:
+                    assert (
+                        batch_size == 1
+                    ), "batch_size is always set to 1 for batch-based iterator"
+                    to_append = (
+                        cur_len_so_far + len(record.token_ids)
+                    ) <= self.max_seq_len
+                else:
+                    to_append = len(batch_records) < batch_size
+                if to_append:
+                    batch_records.append(record)
+                    cur_len_so_far += len(record.token_ids)
+                else:
+                    yield self._pad_batch_records(batch_records, self.simplify)
+                    self.batch_task_id_counter = defaultdict(int)
+                    self.batch_exact_total_task_id_counter = defaultdict(int)
+                    batch_records, max_len = [record], len(record.token_ids)
+                    cur_len_so_far = len(record.token_ids)
 
-                    for k, v in task_id_counter.items():
-                        self.batch_task_id_counter[k] += v
-                    for k, v in exact_total_task_id_counter.items():
-                        self.batch_exact_total_task_id_counter[k] += v
-                    task_id_counter = defaultdict(int)
-                    exact_total_task_id_counter = defaultdict(int)
+                for k, v in task_id_counter.items():
+                    self.batch_task_id_counter[k] += v
+                for k, v in exact_total_task_id_counter.items():
+                    self.batch_exact_total_task_id_counter[k] += v
+                task_id_counter = defaultdict(int)
+                exact_total_task_id_counter = defaultdict(int)
 
-            if phase != "train" and len(batch_records) > 0:
-                while len(batch_records) < batch_size:
-                    batch_records.append(batch_records[-1])
-                    print("in while", "len(batch_records)", len(batch_records))
-                yield self._pad_batch_records(batch_records, self.simplify)
+        if phase != "train" and len(batch_records) > 0:
+            while len(batch_records) < batch_size:
+                batch_records.append(batch_records[-1])
+                print("in while", "len(batch_records)", len(batch_records))
+            yield self._pad_batch_records(batch_records, self.simplify)

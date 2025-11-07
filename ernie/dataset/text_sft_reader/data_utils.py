@@ -420,6 +420,7 @@ def sampling_pseudo_examples(
         if not (example.is_q2code == 1 or example.math_is_end == 0):
             total_len_wo_k += len_wo_k
 
+
 def sampling_pseudo_examples_fc(
     tasks,
     weighted_task_indices,
@@ -463,10 +464,6 @@ def sampling_pseudo_examples_fc(
             - task_id_counter (Dict[int, int]): Task ID counter.
             - exact_total_task_id_counter (Dict[int, int]): Exact total task ID counter.
     """
-    previous_pseudo_example_list = []
-    current_pseudo_example_list = []
-    total_len_wo_k = 0
-    total_example_num = 0
 
     task_id_counter = defaultdict(int)
     exact_total_task_id_counter = defaultdict(int)
@@ -488,9 +485,7 @@ def sampling_pseudo_examples_fc(
         weighted_task_indices, sample_from_same_source_flags
     ):
         example = gen_example(task_id, task_id_counter, exact_total_task_id_counter)
-        yield example, {
-            example.source: 1
-        }, task_id_counter, exact_total_task_id_counter
+        yield example, {example.source: 1}, task_id_counter, exact_total_task_id_counter
         task_id_counter = defaultdict(int)
         exact_total_task_id_counter = defaultdict(int)
         continue
