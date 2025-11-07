@@ -467,6 +467,7 @@ def run_vl_sft(
     cfg.use_attn_mask_start_row_indices = model_args.use_attn_mask_start_row_indices
     cfg.use_recompute_moe = model_args.use_recompute_moe
     cfg.recompute = finetuning_args.recompute
+    cfg.refined_recompute = finetuning_args.refined_recompute
     cfg.recompute_granularity = model_args.recompute_granularity
     cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
     cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn

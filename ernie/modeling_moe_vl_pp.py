@@ -1027,6 +1027,7 @@ class ErnieDecoderLayerPipe(ErnieMoEDecoderLayer):
         if (
             self.config.recompute
             and self.config.recompute_granularity == "full"
+            and not self.config.skip_recompute_ops[self.layer_idx].get("global", False)
             and has_gradient
         ):
             decoderlayer_act_offload_settings = self.config.get(
