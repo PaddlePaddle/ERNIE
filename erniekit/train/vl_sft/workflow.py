@@ -453,91 +453,91 @@ def run_vl_sft(
         data_args.max_seq_len * finetuning_args.per_device_train_batch_size
     )
 
-    # if finetuning_args.pipeline_parallel_degree > 1:  # pp
-    #     print(f"[sft-debug]: virtual_pp_degree={model_args.virtual_pp_degree}")
-    #     cfg.virtual_pp_degree = model_args.virtual_pp_degree
-    #     cfg.num_acc_steps = finetuning_args.gradient_accumulation_steps
-    #     cfg.moe_with_send_router_loss = model_args.moe_with_send_router_loss
-    #     cfg.enable_delay_scale_loss = finetuning_args.enable_delay_scale_loss
-    #     cfg.balanced_image_preprocess = finetuning_args.balanced_image_preprocess
+    if finetuning_args.pipeline_parallel_degree > 1:  # pp
+        print(f"[sft-debug]: virtual_pp_degree={model_args.virtual_pp_degree}")
+        cfg.virtual_pp_degree = model_args.virtual_pp_degree
+        cfg.num_acc_steps = finetuning_args.gradient_accumulation_steps
+        cfg.moe_with_send_router_loss = model_args.moe_with_send_router_loss
+        cfg.enable_delay_scale_loss = finetuning_args.enable_delay_scale_loss
+        cfg.balanced_image_preprocess = finetuning_args.balanced_image_preprocess
 
-    #     if finetuning_args.pp_need_data and not finetuning_args.pp_need_data_degree:
-    #         finetuning_args.pp_need_data_degree = (
-    #             finetuning_args.pipeline_parallel_degree
-    #         )
+        if finetuning_args.pp_need_data and not finetuning_args.pp_need_data_degree:
+            finetuning_args.pp_need_data_degree = (
+                finetuning_args.pipeline_parallel_degree
+            )
 
-    #     if cfg.balanced_image_preprocess:
-    #         assert (
-    #             finetuning_args.pp_need_data
-    #         ), "balanced image preprocess must use with pp_need_data"
+        if cfg.balanced_image_preprocess:
+            assert (
+                finetuning_args.pp_need_data
+            ), "balanced image preprocess must use with pp_need_data"
 
-    #     if (
-    #         finetuning_args.from_scratch
-    #         and finetuning_args.weight_quantize_algo is None
-    #     ):
-    #         model = Ernie4_5_VLMoeForConditionalGenerationPipe(cfg)
+        if (
+            finetuning_args.from_scratch
+            and finetuning_args.weight_quantize_algo is None
+        ):
+            model = Ernie4_5_VLMoeForConditionalGenerationPipe(cfg)
 
-    #     else:
-    #         model = Ernie4_5_VLMoeForConditionalGenerationPipe.from_pretrained(
-    #             model_args.model_name_or_path,
-    #             config=cfg,
-    #         )
-    #     if finetuning_args.pp_need_data_degree:
-    #         model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
-    # else:
-    #     if (
-    #         finetuning_args.from_scratch
-    #         and finetuning_args.weight_quantize_algo is None
-    #     ):
-    #         model = Ernie4_5_VLMoeForConditionalGeneration(cfg)
-    #     else:
-    #         model = Ernie4_5_VLMoeForConditionalGeneration.from_pretrained(
-    #             model_args.model_name_or_path,
-    #             config=cfg,
-    #         )
-    # logger.info(f"vision_model: {model.vision_model}")
+        else:
+            model = Ernie4_5_VLMoeForConditionalGenerationPipe.from_pretrained(
+                model_args.model_name_or_path,
+                config=cfg,
+            )
+        if finetuning_args.pp_need_data_degree:
+            model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
+    else:
+        if (
+            finetuning_args.from_scratch
+            and finetuning_args.weight_quantize_algo is None
+        ):
+            model = Ernie4_5_VLMoeForConditionalGeneration(cfg)
+        else:
+            model = Ernie4_5_VLMoeForConditionalGeneration.from_pretrained(
+                model_args.model_name_or_path,
+                config=cfg,
+            )
+    logger.info(f"vision_model: {model.vision_model}")
 
-    # if model.config.head_dim is None:
-    #     del model.config.head_dim
+    if model.config.head_dim is None:
+        del model.config.head_dim
 
-    # if image_preprocess is not None and hasattr(model, "add_image_preprocess"):
-    #     model.add_image_preprocess(image_preprocess)
+    if image_preprocess is not None and hasattr(model, "add_image_preprocess"):
+        model.add_image_preprocess(image_preprocess)
 
-    # cfg = model.config
-    # logger.info(f"using model type:{type(model)}")
-    # paddle.set_default_dtype("float32")
+    cfg = model.config
+    logger.info(f"using model type:{type(model)}")
+    paddle.set_default_dtype("float32")
 
-    # logger.info(f"using model={type(model)}, cfg={cfg}")
-    # ortho_loss_lambda = (
-    #     cfg.moe_orthogonal_loss_lambda
-    #     if hasattr(cfg, "moe_orthogonal_loss_lambda")
-    #     else 0.0
-    # )
-    # if finetuning_args.use_ortho_loss_callback:
-    #     logger.info("using orthogonal loss callback")
-    #     cfg.moe_orthogonal_loss_lambda = 0.0
+    logger.info(f"using model={type(model)}, cfg={cfg}")
+    ortho_loss_lambda = (
+        cfg.moe_orthogonal_loss_lambda
+        if hasattr(cfg, "moe_orthogonal_loss_lambda")
+        else 0.0
+    )
+    if finetuning_args.use_ortho_loss_callback:
+        logger.info("using orthogonal loss callback")
+        cfg.moe_orthogonal_loss_lambda = 0.0
 
-    # freeze_config = set(finetuning_args.freeze_config.split(" "))
-    # if "freeze_vision" in freeze_config and hasattr(model, "freeze_vision"):
-    #     logger.info("Freeze model vision module")
-    #     model.freeze_vision()
+    freeze_config = set(finetuning_args.freeze_config.split(" "))
+    if "freeze_vision" in freeze_config and hasattr(model, "freeze_vision"):
+        logger.info("Freeze model vision module")
+        model.freeze_vision()
 
     # data
     logger.info("loading data...")
     logger.info(f"args.need_data: {finetuning_args.need_data}")
 
     if finetuning_args.do_train:
-        # hcg = fleet.get_hybrid_communicate_group()
-        # dp_rank = hcg.get_data_parallel_rank()
-        # dp_size = hcg.get_data_parallel_world_size()
-        # sharding_rank = hcg.get_sharding_parallel_rank()
-        # sharding_size = hcg.get_sharding_parallel_world_size()
-        # logger.info(
-        #     f"""[main] hcg: dp_rank: {dp_rank},
-        #     dp_size: {dp_size},
-        #     sharding_rank: {sharding_rank},
-        #     sharding_size: {sharding_size}"""
-        # )
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_rank = hcg.get_data_parallel_rank()
+        dp_size = hcg.get_data_parallel_world_size()
+        sharding_rank = hcg.get_sharding_parallel_rank()
+        sharding_size = hcg.get_sharding_parallel_world_size()
+        logger.info(
+            f"""[main] hcg: dp_rank: {dp_rank},
+            dp_size: {dp_size},
+            sharding_rank: {sharding_rank},
+            sharding_size: {sharding_size}"""
+        )
 
         finetuning_args.is_train_mm = getattr(data_args, "train_dataset_path", False)
         finetuning_args.is_train_text = getattr(data_args, "text_dataset_path", False)
@@ -696,95 +696,92 @@ def run_vl_sft(
         packing=finetuning_args.packing,
     )
 
-    for item in text_sft_dataset:
-        print(item)
+    if model_args.lora:
+        from ernie.utils.peft_utils import initialize_lora_model
 
-    # if model_args.lora:
-    #     from ernie.utils.peft_utils import initialize_lora_model
+        model = initialize_lora_model(
+            model=model,
+            training_args=finetuning_args,
+            model_args=model_args,
+            resume_from_checkpoint=last_checkpoint is not None,
+            dtype=dtype,
+        )
 
-    #     model = initialize_lora_model(
-    #         model=model,
-    #         training_args=finetuning_args,
-    #         model_args=model_args,
-    #         resume_from_checkpoint=last_checkpoint is not None,
-    #         dtype=dtype,
-    #     )
+    callbacks = []
+    callbacks += [GlobalRNGCallback()]
+    if "freeze_lm" in freeze_config:
+        if finetuning_args.modality_ratio is not None:
+            callbacks += [MultiModalInterleaveCallback()]
+        elif hasattr(model, "update_params_stat"):
+            logger.info("Freeze model lm module")
+            model.update_params_stat("lm", stop_gradient=True)
+    if finetuning_args.pp_need_data:
+        callbacks += [PPNeedDataCallback()]
 
-    # callbacks = []
-    # callbacks += [GlobalRNGCallback()]
-    # if "freeze_lm" in freeze_config:
-    #     if finetuning_args.modality_ratio is not None:
-    #         callbacks += [MultiModalInterleaveCallback()]
-    #     elif hasattr(model, "update_params_stat"):
-    #         logger.info("Freeze model lm module")
-    #         model.update_params_stat("lm", stop_gradient=True)
-    # if finetuning_args.pp_need_data:
-    #     callbacks += [PPNeedDataCallback()]
+    callbacks += (
+        [OrthogonalCallback(ortho_loss_lambda)]
+        if finetuning_args.use_ortho_loss_callback
+        else []
+    )
+    if finetuning_args.pp_need_data_degree:
+        callbacks += [PPNeedDataCallback()]
 
-    # callbacks += (
-    #     [OrthogonalCallback(ortho_loss_lambda)]
-    #     if finetuning_args.use_ortho_loss_callback
-    #     else []
-    # )
-    # if finetuning_args.pp_need_data_degree:
-    #     callbacks += [PPNeedDataCallback()]
+    if getattr(cfg, "moe_use_aux_free", 0.0) > 0.0:
+        logger.info("adding aux free callback")
+        callbacks += [
+            MoECorrectionBiasAdjustCallback(
+                finetuning_args.moe_use_aux_free_update_coef,
+                finetuning_args.sequence_parallel,
+            )
+        ]
 
-    # if getattr(cfg, "moe_use_aux_free", 0.0) > 0.0:
-    #     logger.info("adding aux free callback")
-    #     callbacks += [
-    #         MoECorrectionBiasAdjustCallback(
-    #             finetuning_args.moe_use_aux_free_update_coef,
-    #             finetuning_args.sequence_parallel,
-    #         )
-    #     ]
+    vit_trainable_callback = None
+    if (
+        finetuning_args.pipeline_parallel_degree > 1
+        and "freeze_vision" not in freeze_config
+        and finetuning_args.multimodal
+    ):
+        # train VIT
+        vit_trainable_callback = VitTrainableCallback(finetuning_args, model)
 
-    # vit_trainable_callback = None
-    # if (
-    #     finetuning_args.pipeline_parallel_degree > 1
-    #     and "freeze_vision" not in freeze_config
-    #     and finetuning_args.multimodal
-    # ):
-    #     # train VIT
-    #     vit_trainable_callback = VitTrainableCallback(finetuning_args, model)
+    trainer = SFTTrainer(
+        model=model,
+        args=finetuning_args,
+        data_collator=data_collator,
+        is_train_mm=finetuning_args.is_train_mm,
+        train_dataset=train_dataset,
+        is_train_text=finetuning_args.is_train_text,
+        text_sft_dataset=text_sft_dataset,
+        eval_dataset=eval_dataset,
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
+        callbacks=callbacks,
+        modality_ratio=modality_ratio,
+        processing_class=image_preprocess_save,
+        batch_size=finetuning_args.per_device_train_batch_size,
+        packing=finetuning_args.packing,
+    )
+    if vit_trainable_callback is not None:
+        vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager
+        trainer.add_callback(vit_trainable_callback)
 
-    # trainer = SFTTrainer(
-    #     model=model,
-    #     args=finetuning_args,
-    #     data_collator=data_collator,
-    #     is_train_mm=finetuning_args.is_train_mm,
-    #     train_dataset=train_dataset,
-    #     is_train_text=finetuning_args.is_train_text,
-    #     text_sft_dataset=text_sft_dataset,
-    #     eval_dataset=eval_dataset,
-    #     tokenizer=tokenizer,
-    #     compute_metrics=compute_metrics,
-    #     callbacks=callbacks,
-    #     modality_ratio=modality_ratio,
-    #     processing_class=image_preprocess_save,
-    #     batch_size=finetuning_args.per_device_train_batch_size,
-    #     packing=finetuning_args.packing,
-    # )
-    # if vit_trainable_callback is not None:
-    #     vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager
-    #     trainer.add_callback(vit_trainable_callback)
+    global_training_logs.accumulate = finetuning_args.gradient_accumulation_steps
+    checkpoint = None
+    if finetuning_args.resume_from_checkpoint is not None:
+        checkpoint = finetuning_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
 
-    # global_training_logs.accumulate = finetuning_args.gradient_accumulation_steps
-    # checkpoint = None
-    # if finetuning_args.resume_from_checkpoint is not None:
-    #     checkpoint = finetuning_args.resume_from_checkpoint
-    # elif last_checkpoint is not None:
-    #     checkpoint = last_checkpoint
+    # Training
+    if finetuning_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model(finetuning_args.output_dir)
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
-    # # Training
-    # if finetuning_args.do_train:
-    #     train_result = trainer.train(resume_from_checkpoint=checkpoint)
-    #     metrics = train_result.metrics
-    #     trainer.save_model(finetuning_args.output_dir)
-    #     trainer.log_metrics("train", metrics)
-    #     trainer.save_metrics("train", metrics)
-    #     trainer.save_state()
-
-    # # Evaluate and tests model
-    # if finetuning_args.do_eval:
-    #     eval_metrics = trainer.evaluate()
-    #     trainer.log_metrics("eval", eval_metrics)
+    # Evaluate and tests model
+    if finetuning_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
