@@ -593,7 +593,6 @@ class BaseReader:
                             task["target_num_each_epoch"] - same_source_num
                         )
 
-                        # [[1], [1], [1], [1], [1], [1], [1], [1], [1], [1]]
                         task_indices = [[task["task_id"]]] * non_same_source_num
 
                         idx = 0
@@ -602,11 +601,9 @@ class BaseReader:
                             if idx + n_shot > same_source_num:
                                 n_shot = same_source_num - idx
 
-                            # [[1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [2, 2, 2]]
                             task_indices.append([task["task_id"]] * n_shot)
                             idx += n_shot
 
-                        # [[1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [2, 2, 2], [3], [3], [4, 4, 4]]
                         weighted_task_indices.extend(task_indices)
 
                     if shuffle:
@@ -1025,12 +1022,12 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
         for index, turn in enumerate(example.messages):
             if "assistant" in turn["role"]:
                 turn_index += 1
-                # 前一轮是user
+                # User
                 if "user" in example.messages[index - 1]["role"]:
                     src = example.messages[index - 1]["content"]
                     tokens_src = self.begin_of_query + tokenizer.tokenize(src)
 
-                # 前一轮是tool response
+                # Tool
                 if "tool" in example.messages[index - 1]["role"]:
                     tool = example.messages[index - 1]["content"]
                     if isinstance(tool, str):
@@ -1043,7 +1040,7 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                     tokens_src = tokens_src + tokenizer.tokenize(tool)
                     tokens_src = tokens_src + tokenizer.tokenize("\n</tool_output>\n")
 
-                # assistant
+                # Assistant
                 if "</think>" in turn["content"]:
                     reasoning_content = (
                         turn["content"]
@@ -1058,16 +1055,13 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                     content = turn["content"]
 
                 tokens_target = []
-                # 如果有思考内容，以\nAssistant: \n<think>\n为src的结尾
                 if reasoning_content:
-                    # if index == len(example.messages) - 1 or (index < len(example.messages) - 1 and reasoning_content):
                     tokens_src = tokens_src + self.begin_of_response
                     tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
                     tokens_target = tokens_target + tokenizer.tokenize(
                         reasoning_content.strip("\n")
                     )
                     tokens_target = tokens_target + tokenizer.tokenize("\n</think>\n\n")
-                # 如果没有思考内容，以以\nAssistant: \n<think>\n\n</think>\n\n为src的结尾
                 else:
                     tokens_src = tokens_src + self.begin_of_response
                     tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
@@ -1076,7 +1070,6 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                 if len(content) > 0:
                     tokens_target = tokens_target + tokenizer.tokenize(content)
 
-                # assistant里面可能会有tool call
                 tool_calls = None
                 if "tool_calls" in turn:
                     tool_calls = turn["tool_calls"]

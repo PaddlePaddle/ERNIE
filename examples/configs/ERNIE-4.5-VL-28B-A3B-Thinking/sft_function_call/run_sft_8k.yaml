@@ -2,7 +2,7 @@
 stage: VL-SFT
 
 # model
-model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Paddle/
+model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Thinking/
 multimodal: true
 fuse_linear: true
 fuse_rms_norm: false
@@ -19,7 +19,8 @@ moe_use_hard_gate: true
 moe_multimodal_dispatch_use_allgather: v2-alltoall-unpad-text
 
 # data
-train_dataset_path: "examples/data/sft_vl-train_demo1.jsonl"
+dataset_name: "FunctionCallSFTReader"
+train_dataset_path: "examples/data/sft_function_call_vl-train_demo1.jsonl"
 train_dataset_prob: "1.0"
 text_dataset_path: "examples/data/function-call-train.jsonl"
 text_dataset_prob: "1.0"
