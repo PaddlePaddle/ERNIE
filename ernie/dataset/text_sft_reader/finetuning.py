@@ -1115,7 +1115,7 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                 loss_mask = (
                     loss_mask
                     + [0] * (len(tokens_src) - 1)
-                    + [1] * (len(tokens_target) + 1)
+                    + [example.label[turn_index - 1]] * (len(tokens_target) + 1)
                     + [0] * len(break_token_multi_turn)
                 )
                 assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"

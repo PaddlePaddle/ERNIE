@@ -8,9 +8,10 @@ fuse_linear: true
 fuse_rms_norm: false
 use_flash_attention: 1
 use_moe: true
-fine_tuning: Full
-use_sparse_head_and_loss_fn: false
-use_recompute_loss_fn: false
+fine_tuning: LoRA
+lora_rank: 32
+use_sparse_head_and_loss_fn: true
+use_recompute_loss_fn: true
 moe_group: "mp"
 moe_use_aux_free_update_coef: 0.0
 moe_aux_loss_lambda: 0.0
@@ -24,13 +25,13 @@ train_dataset_path: ""
 train_dataset_prob: ""
 text_dataset_path: "examples/data/function-call-train.jsonl"
 text_dataset_prob: "1.0"
-max_seq_len: 8192
+max_seq_len: 32768
 num_samples_each_epoch: 10000000
 modality_ratio: "[1,1]"
 
 # preprocess
 variable_resolution: 1
-pad_to_max_seqlen: 8192
+pad_to_max_seqlen: 32768
 render_timestamp: true
 serialize_output: false
 one_sample_in_one_seq: true
@@ -61,7 +62,7 @@ overwrite_output_dir: true
 
 # optim
 lr_scheduler_type: "cosine"
-learning_rate: 1.0e-05
+learning_rate: 3.0e-04
 min_lr: 1.0e-06
 moe_gate_lr_ratio: 0.01
 visual_ld: 0.9
@@ -74,7 +75,7 @@ scale_loss: 4096
 # performance
 sequence_parallel: 1
 use_sp_callback: true
-tensor_parallel_degree: 4
+tensor_parallel_degree: 2
 pipeline_parallel_degree: 2
 pp_need_data: true
 pp_need_data_degree: 2

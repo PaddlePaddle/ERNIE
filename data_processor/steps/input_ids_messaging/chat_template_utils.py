@@ -191,17 +191,17 @@ def apply_chat_training_template(
                     if reasoning_content:
                         new_text_info.append({"text": "\n<think>\n", "tag": "mask"})
                         new_text_info.append(
-                            {"text": reasoning_content.strip("\n"), "tag": "no_mask"}
+                            {"text": reasoning_content.strip("\n"), "tag": sub_item["tag"]}
                         )
                         new_text_info.append(
-                            {"text": "\n</think>\n\n", "tag": "no_mask"}
+                            {"text": "\n</think>\n\n", "tag": sub_item["tag"]}
                         )
                     else:
                         new_text_info.append({"text": "\n<think>\n", "tag": "mask"})
                         new_text_info.append({"text": "\n</think>\n\n", "tag": "mask"})
 
                     if len(content) > 0:
-                        new_text_info.append({"text": content, "tag": "no_mask"})
+                        new_text_info.append({"text": content, "tag": sub_item["tag"]})
 
                     ## assistant - tool calls
                     tool_calls = None
@@ -217,27 +217,27 @@ def apply_chat_training_template(
                             if "type" in tool_call and tool_call["type"] == "function":
                                 tool_call = tool_call["function"]
                             new_text_info.append(
-                                {"text": '<tool_call>\n{"name": "', "tag": "no_mask"}
+                                {"text": '<tool_call>\n{"name": "', "tag": sub_item["tag"]}
                             )
                             new_text_info.append(
-                                {"text": tool_call["name"], "tag": "no_mask"}
+                                {"text": tool_call["name"], "tag": sub_item["tag"]}
                             )
                             new_text_info.append(
-                                {"text": '", "arguments": ', "tag": "no_mask"}
+                                {"text": '", "arguments": ', "tag": sub_item["tag"]}
                             )
                             if isinstance(tool_call["arguments"], str):
                                 new_text_info.append(
-                                    {"text": tool_call["arguments"], "tag": "no_mask"}
+                                    {"text": tool_call["arguments"], "tag": sub_item["tag"]}
                                 )
                             else:
                                 new_text_info.append(
                                     {
                                         "text": json.dumps(tool_call["arguments"]),
-                                        "tag": "no_mask",
+                                        "tag": sub_item["tag"],
                                     }
                                 )
                             new_text_info.append(
-                                {"text": "}\n</tool_call>\n", "tag": "no_mask"}
+                                {"text": "}\n</tool_call>\n", "tag": sub_item["tag"]}
                             )
                 else:
                     # user / tool
