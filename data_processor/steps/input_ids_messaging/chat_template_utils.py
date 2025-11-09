@@ -172,60 +172,96 @@ def apply_chat_training_template(
                     if label == 0:
                         sub_item["tag"] = "mask"
 
-                # tool calls
-                tool_calls = None
-                if "tool_calls" in sub_item:
-                    tool_calls = sub_item.pop("tool_calls")
-                if tool_calls:
-                    if isinstance(tool_calls, str):
-                        tool_calls = json.loads(tool_calls)
-                    if not isinstance(tool_calls, list):  # parallel function call
-                        tool_calls = [tool_calls]
+                if item_id % 2 == 1:
+                    # assistant
+                    ## assistant - content
+                    if "</think>" in sub_item["text"]:
+                        reasoning_content = (
+                            sub_item["text"]
+                            .split("</think>")[0]
+                            .rstrip("\n")
+                            .split("<think>")[-1]
+                            .lstrip("\n")
+                        )
+                        content = sub_item["text"].split("</think>")[-1].lstrip("\n")
+                    else:
+                        reasoning_content = ""
+                        content = sub_item["text"]
 
-                    for tool_call in tool_calls:
-                        if "type" in tool_call and tool_call["type"] == "function":
-                            tool_call = tool_call["function"]
+                    if reasoning_content:
+                        new_text_info.append({"text": "\n<think>\n", "tag": "mask"})
                         new_text_info.append(
-                            {"text": '<tool_call>\n{"name": "', "tag": "no_mask"}
+                            {"text": reasoning_content.strip("\n"), "tag": "no_mask"}
                         )
                         new_text_info.append(
-                            {"text": tool_call["name"], "tag": "no_mask"}
+                            {"text": "\n</think>\n\n", "tag": "no_mask"}
                         )
-                        new_text_info.append(
-                            {"text": '", "arguments": ', "tag": "no_mask"}
-                        )
-                        if isinstance(tool_call["arguments"], str):
-                            new_text_info.append(
-                                {"text": tool_call["arguments"], "tag": "no_mask"}
-                            )
-                        else:
-                            new_text_info.append(
-                                {
-                                    "text": json.dumps(tool_call["arguments"]),
-                                    "tag": "no_mask",
-                                }
-                            )
-                        new_text_info.append(
-                            {"text": "}\n</tool_call>\n", "tag": "no_mask"}
-                        )
+                    else:
+                        new_text_info.append({"text": "\n<think>\n", "tag": "mask"})
+                        new_text_info.append({"text": "\n</think>\n\n", "tag": "mask"})
 
-                # tool response
-                tool_response = None
-                if "tool_response" in sub_item and sub_item["tool_response"]:
-                    tool_response = sub_item.pop("tool_response")
-                if tool_response:
-                    assert isinstance(sub_item["text"], str)
-                    # If the previous one is not an image / video
-                    if sub_item_idx - 1 > 0 and not isinstance(
-                        item[sub_item_idx - 1], list
-                    ):
-                        new_text_info.append(
-                            {"text": "\n<tool_output>\n", "tag": "mask"}
-                        )
-                    new_text_info.append(sub_item)
-                    new_text_info.append({"text": "\n</tool_output>\n", "tag": "mask"})
+                    if len(content) > 0:
+                        new_text_info.append({"text": content, "tag": "no_mask"})
+
+                    ## assistant - tool calls
+                    tool_calls = None
+                    if "tool_calls" in sub_item:
+                        tool_calls = sub_item.pop("tool_calls")
+                    if tool_calls:
+                        if isinstance(tool_calls, str):
+                            tool_calls = json.loads(tool_calls)
+                        if not isinstance(tool_calls, list):  # parallel function call
+                            tool_calls = [tool_calls]
+
+                        for tool_call in tool_calls:
+                            if "type" in tool_call and tool_call["type"] == "function":
+                                tool_call = tool_call["function"]
+                            new_text_info.append(
+                                {"text": '<tool_call>\n{"name": "', "tag": "no_mask"}
+                            )
+                            new_text_info.append(
+                                {"text": tool_call["name"], "tag": "no_mask"}
+                            )
+                            new_text_info.append(
+                                {"text": '", "arguments": ', "tag": "no_mask"}
+                            )
+                            if isinstance(tool_call["arguments"], str):
+                                new_text_info.append(
+                                    {"text": tool_call["arguments"], "tag": "no_mask"}
+                                )
+                            else:
+                                new_text_info.append(
+                                    {
+                                        "text": json.dumps(tool_call["arguments"]),
+                                        "tag": "no_mask",
+                                    }
+                                )
+                            new_text_info.append(
+                                {"text": "}\n</tool_call>\n", "tag": "no_mask"}
+                            )
                 else:
-                    new_text_info.append(sub_item)
+                    # user / tool
+                    tool_response = None
+                    if "tool_response" in sub_item and sub_item["tool_response"]:
+                        tool_response = sub_item.pop("tool_response")
+                    if tool_response:
+                        if isinstance(sub_item["text"], str):
+                            pass
+                        else:
+                            sub_item["text"] = json.dumps(sub_item["text"])
+                        # If the previous one is not an image / video
+                        if sub_item_idx - 1 > 0 and not isinstance(
+                            item[sub_item_idx - 1], list
+                        ):
+                            new_text_info.append(
+                                {"text": "\n<tool_output>\n", "tag": "mask"}
+                            )
+                        new_text_info.append(sub_item)
+                        new_text_info.append(
+                            {"text": "\n</tool_output>\n", "tag": "mask"}
+                        )
+                    else:
+                        new_text_info.append(sub_item)
 
         if item_id % 2 == 0:
             if is_system and item_id == 0:

@@ -1007,22 +1007,24 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                 tools_info = example.tools
             else:
                 tools_info = json.dumps(example.tools)
-            system_tokens = (
-                [self.begin_token]
-                + tokenizer.tokenize("\n<tool_list>\n")
-                + tokenizer.tokenize(tools_info)
-                + tokenizer.tokenize("\n</tool_list>\n")
-                + tokenizer.tokenize(system_info)
-                + self.newline_token
-            )
+            system_tokens = [self.begin_token]
+            if system_info:
+                system_tokens = system_tokens + tokenizer.tokenize(system_info)
+                system_tokens = system_tokens + tokenizer.tokenize("\n")
+            if tools_info:
+                system_tokens = system_tokens + tokenizer.tokenize("\n<tool_list>\n")
+                system_tokens = system_tokens + tokenizer.tokenize(tools_info)
+                system_tokens = system_tokens + tokenizer.tokenize("\n</tool_list>\n")
             previous_cur_len += len(system_tokens)
 
             tokens = tokens + system_tokens
             loss_mask = loss_mask + [0] * (len(system_tokens))
             assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
 
+        turn_index = 0
         for index, turn in enumerate(example.messages):
             if "assistant" in turn["role"]:
+                turn_index += 1
                 # 前一轮是user
                 if "user" in example.messages[index - 1]["role"]:
                     src = example.messages[index - 1]["content"]
@@ -1035,12 +1037,44 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                         pass
                     else:
                         tool = json.dumps(tool)
-                    tokens_src = tokenizer.tokenize("\n<tool_output>\n")
+                    tokens_src = self.begin_of_query + tokenizer.tokenize(
+                        "\n<tool_output>\n"
+                    )
                     tokens_src = tokens_src + tokenizer.tokenize(tool)
                     tokens_src = tokens_src + tokenizer.tokenize("\n</tool_output>\n")
 
                 # assistant
-                tokens_target = tokenizer.tokenize(turn["content"])
+                if "</think>" in turn["content"]:
+                    reasoning_content = (
+                        turn["content"]
+                        .split("</think>")[0]
+                        .rstrip("\n")
+                        .split("<think>")[-1]
+                        .lstrip("\n")
+                    )
+                    content = turn["content"].split("</think>")[-1].lstrip("\n")
+                else:
+                    reasoning_content = ""
+                    content = turn["content"]
+
+                tokens_target = []
+                # 如果有思考内容，以\nAssistant: \n<think>\n为src的结尾
+                if reasoning_content:
+                    # if index == len(example.messages) - 1 or (index < len(example.messages) - 1 and reasoning_content):
+                    tokens_src = tokens_src + self.begin_of_response
+                    tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
+                    tokens_target = tokens_target + tokenizer.tokenize(
+                        reasoning_content.strip("\n")
+                    )
+                    tokens_target = tokens_target + tokenizer.tokenize("\n</think>\n\n")
+                # 如果没有思考内容，以以\nAssistant: \n<think>\n\n</think>\n\n为src的结尾
+                else:
+                    tokens_src = tokens_src + self.begin_of_response
+                    tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
+                    tokens_src = tokens_src + tokenizer.tokenize("\n</think>\n\n")
+
+                if len(content) > 0:
+                    tokens_target = tokens_target + tokenizer.tokenize(content)
 
                 # assistant里面可能会有tool call
                 tool_calls = None
@@ -1056,6 +1090,8 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                     for tool_call in tool_calls:
                         if "type" in tool_call and tool_call["type"] == "function":
                             tool_call = tool_call["function"]
+                        if turn_index != 1:
+                            tokens_target += tokenizer.tokenize("\n")
                         tokens_target += tokenizer.tokenize('<tool_call>\n{"name": "')
                         tokens_target += tokenizer.tokenize(tool_call["name"])
                         tokens_target += tokenizer.tokenize('", "arguments": ')
@@ -1078,7 +1114,6 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                 if is_parts_b_truncated or is_parts_a_truncated:
                     break
 
-                tokens_src = tokens_src + self.begin_of_response
                 break_token_multi_turn = [self.end_of_response]
 
                 cur_tokens = tokens_src + tokens_target
