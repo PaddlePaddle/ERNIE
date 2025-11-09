@@ -191,7 +191,10 @@ def apply_chat_training_template(
                     if reasoning_content:
                         new_text_info.append({"text": "\n<think>\n", "tag": "mask"})
                         new_text_info.append(
-                            {"text": reasoning_content.strip("\n"), "tag": sub_item["tag"]}
+                            {
+                                "text": reasoning_content.strip("\n"),
+                                "tag": sub_item["tag"],
+                            }
                         )
                         new_text_info.append(
                             {"text": "\n</think>\n\n", "tag": sub_item["tag"]}
@@ -217,7 +220,10 @@ def apply_chat_training_template(
                             if "type" in tool_call and tool_call["type"] == "function":
                                 tool_call = tool_call["function"]
                             new_text_info.append(
-                                {"text": '<tool_call>\n{"name": "', "tag": sub_item["tag"]}
+                                {
+                                    "text": '<tool_call>\n{"name": "',
+                                    "tag": sub_item["tag"],
+                                }
                             )
                             new_text_info.append(
                                 {"text": tool_call["name"], "tag": sub_item["tag"]}
@@ -227,7 +233,10 @@ def apply_chat_training_template(
                             )
                             if isinstance(tool_call["arguments"], str):
                                 new_text_info.append(
-                                    {"text": tool_call["arguments"], "tag": sub_item["tag"]}
+                                    {
+                                        "text": tool_call["arguments"],
+                                        "tag": sub_item["tag"],
+                                    }
                                 )
                             else:
                                 new_text_info.append(
