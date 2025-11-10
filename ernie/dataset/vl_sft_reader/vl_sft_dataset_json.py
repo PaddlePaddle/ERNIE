@@ -752,9 +752,6 @@ class SFTMultimodalDatasetJson(IterableDataset):
         indices = []
         for i, _ in enumerate(self.task_group):
             sample_size = int(self.weight_list[i] * self.length)
-            print(
-                f"Take {sample_size} samples from {self.task_group[i]._file_name} (total length: {len(self.task_group[i].exs)}) to construct current sample list"
-            )
             indices.extend([i] * sample_size)
         return indices
 
