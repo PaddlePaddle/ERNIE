@@ -526,7 +526,10 @@ class ImageModificationProcessor(ProcessorBase):
                 replace_token_id = self.cls_token_id
                 if self.chat_template == "ernie":
                     replace_token_id = self.cls_token_id
-                elif self.chat_template == "ernie_vl":
+                elif (
+                    self.chat_template == "ernie_vl"
+                    or self.chat_template == "ernie_vl_thinking"
+                ):
                     replace_token_id = self.sep_token_id
                 else:
                     raise NotImplementedError(

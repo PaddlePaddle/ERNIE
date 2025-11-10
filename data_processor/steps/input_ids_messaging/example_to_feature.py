@@ -481,7 +481,10 @@ class ExampleToFeature(ProcessorBase):
             if self.chat_template == "ernie":
                 split_token_id = self.cls_token_id
                 min_num = 2
-            elif self.chat_template == "ernie_vl":
+            elif (
+                self.chat_template == "ernie_vl"
+                or self.chat_template == "ernie_vl_thinking"
+            ):
                 split_token_id = self.sep_token_id
                 min_num = 1
             else:

@@ -35,6 +35,7 @@ pad_to_max_seqlen: 8192
 render_timestamp: true
 serialize_output: false
 one_sample_in_one_seq: true
+chat_template: "ernie_vl_thinking"
 
 # dataloader
 dataloader_num_workers: 1

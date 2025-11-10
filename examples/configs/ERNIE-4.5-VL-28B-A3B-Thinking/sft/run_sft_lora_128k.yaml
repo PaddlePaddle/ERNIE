@@ -22,11 +22,10 @@ moe_multimodal_dispatch_use_allgather: v2-alltoall-unpad-text
 pp_seg_method: [0,13,31]
 
 # data
-dataset_name: "FunctionCallSFTReader"
-train_dataset_path: ""
-train_dataset_prob: ""
-text_dataset_path: "examples/data/function-call-train.jsonl"
-text_dataset_prob: "1.0"
+train_dataset_path: "examples/data/sft_vl-train_demo1.jsonl"
+train_dataset_prob: "1.0"
+text_dataset_path: ""
+text_dataset_prob: ""
 max_seq_len: 131072
 num_samples_each_epoch: 10000000
 modality_ratio: "[1,1]"
