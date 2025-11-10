@@ -17,7 +17,7 @@
 **[2025-10] 🔥 Released ERNIEKit v1.4:**
 
 - **New Features**
-    - VL Modle Training: Support SFT for [PaddleOCR-VL-0.9B]((https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B)) model. More details in [PaddleOCR-VL-0.9B SFT](./docs/paddleocr_vl_sft.md).
+    - VL Model Training: Support SFT for [PaddleOCR-VL-0.9B]((https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B)) model. More details in [PaddleOCR-VL-0.9B SFT](./docs/paddleocr_vl_sft.md).
     - Dataflow : Support padding-free startegy.
         - Packing data within a batch into a sequence to avoid padding, thereby reducing GPU memory usage and accelerating training.
 

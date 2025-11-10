@@ -39,7 +39,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 from paddle.io import DataLoader
 
 
-from distutils.util import strtobool
+from setuptools._distutils.util import strtobool
 
 from paddleformers.peft import LoRAModel, PrefixModelForCausalLM
 from paddleformers.trainer import (

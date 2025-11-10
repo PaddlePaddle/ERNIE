@@ -139,7 +139,7 @@ def main():
     os.environ["FLAGS_dataloader_use_file_descriptor"] = "False"
 
     if current_device == "xpu":
-        os.environ["FLAGS_use_stride_kernel"] = "0"
+        os.environ["FLAGS_use_stride_kernel"] = "1"
         os.environ["XPU_PADDLE_L3_SIZE"] = "0"
         os.environ["XPUAPI_DEFAULT_SIZE"] = "2205258752"
 
@@ -185,7 +185,7 @@ def main():
         if current_device == "iluvatar_gpu":
             current_device = "gpu"
         command = (
-            f"python -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
+            f"python -u -m paddle.distributed.launch --log_dir {erniekit_dist_log} "
             f"--{current_device}s {visible_cards} --master {master_ip}:{master_port} "
             f"--nnodes {nnodes} {launcher.__file__} {args_to_pass}"
         )

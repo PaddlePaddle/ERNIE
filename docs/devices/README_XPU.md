@@ -90,9 +90,9 @@ docker run -it --privileged=true  --net host --shm-size '256gb' --device=/dev/xp
 3. Install paddlepaddle-xpu
 ```
 # The "PaddlePaddle" deep learning framework provides basic computing capabilities
-python -m pip install paddlepaddle-xpu==3.0.0.dev20250819 -i https://www.paddlepaddle.org.cn/packages/nightly/xpu-p800/
+python -m pip install paddlepaddle-xpu==3.3.0.dev20251016 -i https://www.paddlepaddle.org.cn/packages/nightly/xpu-p800/
 # Paddle_xpu contains a small number of XPU custom operators, mainly used to support XPU training acceleration
-wget https://bj.bcebos.com/v1/klx-paddlelite/paddle_whl/paddle_kl3/daily_output/20250814/paddle_xpu-0.0.1-py3-none-any.whl
+wget https://bj.bcebos.com/v1/klx-paddlelite/paddle_whl/paddle_kl3/daily_output/20251014/paddle_xpu-0.0.1-py3-none-any.whl
 python -m pip install paddle_xpu-0.0.1-py3-none-any.whl
 
 Nightly version link:

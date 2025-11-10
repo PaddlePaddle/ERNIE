@@ -302,7 +302,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
             use_filtered_label_loss=model_args.use_sparse_head_and_loss_fn,
             loss_subbatch_sequence_length=32768,
-            num_nextn_predict_layers=model_args.num_nextn_predict_layers,
+            num_nextn_predict_layers=finetuning_args.num_nextn_predict_layers,
             **convert_from_kwargs,
             **download_source_kwargs,
         )
@@ -354,7 +354,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         finetuning_args.attention_probs_dropout_prob
     )
     model_config.num_acc_steps = finetuning_args.gradient_accumulation_steps
-    model_config.num_nextn_predict_layers = model_args.num_nextn_predict_layers
+    model_config.num_nextn_predict_layers = finetuning_args.num_nextn_predict_layers
     model_config.multi_token_pred_lambda = finetuning_args.multi_token_pred_lambda
     model_config.use_recompute_mtp = finetuning_args.use_recompute_mtp
     if model_args.moe_use_aux_free is False:
@@ -446,6 +446,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     data_collator = partial(
         collate_fn,
         tokenizer=tokenizer,
+        finetuning_args=finetuning_args,
         model_args=model_args,
         max_seq_len=data_args.max_seq_len,
     )
