@@ -50,7 +50,7 @@ For more installation methods, please refer to the [ERNIEKit Installation Guide]
 ## 3. Model and Dataset Preparation
 
 ### 3.1. Model Preparation
-The PaddleOCR-VL-0.9B model can be downloaded from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files).
+The PaddleOCR-VL-0.9B model can be downloaded from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files).
 
 ```bash
 huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/PaddleOCR-VL
