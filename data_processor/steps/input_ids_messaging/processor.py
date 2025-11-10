@@ -204,6 +204,7 @@ class InputIdsMassageProcessor(ProcessorBase):
                 data,
                 self.tokenizer,
                 self.is_training,
+                self.chat_template,
                 use_pic_id=self.use_pic_id,
                 **kwargs,
             )
