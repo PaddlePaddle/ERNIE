@@ -14,12 +14,15 @@
 """ Training Ernie VL Model. """
 
 import os
+import json
 import random
 from functools import partial
 
 import numpy as np
 import paddle
-
+from paddleformers.transformers import (
+    AutoConfig,
+)
 from paddle.distributed import fleet
 from paddleformers.datasets import IterDataset
 from paddleformers.trainer import get_last_checkpoint
@@ -44,10 +47,20 @@ from ernie.dataset.vl_sft_reader import (
 )
 from ernie.dataset.vl_sft_reader.data_utils import merge_fn_group_batch
 
-from ernie.modeling_moe_vl import Ernie4_5_VLMoeForConditionalGeneration
+from paddleformers.transformers import (
+    Ernie4_5_VLMoeForConditionalGenerationModel as Ernie4_5_VLMoeForConditionalGeneration_formers,
+)
+from ernie.modeling_moe_vl import (
+    Ernie4_5_VLMoeForConditionalGeneration as Ernie4_5_VLMoeForConditionalGeneration_erniekit,
+)
 from ernie.tokenizer_vl import Ernie4_5_VLTokenizer
 from ernie.utils.common_utils import check_refined_recompute
-from ernie.modeling_moe_vl_pp import Ernie4_5_VLMoeForConditionalGenerationPipe
+from paddleformers.transformers import (
+    Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_formers,
+)
+from ernie.modeling_moe_vl_pp import (
+    Ernie4_5_VLMoeForConditionalGenerationPipe as Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit,
+)
 from ernie.utils.misc import global_training_logs
 from ernie.utils.mm_data_utils import MMSpecialTokensConfig
 from ernie.utils.seed_utils import set_seed
@@ -58,6 +71,16 @@ from data_processor.steps.end2end_processing import (
 from data_processor.image_preprocessor.image_preprocessor_adaptive import (
     AdaptiveImageProcessor,
 )
+
+
+def resolve_source(model_name_or_path):
+    convert_from_hf = False
+    config_json = os.path.join(model_name_or_path, "config.json")
+    with open(config_json) as f:
+        config_dict = json.load(f)
+    if "torch_dtype" in config_dict:
+        convert_from_hf = True
+    return convert_from_hf
 
 
 def get_resume_checkpoint_path(config):
@@ -114,7 +137,6 @@ def run_vl_sft(
     """
     main function
     """
-
     preprocess_args.batch_size = finetuning_args.batch_size
     finetuning_args.max_seq_len = data_args.max_seq_len
     finetuning_args.max_seq_length = data_args.max_seq_len
@@ -218,6 +240,8 @@ def run_vl_sft(
     ):
         finetuning_args.same_data = True
     logger.info(f"setting same_data: {finetuning_args.same_data}")
+
+    convert_from_hf = resolve_source(model_args.model_name_or_path)
 
     image_preprocess_save = AdaptiveImageProcessor.from_pretrained(
         model_args.model_name_or_path
@@ -373,10 +397,18 @@ def run_vl_sft(
 
     if paddleformers_version >= "0.3":
         finetuning_args.save_to_hf = False
-    cfg = Ernie4_5_VLMoeConfig.from_pretrained(
-        os.path.join(model_args.model_name_or_path),
-        quantization_config=quantization_config,
-    )
+    if convert_from_hf:
+        finetuning_args.save_to_hf = True
+        finetuning_args.use_huggingface_model = True
+        cfg = AutoConfig.from_pretrained(
+            os.path.join(model_args.model_name_or_path),
+            quantization_config=quantization_config,
+        )
+    else:
+        cfg = Ernie4_5_VLMoeConfig.from_pretrained(
+            os.path.join(model_args.model_name_or_path),
+            quantization_config=quantization_config,
+        )
     cfg.use_cache = False
     cfg.max_sequence_length = data_args.max_seq_len
     cfg.seqlen = data_args.max_seq_len
@@ -453,6 +485,20 @@ def run_vl_sft(
         data_args.max_seq_len * finetuning_args.per_device_train_batch_size
     )
 
+    if convert_from_hf:
+        Ernie4_5_VLMoeForConditionalGeneration = (
+            Ernie4_5_VLMoeForConditionalGeneration_formers
+        )
+        Ernie4_5_VLMoeForConditionalGenerationPipe = (
+            Ernie4_5_VLMoeForConditionalGenerationPipe_formers
+        )
+    else:
+        Ernie4_5_VLMoeForConditionalGeneration = (
+            Ernie4_5_VLMoeForConditionalGeneration_erniekit
+        )
+        Ernie4_5_VLMoeForConditionalGenerationPipe = (
+            Ernie4_5_VLMoeForConditionalGenerationPipe_erniekit
+        )
     if finetuning_args.pipeline_parallel_degree > 1:  # pp
         print(f"[sft-debug]: virtual_pp_degree={model_args.virtual_pp_degree}")
         cfg.virtual_pp_degree = model_args.virtual_pp_degree
@@ -481,6 +527,7 @@ def run_vl_sft(
             model = Ernie4_5_VLMoeForConditionalGenerationPipe.from_pretrained(
                 model_args.model_name_or_path,
                 config=cfg,
+                convert_from_hf=convert_from_hf,
             )
         if finetuning_args.pp_need_data_degree:
             model.set_pp_need_data_degree(finetuning_args.pp_need_data_degree)
@@ -494,6 +541,7 @@ def run_vl_sft(
             model = Ernie4_5_VLMoeForConditionalGeneration.from_pretrained(
                 model_args.model_name_or_path,
                 config=cfg,
+                convert_from_hf=convert_from_hf,
             )
     logger.info(f"vision_model: {model.vision_model}")
 

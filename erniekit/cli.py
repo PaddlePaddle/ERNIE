@@ -139,7 +139,7 @@ def main():
     os.environ["FLAGS_dataloader_use_file_descriptor"] = "False"
 
     if current_device == "xpu":
-        os.environ["FLAGS_use_stride_kernel"] = "0"
+        os.environ["FLAGS_use_stride_kernel"] = "1"
         os.environ["XPU_PADDLE_L3_SIZE"] = "0"
         os.environ["XPUAPI_DEFAULT_SIZE"] = "2205258752"
 

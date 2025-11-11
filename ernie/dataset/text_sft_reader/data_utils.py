@@ -419,3 +419,73 @@ def sampling_pseudo_examples(
 
         if not (example.is_q2code == 1 or example.math_is_end == 0):
             total_len_wo_k += len_wo_k
+
+
+def sampling_pseudo_examples_fc(
+    tasks,
+    weighted_task_indices,
+    sample_from_same_source_flags,
+    tokenizer,
+    rng,
+    max_seq_len,
+    pseudo_sampling_prob,
+    trigger_data_prob,
+    use_anti_k_sampling,
+    drop_history_with_k,
+    use_train_part_sharding,
+    dp_worldsize,
+    dp_worldrank,
+):
+    """
+    Sample pseudo examples from tasks.
+
+    Args:
+        tasks (List[Dict[str, Any]]): List of tasks, each task
+        is a dictionary containing a sampler.
+        weighted_task_indices (List[int]): List of weighted task indices.
+        sample_from_same_source_flags (List[bool]): List of flags indicating
+        whether to sample from the same source.
+        tokenizer (Any): Tokenizer object.
+        rng (Any): Random number generator object.
+        max_seq_len (int): Maximum sequence length.
+        pseudo_sampling_prob (float): Pseudo sampling probability.
+        trigger_data_prob (float): Trigger data probability.
+        use_anti_k_sampling (bool): Whether to use anti-K sampling.
+        drop_history_with_k (bool): Whether to drop history containing K.
+        use_train_part_sharding (bool): Whether to use training part sharding.
+        dp_worldsize (int): Data parallel world size.
+        dp_worldrank (int): Data parallel world rank.
+
+    Yields:
+        Tuple[Any, Dict[str, int], Dict[int, int], Dict[int, int]]:
+            - example (Any): Sampled example.
+            - source_to_num_opt (Dict[str, int]): Mapping from
+            source to number of optimizations.
+            - task_id_counter (Dict[int, int]): Task ID counter.
+            - exact_total_task_id_counter (Dict[int, int]): Exact total task ID counter.
+    """
+
+    task_id_counter = defaultdict(int)
+    exact_total_task_id_counter = defaultdict(int)
+
+    def gen_example(task_id, task_id_counter, exact_total_task_id_counter):
+        task_id_local = (
+            (task_id - dp_worldrank) // dp_worldsize
+            if use_train_part_sharding
+            else task_id
+        )
+        example = next(tasks[task_id_local]["sampler"])
+
+        task_id_counter[task_id] += 1
+        exact_total_task_id_counter[task_id] += 1
+
+        return example
+
+    for task_id, same_source_flag in zip(
+        weighted_task_indices, sample_from_same_source_flags
+    ):
+        example = gen_example(task_id, task_id_counter, exact_total_task_id_counter)
+        yield example, {example.source: 1}, task_id_counter, exact_total_task_id_counter
+        task_id_counter = defaultdict(int)
+        exact_total_task_id_counter = defaultdict(int)
+        continue
