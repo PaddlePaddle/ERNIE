@@ -219,6 +219,11 @@ class AdaptiveImageProcessor(BaseImageProcessor):
         )
         return (resized_height, resized_width), (resized_height // self.patch_size, resized_width // self.patch_size)
 
+    def to_dict(self):
+        encoder_dict = super().to_dict()
+        encoder_dict.pop("image_processor_type", None)
+        return encoder_dict
+
     def _preprocess(
         self,
         images: Union[ImageInput, VideoInput],
