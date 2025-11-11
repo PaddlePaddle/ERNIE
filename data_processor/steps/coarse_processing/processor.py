@@ -111,6 +111,7 @@ class CoarseProcessor(ProcessorBase):
         video processor
         """
         sequence = omini_convert_schema_to_sequence(schema)
+        oral_schema = schema
         # sequnce is in format
         video_frame_args = dict()
         video_frame_args["fps"] = kwargs.get("video_fps", self.video_fps)
@@ -178,6 +179,8 @@ class CoarseProcessor(ProcessorBase):
                 )  # make video into image frame element
 
         schema = omini_convert_sequence_to_schema(new_sequence)
+        if "tools" in oral_schema:
+            schema["tools"] = oral_schema["tools"]
         return schema
 
 

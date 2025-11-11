@@ -172,6 +172,7 @@ class InputIdsMassageProcessor(ProcessorBase):
 
         return {
             "all_item_list": all_item_list,
+            "tools": user_input.get("tools", None),
             "is_system": bool(user_input.get("is_system", 0)),
         }
 
@@ -203,6 +204,7 @@ class InputIdsMassageProcessor(ProcessorBase):
                 data,
                 self.tokenizer,
                 self.is_training,
+                self.chat_template,
                 use_pic_id=self.use_pic_id,
                 **kwargs,
             )

@@ -28,7 +28,12 @@ import ujson as json
 from paddleformers.trainer import TrainerState
 from paddleformers.trainer.trainer import TRAINER_STATE_NAME
 
-from .data_utils import RandomNoReplacementSampler, sampling_pseudo_examples
+
+from .data_utils import (
+    RandomNoReplacementSampler,
+    sampling_pseudo_examples,
+    sampling_pseudo_examples_fc,
+)
 from ernie.dataset.data_utils import pad_batch_data, round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
@@ -978,3 +983,370 @@ class KnowledgeBasedSFTReader(BaseReader):
                 padded_batch_exact_total_task_ids.astype("int64"),
             ]
         return return_list
+
+
+class FunctionCallSFTReader(KnowledgeBasedSFTReader):
+    """
+    Knowledge Based SFT Reader
+    """
+
+    def _convert_example_to_record(self, example, max_seq_length, tokenizer, index):
+        tokens = []
+        labels = []
+        loss_mask = []
+        previous_cur_len = 2  # start_token, break_turn_token
+        resever_multi_turn_break_length = 8
+
+        # add system info
+        if self.add_sys_token:
+            system_info = example.system
+            if isinstance(example.tools, str):
+                tools_info = example.tools
+            else:
+                tools_info = json.dumps(example.tools)
+            system_tokens = [self.begin_token]
+            if system_info:
+                system_tokens = system_tokens + tokenizer.tokenize(system_info)
+                system_tokens = system_tokens + tokenizer.tokenize("\n")
+            if tools_info:
+                system_tokens = system_tokens + tokenizer.tokenize("\n<tool_list>\n")
+                system_tokens = system_tokens + tokenizer.tokenize(tools_info)
+                system_tokens = system_tokens + tokenizer.tokenize("\n</tool_list>\n")
+            previous_cur_len += len(system_tokens)
+
+            tokens = tokens + system_tokens
+            loss_mask = loss_mask + [0] * (len(system_tokens))
+            assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
+
+        turn_index = 0
+        for index, turn in enumerate(example.messages):
+            if "assistant" in turn["role"]:
+                turn_index += 1
+                # User
+                if "user" in example.messages[index - 1]["role"]:
+                    src = example.messages[index - 1]["content"]
+                    tokens_src = self.begin_of_query + tokenizer.tokenize(src)
+
+                # Tool
+                if "tool" in example.messages[index - 1]["role"]:
+                    tool = example.messages[index - 1]["content"]
+                    if isinstance(tool, str):
+                        pass
+                    else:
+                        tool = json.dumps(tool)
+                    tokens_src = self.begin_of_query + tokenizer.tokenize(
+                        "\n<tool_output>\n"
+                    )
+                    tokens_src = tokens_src + tokenizer.tokenize(tool)
+                    tokens_src = tokens_src + tokenizer.tokenize("\n</tool_output>\n")
+
+                # Assistant
+                if "</think>" in turn["content"]:
+                    reasoning_content = (
+                        turn["content"]
+                        .split("</think>")[0]
+                        .rstrip("\n")
+                        .split("<think>")[-1]
+                        .lstrip("\n")
+                    )
+                    content = turn["content"].split("</think>")[-1].lstrip("\n")
+                else:
+                    reasoning_content = ""
+                    content = turn["content"]
+
+                tokens_target = []
+                if reasoning_content:
+                    tokens_src = tokens_src + self.begin_of_response
+                    tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
+                    tokens_target = tokens_target + tokenizer.tokenize(
+                        reasoning_content.strip("\n")
+                    )
+                    tokens_target = tokens_target + tokenizer.tokenize("\n</think>\n\n")
+                else:
+                    tokens_src = tokens_src + self.begin_of_response
+                    tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
+                    tokens_src = tokens_src + tokenizer.tokenize("\n</think>\n\n")
+
+                if len(content) > 0:
+                    tokens_target = tokens_target + tokenizer.tokenize(content)
+
+                tool_calls = None
+                if "tool_calls" in turn:
+                    tool_calls = turn["tool_calls"]
+
+                if tool_calls:
+                    if isinstance(tool_calls, str):
+                        tool_calls = json.loads(tool_calls)
+                    if not isinstance(tool_calls, list):  # parallel function call
+                        tool_calls = [tool_calls]
+
+                    for tool_call in tool_calls:
+                        if "type" in tool_call and tool_call["type"] == "function":
+                            tool_call = tool_call["function"]
+                        if turn_index != 1:
+                            tokens_target += tokenizer.tokenize("\n")
+                        tokens_target += tokenizer.tokenize('<tool_call>\n{"name": "')
+                        tokens_target += tokenizer.tokenize(tool_call["name"])
+                        tokens_target += tokenizer.tokenize('", "arguments": ')
+                        if isinstance(tool_call["arguments"], str):
+                            tokens_target += tokenizer.tokenize(tool_call["arguments"])
+                        else:
+                            tokens_target += tokenizer.tokenize(
+                                json.dumps(tool_call["arguments"])
+                            )
+                        tokens_target += tokenizer.tokenize("}\n</tool_call>\n")
+
+                is_parts_a_truncated, is_parts_b_truncated = self._truncate_seq_pair(
+                    tokens_src,
+                    tokens_target,
+                    self.max_seq_len
+                    + 1
+                    - previous_cur_len
+                    - resever_multi_turn_break_length,
+                )
+                if is_parts_b_truncated or is_parts_a_truncated:
+                    break
+
+                break_token_multi_turn = [self.end_of_response]
+
+                cur_tokens = tokens_src + tokens_target
+                tokens = tokens + cur_tokens + break_token_multi_turn
+
+                loss_mask = (
+                    loss_mask
+                    + [0] * (len(tokens_src) - 1)
+                    + [example.label[turn_index - 1]] * (len(tokens_target) + 1)
+                    + [0] * len(break_token_multi_turn)
+                )
+                assert len(tokens) == len(loss_mask), f"{len(tokens)}-{len(loss_mask)}"
+
+                previous_cur_len += len(cur_tokens) + len(break_token_multi_turn)
+
+                if len(tokens) <= 4:
+                    return []
+
+                if tokens[0] != self.begin_token:
+                    tokens = [self.begin_token] + tokens
+                    loss_mask = [0] + loss_mask
+
+        assert len(tokens) <= self.max_seq_len, f"{len(tokens)}-{self.max_seq_len}"
+        assert (
+            len(loss_mask) <= self.max_seq_len
+        ), f"{len(loss_mask)}-{self.max_seq_len}"
+
+        self.current_example += 1
+
+        # ! force setup labels
+        del tokens[-1]  # del last cls_token, there is no </s> in the last position
+        del loss_mask[-1]
+        labels = tokens[1:] + [self.end_token]
+
+        # let the last token of result to predict </s>
+        labels = [
+            label if label != self.end_of_response else self.end_token
+            for label in labels
+        ]
+
+        token_ids = tokenizer.convert_tokens_to_ids(tokens)
+        label_ids = tokenizer.convert_tokens_to_ids(labels)
+
+        if self.rope_3d:
+            pos_ids = np.array([[i] * 3 for i in range(len(tokens))])
+
+        pos_ids_extra = pos_ids
+        assert len(pos_ids) == len(pos_ids_extra)
+
+        if sum(loss_mask) == 0:
+            print("[BAD CASE] loss_mask all 0", example.src, example.tgt)
+            return []
+
+        records = []
+        record = Record(
+            token_ids=token_ids,
+            position_ids=pos_ids,
+            position_ids_extra=pos_ids_extra,
+            label=label_ids,
+            loss_mask=loss_mask,
+        )
+        records.append(record)
+
+        return records
+
+    def _read_jsonl(self, input_file):
+        """Reads jsonl file."""
+        with open(input_file, "r") as f:
+            examples = []
+            cnt = 0
+            Example = None
+            all_lines = []
+
+            if self.use_train_part_sharding:
+                for line_i, line in enumerate(f):
+                    if line_i % self.dp_worldsize == self.dp_worldrank:
+                        all_lines.append(line)
+            else:
+                for line in f:
+                    all_lines.append(line)
+
+            # for line_i, line in enumerate(f):
+            for line in all_lines:
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                # oral
+                if Example is None:
+                    names = [
+                        "messages",
+                        "tools",
+                        "label",
+                        "disable_pseudo_multi_turn",
+                        "is_memory",
+                        "is_system",
+                        "source",
+                        "is_q2code",
+                        "math_is_end",
+                        "system",
+                        "prefix",
+                    ]
+                    Example = namedtuple("Example", names)
+
+                # 自动生成label
+                if "label" not in data:
+                    data["label"] = []
+                    for index, turn in enumerate(data["messages"]):
+                        if "assistant" in turn["role"]:
+                            data["label"].append(1)
+
+                if "is_system" not in data:
+                    if data["messages"][0]["role"] == "system":
+                        data["is_system"] = 1
+                        data["system"] = data["messages"][0]["content"]
+                    else:
+                        data["is_system"] = 0
+                        data["system"] = ""
+
+                if "disable_pseudo_multi_turn" not in data:
+                    data["disable_pseudo_multi_turn"] = 0
+
+                if "is_memory" not in data:
+                    data["is_memory"] = 0
+
+                if "is_q2code" not in data:
+                    data["is_q2code"] = 0
+
+                if "math_is_end" not in data:
+                    data["math_is_end"] = 2
+
+                if self.add_sys_token:
+                    if data["system"] != "":
+                        data["disable_pseudo_multi_turn"] = 1
+
+                try:
+                    data["prefix"] = ""
+                    example = Example(
+                        **{
+                            "messages": data["messages"],
+                            "tools": data["tools"],
+                            "label": data["label"],
+                            "disable_pseudo_multi_turn": data[
+                                "disable_pseudo_multi_turn"
+                            ],
+                            "is_memory": data["is_memory"],
+                            "is_system": data["is_system"],
+                            "source": input_file,
+                            "is_q2code": data["is_q2code"],
+                            "math_is_end": data["math_is_end"],
+                            "system": data["system"],
+                            "prefix": data["prefix"],
+                        }
+                    )
+                except Exception as e:
+                    print(line)
+                    raise e
+                examples.append(example)
+                cnt += 1
+
+            return examples
+
+    def _prepare_batch_data(
+        self,
+        tasks,
+        weighted_task_indices,
+        sample_from_same_source_flags,
+        batch_size,
+        phase=None,
+    ):
+        """generate batch records"""
+        batch_records, max_len = [], 0
+        cur_len_so_far = 0
+        for index, (
+            example,
+            source_to_num_opt,
+            task_id_counter,
+            exact_total_task_id_counter,
+        ) in enumerate(
+            sampling_pseudo_examples_fc(
+                tasks,
+                weighted_task_indices,
+                sample_from_same_source_flags,
+                self.tokenizer,
+                self.global_rng,
+                self.max_seq_len,
+                self.pseudo_sampling_prob,
+                self.trigger_data_prob,
+                self.use_anti_k_sampling,
+                self.drop_history_with_k,
+                self.use_train_part_sharding,
+                self.dp_worldsize,
+                self.dp_worldrank,
+            )
+        ):
+            if phase == "train":
+                self.current_example += sum(source_to_num_opt.values())
+            for k, v in source_to_num_opt.items():
+                self.source_to_num_opt[k] += v
+
+            records = self._convert_example_to_record(
+                example, self.max_seq_len, self.tokenizer, index
+            )
+            if len(records) == 0:
+
+                for k, v in task_id_counter.items():
+                    self.batch_task_id_counter[k] += v
+                for k, v in exact_total_task_id_counter.items():
+                    self.batch_exact_total_task_id_counter[k] += v
+
+            for record in records:
+                max_len = max(max_len, len(record.token_ids))
+                if self.in_tokens:
+                    assert (
+                        batch_size == 1
+                    ), "batch_size is always set to 1 for batch-based iterator"
+                    to_append = (
+                        cur_len_so_far + len(record.token_ids)
+                    ) <= self.max_seq_len
+                else:
+                    to_append = len(batch_records) < batch_size
+                if to_append:
+                    batch_records.append(record)
+                    cur_len_so_far += len(record.token_ids)
+                else:
+                    yield self._pad_batch_records(batch_records, self.simplify)
+                    self.batch_task_id_counter = defaultdict(int)
+                    self.batch_exact_total_task_id_counter = defaultdict(int)
+                    batch_records, max_len = [record], len(record.token_ids)
+                    cur_len_so_far = len(record.token_ids)
+
+                for k, v in task_id_counter.items():
+                    self.batch_task_id_counter[k] += v
+                for k, v in exact_total_task_id_counter.items():
+                    self.batch_exact_total_task_id_counter[k] += v
+                task_id_counter = defaultdict(int)
+                exact_total_task_id_counter = defaultdict(int)
+
+        if phase != "train" and len(batch_records) > 0:
+            while len(batch_records) < batch_size:
+                batch_records.append(batch_records[-1])
+                print("in while", "len(batch_records)", len(batch_records))
+            yield self._pad_batch_records(batch_records, self.simplify)
