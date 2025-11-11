@@ -214,6 +214,77 @@ Here is a system configuration example of SFT VL dataset:
 }
 ```
 
+#### SFT VL Dataset For function call
+
+We provide demo data for quick training, please download the [image](待补充) data according to your needs and unzip it to the [demo](../examples/data/)  data directory. You can either use these samples or train with your own data.
+
+Required fields for SFT VL Function Call:
+
+* `text_info`: The list of text data, each element contains a `text`, `tag`, and `tool_response`
+  * `text`: The text content from User question or System response
+  * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
+  * `tool_response`: `true`=role is tool, `fasle`=role is user, only valid when `tag` is `mask`
+  * `tool_calls`: The tool calls information
+* `image_info`: The list of image data, each element contains a `image_url` and a `matched_text_index`
+  * `image_url`: The url to download image online or the path to access image locally
+  * `matched_text_index`: The index of matched text in `text_info`
+    * Default: `matched_text_index=0` means the image is matched with the first text, and will be palced before the first text
+* `is_system(optional)`: The system flag (1=system configuration, 0=no system configuration)
+  * system configuration = `text_info[0]` if `is_system=1`
+* `tools`: The tools information
+
+Notes:
+* Each training sample is in JSON format, with multiple samples separated by newlines
+* Video data is supported by replacing the `image_info` with `video_info`
+  * the `image_url` can be a video url or video path
+* Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
+
+Here is a multi-image example of SFT VL dataset:
+```json
+{
+    "image_info": [
+        {"matched_text_index": 0, "image_url": "000000213579.jpg"},
+        {"matched_text_index": 2, "image_url": "000000213579_0_493_518_786.jpg"},
+        {"matched_text_index": 4, "image_url": "000000213579_468_391_670_575.jpg"},
+    ],
+    "text_info": [
+        {"text": "Is the fork on the left side of the cup?", "tag": "mask", "tool_response": false},
+        {"text": "\n<think>\nI need to check the relative positions of the fork and the cup in the image. I'll first locate both objects and then determine if the fork is on the left side of the cup.\n\nI will zoom in on the plate with the cake and the fork to get a better view of their position.\n</think>\n\n", "tool_calls": [{"name": "image_zoom_in_tool", "arguments": "{\"bbox_2d\": [0, 493, 518, 786]}"}], "tag": "no_mask"},
+        {"text": "", "tag": "mask", "tool_response": true},
+        {"text": "\n<think>\nOkay, now I see the fork clearly. It's positioned on the left side of the plate, next to a slice of cake. The plate itself is very colorful with sections of green, red, blue, and yellow. Now that I have confirmed the location of the fork, I need to find the cup to determine their relative positions. I will now zoom in on the person holding the cup to get a better look.\n</think>\n\n", "tool_calls": [{"name": "image_zoom_in_tool", "arguments": "{\"bbox_2d\": [468, 391, 670, 575]}"}], "tag": "no_mask"}, 
+        {"text": "", "tag": "mask", "tool_response": true},
+        {"text": "\n<think>\nBased on the visual analysis of the image, I can determine the relative positions of the fork and the cup.\n\n- The fork is located on a colorful plate, positioned to the left of a slice of cake.\n- The cup, which has a blue design with a cartoon character, is being held by a person.\n- When viewing the overall scene, the plate with the fork is situated to the left of the person holding the cup.\n\nTherefore, yes, the fork is on the left side of the cup.\n</think>\n\nYes, the fork is on the left side of the cup.", "tool_calls": [], "tag": "no_mask"}
+    ],
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "image_zoom_in_tool",
+                "description": "Zoom in on a specific region of an image by cropping it based on a bounding box (bbox) and an optional object label.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "bbox_2d": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 4,
+                            "maxItems": 4,
+                            "description": "The bounding box of the region to zoom in, as [x1, y1, x2, y2], where (x1, y1) is the top-left corner and (x2, y2) is the bottom-right corner, and the values of x1, y1, x2, y2 are all normalized to the range 0–1000 based on the original image dimensions."
+                        },
+                        "label": {
+                            "type": "string",
+                            "description": "The name or label of the object in the specified bounding box (optional)."
+                        }
+                    },
+                    "required": ["bbox_2d"]
+                },
+                "strict": false
+            }
+        }
+    ]
+}
+```
+
 ## chatml Format
 
 The chatml Format is used for training thinking models and function call training:
