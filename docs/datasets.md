@@ -216,8 +216,6 @@ Here is a system configuration example of SFT VL dataset:
 
 #### SFT VL Dataset For function call
 
-We provide demo data for quick training, please download the [image](待补充) data according to your needs and unzip it to the [demo](../examples/data/)  data directory. You can either use these samples or train with your own data.
-
 Required fields for SFT VL Function Call:
 
 * `text_info`: The list of text data, each element contains a `text`, `tag`, and `tool_response`
