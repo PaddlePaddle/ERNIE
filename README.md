@@ -14,6 +14,11 @@
 
 ## 📣 Recent updates
 
+**[2025-11] 🔥 Released ERNIEKit v1.5:**
+
+- **New Features**
+    - [ERNIE-4.5-VL-28B-A3B-Thinking] Supports SFT training and function call training for ERNIE-4.5-VL-28B-A3B-Thinking (https://huggingface.co/baidu/ERNIE-4.5-VL-28B-A3B-Thinking).
+
 **[2025-10] 🔥 Released ERNIEKit v1.4:**
 
 - **New Features**
