@@ -93,7 +93,11 @@ def make_batched_images(images) -> List[List[ImageInput]]:
     Returns:
         list: A list of images.
     """
-    if isinstance(images, (list, tuple)) and isinstance(images[0], (list, tuple)) and is_valid_image(images[0][0]):
+    if (
+        isinstance(images, (list, tuple))
+        and isinstance(images[0], (list, tuple))
+        and is_valid_image(images[0][0])
+    ):
         return [img for img_list in images for img in img_list]
 
     elif isinstance(images, (list, tuple)) and is_valid_image(images[0]):
@@ -108,7 +112,11 @@ def make_batched_images(images) -> List[List[ImageInput]]:
 # Copied from transformers.models.llava_next_video.image_processing_llava_next_video.make_batched_videos
 def make_batched_videos(videos) -> List[VideoInput]:
     """dummy"""
-    if isinstance(videos, (list, tuple)) and isinstance(videos[0], (list, tuple)) and is_valid_image(videos[0][0]):
+    if (
+        isinstance(videos, (list, tuple))
+        and isinstance(videos[0], (list, tuple))
+        and is_valid_image(videos[0][0])
+    ):
         return videos
 
     elif isinstance(videos, (list, tuple)) and is_valid_image(videos[0]):
@@ -157,7 +165,12 @@ class AdaptiveImageProcessor(BaseImageProcessor):
             The merge size of the vision encoder to llm encoder.
     """
 
-    model_input_names = ["pixel_values", "image_grid_thw", "pixel_values_videos", "video_grid_thw"]
+    model_input_names = [
+        "pixel_values",
+        "image_grid_thw",
+        "pixel_values_videos",
+        "video_grid_thw",
+    ]
 
     def __init__(
         self,
@@ -196,12 +209,16 @@ class AdaptiveImageProcessor(BaseImageProcessor):
     def set_pixels(self, min_pixels=None, max_pixels=None, msg=""):
         """set_pixels"""
         if min_pixels is not None:
-            assert isinstance(min_pixels, int) and min_pixels >= 0, "min_pixels must be positive int"
+            assert (
+                isinstance(min_pixels, int) and min_pixels >= 0
+            ), "min_pixels must be positive int"
             logger.info(f"{msg} AdaptiveImageProcessor set min_pixels = {min_pixels}")
             self.min_pixels = min_pixels
             self.size["min_pixels"] = int(min_pixels)
         if max_pixels is not None:
-            assert isinstance(max_pixels, int) and max_pixels > 0, "max_pixels must be positive int"
+            assert (
+                isinstance(max_pixels, int) and max_pixels > 0
+            ), "max_pixels must be positive int"
             logger.info(f"{msg} AdaptiveImageProcessor set max_pixels = {max_pixels}")
             self.max_pixels = max_pixels
             self.size["max_pixels"] = int(max_pixels)
@@ -217,7 +234,15 @@ class AdaptiveImageProcessor(BaseImageProcessor):
             min_pixels=actual_min_pixels,
             max_pixels=actual_max_pixels,
         )
-        return (resized_height, resized_width), (resized_height // self.patch_size, resized_width // self.patch_size)
+        return (resized_height, resized_width), (
+            resized_height // self.patch_size,
+            resized_width // self.patch_size,
+        )
+
+    def to_dict(self):
+        encoder_dict = super().to_dict()
+        encoder_dict.pop("image_processor_type", None)
+        return encoder_dict
 
     def _preprocess(
         self,
@@ -325,12 +350,21 @@ class AdaptiveImageProcessor(BaseImageProcessor):
                     data_format=input_data_format,
                 )
             if do_rescale:
-                image = rescale(image, scale=rescale_factor, data_format=input_data_format)
+                image = rescale(
+                    image, scale=rescale_factor, data_format=input_data_format
+                )
 
             if do_normalize:
-                image = normalize(image=image, mean=image_mean, std=image_std, data_format=input_data_format)
+                image = normalize(
+                    image=image,
+                    mean=image_mean,
+                    std=image_std,
+                    data_format=input_data_format,
+                )
 
-            image = to_channel_dimension_format(image, data_format, input_channel_dim=input_data_format)  # [C, H, W]
+            image = to_channel_dimension_format(
+                image, data_format, input_channel_dim=input_data_format
+            )  # [C, H, W]
 
             processed_images.append(image)
         patches = np.array(processed_images)
@@ -339,7 +373,10 @@ class AdaptiveImageProcessor(BaseImageProcessor):
 
         channel = patches.shape[1]  # [time, C, H, W]
         grid_t = patches.shape[0]
-        grid_h, grid_w = resized_height // self.patch_size, resized_width // self.patch_size
+        grid_h, grid_w = (
+            resized_height // self.patch_size,
+            resized_width // self.patch_size,
+        )
         patches = patches.reshape(
             [
                 grid_t,
@@ -430,11 +467,15 @@ class AdaptiveImageProcessor(BaseImageProcessor):
         size = size if size is not None else self.size
         resample = resample if resample is not None else self.resample
         do_rescale = do_rescale if do_rescale is not None else self.do_rescale
-        rescale_factor = rescale_factor if rescale_factor is not None else self.rescale_factor
+        rescale_factor = (
+            rescale_factor if rescale_factor is not None else self.rescale_factor
+        )
         do_normalize = do_normalize if do_normalize is not None else self.do_normalize
         image_mean = image_mean if image_mean is not None else self.image_mean
         image_std = image_std if image_std is not None else self.image_std
-        do_convert_rgb = do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        do_convert_rgb = (
+            do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        )
 
         if images is not None:
             images = make_batched_images(images)
@@ -442,7 +483,10 @@ class AdaptiveImageProcessor(BaseImageProcessor):
             videos = make_batched_videos(videos)
 
         if images is not None and not valid_images(images):
-            raise ValueError("Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, " "paddle.Tensor.")
+            raise ValueError(
+                "Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, "
+                "paddle.Tensor."
+            )
 
         if images is not None:
             pixel_values, vision_grid_thws = [], []
@@ -493,7 +537,10 @@ class AdaptiveImageProcessor(BaseImageProcessor):
             pixel_values = np.array(pixel_values)
             vision_grid_thws = np.array(vision_grid_thws)
 
-            data = {"pixel_values_videos": pixel_values, "video_grid_thw": vision_grid_thws}
+            data = {
+                "pixel_values_videos": pixel_values,
+                "video_grid_thw": vision_grid_thws,
+            }
 
         return BatchFeature(data=data, tensor_type=return_tensors)
 
@@ -514,7 +561,11 @@ def floor_by_factor(number: int, factor: int) -> int:
 
 
 def smart_resize(
-    height: int, width: int, factor: int = IMAGE_FACTOR, min_pixels: int = MIN_PIXELS, max_pixels: int = MAX_PIXELS
+    height: int,
+    width: int,
+    factor: int = IMAGE_FACTOR,
+    min_pixels: int = MIN_PIXELS,
+    max_pixels: int = MAX_PIXELS,
 ):
     """
     Rescales the image so that the following conditions are met:
