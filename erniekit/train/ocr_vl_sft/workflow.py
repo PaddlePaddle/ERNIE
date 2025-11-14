@@ -416,6 +416,8 @@ def run_ocr_vl_sft(
     )
     cfg.use_flash_attention = model_args.use_flash_attention
     cfg.vision_config.use_flash_attention = model_args.use_flash_attention
+    cfg.use_sparse_flash_attn = model_args.use_sparse_flash_attn
+    cfg.vision_config.use_sparse_flash_attn = model_args.use_sparse_flash_attn
     cfg.recompute = finetuning_args.recompute
     cfg.vision_config.recompute = finetuning_args.recompute
     cfg.recompute_granularity = model_args.recompute_granularity
