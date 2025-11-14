@@ -45,7 +45,7 @@ python -m pip install opencv-python-headless
 python -m pip install numpy==1.26.4
 ```
 
-For more installation methods, please refer to the [ERNIEKit Installation Guide]((./erniekit.md#2-installation)).
+For more installation methods, please refer to the [ERNIEKit Installation Guide](./erniekit.md#2-installation).
 
 ## 3. Model and Dataset Preparation
 
@@ -58,7 +58,7 @@ huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/Padd
 
 ### 3.2. Dataset Preparation
 
-For the training dataset format, please refer to [SFT VL Dataset Format]((./datasets.md#sft-vl-dataset)). Required fields are as follows:
+For the training dataset format, please refer to [SFT VL Dataset Format](./datasets.md#sft-vl-dataset). Required fields are as follows:
 * `text_info`: The list of text data, each element contains a `text` and a `tag`
   * `text`: The text content from User question or System response
   * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
@@ -71,7 +71,7 @@ Notes:
 * Each training sample is in JSON format, with multiple samples separated by newlines
 * Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
 
-For your convenience, we also provide a quick-start [Bengali training dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:
+For your convenience, we also provide a quick-start [Bengali training dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:   
 
 ```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
@@ -190,7 +190,7 @@ cp PaddlePaddle/PaddleOCR-VL/inference.yml PaddleOCR-VL-SFT-Bengali
 ```
 
 ### 7.3. Inference Dataset Preparation
-We provide a [Bengali test dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl)) that can be used for inference to observe the fine-tuning results. Download it using the following command:
+We provide a [Bengali test dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl) that can be used for inference to observe the fine-tuning results. Download it using the following command:
 
 ```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
