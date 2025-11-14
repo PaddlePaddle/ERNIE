@@ -57,8 +57,9 @@ class PaddleOCRVisionConfig(PretrainedConfig):
         tokens_per_second=2,
         recompute=False,
         recompute_granularity="full",
-        recompute_use_reentrant=True,
+        recompute_use_reentrant=False,
         use_flash_attention=False,
+        use_sparse_flash_attn=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -82,11 +83,13 @@ class PaddleOCRVisionConfig(PretrainedConfig):
         self.recompute_granularity = recompute_granularity
         self.recompute_use_reentrant = recompute_use_reentrant
         self.use_flash_attention = use_flash_attention
+        self.use_sparse_flash_attn = use_sparse_flash_attn
 
         self.register_unsavable_keys(
             [
                 "recompute",
                 "recompute_use_reentrant",
                 "recompute_granularity",
+                "use_sparse_flash_attn",
             ]
         )

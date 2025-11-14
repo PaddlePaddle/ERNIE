@@ -50,9 +50,12 @@ class PaddleOCRVLConfig(PretrainedConfig):
         rms_norm_eps=1e-6,
         use_cache=False,
         use_flash_attention=False,
+        use_sparse_flash_attn=False,
         recompute=False,
         recompute_granularity="core_attn",
-        recompute_use_reentrant=True,
+        recompute_use_reentrant=False,
+        use_rmsnorm=True,
+        fuse_rms_norm=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -66,6 +69,7 @@ class PaddleOCRVLConfig(PretrainedConfig):
         hidden_dropout_prob=0.0,
         compression_ratio: float = 1.0,
         num_key_value_heads=None,
+        use_sparse_head_and_loss_fn=False,
         max_sequence_length=None,
         tie_word_embeddings=False,
         vision_config=None,
@@ -91,9 +95,12 @@ class PaddleOCRVLConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
         self.use_flash_attention = use_flash_attention
+        self.use_sparse_flash_attn = use_sparse_flash_attn
         self.recompute = recompute
         self.recompute_granularity = recompute_granularity
         self.recompute_use_reentrant = recompute_use_reentrant
+        self.use_rmsnorm = use_rmsnorm
+        self.fuse_rms_norm = fuse_rms_norm
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
@@ -113,6 +120,7 @@ class PaddleOCRVLConfig(PretrainedConfig):
         self.hidden_dropout_prob = hidden_dropout_prob
         self.compression_ratio = compression_ratio
         self.num_key_value_heads = num_key_value_heads
+        self.use_sparse_head_and_loss_fn = use_sparse_head_and_loss_fn
         self.max_sequence_length = max_sequence_length
         self.rope_scaling = rope_scaling
         if self.rope_scaling is not None and "type" in self.rope_scaling:
@@ -123,17 +131,13 @@ class PaddleOCRVLConfig(PretrainedConfig):
         super().__init__(tie_word_embeddings=tie_word_embeddings, **kwargs)
 
         # Currently, these configuration items are hard-coded
-        self.fuse_rms_norm = True
-        self.use_sparse_flash_attn = True
         self.use_var_len_flash_attn = False
         self.scale_qk_coeff = 1.0
         self.fuse_softmax_mask = False
-        self.use_sparse_head_and_loss_fn = False
         self.use_recompute_loss_fn = False
         self.use_fused_head_and_loss_fn = False
         self.fuse_linear = False
         self.token_balance_seqlen = False
-        self.use_rmsnorm = True
         self.fuse_ln = False
         self.cachekv_quant = False
         self.fuse_swiglu = False
