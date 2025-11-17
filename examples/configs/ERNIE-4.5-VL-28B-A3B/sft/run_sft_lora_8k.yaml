@@ -18,6 +18,7 @@ moe_aux_loss_lambda: 0.0
 moe_use_aux_free: true
 moe_use_hard_gate: true
 moe_multimodal_dispatch_use_allgather: v2-alltoall-unpad-text
+pp_seg_method: layer:Ernie4_5_DecoderLayer|ErnieDecoderLayer|EmptyLayer
 
 # data
 train_dataset_path: "examples/data/sft_vl-train_demo1.jsonl"
@@ -87,6 +88,8 @@ sharding_parallel_config: "split_param enable_fuse_optimizer_states"
 sharding_comm_buffer_size_MB: 2048
 save_sharding_stage1_model_include_freeze_params: true
 offload_optim: true
+tensorwise_offload_optimizer: true
+unified_checkpoint_config: ignore_merge_optimizer
 use_recompute_moe: true
 recompute: true
 recompute_granularity: full
