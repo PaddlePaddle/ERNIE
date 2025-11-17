@@ -20,6 +20,8 @@ from paddleformers.trainer import TrainingArguments
 from paddleformers.utils.log import logger
 from paddleformers.trainer.trainer_utils import ShardingOption
 
+from ..utils.process import detect_device
+
 try:
     from paddle.distributed import in_auto_parallel_align_mode
 except Exception:
@@ -517,6 +519,8 @@ class FinetuningArguments(
         self.per_device_eval_batch_size = self.batch_size
         self.server_tp_degree = self.tensor_parallel_degree
 
+        # device
+        self.device = detect_device()
         super().__post_init__()
 
         # ERNIE VL model post init

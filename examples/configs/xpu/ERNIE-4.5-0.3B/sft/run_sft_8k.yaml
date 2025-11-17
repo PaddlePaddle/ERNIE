@@ -82,6 +82,4 @@ amp_custom_black_list:
 unified_checkpoint: True
 unified_checkpoint_config: async_save
 
-# device
-device: xpu
 fuse_rms_norm: false
