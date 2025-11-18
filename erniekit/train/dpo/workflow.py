@@ -573,6 +573,12 @@ def run_dpo(
         lora=model_args.lora,
     )
 
+    # padding to the maximum seq length in batch data when max_seq_len is None
+    max_seq_len = (
+        data_args.max_seq_len
+        if (data_args.packing or finetuning_args.sequence_parallel)
+        else None
+    )
     trainer = ErnieMoEDPOTrainer(
         model=model,
         ref_model=ref_model,
@@ -592,7 +598,7 @@ def run_dpo(
         data_collator=partial(
             collate_fn,
             tokenizer=tokenizer,
-            max_seq_len=data_args.max_seq_len,
+            max_seq_len=max_seq_len,
             use_sparse_head_and_loss_fn=model_args.use_sparse_head_and_loss_fn,
             use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
             use_response_score_delta=finetuning_args.offset_alpha > 0.0,

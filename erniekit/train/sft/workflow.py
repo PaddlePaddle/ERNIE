@@ -590,13 +590,19 @@ def run_sft(
 
     logger.info("Creating dataset successfully ...")
 
+    # padding to the maximum seq length in batch data when max_seq_len is None
+    max_seq_len = (
+        data_args.max_seq_len + model_config.num_nextn_predict_layers
+        if (data_args.packing or finetuning_args.sequence_parallel)
+        else None
+    )
     if data_args.dataset_type != "pretrain":
         data_collator = partial(
             collate_fn,
             tokenizer=tokenizer,
             training_args=finetuning_args,
             model_args=model_args,
-            max_seq_len=data_args.max_seq_len + model_config.num_nextn_predict_layers,
+            max_seq_len=max_seq_len,
         )
 
     if model_args.lora:
