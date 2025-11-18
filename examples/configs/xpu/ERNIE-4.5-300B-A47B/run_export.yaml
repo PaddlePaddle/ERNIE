@@ -16,6 +16,3 @@ pipeline_parallel_config: disable_partial_send_recv enable_clear_every_step_cach
 sequence_parallel: True
 compute_type: bf16
 fp16_opt_level: O2
-
-# device
-device: xpu

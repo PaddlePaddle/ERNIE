@@ -80,8 +80,6 @@ amp_custom_black_list:
 unified_checkpoint: True
 # unified_checkpoint_config: async_save
 
-# device
-device: iluvatar_gpu
 use_flash_attention: true
 use_sparse_head_and_loss_fn: false
 use_attn_mask_start_row_indices: false

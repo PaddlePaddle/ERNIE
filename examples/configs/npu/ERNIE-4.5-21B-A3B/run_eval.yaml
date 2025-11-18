@@ -49,8 +49,6 @@ amp_custom_black_list:
 unified_checkpoint: True
 unified_checkpoint_config: async_save
 
-# device
-device: npu
 use_attn_mask_start_row_indices: true
 moe_use_aux_free: false
 moe_multimodal_dispatch_use_allgather: ""

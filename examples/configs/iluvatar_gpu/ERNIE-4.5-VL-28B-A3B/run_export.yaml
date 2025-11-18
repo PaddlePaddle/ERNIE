@@ -17,5 +17,3 @@ sequence_parallel: True
 compute_type: bf16
 fp16_opt_level: O2
 
-# device
-device: iluvatar_gpu

@@ -99,6 +99,3 @@ amp_master_grad: 1
 
 # checkpoint
 unified_checkpoint: true
-
-# device
-device: xpu
