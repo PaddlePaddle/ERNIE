@@ -149,6 +149,7 @@ class ErnieMoEConfig(PretrainedConfig):
         global_aux_loss=False,
         moe_dropout_prob=0.0,
         moe_group="world",
+        moe_group_name="world",
         num_experts_per_tok: int = 8,
         moe_intermediate_size: Union[int, list] = 0,
         moe_num_shared_experts: int = 0,
@@ -356,6 +357,7 @@ class ErnieMoEConfig(PretrainedConfig):
         self.moe_layer_interval = moe_layer_interval
         self.moe_dropout_prob = moe_dropout_prob
         self.moe_group = moe_group
+        self.moe_group_name = moe_group_name
         self.num_experts_per_tok = num_experts_per_tok
         self.moe_num_shared_experts = moe_num_shared_experts
         self.moe_num_dense_experts = moe_num_dense_experts
@@ -395,7 +397,6 @@ class ErnieMoEConfig(PretrainedConfig):
 
         self.use_linear_residual_norm_recompute = use_linear_residual_norm_recompute
         self.use_rms_qkv_recompute = use_rms_qkv_recompute
-
         assert aux_loss_type in ["", "default", "seq_aux_loss", "switch_aux_loss"]
         self.aux_loss_type = aux_loss_type
 

@@ -31,7 +31,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 from paddle.incubate.tensor.manipulation import create_async_load
 from paddle.nn import functional as F
 from paddle.nn.layer.layers import Layer
-
+from paddle.distributed.flex_checkpoint.dcp.sharded_weight import  build_sharded_state_dict
 try:
     from paddle.nn.functional import all_gather_gemm, flux, gemm_reduce_scatter
 except ImportError:
@@ -449,7 +449,14 @@ class ColumnSequenceParallelLinear(Layer):
             output = self.linear(input_parallel, self.weight, self.bias)
             return output
 
-
+    def sharded_state_dict(
+        self,
+        structured_name_prefix: str = "",
+    ):
+        state_dict = self.state_dict(structured_name_prefix="")
+        return build_sharded_state_dict(
+            state_dict, {"weight": 1}, structured_name_prefix
+        )
 class MPScale(PyLayer):
     @staticmethod
     def forward(ctx, x, mp_degree):
@@ -588,3 +595,12 @@ class RowSequenceParallelLinear(Layer):
         else:
             output = self.linear(input_parallel, self.weight, self.bias)
         return output
+    
+    def sharded_state_dict(
+        self,
+        structured_name_prefix: str = "",
+    ):
+        state_dict = self.state_dict(structured_name_prefix="")
+        return build_sharded_state_dict(
+            state_dict, {"weight": 0}, structured_name_prefix
+        )
