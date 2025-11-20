@@ -129,16 +129,6 @@ def run_sft(
             if finetuning_args.release_grads is True:
                 finetuning_args.release_grads = False
 
-    # checkpoint O1 quantization is open by default.
-    if (
-        not finetuning_args.disable_ckpt_quant
-        and finetuning_args.ckpt_quant_stage == "O0"
-        and not model_args.lora
-    ):
-        finetuning_args.ckpt_quant_stage = "O1"
-    elif finetuning_args.disable_ckpt_quant:
-        finetuning_args.ckpt_quant_stage = "O0"
-
     finetuning_args.print_config(model_args, "Model")
     finetuning_args.print_config(data_args, "Data")
 
