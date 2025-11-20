@@ -16,10 +16,9 @@ image_dtype: "float32"
 ### model
 model_name_or_path: PaddlePaddle/PaddleOCR-VL
 fine_tuning: Full
-fuse_rope: True
-use_sparse_head_and_loss_fn: True
 multimodal: True
 use_flash_attention: True
+use_sparse_flash_attn: True
 
 ### finetuning
 # base
@@ -28,7 +27,7 @@ seed: 23
 do_train: True
 # do_eval: True
 distributed_dataloader: False
-dataloader_num_workers: 1
+dataloader_num_workers: 8
 prefetch_factor: 10
 batch_size: 1
 packing_size: 8
@@ -36,8 +35,9 @@ packing: True
 padding: False
 num_train_epochs: 2
 max_steps: 926
-# max_evaluate_steps: 10000
-# eval_steps: 10000
+# eval_batch_size: 1
+# eval_iters: 50
+# eval_steps: 100
 # evaluation_strategy: steps
 save_steps: 200
 save_total_limit: 5

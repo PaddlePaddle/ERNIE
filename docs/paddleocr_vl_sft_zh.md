@@ -58,7 +58,7 @@ python -m pip install numpy==1.26.4
 
 ### 3.1. 模型准备
 
-在 [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) 或者 [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files) 可以下载 PaddleOCR-VL-0.9B 模型。
+在 [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL) 或者 [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL) 可以下载 PaddleOCR-VL-0.9B 模型。
 
 ```bash
 huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/PaddleOCR-VL
