@@ -152,16 +152,6 @@ def run_ocr_vl_sft(
 
         PipelineParallel.timer_printer = lambda _: None
 
-    # checkpoint O1 quantization is open by default.
-    if (
-        not finetuning_args.disable_ckpt_quant
-        and finetuning_args.ckpt_quant_stage == "O0"
-        and not model_args.lora
-    ):
-        finetuning_args.ckpt_quant_stage = "O1"
-    elif finetuning_args.disable_ckpt_quant:
-        finetuning_args.ckpt_quant_stage = "O0"
-
     finetuning_args.resume_from_checkpoint = get_resume_checkpoint_path(finetuning_args)
     if (
         finetuning_args.resume_from_checkpoint is not None

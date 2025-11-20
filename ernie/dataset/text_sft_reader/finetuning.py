@@ -77,6 +77,7 @@ class BaseReader:
         simplify=False,
         use_train_part_sharding=False,
         rope_3d=False,
+        chat_template="ernie_vl",
         **kwargs,
     ):
         self.task_group = copy.deepcopy(task_group)
@@ -104,6 +105,7 @@ class BaseReader:
         self.simplify = simplify
         self.use_train_part_sharding = use_train_part_sharding
         self.rope_3d = rope_3d
+        self.chat_template = chat_template
         self.place = paddle.set_device(device)
 
         # setup special tokens
@@ -331,7 +333,10 @@ class BaseReader:
                         if "<think>" in last_tgt and "</think>" in last_tgt:
                             data["prefix"] = ""
                         else:
-                            data["prefix"] = "<think>\n\n</think>\n\n"
+                            if self.chat_template == "ernie_vl_thinking":
+                                data["prefix"] = "\n<think>\n\n</think>\n\n"
+                            else:
+                                data["prefix"] = "<think>\n\n</think>\n\n"
                             data["label"] = [0] * len(data["tgt"])
                             data["label"][-1] = 1
                     else:
@@ -744,6 +749,25 @@ class KnowledgeBasedSFTReader(BaseReader):
                 prefix_token = tokenizer.tokenize(example.prefix)
                 cur_tokens = tokens_src + prefix_token + tokens_target
                 extra_loss_mask = [0] * len(prefix_token)
+            elif (
+                "</think>" in tgt.strip() and self.chat_template == "ernie_vl_thinking"
+            ):
+                reasoning_content = (
+                    tgt.strip()
+                    .split("</think>")[0]
+                    .rstrip("\n")
+                    .split("<think>")[-1]
+                    .lstrip("\n")
+                )
+                content = tgt.strip().split("</think>")[-1].lstrip("\n")
+                tokens_target = (
+                    tokenizer.tokenize("\n<think>\n")
+                    + tokenizer.tokenize(reasoning_content.strip("\n"))
+                    + tokenizer.tokenize("\n</think>\n\n")
+                    + tokenizer.tokenize(content)
+                )
+                cur_tokens = tokens_src + tokens_target
+                extra_loss_mask = []
             else:
                 cur_tokens = tokens_src + tokens_target
                 extra_loss_mask = []
@@ -1025,7 +1049,7 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                 # User
                 if "user" in example.messages[index - 1]["role"]:
                     src = example.messages[index - 1]["content"]
-                    tokens_src = self.begin_of_query + tokenizer.tokenize(src)
+                    tokens_src = self.begin_of_query + tokenizer.tokenize(src.strip())
 
                 # Tool
                 if "tool" in example.messages[index - 1]["role"]:
@@ -1041,30 +1065,39 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                     tokens_src = tokens_src + tokenizer.tokenize("\n</tool_output>\n")
 
                 # Assistant
-                if "</think>" in turn["content"]:
+                if "</think>" in turn["content"].strip():
                     reasoning_content = (
                         turn["content"]
+                        .strip()
                         .split("</think>")[0]
                         .rstrip("\n")
                         .split("<think>")[-1]
                         .lstrip("\n")
                     )
-                    content = turn["content"].split("</think>")[-1].lstrip("\n")
+                    content = turn["content"].strip().split("</think>")[-1].lstrip("\n")
                 else:
                     reasoning_content = ""
-                    content = turn["content"]
+                    content = turn["content"].strip()
 
                 tokens_target = []
                 if reasoning_content:
                     tokens_src = tokens_src + self.begin_of_response
-                    tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
+                    if self.chat_template == "ernie_vl_thinking":
+                        tokens_target = tokens_target + tokenizer.tokenize(
+                            "\n<think>\n"
+                        )
+                    else:
+                        tokens_target = tokens_target + tokenizer.tokenize("<think>\n")
                     tokens_target = tokens_target + tokenizer.tokenize(
                         reasoning_content.strip("\n")
                     )
                     tokens_target = tokens_target + tokenizer.tokenize("\n</think>\n\n")
                 else:
                     tokens_src = tokens_src + self.begin_of_response
-                    tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
+                    if self.chat_template == "ernie_vl_thinking":
+                        tokens_src = tokens_src + tokenizer.tokenize("\n<think>\n")
+                    else:
+                        tokens_src = tokens_src + tokenizer.tokenize("<think>\n")
                     tokens_src = tokens_src + tokenizer.tokenize("\n</think>\n\n")
 
                 if len(content) > 0:
@@ -1122,12 +1155,12 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
 
                 previous_cur_len += len(cur_tokens) + len(break_token_multi_turn)
 
-                if len(tokens) <= 4:
-                    return []
+        if len(tokens) <= 4:
+            return []
 
-                if tokens[0] != self.begin_token:
-                    tokens = [self.begin_token] + tokens
-                    loss_mask = [0] + loss_mask
+        if tokens[0] != self.begin_token:
+            tokens = [self.begin_token] + tokens
+            loss_mask = [0] + loss_mask
 
         assert len(tokens) <= self.max_seq_len, f"{len(tokens)}-{self.max_seq_len}"
         assert (
@@ -1157,7 +1190,7 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
         assert len(pos_ids) == len(pos_ids_extra)
 
         if sum(loss_mask) == 0:
-            print("[BAD CASE] loss_mask all 0", example.src, example.tgt)
+            print("[BAD CASE] loss_mask all 0", example.messages)
             return []
 
         records = []
@@ -1210,6 +1243,9 @@ class FunctionCallSFTReader(KnowledgeBasedSFTReader):
                         "prefix",
                     ]
                     Example = namedtuple("Example", names)
+
+                if "tools" not in data:
+                    data["tools"] = ""
 
                 # 自动生成label
                 if "label" not in data:
