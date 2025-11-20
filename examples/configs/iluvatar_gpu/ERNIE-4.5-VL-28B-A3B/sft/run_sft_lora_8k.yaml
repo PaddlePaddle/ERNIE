@@ -40,9 +40,6 @@ one_sample_in_one_seq: true
 # dataloader
 dataloader_num_workers: 1
 
-# device
-device: iluvatar_gpu
-
 # train
 do_train: true
 batch_size: 1

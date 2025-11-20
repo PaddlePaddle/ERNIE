@@ -72,7 +72,9 @@ NativeLinear = nn.Linear
 try:
     from paddle.nn.functional.flash_attention import flash_attention
 
-    logger.warning("Use flash attention in scaled-dot-product. Attention mask is deprecated")
+    logger.warning(
+        "Use flash attention in scaled-dot-product. Attention mask is deprecated"
+    )
 except (ImportError, ModuleNotFoundError):
     flash_attention = None
 
@@ -120,6 +122,32 @@ __all__ = [
 ]
 
 
+def kl_divergence(p, q, eps: float = 1e-10, degree=-1, rank=-1):
+    """
+    D_KL(p||q) = sum(p * log(p/q))
+
+    Args:
+        p: policy logprobs [batch, seq_len, vocab // tp_degree]
+        q: ref logprobs [batch, seq_len, vocab]
+        eps: -
+    """
+
+    if p.shape[-1] != q.shape[-1]:
+        interval_per_rank = q.shape[-1] // degree
+        q = q[..., rank * interval_per_rank : (rank + 1) * interval_per_rank]
+
+    p = F.softmax(p, axis=-1, dtype="float32")
+    q = F.softmax(q, axis=-1, dtype="float32")
+    p = p + eps
+    q = q + eps
+
+    log_p = paddle.log(p)
+    log_q = paddle.log(q)
+    kl = p * (log_p - log_q)
+
+    return kl.mean(axis=-1, keepdim=True)
+
+
 def get_triangle_upper_mask(x, mask=None):
     if mask is not None:
         return mask
@@ -153,7 +181,9 @@ def gqa_qkv_split_func(
         q_list = paddle.split(q, tensor_parallel_degree, axis=-1)
         k_list = paddle.split(k, tensor_parallel_degree, axis=-1)
         v_list = paddle.split(v, tensor_parallel_degree, axis=-1)
-        ret = [paddle.concat([q, k, v], axis=-1) for q, k, v in zip(q_list, k_list, v_list)]
+        ret = [
+            paddle.concat([q, k, v], axis=-1) for q, k, v in zip(q_list, k_list, v_list)
+        ]
         return ret
     else:
         q = paddle.split(q, tensor_parallel_degree, axis=-1)[tensor_parallel_rank]
@@ -205,7 +235,9 @@ def parallel_matmul(
                 logits += bias
         else:
             if fuse_linear:
-                logits = paddle.incubate.nn.functional.fused_linear(input_parallel, y, bias)
+                logits = paddle.incubate.nn.functional.fused_linear(
+                    input_parallel, y, bias
+                )
             else:
                 logits = F.linear(input_parallel, y, bias)
 
@@ -216,7 +248,9 @@ def parallel_matmul(
 
     else:
         if fuse_linear:
-            logits = paddle.incubate.nn.functional.fused_linear(x, y, bias, transpose_weight=transpose_y)
+            logits = paddle.incubate.nn.functional.fused_linear(
+                x, y, bias, transpose_weight=transpose_y
+            )
         else:
             logits = paddle.matmul(x, y, transpose_y=transpose_y)
             if bias is not None:
@@ -224,7 +258,9 @@ def parallel_matmul(
         return logits
 
 
-def calc_lm_head_logits(config, hidden_states, weight, bias, tensor_parallel_output=None, training=True):
+def calc_lm_head_logits(
+    config, hidden_states, weight, bias, tensor_parallel_output=None, training=True
+):
     if config.sequence_parallel:
         if config.use_sparse_head_and_loss_fn:
             pass
@@ -233,10 +269,16 @@ def calc_lm_head_logits(config, hidden_states, weight, bias, tensor_parallel_out
             if lm_head_use_gather:
                 hidden_states = GatherOp.apply(hidden_states)
             if not config.using_dynamic_sequence_length:
-                hidden_states = hidden_states.reshape([-1, config.seqlen, hidden_states.shape[-1]])
+                hidden_states = hidden_states.reshape(
+                    [-1, config.seqlen, hidden_states.shape[-1]]
+                )
             else:
-                assert config.micro_batch_size, "micro_batch_size should be set when using dygramic sequence length."
-                hidden_states = hidden_states.reshape([config.micro_batch_size, -1, hidden_states.shape[-1]])
+                assert (
+                    config.micro_batch_size
+                ), "micro_batch_size should be set when using dygramic sequence length."
+                hidden_states = hidden_states.reshape(
+                    [config.micro_batch_size, -1, hidden_states.shape[-1]]
+                )
 
     if tensor_parallel_output is None:
         tensor_parallel_output = config.tensor_parallel_output
@@ -277,7 +319,9 @@ def masked_fill(x, mask, value):
     return paddle.where(mask, y, x)
 
 
-def mem_eff_attn(query, key, value, pack_offset, drop_prob=0.0, dtype=paddle.bfloat16, training=True):
+def mem_eff_attn(
+    query, key, value, pack_offset, drop_prob=0.0, dtype=paddle.bfloat16, training=True
+):
     pack_offset = pack_offset.numpy()
     shape = pack_offset.shape
     assert len(shape) == 2, len(shape)
@@ -300,7 +344,9 @@ def mem_eff_attn(query, key, value, pack_offset, drop_prob=0.0, dtype=paddle.bfl
         return x.astype(dtype) if x.dtype != dtype else x
 
     if len(seqlens) == 1:
-        out, _ = flash_attention(query, key, value, drop_prob, causal=True, training=training)
+        out, _ = flash_attention(
+            query, key, value, drop_prob, causal=True, training=training
+        )
     else:
         mask = BlockDiagonalCausalMask.from_seqlens(seqlens)
         out = memory_efficient_attention(
@@ -326,7 +372,9 @@ def inbatch_pack_offset_to_attn_mask_start_row_indices(inbatch_pack_offset):
         row_start_indices = np.repeat(cumsum_item[1:], record_lens)
         attn_mask_row_start_indices.append(row_start_indices[None, None, ...])
     attn_mask_row_start_indices = np.concatenate(attn_mask_row_start_indices, axis=0)
-    return paddle.to_tensor(attn_mask_row_start_indices, dtype=paddle.int32), int(min_start_row)
+    return paddle.to_tensor(attn_mask_row_start_indices, dtype=paddle.int32), int(
+        min_start_row
+    )
 
 
 def scaled_dot_product_attention(
@@ -360,14 +408,20 @@ def scaled_dot_product_attention(
 
     can_use_fa = config.use_flash_attn and flash_attention is not None
     can_use_fa_sparse_mask = (
-        config.use_mem_eff_attn and inbatch_pack_offset is not None and flashmask_attention is not None
+        config.use_mem_eff_attn
+        and inbatch_pack_offset is not None
+        and flashmask_attention is not None
     )
 
     if not can_use_fa and not can_use_fa_sparse_mask:
         if query_states.shape[-2] != key_states.shape[-2]:
-            key_states = key_states.repeat_interleave(num_heads // num_key_value_heads, axis=-2)
+            key_states = key_states.repeat_interleave(
+                num_heads // num_key_value_heads, axis=-2
+            )
         if query_states.shape[-2] != value_states.shape[-2]:
-            value_states = value_states.repeat_interleave(num_heads // num_key_value_heads, axis=-2)
+            value_states = value_states.repeat_interleave(
+                num_heads // num_key_value_heads, axis=-2
+            )
 
     if can_use_fa:
         assert not (config.use_mem_eff_attn and inbatch_pack_offset is not None)
@@ -384,7 +438,9 @@ def scaled_dot_product_attention(
         return attn_output, attn_weights
     else:
 
-        query_states = paddle.transpose(query_states, [0, 2, 1, 3]) / math.sqrt(head_dim)
+        query_states = paddle.transpose(query_states, [0, 2, 1, 3]) / math.sqrt(
+            head_dim
+        )
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
@@ -408,14 +464,20 @@ def scaled_dot_product_attention(
             attn_weights = attention_mask + attn_weights
             attn_weights = paddle.maximum(
                 attn_weights,
-                paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype),
+                paddle.to_tensor(
+                    float(finfo(query_states.dtype).min), dtype=query_states.dtype
+                ),
             )
 
             if paddle.in_dynamic_mode():
                 with paddle.amp.auto_cast(False):
-                    attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+                    attn_weights = F.softmax(
+                        attn_weights, axis=-1, dtype="float32"
+                    ).astype(query_states.dtype)
             else:
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(
+                    query_states.dtype
+                )
         else:
             attn_weights = attn_weights.cast(paddle.float32)
             attention_mask = attention_mask.cast(paddle.float32)
@@ -453,12 +515,18 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     mask = paddle.full((target_length, target_length), float(finfo(dtype).min))
 
     mask_cond = paddle.arange(mask.shape[-1])
-    mask = masked_fill(mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0)
+    mask = masked_fill(
+        mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0
+    )
 
     if past_key_values_length > 0:
-        mask = paddle.concat([paddle.zeros([target_length, past_key_values_length]), mask], axis=-1)
+        mask = paddle.concat(
+            [paddle.zeros([target_length, past_key_values_length]), mask], axis=-1
+        )
 
-    return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
+    return mask[None, None, :, :].expand(
+        [batch_size, 1, target_length, target_length + past_key_values_length]
+    )
 
 
 def _expand_mask(mask, dtype, tgt_length):
@@ -470,10 +538,14 @@ def _expand_mask(mask, dtype, tgt_length):
         batch_size, src_length = mask.shape[0], mask.shape[-1]
         tgt_length = tgt_length if tgt_length is not None else src_length
 
-        expanded_mask = mask[:, None, None, :].expand([batch_size, 1, tgt_length, src_length])
+        expanded_mask = mask[:, None, None, :].expand(
+            [batch_size, 1, tgt_length, src_length]
+        )
 
     inverted_mask = 1.0 - expanded_mask
-    return masked_fill(inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min))
+    return masked_fill(
+        inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min)
+    )
 
 
 class FusedDropoutImpl(nn.Layer):
@@ -510,14 +582,20 @@ class RMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.fuse_rms_norm:
-            return fused_rms_norm_ext(hidden_states, self.weight, self.variance_epsilon)[0]
+            return fused_rms_norm_ext(
+                hidden_states, self.weight, self.variance_epsilon
+            )[0]
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+                hidden_states = (
+                    paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+                )
         else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+            hidden_states = (
+                paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+            )
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
@@ -529,7 +607,9 @@ class RotaryEmbedding(nn.Layer):
         super().__init__()
         self.base = base
         self.max_position_embeddings = max_position_embeddings
-        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
+        inv_freq = 1.0 / (
+            base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim)
+        )
 
         t = paddle.arange(max_position_embeddings, dtype="float32")
         freqs = paddle.einsum("i,j->ij", t, inv_freq.cast("float32"))
@@ -567,8 +647,12 @@ class RotaryEmbedding(nn.Layer):
         cos = cos[:, offset : q.shape[1] + offset, None, :]
         sin = sin[:, offset : q.shape[1] + offset, None, :]
 
-        q_embed = paddle.add(paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin))
-        k_embed = paddle.add(paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin))
+        q_embed = paddle.add(
+            paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin)
+        )
+        k_embed = paddle.add(
+            paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin)
+        )
         q_embed = q_embed.astype(q.dtype)
         k_embed = k_embed.astype(k.dtype)
         return q_embed, k_embed
@@ -592,8 +676,12 @@ class RopeEmbeddingLegacy(nn.Layer):
         else:
             position_ids = position_ids / self.compression_ratio
             seq_length = position_ids.shape[-1]
-            sinusoid_inp = position_ids.unsqueeze(-1).astype("float32") * indices.unsqueeze(0)
-        pos_emb = paddle.concat([paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1)
+            sinusoid_inp = position_ids.unsqueeze(-1).astype(
+                "float32"
+            ) * indices.unsqueeze(0)
+        pos_emb = paddle.concat(
+            [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1
+        )
         pos_emb = paddle.reshape(pos_emb, (-1, 1, seq_length, self.head_dim))
         pos_emb.stop_gradient = True
         return pos_emb
@@ -642,7 +730,9 @@ class RopeEmbeddingLegacy(nn.Layer):
             :,
             1 : self.head_dim // 2 - self.freq_allocation : 2,
         ]
-        sin_hw = paddle.stack([sin_h, sin_w], axis=-1).reshape(sin_h.shape[:-1] + [sin_h.shape[-1] * 2])
+        sin_hw = paddle.stack([sin_h, sin_w], axis=-1).reshape(
+            sin_h.shape[:-1] + [sin_h.shape[-1] * 2]
+        )
         sin_thw = paddle.concat([sin_hw, sin_t], axis=-1)
 
         cos_t = cos[batch_indices, position_ids[..., 0], :, -self.freq_allocation :]
@@ -658,7 +748,9 @@ class RopeEmbeddingLegacy(nn.Layer):
             :,
             1 : self.head_dim // 2 - self.freq_allocation : 2,
         ]
-        cos_hw = paddle.stack([cos_h, cos_w], axis=-1).reshape(cos_h.shape[:-1] + [cos_h.shape[-1] * 2])
+        cos_hw = paddle.stack([cos_h, cos_w], axis=-1).reshape(
+            cos_h.shape[:-1] + [cos_h.shape[-1] * 2]
+        )
         cos_thw = paddle.concat([cos_hw, cos_t], axis=-1)
 
         sin_pos = paddle.reshape(
@@ -690,12 +782,18 @@ class RopeEmbeddingLegacy(nn.Layer):
 
     def forward_single(self, position_ids):
         batch_size, seq_length = position_ids.shape[:2]
-        rope_emb = paddle.zeros((2, batch_size, seq_length, 1, self.head_dim), dtype="float32")
-        inv_freq = self.base ** (-paddle.arange(0, self.head_dim, 2, dtype="float32") / self.head_dim)
+        rope_emb = paddle.zeros(
+            (2, batch_size, seq_length, 1, self.head_dim), dtype="float32"
+        )
+        inv_freq = self.base ** (
+            -paddle.arange(0, self.head_dim, 2, dtype="float32") / self.head_dim
+        )
         position_ids = position_ids.cast("float32")
         position_ids = position_ids / self.compression_ratio
         freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
-        emb = paddle.stack([freqs, freqs], axis=-1).reshape((batch_size, seq_length, self.head_dim))
+        emb = paddle.stack([freqs, freqs], axis=-1).reshape(
+            (batch_size, seq_length, self.head_dim)
+        )
         emb = paddle.unsqueeze(emb, 2)
 
         rope_emb[0] = paddle.cos(emb)
@@ -720,16 +818,29 @@ class ErnieMLP(nn.Layer):
         self.fuse_ffn = config.fuse_attn_ffn
 
         if config.tensor_parallel_degree > 1:
-            ColumnLN = ColumnSequenceParallelLinear if config.sequence_parallel else ColumnParallelLinear
-            RowLN = RowSequenceParallelLinear if config.sequence_parallel else RowParallelLinear
+            ColumnLN = (
+                ColumnSequenceParallelLinear
+                if config.sequence_parallel
+                else ColumnParallelLinear
+            )
+            RowLN = (
+                RowSequenceParallelLinear
+                if config.sequence_parallel
+                else RowParallelLinear
+            )
 
             column_ln_configs = (
-                {"use_rr": config.use_recompute and config.skip_recompute_ops.get("mlp_column_ln", False)}
+                {
+                    "use_rr": config.use_recompute
+                    and config.skip_recompute_ops.get("mlp_column_ln", False)
+                }
                 if config.sequence_parallel and get_env_device() == "gpu"
                 else {}
             )
             if config.sequence_parallel and get_env_device() == "gpu":
-                column_ln_configs["use_tpsp_comm_overlap"] = config.use_tpsp_comm_overlap
+                column_ln_configs["use_tpsp_comm_overlap"] = (
+                    config.use_tpsp_comm_overlap
+                )
             if config.fuse_attn_ffn:
                 self.up_gate_proj = ColumnLN(
                     self.hidden_size,
@@ -757,7 +868,9 @@ class ErnieMLP(nn.Layer):
                     **column_ln_configs,
                 )
         else:
-            LinearFN = paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
+            LinearFN = (
+                paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
+            )
             if config.fuse_attn_ffn:
                 self.up_gate_proj = LinearFN(
                     self.hidden_size,
@@ -765,12 +878,19 @@ class ErnieMLP(nn.Layer):
                     bias_attr=config.use_bias,
                 )
             else:
-                self.gate_proj = LinearFN(self.hidden_size, self.intermediate_size, bias_attr=config.use_bias)
-                self.up_proj = LinearFN(self.hidden_size, self.intermediate_size, bias_attr=config.use_bias)
+                self.gate_proj = LinearFN(
+                    self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+                )
+                self.up_proj = LinearFN(
+                    self.hidden_size, self.intermediate_size, bias_attr=config.use_bias
+                )
 
         if config.tensor_parallel_degree > 1:
             row_ln_configs = (
-                {"use_rr": config.use_recompute and config.skip_recompute_ops.get("mlp_row_ln", False)}
+                {
+                    "use_rr": config.use_recompute
+                    and config.skip_recompute_ops.get("mlp_row_ln", False)
+                }
                 if config.sequence_parallel and get_env_device() == "gpu"
                 else {}
             )
@@ -785,8 +905,12 @@ class ErnieMLP(nn.Layer):
                 **row_ln_configs,
             )
         else:
-            LinearFN = paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
-            self.down_proj = LinearFN(self.intermediate_size, self.hidden_size, bias_attr=config.use_bias)
+            LinearFN = (
+                paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
+            )
+            self.down_proj = LinearFN(
+                self.intermediate_size, self.hidden_size, bias_attr=config.use_bias
+            )
 
         self.fuse_swiglu = config.fuse_swiglu
         if self.fuse_swiglu:
@@ -799,7 +923,9 @@ class ErnieMLP(nn.Layer):
             and self.config.use_fp8_mlp
             and not self.config.use_bias
         ):
-            return MemEfficientFp8FusedMlpFunc.apply(x, self.up_gate_proj.weight, self.down_proj.weight)
+            return MemEfficientFp8FusedMlpFunc.apply(
+                x, self.up_gate_proj.weight, self.down_proj.weight
+            )
 
         if self.fuse_swiglu:
             if self.fuse_ffn:
@@ -844,15 +970,24 @@ class ErnieAttention(nn.Layer):
         self.fuse_attn = config.fuse_attn_ffn
         self.use_recompute_attn = config.use_recompute_attn
         logger.info(f"using recompute attn={self.use_recompute_attn}")
-        self.is_gqa = config.num_key_value_heads is not None and config.num_key_value_heads != self.num_heads
+        self.is_gqa = (
+            config.num_key_value_heads is not None
+            and config.num_key_value_heads != self.num_heads
+        )
         if config.fuse_rope:
             assert fused_rope is not None, "fused_rope is not supported"
         self.fuse_rope = config.fuse_rope
         self.rope_3d = config.rope_3d
         if self.rope_3d:
-            assert not self.fuse_rope, "does not support fuse rope when rope_3d is on for now."
-            assert not config.rope_reorder, "does not support rope_reorder when rope_3d is on for now."
-            assert config.freq_allocation is not None, "freq_allocation must be provided if rope_3d is on."
+            assert (
+                not self.fuse_rope
+            ), "does not support fuse rope when rope_3d is on for now."
+            assert (
+                not config.rope_reorder
+            ), "does not support rope_reorder when rope_3d is on for now."
+            assert (
+                config.freq_allocation is not None
+            ), "freq_allocation must be provided if rope_3d is on."
 
         if config.tensor_parallel_degree > 1:
             assert (
@@ -863,9 +998,13 @@ class ErnieAttention(nn.Layer):
                 assert (
                     self.num_key_value_heads % config.tensor_parallel_degree == 0
                 ), f"num_heads: {self.num_key_value_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
-                self.num_key_value_heads = self.num_key_value_heads // config.tensor_parallel_degree
+                self.num_key_value_heads = (
+                    self.num_key_value_heads // config.tensor_parallel_degree
+                )
         if self.is_gqa:
-            logger.info(f"use GQA - num_heads: {self.num_heads}- num_key_value_heads: {self.num_key_value_heads}")
+            logger.info(
+                f"use GQA - num_heads: {self.num_heads}- num_key_value_heads: {self.num_key_value_heads}"
+            )
             assert (
                 self.num_heads % self.num_key_value_heads == 0
             ), f"num_heads: {self.num_heads}, num_key_value_heads: {self.num_key_value_heads}"
@@ -875,15 +1014,28 @@ class ErnieAttention(nn.Layer):
             q_hidden_size = kv_hidden_size = self.head_dim * config.num_attention_heads
 
         if config.tensor_parallel_degree > 1:
-            ColumnLN = ColumnSequenceParallelLinear if config.sequence_parallel else ColumnParallelLinear
-            RowLN = RowSequenceParallelLinear if config.sequence_parallel else RowParallelLinear
+            ColumnLN = (
+                ColumnSequenceParallelLinear
+                if config.sequence_parallel
+                else ColumnParallelLinear
+            )
+            RowLN = (
+                RowSequenceParallelLinear
+                if config.sequence_parallel
+                else RowParallelLinear
+            )
             column_ln_configs = (
-                {"use_rr": config.use_recompute and config.skip_recompute_ops.get("attention_column_ln", False)}
+                {
+                    "use_rr": config.use_recompute
+                    and config.skip_recompute_ops.get("attention_column_ln", False)
+                }
                 if config.sequence_parallel and get_env_device() == "gpu"
                 else {}
             )
             if config.sequence_parallel and get_env_device() == "gpu":
-                column_ln_configs["use_tpsp_comm_overlap"] = config.use_tpsp_comm_overlap
+                column_ln_configs["use_tpsp_comm_overlap"] = (
+                    config.use_tpsp_comm_overlap
+                )
 
             if config.fuse_attn_ffn:
                 self.qkv_proj = ColumnLN(
@@ -920,7 +1072,9 @@ class ErnieAttention(nn.Layer):
                     **column_ln_configs,
                 )
         else:
-            LinearFN = paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
+            LinearFN = (
+                paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
+            )
             if config.fuse_attn_ffn:
                 self.qkv_proj = LinearFN(
                     self.hidden_size,
@@ -946,7 +1100,10 @@ class ErnieAttention(nn.Layer):
 
         if config.tensor_parallel_degree > 1:
             row_ln_configs = (
-                {"use_rr": config.use_recompute and config.skip_recompute_ops.get("attention_row_ln", False)}
+                {
+                    "use_rr": config.use_recompute
+                    and config.skip_recompute_ops.get("attention_row_ln", False)
+                }
                 if config.sequence_parallel and get_env_device() == "gpu"
                 else {}
             )
@@ -962,7 +1119,9 @@ class ErnieAttention(nn.Layer):
                 **row_ln_configs,
             )
         else:
-            LinearFN = paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
+            LinearFN = (
+                paddle.incubate.nn.FusedLinear if config.fuse_linear else NativeLinear
+            )
             self.o_proj = LinearFN(
                 q_hidden_size,
                 self.hidden_size,
@@ -1004,7 +1163,11 @@ class ErnieAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         if self.config.sequence_parallel:
             if not self.config.using_dynamic_sequence_length:
-                bsz = hidden_states.shape[0] * self.config.tensor_parallel_degree // self.config.seqlen
+                bsz = (
+                    hidden_states.shape[0]
+                    * self.config.tensor_parallel_degree
+                    // self.config.seqlen
+                )
                 q_len = self.config.seqlen
             else:
                 assert (
@@ -1012,7 +1175,9 @@ class ErnieAttention(nn.Layer):
                 ), "micro_batch_size should be set when using dygramic sequence length."
 
                 bsz = self.config.micro_batch_size
-                q_len = hidden_states.shape[0] * self.config.tensor_parallel_degree // bsz
+                q_len = (
+                    hidden_states.shape[0] * self.config.tensor_parallel_degree // bsz
+                )
         else:
             bsz, q_len, _ = hidden_states.shape
         query_states = key_states = value_states = mix_layer = None
@@ -1030,9 +1195,13 @@ class ErnieAttention(nn.Layer):
                 )
                 mix_layer = None
             else:
-                mix_layer = mix_layer.reshape([bsz, q_len, self.num_heads, 3 * self.head_dim])
+                mix_layer = mix_layer.reshape(
+                    [bsz, q_len, self.num_heads, 3 * self.head_dim]
+                )
         else:
-            query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+            query_states = self.q_proj(hidden_states).reshape(
+                shape=[bsz, q_len, self.num_heads, self.head_dim]
+            )
             key_states = self.k_proj(hidden_states).reshape(
                 shape=[
                     bsz,
@@ -1109,7 +1278,9 @@ class ErnieAttention(nn.Layer):
 
         if self.rope_3d:
             assert position_ids is not None, "rope3d requires pos-id"
-        kv_seq_len = key_states.shape[-3] if not self.rope_3d else position_ids.max() + 1
+        kv_seq_len = (
+            key_states.shape[-3] if not self.rope_3d else position_ids.max() + 1
+        )
         offset = 0
         if past_key_value is not None:
             if not self.rope_3d:
@@ -1134,10 +1305,14 @@ class ErnieAttention(nn.Layer):
         else:
             if offset > 0 or position_ids is not None or not self.fuse_rope:
                 if not self.rope_3d:
-                    cos_sin = self.rotary_emb(kv_seq_len, position_ids).transpose([0, 2, 1, 3])
+                    cos_sin = self.rotary_emb(kv_seq_len, position_ids).transpose(
+                        [0, 2, 1, 3]
+                    )
                     if offset > 0 and position_ids is None:
                         cos_sin = cos_sin[:, offset:]
-                    query_states, key_states = self.rotary_emb.apply_rotary(cos_sin, query_states, key_states)
+                    query_states, key_states = self.rotary_emb.apply_rotary(
+                        cos_sin, query_states, key_states
+                    )
                 else:
                     cos_sin = self.rotary_emb(kv_seq_len).transpose([0, 2, 1, 3])
 
@@ -1152,8 +1327,12 @@ class ErnieAttention(nn.Layer):
                 bsz, q_len, num_heads, head_dim = query_states.shape
                 _, kv_seq_len, num_key_value_heads, _ = key_states.shape
                 if num_heads != num_key_value_heads:
-                    query_states, _, _ = fused_rope(query_states, None, None, rotary_emb_base=self.config.rope_theta)
-                    key_states, _, _ = fused_rope(key_states, None, None, rotary_emb_base=self.config.rope_theta)
+                    query_states, _, _ = fused_rope(
+                        query_states, None, None, rotary_emb_base=self.config.rope_theta
+                    )
+                    key_states, _, _ = fused_rope(
+                        key_states, None, None, rotary_emb_base=self.config.rope_theta
+                    )
                 else:
                     query_states, key_states, _ = fused_rope(
                         query_states,
@@ -1199,8 +1378,12 @@ class ErnieDecoderLayer(nn.Layer):
 
         self.input_layernorm = Norm(config)
         self.post_attention_layernorm = Norm(config)
-        self.residual_add1 = FusedDropoutImpl(config.hidden_dropout_prob, mode="upscale_in_train")
-        self.residual_add2 = FusedDropoutImpl(config.hidden_dropout_prob, mode="upscale_in_train")
+        self.residual_add1 = FusedDropoutImpl(
+            config.hidden_dropout_prob, mode="upscale_in_train"
+        )
+        self.residual_add2 = FusedDropoutImpl(
+            config.hidden_dropout_prob, mode="upscale_in_train"
+        )
         self.config = config
 
     def forward(
@@ -1226,8 +1409,13 @@ class ErnieDecoderLayer(nn.Layer):
             inbatch_pack_offset=inbatch_pack_offset,
         )
 
-        if self.config.tensor_parallel_degree > 1 and self.config.hidden_dropout_prob > 0.0:
-            current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
+        if (
+            self.config.tensor_parallel_degree > 1
+            and self.config.hidden_dropout_prob > 0.0
+        ):
+            current_seed = (
+                "local_seed" if self.config.sequence_parallel else "global_seed"
+            )
             with get_rng_state_tracker().rng_state(current_seed):
                 hidden_states = self.residual_add1(hidden_states, residual)
         else:
@@ -1237,8 +1425,13 @@ class ErnieDecoderLayer(nn.Layer):
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
 
-        if self.config.tensor_parallel_degree > 1 and self.config.hidden_dropout_prob > 0.0:
-            current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
+        if (
+            self.config.tensor_parallel_degree > 1
+            and self.config.hidden_dropout_prob > 0.0
+        ):
+            current_seed = (
+                "local_seed" if self.config.sequence_parallel else "global_seed"
+            )
             with get_rng_state_tracker().rng_state(current_seed):
                 hidden_states = self.residual_add2(hidden_states, residual)
         else:
@@ -1270,7 +1463,9 @@ class ErniePretrainedModel(PretrainedModel):
             ["norm.weight"],
         ]
         for layer_index in range(
-            config.num_hidden_layers if not config.remove_tail_layer else config.num_hidden_layers - 1
+            config.num_hidden_layers
+            if not config.remove_tail_layer
+            else config.num_hidden_layers - 1
         ):
             if config.fuse_attn_ffn:
                 layer_mappings = [
@@ -1332,7 +1527,10 @@ class ErniePretrainedModel(PretrainedModel):
                 mapping[1] = "ernie." + mapping[1]
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
-        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        mappings = [
+            StateDictNameMapping(*mapping, index=index)
+            for index, mapping in enumerate(model_mappings)
+        ]
         return mappings
 
     @classmethod
@@ -1347,7 +1545,10 @@ class ErniePretrainedModel(PretrainedModel):
             num_attention_heads=config.num_attention_heads,
         )
 
-        if config.num_key_value_heads is not None and config.num_key_value_heads != config.num_attention_heads:
+        if (
+            config.num_key_value_heads is not None
+            and config.num_key_value_heads != config.num_attention_heads
+        ):
             if is_split:
                 qkv_fn = partial(
                     gqa_qkv_split_func,
@@ -1372,8 +1573,12 @@ class ErniePretrainedModel(PretrainedModel):
             if config.fuse_attn_ffn:
                 base_actions = {
                     "layers.0.self_attn.qkv_proj.weight": qkv_fn,
-                    "layers.0.mlp.up_gate_proj.weight": partial(fn, is_column=True, is_naive_2fuse=True),
-                    "lm_head.weight": partial(fn, is_column=not config.tie_word_embeddings),
+                    "layers.0.mlp.up_gate_proj.weight": partial(
+                        fn, is_column=True, is_naive_2fuse=True
+                    ),
+                    "lm_head.weight": partial(
+                        fn, is_column=not config.tie_word_embeddings
+                    ),
                     "embed_tokens.weight": partial(fn, is_column=False),
                     "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                     "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
@@ -1382,7 +1587,9 @@ class ErniePretrainedModel(PretrainedModel):
                     base_actions.update(
                         {
                             "layers.0.self_attn.qkv_proj.bias": qkv_fn,
-                            "layers.0.mlp.up_gate_proj.bias": partial(fn, is_column=True, is_naive_2fuse=True),
+                            "layers.0.mlp.up_gate_proj.bias": partial(
+                                fn, is_column=True, is_naive_2fuse=True
+                            ),
                             "lm_head.bias": partial(fn, is_column=True),
                         }
                     )
@@ -1393,7 +1600,9 @@ class ErniePretrainedModel(PretrainedModel):
                     "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
                     "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
                     "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
-                    "lm_head.weight": partial(fn, is_column=not config.tie_word_embeddings),
+                    "lm_head.weight": partial(
+                        fn, is_column=not config.tie_word_embeddings
+                    ),
                     "embed_tokens.weight": partial(fn, is_column=False),
                     "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                     "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
@@ -1401,9 +1610,15 @@ class ErniePretrainedModel(PretrainedModel):
                 if config.use_bias:
                     base_actions.update(
                         {
-                            "layers.0.self_attn.q_proj.bias": partial(fn, is_column=True),
-                            "layers.0.self_attn.k_proj.bias": partial(fn, is_column=True),
-                            "layers.0.self_attn.v_proj.bias": partial(fn, is_column=True),
+                            "layers.0.self_attn.q_proj.bias": partial(
+                                fn, is_column=True
+                            ),
+                            "layers.0.self_attn.k_proj.bias": partial(
+                                fn, is_column=True
+                            ),
+                            "layers.0.self_attn.v_proj.bias": partial(
+                                fn, is_column=True
+                            ),
                             "layers.0.mlp.gate_proj.bias": partial(fn, is_column=True),
                             "layers.0.mlp.up_proj.bias": partial(fn, is_column=True),
                             "lm_head.bias": partial(fn, is_column=True),
@@ -1418,7 +1633,9 @@ class ErniePretrainedModel(PretrainedModel):
             return final_actions
 
         mappings = get_tensor_parallel_split_mappings(
-            config.num_hidden_layers if not config.remove_tail_layer else config.num_hidden_layers - 1
+            config.num_hidden_layers
+            if not config.remove_tail_layer
+            else config.num_hidden_layers - 1
         )
 
         return mappings
@@ -1448,7 +1665,9 @@ class ErniePretrainedModel(PretrainedModel):
                 dtype = paddle.get_default_dtype()
                 paddle.set_default_dtype("float32")
                 layer.weight.set_value(
-                    paddle.randn(layer.weight.shape, dtype=dtype).scale(self.config.initializer_range)
+                    paddle.randn(layer.weight.shape, dtype=dtype).scale(
+                        self.config.initializer_range
+                    )
                 )
                 paddle.set_default_dtype(dtype)
                 logger.info(
@@ -1459,7 +1678,9 @@ class ErniePretrainedModel(PretrainedModel):
 
         elif isinstance(layer, RotaryEmbedding):
             head_dim = self.config.hidden_size // self.config.num_attention_heads
-            inv_freq = 1.0 / (layer.base ** (np.arange(0, head_dim, 2).astype("float32") / head_dim))
+            inv_freq = 1.0 / (
+                layer.base ** (np.arange(0, head_dim, 2).astype("float32") / head_dim)
+            )
 
             t = np.arange(layer.max_position_embeddings, dtype="float32")
             freqs = np.einsum("i,j->ij", t, inv_freq)
@@ -1494,7 +1715,9 @@ class ErnieModel(ErniePretrainedModel):
         layers_list = [
             ErnieDecoderLayer(config, layer_idx)
             for layer_idx in range(
-                config.num_hidden_layers - 1 if config.remove_tail_layer else config.num_hidden_layers
+                config.num_hidden_layers - 1
+                if config.remove_tail_layer
+                else config.num_hidden_layers
             )
         ]
 
@@ -1512,7 +1735,9 @@ class ErnieModel(ErniePretrainedModel):
         self.embed_tokens = value
 
     @classmethod
-    def _prepare_decoder_attention_mask(cls, attention_mask, input_shape, past_key_values_length, dtype):
+    def _prepare_decoder_attention_mask(
+        cls, attention_mask, input_shape, past_key_values_length, dtype
+    ):
         combined_attention_mask = None
         if input_shape[-1] > 1:
             combined_attention_mask = _make_causal_mask(
@@ -1520,9 +1745,13 @@ class ErnieModel(ErniePretrainedModel):
             )
 
         if attention_mask is not None:
-            expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+            expanded_attn_mask = _expand_mask(
+                attention_mask, dtype, tgt_length=input_shape[-1]
+            )
             combined_attention_mask = (
-                expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
+                expanded_attn_mask
+                if combined_attention_mask is None
+                else expanded_attn_mask + combined_attention_mask
             )
         combined_attention_mask = paddle.maximum(
             combined_attention_mask.astype(dtype),
@@ -1576,22 +1805,34 @@ class ErnieModel(ErniePretrainedModel):
         inbatch_pack_offset=None,
         **kwargs,
     ):
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+            raise ValueError(
+                "You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time"
+            )
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape
         elif inputs_embeds is not None:
             batch_size, seq_length, _ = inputs_embeds.shape
         else:
-            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+            raise ValueError(
+                "You have to specify either decoder_input_ids or decoder_inputs_embeds"
+            )
 
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.layers))
@@ -1611,7 +1852,9 @@ class ErnieModel(ErniePretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         can_use_fa = self.config.use_flash_attn and flash_attention is not None
-        can_mem_eff_attn = self.config.use_mem_eff_attn and inbatch_pack_offset is not None
+        can_mem_eff_attn = (
+            self.config.use_mem_eff_attn and inbatch_pack_offset is not None
+        )
         if can_use_fa or can_mem_eff_attn:
             if attention_mask is not None:
                 attention_mask = None
@@ -1621,7 +1864,9 @@ class ErnieModel(ErniePretrainedModel):
                     f"attention_mask is not None = {attention_mask is not None}"
                 )
         elif attention_mask is None:
-            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+            attention_mask = paddle.ones(
+                (batch_size, seq_length_with_past), dtype=paddle.bool
+            )
 
         if attention_mask is not None:
             attention_mask = self._prepare_decoder_attention_mask(
@@ -1640,7 +1885,9 @@ class ErnieModel(ErniePretrainedModel):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
-            past_key_value = past_key_values[idx] if past_key_values is not None else None
+            past_key_value = (
+                past_key_values[idx] if past_key_values is not None else None
+            )
 
             has_gradient = not hidden_states.stop_gradient
             if self.config.use_recompute and has_gradient:
@@ -1686,7 +1933,11 @@ class ErnieModel(ErniePretrainedModel):
         next_cache = next_decoder_cache if use_cache else None
 
         if not return_dict:
-            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+            return tuple(
+                v
+                for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+                if v is not None
+            )
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
@@ -1725,7 +1976,9 @@ class FusedHeadParallelCrossEntropy(PyLayer):
 
         if ctx.tensor_parallel_degree > 1:
             ctx.mp_group = (
-                fleet.get_hybrid_communicate_group().get_model_parallel_group() if mp_group is None else mp_group
+                fleet.get_hybrid_communicate_group().get_model_parallel_group()
+                if mp_group is None
+                else mp_group
             )
             ctx.rank = ctx.mp_group.rank
             ctx.world_size = ctx.mp_group.nranks
@@ -1758,7 +2011,9 @@ class FusedHeadParallelCrossEntropy(PyLayer):
                         [ctx.num_tokens_per_rank[idx], hidden_states.shape[-1]],
                         dtype=hidden_states.dtype,
                     )
-                    labels_recv = paddle.empty([ctx.num_tokens_per_rank[idx]], dtype=labels.dtype)
+                    labels_recv = paddle.empty(
+                        [ctx.num_tokens_per_rank[idx]], dtype=labels.dtype
+                    )
 
                 if ctx.tensor_parallel_degree > 1:
                     dist.stream.broadcast(
@@ -1766,7 +2021,9 @@ class FusedHeadParallelCrossEntropy(PyLayer):
                         src=ctx.mp_group.ranks[idx],
                         group=ctx.mp_group,
                     )
-                    dist.stream.broadcast(labels_recv, src=ctx.mp_group.ranks[idx], group=ctx.mp_group)
+                    dist.stream.broadcast(
+                        labels_recv, src=ctx.mp_group.ranks[idx], group=ctx.mp_group
+                    )
 
                 seq_len = hidden_states_recv.shape[0]
                 num_chunk = (seq_len + ctx.seq_chunk_size - 1) // ctx.seq_chunk_size
@@ -1821,7 +2078,9 @@ class FusedHeadParallelCrossEntropy(PyLayer):
 
         hidden_states, weight, bias, labels = ctx.saved_tensor()
 
-        loss_all_grad_list = paddle.split(loss_all_grad, ctx.loss_concat_sections, axis=0)
+        loss_all_grad_list = paddle.split(
+            loss_all_grad, ctx.loss_concat_sections, axis=0
+        )
 
         def detach_variable(inp):
             if inp is None:
@@ -1857,14 +2116,18 @@ class FusedHeadParallelCrossEntropy(PyLayer):
                         [ctx.num_tokens_per_rank[idx], hidden_states.shape[-1]],
                         dtype=hidden_states.dtype,
                     )
-                    labels_recv = paddle.empty([ctx.num_tokens_per_rank[idx]], dtype=labels.dtype)
+                    labels_recv = paddle.empty(
+                        [ctx.num_tokens_per_rank[idx]], dtype=labels.dtype
+                    )
                 if ctx.tensor_parallel_degree > 1:
                     dist.stream.broadcast(
                         hidden_states_recv,
                         src=ctx.mp_group.ranks[idx],
                         group=ctx.mp_group,
                     )
-                    dist.stream.broadcast(labels_recv, src=ctx.mp_group.ranks[idx], group=ctx.mp_group)
+                    dist.stream.broadcast(
+                        labels_recv, src=ctx.mp_group.ranks[idx], group=ctx.mp_group
+                    )
                 hidden_states_recv.stop_gradient = False
 
                 seq_len = hidden_states_recv.shape[0]
@@ -1873,7 +2136,9 @@ class FusedHeadParallelCrossEntropy(PyLayer):
                 for chunk_idx in range(num_chunk):
                     start = chunk_idx * ctx.seq_chunk_size
                     end = min(start + ctx.seq_chunk_size, seq_len)
-                    hidden_states_chunk = hidden_states_recv.slice(axes=[0], starts=[start], ends=[end])
+                    hidden_states_chunk = hidden_states_recv.slice(
+                        axes=[0], starts=[start], ends=[end]
+                    )
                     labels_chunk = labels_recv._slice(start, end)
                     loss_grad_chunk = loss_all_grad_list[idx]._slice(start, end)
 
@@ -1897,10 +2162,12 @@ class FusedHeadParallelCrossEntropy(PyLayer):
                                 ignore_index=ctx.ignore_index,
                             )
                         else:
-                            loss_chunk = paddle.nn.functional.softmax_with_cross_entropy(
-                                logits.cast("float32"),
-                                labels_chunk.unsqueeze(-1),
-                                ignore_index=ctx.ignore_index,
+                            loss_chunk = (
+                                paddle.nn.functional.softmax_with_cross_entropy(
+                                    logits.cast("float32"),
+                                    labels_chunk.unsqueeze(-1),
+                                    ignore_index=ctx.ignore_index,
+                                )
                             )
 
                     with paddle.amp.auto_cast(enable=False):
@@ -1915,7 +2182,9 @@ class FusedHeadParallelCrossEntropy(PyLayer):
 
                 if idx == ctx.rank:
                     hidden_states_grad = hidden_states_recv.grad
-                    hidden_states_grad = hidden_states_grad.reshape(ctx.hidden_states_shape)
+                    hidden_states_grad = hidden_states_grad.reshape(
+                        ctx.hidden_states_shape
+                    )
 
         if weight_main_grad is not None:
             weight_main_grad = weight_main_grad.astype(weight.dtype)
@@ -1942,7 +2211,10 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         self.ignored_index = getattr(config, "ignored_index", -100)
         self.config = config
         self.return_tuple = return_tuple
-        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+        self.enable_parallel_cross_entropy = (
+            config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+        )
+        self.kl_loss_fn = kl_divergence
 
         if self.enable_parallel_cross_entropy:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
@@ -1952,25 +2224,40 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
             )
         self.token_balance_loss = config.token_balance_loss
 
-    def forward(self, prediction_scores, masked_lm_labels):
+    def forward(
+        self,
+        prediction_scores,
+        masked_lm_labels,
+        kl_logits=None,
+        kl_ids=None,
+        loss_ratio=None,
+    ):
 
         if self.config.use_sparse_head_and_loss_fn:
             hidden_states, outlinear_weight, outlinear_bias = prediction_scores
 
             if self.config.sequence_parallel:
-                masked_lm_labels, sparse_label_idx = sequence_parallel_sparse_mask_labels(
-                    masked_lm_labels, self.ignored_index
+                masked_lm_labels, sparse_label_idx = (
+                    sequence_parallel_sparse_mask_labels(
+                        masked_lm_labels, self.ignored_index
+                    )
                 )
                 sparse_label_idx = sparse_label_idx.reshape([-1, 1])
                 hidden_states = paddle.gather(hidden_states, sparse_label_idx, axis=0)
                 hidden_states = AllGatherVarlenOp.apply(hidden_states)
             else:
                 masked_lm_labels = masked_lm_labels.flatten()
-                sparse_label_idx = paddle.nonzero(masked_lm_labels != self.ignored_index).flatten()
-                masked_lm_labels = paddle.take_along_axis(masked_lm_labels, sparse_label_idx, axis=0)
+                sparse_label_idx = paddle.nonzero(
+                    masked_lm_labels != self.ignored_index
+                ).flatten()
+                masked_lm_labels = paddle.take_along_axis(
+                    masked_lm_labels, sparse_label_idx, axis=0
+                )
 
                 hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
-                hidden_states = paddle.take_along_axis(hidden_states, sparse_label_idx.reshape([-1, 1]), axis=0)
+                hidden_states = paddle.take_along_axis(
+                    hidden_states, sparse_label_idx.reshape([-1, 1]), axis=0
+                )
 
             if self.config.use_recompute_loss_fn:
                 offload_kwargs = {}
@@ -1995,20 +2282,28 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                 res = self.forward_impl(logits, masked_lm_labels)
         elif self.config.use_recompute_loss_fn:
             if self.config.use_fused_head_loss_fn:
-                res = self.forward_impl_with_fused_head_loss_fn(masked_lm_labels, *prediction_scores)
+                res = self.forward_impl_with_fused_head_loss_fn(
+                    masked_lm_labels, *prediction_scores
+                )
             else:
-                assert isinstance(prediction_scores, tuple) and len(prediction_scores) in [3, 4], prediction_scores
+                assert isinstance(prediction_scores, tuple) and len(
+                    prediction_scores
+                ) in [3, 4], prediction_scores
                 res = recompute(
                     self.forward_impl_with_calc_logits,
                     masked_lm_labels,
                     *prediction_scores,
                 )
         else:
-            res = self.forward_impl(prediction_scores, masked_lm_labels)
+            res = self.forward_impl(
+                prediction_scores, masked_lm_labels, kl_logits, kl_ids, loss_ratio
+            )
 
         return res
 
-    def forward_impl_with_fused_head_loss_fn(self, masked_lm_labels, hidden_states, outlinear_weight, outlinear_bias):
+    def forward_impl_with_fused_head_loss_fn(
+        self, masked_lm_labels, hidden_states, outlinear_weight, outlinear_bias
+    ):
         masked_lm_labels.stop_gradient = True
         masked_lm_loss, masked_lm_labels_all = FusedHeadParallelCrossEntropy.apply(
             hidden_states,
@@ -2024,13 +2319,17 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         )
         lossmask = masked_lm_labels_all != self.ignored_index
         if (~lossmask).all():
-            logger.warning(f"encounter empty span when calculate loss, ignored_index={self.ignored_index}")
+            logger.warning(
+                f"encounter empty span when calculate loss, ignored_index={self.ignored_index}"
+            )
             loss = paddle.mean(masked_lm_loss) * 0.0
             loss_sum = masked_lm_loss.sum().detach()
         else:
             lossmask = lossmask.reshape([-1]).cast(paddle.float32)
 
-            masked_lm_loss = paddle.sum(masked_lm_loss.cast(paddle.float32).reshape([-1]) * lossmask)
+            masked_lm_loss = paddle.sum(
+                masked_lm_loss.cast(paddle.float32).reshape([-1]) * lossmask
+            )
             loss = masked_lm_loss / lossmask.sum()
             if self.token_balance_loss:
                 _loss = masked_lm_loss / self.config.token_balance_seqlen
@@ -2043,7 +2342,9 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
             return loss_sum
         return loss, loss_sum
 
-    def forward_impl_with_calc_logits(self, masked_lm_labels, hidden_states, outlinear_weight, outlinear_bias):
+    def forward_impl_with_calc_logits(
+        self, masked_lm_labels, hidden_states, outlinear_weight, outlinear_bias
+    ):
 
         logits = calc_lm_head_logits(
             self.config,
@@ -2057,22 +2358,32 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     def loss_impl(self, prediction_scores, masked_lm_labels):
         prediction_scores = prediction_scores.cast("float32")
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(-1))
+        masked_lm_loss = self.loss_func(
+            prediction_scores, masked_lm_labels.unsqueeze(-1)
+        )
 
         return masked_lm_loss
 
-    def forward_impl(self, prediction_scores, masked_lm_labels):
+    def forward_impl(
+        self,
+        prediction_scores,
+        masked_lm_labels,
+        kl_logits=None,
+        kl_ids=None,
+        loss_ratio=None,
+    ):
         if self.enable_parallel_cross_entropy:
             assert prediction_scores.shape[-1] != self.config.vocab_size, (
                 f"enable_parallel_cross_entropy, the vocab_size should be splited:"
                 f" {prediction_scores.shape[-1]}, {self.config.vocab_size}"
             )
 
+        kl_loss = paddle.to_tensor(0.0)
         with paddle.amp.auto_cast(False):
             prediction_scores_dims = len(prediction_scores.shape)
-            if prediction_scores_dims == 2 and prediction_scores.shape[0] > self.config.get(
-                "loss_subbatch_seqlen", 32768
-            ):
+            if prediction_scores_dims == 2 and prediction_scores.shape[
+                0
+            ] > self.config.get("loss_subbatch_seqlen", 32768):
                 sb_loss_func = subbatch(
                     self.loss_impl,
                     [0, 1],
@@ -2081,9 +2392,9 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                     0,
                 )
                 masked_lm_loss = sb_loss_func(prediction_scores, masked_lm_labels)
-            elif prediction_scores_dims == 3 and prediction_scores.shape[1] > self.config.get(
-                "loss_subbatch_seqlen", 32768
-            ):
+            elif prediction_scores_dims == 3 and prediction_scores.shape[
+                1
+            ] > self.config.get("loss_subbatch_seqlen", 32768):
                 sb_loss_func = subbatch(
                     self.loss_impl,
                     [0, 1],
@@ -2095,14 +2406,45 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
             else:
                 masked_lm_loss = self.loss_impl(prediction_scores, masked_lm_labels)
 
+            if kl_logits is not None:
+                prediction_scores_kl = F.softmax(
+                    prediction_scores, axis=-1, dtype="float32"
+                )
+                prediction_scores_kl = prediction_scores_kl.take_along_axis(
+                    kl_ids, axis=-1
+                )
+
+                kl_logits = paddle.exp(kl_logits)
+                kl_loss = self.kl_loss_fn(
+                    prediction_scores_kl,
+                    kl_logits,
+                    degree=self.config.tensor_parallel_degree,
+                    rank=self.config.tensor_parallel_rank,
+                )
+                kl_loss_log = kl_loss.mean()
+                ce_loss_log = masked_lm_loss.mean()
+                masked_lm_loss = (
+                    loss_ratio[: loss_ratio.shape[0] // 2][:, None, None] * kl_loss
+                    + loss_ratio[loss_ratio.shape[0] // 2 :][:, None, None]
+                    * masked_lm_loss
+                )
+                full_step_loss_log = masked_lm_loss.mean()
+                logger.info(
+                    f"[Micro Step]: KL Loss {kl_loss_log}, CE Loss {ce_loss_log}, Full Loss {full_step_loss_log}"
+                )
+
             lossmask = masked_lm_labels != self.ignored_index
             if (~lossmask).all():
-                logger.warning(f"encounter empty span when calculate loss, ignored_index={self.ignored_index}")
+                logger.warning(
+                    f"encounter empty span when calculate loss, ignored_index={self.ignored_index}"
+                )
                 loss = paddle.mean(masked_lm_loss) * 0.0
                 loss_sum = masked_lm_loss.sum().detach()
             else:
                 lossmask = lossmask.reshape([-1]).cast(paddle.float32)
-                masked_lm_loss = paddle.sum(masked_lm_loss.cast(paddle.float32).reshape([-1]) * lossmask)
+                masked_lm_loss = paddle.sum(
+                    masked_lm_loss.cast(paddle.float32).reshape([-1]) * lossmask
+                )
                 loss = masked_lm_loss / lossmask.sum()
                 if self.token_balance_loss:
                     _loss = masked_lm_loss / self.config.token_balance_seqlen
@@ -2127,27 +2469,41 @@ class ErnieLMHead(nn.Layer):
 
         self.weight = self.create_parameter(
             shape=(
-                [vocab_size, config.hidden_size] if config.tie_word_embeddings else [config.hidden_size, vocab_size]
+                [vocab_size, config.hidden_size]
+                if config.tie_word_embeddings
+                else [config.hidden_size, vocab_size]
             ),
             dtype=paddle.get_default_dtype(),
         )
-        logger.info(f"output-weight:{self.weight.shape} config.tie_word_embeddings={config.tie_word_embeddings}")
+        logger.info(
+            f"output-weight:{self.weight.shape} config.tie_word_embeddings={config.tie_word_embeddings}"
+        )
         if config.weight_share_add_bias and config.use_bias:
             self.bias = self.create_parameter(
                 shape=[vocab_size],
                 dtype=paddle.get_default_dtype(),
-                attr=paddle.ParamAttr(initializer=paddle.nn.initializer.constant.Constant(0.0)),
+                attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.constant.Constant(0.0)
+                ),
             )
         else:
             self.bias = None
 
-        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        self.weight.is_distributed = (
+            True if (vocab_size != config.vocab_size) else False
+        )
         if config.weight_share_add_bias and config.use_bias:
-            self.bias.is_distributed = True if (vocab_size != config.vocab_size) else False
+            self.bias.is_distributed = (
+                True if (vocab_size != config.vocab_size) else False
+            )
 
         if self.weight.is_distributed:
             self.weight.split_axis = 1
-        if config.weight_share_add_bias and config.use_bias and self.bias.is_distributed:
+        if (
+            config.weight_share_add_bias
+            and config.use_bias
+            and self.bias.is_distributed
+        ):
             self.bias.split_axis = 0
 
         if self.config.use_recompute_loss_fn:
@@ -2196,7 +2552,9 @@ class ErnieForCausalLM(ErniePretrainedModel):
             ), f"sequence-parallel needs mp>1, got mp={config.tensor_parallel_degree}"
 
         new_initializer_range = math.sqrt(0.3333 / config.hidden_size)
-        logger.info(f"change initializer-range from {config.initializer_range} to {new_initializer_range}")
+        logger.info(
+            f"change initializer-range from {config.initializer_range} to {new_initializer_range}"
+        )
         config.initializer_range = new_initializer_range
         self.config = config
 
@@ -2283,16 +2641,30 @@ class ErnieForCausalLM(ErniePretrainedModel):
 
         return model_inputs
 
-    def update_model_kwargs_for_generation(self, outputs, model_kwargs, is_encoder_decoder=False):
-        if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
+    def update_model_kwargs_for_generation(
+        self, outputs, model_kwargs, is_encoder_decoder=False
+    ):
+        if (
+            isinstance(outputs, tuple)
+            and len(outputs) > 1
+            and not isinstance(outputs[1], paddle.Tensor)
+        ):
             model_kwargs["past_key_values"] = outputs[1]
 
-        if isinstance(outputs, CausalLMOutputWithCrossAttentions) and "past_key_values" in outputs:
+        if (
+            isinstance(outputs, CausalLMOutputWithCrossAttentions)
+            and "past_key_values" in outputs
+        ):
             model_kwargs["past_key_values"] = outputs.past_key_values
 
-        if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
+        if (
+            "token_type_ids" in model_kwargs
+            and model_kwargs["token_type_ids"] is not None
+        ):
             token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
+            model_kwargs["token_type_ids"] = paddle.concat(
+                [token_type_ids, token_type_ids[:, -1:]], axis=-1
+            )
 
         if not is_encoder_decoder:
             if "attention_mask" in model_kwargs:
@@ -2306,10 +2678,14 @@ class ErnieForCausalLM(ErniePretrainedModel):
                 )
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
             role_ids = model_kwargs["role_ids"]
-            model_kwargs["role_ids"] = paddle.concat([role_ids, role_ids[:, -1:]], axis=-1)
+            model_kwargs["role_ids"] = paddle.concat(
+                [role_ids, role_ids[:, -1:]], axis=-1
+            )
 
         if self.config.rope_3d:
-            assert "position_ids" in model_kwargs, "position_ids must be provided if rope_3d is on"
+            assert (
+                "position_ids" in model_kwargs
+            ), "position_ids must be provided if rope_3d is on"
             position_ids = model_kwargs["position_ids"]
             model_kwargs["position_ids"] = paddle.concat(
                 [
@@ -2339,11 +2715,19 @@ class ErnieForCausalLM(ErniePretrainedModel):
         inbatch_pack_offset=None,
         loss_mask=None,
     ):
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         outputs = self.ernie(
             input_ids,

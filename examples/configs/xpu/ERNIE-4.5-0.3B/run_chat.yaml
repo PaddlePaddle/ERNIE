@@ -13,6 +13,4 @@ max_new_tokens: 8192
 top_p: 0.7
 temperature: 0.95
 
-# device
-device: xpu
 fuse_rms_norm: false
