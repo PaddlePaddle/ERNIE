@@ -608,7 +608,9 @@ class PaddleOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMix
 
         if inbatch_pack_offset is not None:
             attn_mask_startend_row_indices = (
-                inbatch_pack_offset_to_attn_mask_startend_row_indices(inbatch_pack_offset)
+                inbatch_pack_offset_to_attn_mask_startend_row_indices(
+                    inbatch_pack_offset
+                )
             )
         else:
             attn_mask_startend_row_indices = None
