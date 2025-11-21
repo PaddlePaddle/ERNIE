@@ -86,13 +86,13 @@ class ModelArguments:
     use_attn_mask_startend_row_indices: bool = field(
         default=True,
         metadata={
-            "help": "Whether to use attn_mask_start_row_indices in flash attention."
+            "help": "Whether to use attn_mask_startend_row_indices in flash attention."
         },
     )
     use_sparse_flash_attn: bool = field(
         default=True,
         metadata={
-            "help": "Under use attn_mask_start_row_indices=True, whether use sparse flash attention or not."
+            "help": "Under use attn_mask_startend_row_indices=True, whether use sparse flash attention or not."
         },
     )
     use_sparse_head_and_loss_fn: bool = field(

@@ -525,13 +525,13 @@ class Ernie4_5_DecoderLayerPipe(Ernie4_5_DecoderLayer):
             max_seq_len = hidden_states.shape[0] * self.config.tensor_parallel_degree
         if attention_mask is None:
             tgt_mask = None
-            attn_mask_start_row_indices = None
+            attn_mask_startend_row_indices = None
         elif attention_mask.dtype == paddle.int32:
             tgt_mask = None
-            attn_mask_start_row_indices = attention_mask[:, :, :max_seq_len]
+            attn_mask_startend_row_indices = attention_mask[:, :, :max_seq_len]
         else:
             tgt_mask = attention_mask[:, :, :max_seq_len, :max_seq_len]
-            attn_mask_start_row_indices = None
+            attn_mask_startend_row_indices = None
             assert (
                 len(tgt_mask.shape) == 4
             ), f"Attention mask should be 4D tensor, but got {tgt_mask.shape}."
@@ -550,7 +550,7 @@ class Ernie4_5_DecoderLayerPipe(Ernie4_5_DecoderLayer):
                 super().forward,
                 hidden_states,
                 attention_mask=tgt_mask,
-                attn_mask_start_row_indices=attn_mask_start_row_indices,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 position_ids=position_ids_decoder,
                 output_gate_logits=False,
                 use_reentrant=self.config.recompute_use_reentrant,
@@ -559,7 +559,7 @@ class Ernie4_5_DecoderLayerPipe(Ernie4_5_DecoderLayer):
             hidden_states = super().forward(
                 hidden_states=hidden_states,
                 attention_mask=tgt_mask,
-                attn_mask_start_row_indices=attn_mask_start_row_indices,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 position_ids=position_ids_decoder,
                 output_gate_logits=False,
             )
@@ -794,13 +794,13 @@ class MTPLayer(nn.Layer):
 
         if attention_mask is None:
             tgt_mask = None
-            attn_mask_start_row_indices = None
+            attn_mask_startend_row_indices = None
         elif attention_mask.dtype == paddle.int32:
             tgt_mask = None
-            attn_mask_start_row_indices = attention_mask
+            attn_mask_startend_row_indices = attention_mask
         else:
             tgt_mask = attention_mask
-            attn_mask_start_row_indices = None
+            attn_mask_startend_row_indices = None
             assert (
                 len(tgt_mask.shape) == 4
             ), f"Attention mask should be 4D tensor, but got {tgt_mask.shape}."
@@ -812,7 +812,7 @@ class MTPLayer(nn.Layer):
             if attention_mask is not None:
                 if attention_mask.dtype == paddle.int32:
                     tgt_mask = None
-                    attn_mask_start_row_indices = attention_mask[
+                    attn_mask_startend_row_indices = attention_mask[
                         :, :, depth + 1 : max_seq_len + depth + 1
                     ]
                 else:
@@ -822,7 +822,7 @@ class MTPLayer(nn.Layer):
                         depth + 1 : max_seq_len + depth + 1,
                         depth + 1 : max_seq_len + depth + 1,
                     ]
-                    attn_mask_start_row_indices = None
+                    attn_mask_startend_row_indices = None
                     assert (
                         len(tgt_mask.shape) == 4
                     ), f"Attention mask should be 4D tensor, but got {tgt_mask.shape}."
@@ -873,7 +873,7 @@ class MTPLayer(nn.Layer):
             layer_outputs = decoder_layer(
                 inputs_embeds_cur_depth,
                 tgt_mask,  # attention_mask
-                attn_mask_start_row_indices,  # attn_mask_start_row_indices
+                attn_mask_startend_row_indices,  # attn_mask_startend_row_indices
                 position_ids,  # position_ids
                 None,  # token-type
                 False,  # output-attention
@@ -1002,7 +1002,7 @@ class Ernie4_5_MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     def _prepare_pipeline_inputs_func(cls, inputs):
         first_stage_keys = [
             "input_ids",
-            "attn_mask_start_row_indices",
+            "attn_mask_startend_row_indices",
             "position_ids",
             "nbatch_pack_offset",
         ]
