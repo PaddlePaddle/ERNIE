@@ -6,19 +6,15 @@ English | [简体中文](./paddleocr_vl_sft_zh.md)
 
 PaddleOCR-VL, a SOTA and resource-efficient model tailored for document parsing. Its core component is PaddleOCR-VL-0.9B, a compact yet powerful vision-language model (VLM) that integrates a NaViT-style dynamic resolution visual encoder with the ERNIE-4.5-0.3B language model to enable accurate element recognition. This innovative model efficiently supports 109 languages and excels in recognizing complex elements (e.g., text, tables, formulas, and charts), while maintaining minimal resource consumption. Through comprehensive evaluations on widely used public benchmarks and in-house benchmarks, PaddleOCR-VL achieves SOTA performance in both page-level document parsing and element-level recognition. It significantly outperforms existing solutions, exhibits strong competitiveness against top-tier VLMs, and delivers fast inference speeds. These strengths make it highly suitable for practical deployment in real-world scenarios.
 
-While PaddleOCR-VL-0.9B excels in common scenarios, its performance often faces limitations in many specific or complex business applications. For instance:
+While PaddleOCR-VL-0.9B performs excellently in common scenarios, its recognition capabilities may face bottlenecks in specific or complex business applications. For example:
 
-- Domain-Specific Applications
-    - Finance & Accounting: Recognizing documents such as invoices, receipts, bank statements, and financial reports
-    - Healthcare: Processing medical records, lab reports, handwritten prescriptions, and pharmaceutical instructions
-    - Legal Sector: Identifying text in contracts, legal instruments, court filings, and certificates.
-- Non-Standard Text and Typography
-    - Handwriting Recognition: Deciphering handwritten forms, notes, letters, and questionnaires.
-    - Stylized & Artistic Fonts: Recognizing text on posters, billboards, product packaging, and menus.
-    - Historical & Archival Documents: Processing ancient manuscripts, old newspapers, and historical archives.
-- Task-Specific Structured Output
-    - Table Recognition & Structuring: Converting tables within images into structured formats like Excel, CSV, or JSON.
-    - Mathematical Formula Recognition: Identifying mathematical equations in textbooks or research papers and exporting them into formats like LaTeX.
+- Non-standard text and symbols
+    - Artistic or stylized fonts: Recognizing text on posters, billboards, product packaging, cards/documents, and seals.
+    - Specialized symbols: Such as the recognition of symbols in organic chemistry.
+- Specific tasks and output formats
+    - Fine-grained text localization and grounding outputs.
+    - Flowchart recognition with structured output.
+- Data for specific low-resource languages: such as Tibetan, Bengali, etc.
 
 This is where SFT (Supervised Fine-Tuning) becomes necessary to enhance the model’s accuracy and robustness for these specialized tasks.
 
@@ -49,12 +45,12 @@ python -m pip install opencv-python-headless
 python -m pip install numpy==1.26.4
 ```
 
-For more installation methods, please refer to the [ERNIEKit Installation Guide]((./erniekit.md#2-installation)).
+For more installation methods, please refer to the [ERNIEKit Installation Guide](./erniekit.md#2-installation).
 
 ## 3. Model and Dataset Preparation
 
 ### 3.1. Model Preparation
-The PaddleOCR-VL-0.9B model can be downloaded from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL/files).
+The PaddleOCR-VL-0.9B model can be downloaded from [huggingface](https://huggingface.co/PaddlePaddle/PaddleOCR-VL) or [modelscope](https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL).
 
 ```bash
 huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/PaddleOCR-VL
@@ -62,7 +58,7 @@ huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/Padd
 
 ### 3.2. Dataset Preparation
 
-For the training dataset format, please refer to [SFT VL Dataset Format]((./datasets.md#sft-vl-dataset)). Required fields are as follows:
+For the training dataset format, please refer to [SFT VL Dataset Format](./datasets.md#sft-vl-dataset). Required fields are as follows:
 * `text_info`: The list of text data, each element contains a `text` and a `tag`
   * `text`: The text content from User question or System response
   * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
@@ -75,7 +71,7 @@ Notes:
 * Each training sample is in JSON format, with multiple samples separated by newlines
 * Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
 
-For your convenience, we also provide a quick-start [Bengali training dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:
+For your convenience, we also provide a quick-start [Bengali training dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:   
 
 ```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
@@ -91,7 +87,7 @@ Bengali training example:
 ```json
 {
     "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+        {"matched_text_index": 0, "image_url": "./assets/bengali_train_example.png"},
     ],
     "text_info": [
         {"text": "OCR:", "tag": "mask"},
@@ -194,7 +190,7 @@ cp PaddlePaddle/PaddleOCR-VL/inference.yml PaddleOCR-VL-SFT-Bengali
 ```
 
 ### 7.3. Inference Dataset Preparation
-We provide a [Bengali test dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl)) that can be used for inference to observe the fine-tuning results. Download it using the following command:
+We provide a [Bengali test dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl) that can be used for inference to observe the fine-tuning results. Download it using the following command:
 
 ```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
@@ -236,7 +232,7 @@ Table Data: OTSL format
 ```json
 {
     "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/table_example.jps"},
+        {"matched_text_index": 0, "image_url": "./assets/table_example.png"},
     ],
     "text_info": [
         {"text": "Table Recognition:", "tag": "mask"},
@@ -254,7 +250,7 @@ Formula Data: LaTeX format
 ```json
 {
     "image_info": [
-        {"matched_text_index": 0, "image_url": "./assets/formula_example.jps"},
+        {"matched_text_index": 0, "image_url": "./assets/formula_example.jpg"},
     ],
     "text_info": [
         {"text": "Formula Recognition:", "tag": "mask"},
@@ -281,7 +277,7 @@ Chart Data: Markdown format
 }
 ```
 
-### Common Issues
+### 8.2. Common Issues
 
 If you encounter the following problem while using the above command, it is generally due to a conflict between cv2 and the environment. This can be resolved by installing `opencv-python-headless`.
 

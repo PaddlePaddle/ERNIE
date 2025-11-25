@@ -42,7 +42,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
 from paddle._typing import ParamAttrLike
-from paddle.nn.functional.flash_attention import flashmask_attention
+from paddle.nn.functional.flash_attention import (
+    flashmask_attention,
+    flash_attn_unpadded,
+)
 from paddleformers.transformers.model_utils import PretrainedModel
 from paddleformers.transformers.model_outputs import (
     BaseModelOutput,
@@ -139,32 +142,32 @@ class SiglipAttention(nn.Layer):
         values: paddle.Tensor,
         attention_mask: Optional[paddle.Tensor] = None,
         cu_seqlens: Optional[List[paddle.Tensor]] = None,
+        startend_row_indices: Optional[paddle.Tensor] = None,
+        max_seqlen: Optional[int] = None,
     ):
         if self.config.use_flash_attention:
 
-            # FlashAttentionVarlen cu_seqlens to FlashMask mask
-            cu_seqlens_rm_first = cu_seqlens[1:]
-            cu_seqlens_rm_last = cu_seqlens[:-1]
-            repeats = cu_seqlens_rm_first - cu_seqlens_rm_last
-
-            startend_row_indices_lts = paddle.repeat_interleave(
-                cu_seqlens_rm_first, repeats
-            ).reshape([1, 1, -1, 1])
-            startend_row_indices_ute = paddle.repeat_interleave(
-                cu_seqlens_rm_last, repeats
-            ).reshape([1, 1, -1, 1])
-            startend_row_indices = paddle.concat(
-                [startend_row_indices_lts, startend_row_indices_ute], axis=-1
-            )
-
-            attn_output = flashmask_attention(
-                queries,
-                keys,
-                values,
-                startend_row_indices=startend_row_indices,
-                causal=self.is_causal,
-                dropout=0.0 if not self.training else self.dropout,
-            )
+            if self.config.use_sparse_flash_attn:
+                attn_output = flashmask_attention(
+                    queries,
+                    keys,
+                    values,
+                    startend_row_indices=startend_row_indices,
+                    causal=self.is_causal,
+                    dropout=0.0 if not self.training else self.dropout,
+                )
+            else:
+                attn_output = flash_attn_unpadded(
+                    queries.squeeze(0),
+                    keys.squeeze(0),
+                    values.squeeze(0),
+                    cu_seqlens,
+                    cu_seqlens,
+                    max_seqlen,
+                    max_seqlen,
+                    scale=self.scale,
+                    causal=self.is_causal,
+                )[0].squeeze(0)
             attn_weights = None
         else:
             attn_output, attn_weights = eager_attention_forward(
@@ -186,6 +189,8 @@ class SiglipAttention(nn.Layer):
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: Optional[bool] = False,
         cu_seqlens: Optional[List[paddle.Tensor]] = None,
+        startend_row_indices: Optional[paddle.Tensor] = None,
+        max_seqlen: Optional[int] = None,
         rope_emb: Optional[Tuple[paddle.Tensor, paddle.Tensor]] = None,  # (cos, sin)
     ):
 
@@ -228,6 +233,8 @@ class SiglipAttention(nn.Layer):
                 v,
                 attention_mask,
                 cu_seqlens,
+                startend_row_indices,
+                max_seqlen,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
 
@@ -238,6 +245,8 @@ class SiglipAttention(nn.Layer):
                 v,
                 attention_mask,
                 cu_seqlens,
+                startend_row_indices,
+                max_seqlen,
             )
 
         attn_output = attn_output.reshape([B, L, D]).contiguous()
@@ -430,6 +439,8 @@ class SiglipEncoderLayer(paddle.nn.Layer):
         attention_mask,
         output_attentions=False,
         cu_seqlens=None,
+        startend_row_indices=None,
+        max_seqlen=None,
         rope_emb=None,
     ):
 
@@ -442,6 +453,8 @@ class SiglipEncoderLayer(paddle.nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             cu_seqlens=cu_seqlens,
+            startend_row_indices=startend_row_indices,
+            max_seqlen=max_seqlen,
             rope_emb=rope_emb,
         )
 
@@ -652,6 +665,22 @@ class SiglipEncoder(nn.Layer):
         else:
             attn_cu_seqlens = cu_seqlens
 
+        # FlashAttentionVarlen cu_seqlens to FlashMask mask
+        cu_seqlens_rm_first = cu_seqlens[1:]
+        cu_seqlens_rm_last = cu_seqlens[:-1]
+        repeats = cu_seqlens_rm_first - cu_seqlens_rm_last
+        max_seqlen = repeats.max().item()
+
+        startend_row_indices_lts = paddle.repeat_interleave(
+            cu_seqlens_rm_first, repeats
+        ).reshape([1, 1, -1, 1])
+        startend_row_indices_ute = paddle.repeat_interleave(
+            cu_seqlens_rm_last, repeats
+        ).reshape([1, 1, -1, 1])
+        startend_row_indices = paddle.concat(
+            [startend_row_indices_lts, startend_row_indices_ute], axis=-1
+        )
+
         for encoder_layer in self.layers:
             if output_hidden_states:
                 encoder_states = encoder_states + (
@@ -671,6 +700,8 @@ class SiglipEncoder(nn.Layer):
                     attention_mask,
                     output_attentions=output_attentions,
                     cu_seqlens=attn_cu_seqlens,
+                    startend_row_indices=startend_row_indices,
+                    max_seqlen=max_seqlen,
                     rope_emb=rope_emb,
                     use_reentrant=self.config.recompute_use_reentrant,
                 )
@@ -680,6 +711,8 @@ class SiglipEncoder(nn.Layer):
                     attention_mask,
                     output_attentions=output_attentions,
                     cu_seqlens=attn_cu_seqlens,
+                    startend_row_indices=startend_row_indices,
+                    max_seqlen=max_seqlen,
                     rope_emb=rope_emb,
                 )
             hidden_states = layer_outputs[0]
@@ -785,16 +818,6 @@ class MultiHeadAttention(nn.Layer):
         assert (
             self.head_dim * num_heads == self.embed_dim
         ), "embed_dim must be divisible by num_heads"
-
-        # self.q_proj = Linear(
-        #     embed_dim, embed_dim, weight_attr, bias_attr=bias_attr
-        # )
-        # self.k_proj = Linear(
-        #     self.kdim, embed_dim, weight_attr, bias_attr=bias_attr
-        # )
-        # self.v_proj = Linear(
-        #     self.vdim, embed_dim, weight_attr, bias_attr=bias_attr
-        # )
 
         # register parameters to keep consistent with torch.nn.MultiHeadAttention
         self.in_proj_weight = self.create_parameter(
