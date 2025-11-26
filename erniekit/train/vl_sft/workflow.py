@@ -20,10 +20,7 @@ from functools import partial
 
 import numpy as np
 import paddle
-from paddleformers.transformers import (
-    AutoConfig,
-    AutoTokenizer
-)
+from paddleformers.transformers import AutoConfig, AutoTokenizer
 from paddle.distributed import fleet
 from paddleformers.datasets import IterDataset
 from paddleformers.trainer import get_last_checkpoint
