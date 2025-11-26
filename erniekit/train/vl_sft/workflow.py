@@ -22,6 +22,7 @@ import numpy as np
 import paddle
 from paddleformers.transformers import (
     AutoConfig,
+    AutoTokenizer
 )
 from paddle.distributed import fleet
 from paddleformers.datasets import IterDataset
@@ -238,11 +239,18 @@ def run_vl_sft(
     )
     print("data_processor_args:\n", preprocess_args)
 
-    tokenizer = Ernie4_5_VLTokenizer.from_pretrained(
-        model_args.model_name_or_path,
-        padding_side="right",
-        model_max_length=data_args.max_seq_len,
-    )
+    if convert_from_hf:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.model_name_or_path,
+            padding_side="right",
+            model_max_length=data_args.max_seq_len,
+        )
+    else:
+        tokenizer = Ernie4_5_VLTokenizer.from_pretrained(
+            model_args.model_name_or_path,
+            padding_side="right",
+            model_max_length=data_args.max_seq_len,
+        )
     data_processor = End2EndProcessor(preprocess_args, tokenizer, image_preprocess_save)
     data_processor.train().sft()
     logger.info(f"[DEBUG] data_processor_args: {preprocess_args}")
