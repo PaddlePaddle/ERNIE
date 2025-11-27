@@ -100,7 +100,7 @@ Each parameter is documented with its type, default value and detailed descripti
 | `release_grads` | bool | False | Release gradients after each iteration to reduce peak memory |
 | `use_sparse_head_and_loss_fn` | bool | False | Use sparse LM Head and loss function |
 | `use_fused_head_and_loss_fn` | bool | False | Fuse LM head and CrossEntropyLoss to save memory |
-| `use_attn_mask_start_row_indices` | bool | True | Use sparse mask representation with start row indices |
+| `use_attn_mask_startend_row_indices` | bool | True | Use sparse mask representation with start row indices |
 | `recompute_use_reentrant` | bool | False | Recompute implementation (PyLayer if True, hooks if False) |
 | `recompute` | bool | False | Enable gradient checkpointing |
 | `recompute_granularity` | str | "full" | Recompute granularity ("full"/"full_attn"/"core_attn") |
@@ -124,7 +124,7 @@ Each parameter is documented with its type, default value and detailed descripti
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `use_flash_attention` | bool | True | Enable FlashAttention |
-| `use_sparse_flash_attn` | bool | True | Enable FlashMask (requires `use_attn_mask_start_row_indices`) |
+| `use_sparse_flash_attn` | bool | True | Enable FlashMask (requires `use_attn_mask_startend_row_indices`) |
 | `fuse_rope` | bool | False | Fuse rotary position embedding |
 | `fuse_linear` | bool | False | F fuse linear operations |
 | `greedy_intokens` | bool | True | Enable greedy token-based packing. <br>Instead of sequential sampling, a global buffer of samples is maintained <br>and greedily packed into sequences to maximize token utilization and minimize padding. |

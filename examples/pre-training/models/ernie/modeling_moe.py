@@ -2126,18 +2126,23 @@ class ErniePretrainingCriterion(ErniePretrainingCriterionBase):
                 reduction="none",
             )
 
-    def forward(
-        self, prediction_scores, masked_lm_labels, router_loss=None, mtp_logits=None
-    ):
+    def forward(self, prediction_scores, labels, router_loss=None, mtp_logits=None):
+        masked_lm_labels, kl_logits, kl_ids, loss_ratio = labels
         if self.config.multi_token_pred_depth > 0:
             masked_lm_labels_ori = masked_lm_labels
             masked_lm_labels = masked_lm_labels[
                 :, : -self.config.multi_token_pred_depth
             ]
+            if kl_logits is not None:
+                kl_logits = kl_logits[:, : -self.config.multi_token_pred_depth]
+                kl_ids = kl_ids[:, : -self.config.multi_token_pred_depth]
             seq_length = masked_lm_labels.shape[1]
         res = super().forward(
             prediction_scores,
             masked_lm_labels,
+            kl_logits=kl_logits,
+            kl_ids=kl_ids,
+            loss_ratio=loss_ratio,
         )
         global_training_logs = get_global_training_logs()
 

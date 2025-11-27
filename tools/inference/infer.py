@@ -31,7 +31,7 @@ from paddleformers import __version__ as paddleformers_version
 from tqdm import tqdm
 
 from ernie.configuration import Ernie4_5_MoeConfig
-from ernie.dataset.data_utils import convert_to_input_ids
+from paddleformers.datasets.data_utils import convert_to_input_ids
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.tokenizer import Ernie4_5_Tokenizer
 from ernie.utils.common_utils import infer_save_test_case

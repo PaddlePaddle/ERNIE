@@ -182,16 +182,6 @@ def run_vl_sft(
 
         PipelineParallel.timer_printer = lambda _: None
 
-    # checkpoint O1 quantization is open by default.
-    if (
-        not finetuning_args.disable_ckpt_quant
-        and finetuning_args.ckpt_quant_stage == "O0"
-        and not model_args.lora
-    ):
-        finetuning_args.ckpt_quant_stage = "O1"
-    elif finetuning_args.disable_ckpt_quant:
-        finetuning_args.ckpt_quant_stage = "O0"
-
     finetuning_args.resume_from_checkpoint = get_resume_checkpoint_path(finetuning_args)
     if (
         finetuning_args.resume_from_checkpoint is not None
@@ -464,7 +454,9 @@ def run_vl_sft(
 
     cfg.use_flash_attention = model_args.use_flash_attention
     cfg.use_sparse_flash_attn = model_args.use_sparse_flash_attn
-    cfg.use_attn_mask_start_row_indices = model_args.use_attn_mask_start_row_indices
+    cfg.use_attn_mask_startend_row_indices = (
+        model_args.use_attn_mask_startend_row_indices
+    )
     cfg.use_recompute_moe = model_args.use_recompute_moe
     cfg.recompute = finetuning_args.recompute
     cfg.refined_recompute = finetuning_args.refined_recompute
@@ -690,7 +682,7 @@ def run_vl_sft(
                 "worker_index": paddle.distributed.get_rank(),
                 "prefetch_factor": finetuning_args.prefetch_factor,
                 "task_group": train_task_group_text,
-                "in_tokens": finetuning_args.packing,  # Text SFT packing option
+                "in_tokens": data_args.packing,  # Text SFT packing option
                 "batch_size": finetuning_args.per_device_train_batch_size,
                 "tokenizer": tokenizer,
                 "number_of_samples_each_epoch": data_args.num_samples_each_epoch,
@@ -707,6 +699,7 @@ def run_vl_sft(
                 "max_shot": finetuning_args.max_shot,
                 "use_train_part_sharding": finetuning_args.text_use_train_part_sharding,
                 "rope_3d": model_args.rope_3d,
+                "chat_template": preprocess_args.chat_template,
             }
 
             text_sft_train_reader = create_pyreader(config_dataset_text)
@@ -742,7 +735,7 @@ def run_vl_sft(
         im_prefix_length=256,
         rng=random.Random(2024),
         combine_batch=1,
-        packing=finetuning_args.packing,
+        packing=data_args.packing,
     )
 
     if model_args.lora:
@@ -808,7 +801,7 @@ def run_vl_sft(
         modality_ratio=modality_ratio,
         processing_class=image_preprocess_save,
         batch_size=finetuning_args.per_device_train_batch_size,
-        packing=finetuning_args.packing,
+        packing=data_args.packing,
     )
     if vit_trainable_callback is not None:
         vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager

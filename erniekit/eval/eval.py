@@ -288,7 +288,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
 
     if finetuning_args.use_huggingface_model:
         if (
-            model_args.use_attn_mask_start_row_indices
+            model_args.use_attn_mask_startend_row_indices
             and model_args.use_sparse_flash_attn
         ):
             _attn_implementation = "flashmask"
@@ -413,13 +413,20 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         "random_seed": finetuning_args.seed,
         "num_replicas": finetuning_args.dataset_world_size,
         "rank": finetuning_args.dataset_rank,
+        "packing": data_args.packing,
+        "mix_strategy": data_args.mix_strategy,
+        "encode_one_turn": data_args.encode_one_turn,
+        "use_template": data_args.use_template,
+        "is_pretraining": True if model_args.stage.lower() == "pt" else False,
     }
-    from ernie.dataset.finetuning import collate_fn
+    from paddleformers.datasets.finetuning import collate_fn
 
     if data_args.dataset_type == "map":
-        from ernie.dataset.finetuning import create_indexed_dataset as create_dataset
+        from paddleformers.datasets.finetuning import (
+            create_indexed_dataset as create_dataset,
+        )
     else:
-        from ernie.dataset.finetuning import create_dataset
+        from paddleformers.datasets.finetuning import create_dataset
     dataset_config.update(
         {
             "num_samples_each_epoch": data_args.num_samples_each_epoch,
@@ -446,7 +453,7 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
     data_collator = partial(
         collate_fn,
         tokenizer=tokenizer,
-        finetuning_args=finetuning_args,
+        training_args=finetuning_args,
         model_args=model_args,
         max_seq_len=data_args.max_seq_len,
     )

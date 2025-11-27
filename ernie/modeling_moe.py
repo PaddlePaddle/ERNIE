@@ -665,7 +665,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
         self,
         hidden_states: paddle.Tensor,
         attention_mask: Optional[paddle.Tensor] = None,
-        attn_mask_start_row_indices: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
         token_type_ids: Optional[paddle.Tensor] = None,
         output_attentions: Optional[bool] = False,
@@ -678,7 +678,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
         Args:
             hidden_states (paddle.Tensor): Input tensor [batch_size, seq_len, hidden_size]
             attention_mask (Optional[paddle.Tensor]): Attention mask tensor
-            attn_mask_start_row_indices (Optional[paddle.Tensor]): Indices for variable length attention
+            attn_mask_startend_row_indices (Optional[paddle.Tensor]): Indices for variable length attention
             position_ids (Optional[paddle.Tensor]): Position indices for rotary embeddings
             output_attentions (Optional[bool]): Whether to return attention weights
             past_key_value (Optional[Tuple[paddle.Tensor]]): Cached key/value states
@@ -723,7 +723,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
                 hidden_states,
                 past_key_value,
                 attention_mask,
-                attn_mask_start_row_indices,
+                attn_mask_startend_row_indices,
                 position_ids,
                 output_attentions,
                 use_cache,
@@ -735,7 +735,7 @@ class Ernie4_5_DecoderLayer(nn.Layer):
                     hidden_states=hidden_states,
                     past_key_value=past_key_value,
                     attention_mask=attention_mask,
-                    attn_mask_start_row_indices=attn_mask_start_row_indices,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     position_ids=position_ids,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
@@ -1256,7 +1256,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
         layer_module,
         hidden_states,
         attention_mask,
-        attn_mask_start_row_indices,
+        attn_mask_startend_row_indices,
         position_ids,
         token_type_ids,
         output_attentions,
@@ -1269,7 +1269,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
             layer_module (nn.Layer): Transformer layer to recompute
             hidden_states (paddle.Tensor): Input hidden states
             attention_mask (paddle.Tensor): Attention mask
-            attn_mask_start_row_indices (paddle.Tensor): Variable length indices
+            attn_mask_startend_row_indices (paddle.Tensor): Variable length indices
             position_ids (paddle.Tensor): Position indices
             output_attentions (bool): Whether to output attention weights
             past_key_value (Optional[Tuple[paddle.Tensor]]): Cached key/value states
@@ -1289,7 +1289,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
             create_custom_forward(layer_module),
             hidden_states,
             attention_mask,
-            attn_mask_start_row_indices,
+            attn_mask_startend_row_indices,
             position_ids,
             token_type_ids,
             output_attentions,
@@ -1304,7 +1304,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
         position_ids=None,
         token_type_ids=None,
         attention_mask=None,
-        attn_mask_start_row_indices=None,
+        attn_mask_startend_row_indices=None,
         inputs_embeds=None,
         use_cache=None,
         past_key_values=None,
@@ -1319,7 +1319,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
             input_ids (Optional[paddle.Tensor]): Input token IDs
             position_ids (Optional[paddle.Tensor]): Position indices
             attention_mask (Optional[paddle.Tensor]): Attention mask
-            attn_mask_start_row_indices (Optional[paddle.Tensor]): Variable length attention indices
+            attn_mask_startend_row_indices (Optional[paddle.Tensor]): Variable length attention indices
             inputs_embeds (Optional[paddle.Tensor]): Precomputed embeddings
             use_cache (Optional[bool]): Whether to cache key/value states
             past_key_values (Optional[Tuple[Tuple[paddle.Tensor]]]): Cached key/value states
@@ -1402,14 +1402,14 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
                     : -self.config.num_nextn_predict_layers,
                 ]
 
-            if attn_mask_start_row_indices is not None:
-                attn_mask_start_row_indices_extra = attn_mask_start_row_indices[
+            if attn_mask_startend_row_indices is not None:
+                attn_mask_startend_row_indices_extra = attn_mask_startend_row_indices[
                     :, :, -self.config.num_nextn_predict_layers :
                 ]
-                attn_mask_start_row_indices = attn_mask_start_row_indices[
+                attn_mask_startend_row_indices = attn_mask_startend_row_indices[
                     :, :, : -self.config.num_nextn_predict_layers
                 ]
-                attn_mask_start_row_indices_ori = attn_mask_start_row_indices
+                attn_mask_startend_row_indices_ori = attn_mask_startend_row_indices
 
             nbatch_pack_offset = kwargs.get("nbatch_pack_offset", None)
             if nbatch_pack_offset is None:
@@ -1454,7 +1454,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
                     decoder_layer,
                     hidden_states,
                     attention_mask,
-                    attn_mask_start_row_indices,
+                    attn_mask_startend_row_indices,
                     position_ids,
                     token_type_ids,
                     output_attentions,
@@ -1465,7 +1465,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask,
-                    attn_mask_start_row_indices,
+                    attn_mask_startend_row_indices,
                     position_ids,
                     token_type_ids,
                     output_attentions,
@@ -1520,11 +1520,11 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
                         (depth + 1) : (seqlen + depth + 1),
                     ]
 
-                if attn_mask_start_row_indices is not None:
-                    attn_mask_start_row_indices = paddle.concat(
+                if attn_mask_startend_row_indices is not None:
+                    attn_mask_startend_row_indices = paddle.concat(
                         [
-                            attn_mask_start_row_indices_ori[:, :, (depth + 1) :],
-                            attn_mask_start_row_indices_extra[:, :, : (depth + 1)],
+                            attn_mask_startend_row_indices_ori[:, :, (depth + 1) :],
+                            attn_mask_startend_row_indices_extra[:, :, : (depth + 1)],
                         ],
                         axis=-1,
                     )
@@ -1570,7 +1570,7 @@ class Ernie4_5_Model(Ernie4_5_PretrainedModel):
                 layer_outputs = decoder_layer(
                     inputs_embeds_cur_depth,
                     attention_mask,
-                    attn_mask_start_row_indices,
+                    attn_mask_startend_row_indices,
                     position_ids,
                     token_type_ids,
                     output_attentions,
@@ -1976,7 +1976,7 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
         input_ids,
         position_ids=None,
         attention_mask=None,
-        attn_mask_start_row_indices=None,
+        attn_mask_startend_row_indices=None,
         token_type_ids=None,  # for moe token-type routing
         inputs_embeds=None,
         labels=None,
@@ -1995,7 +1995,7 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
             input_ids (paddle.Tensor): Input token IDs.
             position_ids (paddle.Tensor): Position IDs.
             attention_mask (paddle.Tensor): Attention mask.
-            attn_mask_start_row_indices (paddle.Tensor): Attention mask start indices.
+            attn_mask_startend_row_indices (paddle.Tensor): Attention mask start indices.
             inputs_embeds (paddle.Tensor): Optional embedded inputs.
             labels (paddle.Tensor): Target labels.
             loss_mask (paddle.Tensor): Loss mask.
@@ -2030,7 +2030,7 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
             position_ids=position_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            attn_mask_start_row_indices=attn_mask_start_row_indices,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             past_key_values=past_key_values,

@@ -16,7 +16,7 @@ sequence_parallel: True
 compute_type: bf16
 fp16_opt_level: O2
 
-use_attn_mask_start_row_indices: true
+use_attn_mask_startend_row_indices: true
 moe_use_aux_free: false
 moe_multimodal_dispatch_use_allgather: ""
 fuse_rope: false
