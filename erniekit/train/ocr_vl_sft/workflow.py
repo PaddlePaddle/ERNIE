@@ -116,6 +116,7 @@ def run_ocr_vl_sft(
     preprocess_args.batch_size = finetuning_args.batch_size
     finetuning_args.max_seq_len = data_args.max_seq_len
     finetuning_args.max_seq_length = data_args.max_seq_len
+    finetuning_args.packing = data_args.packing
 
     # create output dir
     os.makedirs(finetuning_args.output_dir, exist_ok=True)

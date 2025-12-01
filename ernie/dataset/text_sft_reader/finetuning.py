@@ -28,13 +28,12 @@ import ujson as json
 from paddleformers.trainer import TrainerState
 from paddleformers.trainer.trainer import TRAINER_STATE_NAME
 
-
 from .data_utils import (
     RandomNoReplacementSampler,
     sampling_pseudo_examples,
     sampling_pseudo_examples_fc,
 )
-from ernie.dataset.data_utils import pad_batch_data, round_up_to_multiple_of_8
+from paddleformers.datasets.data_utils import pad_batch_data, round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
 

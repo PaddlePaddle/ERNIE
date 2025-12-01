@@ -43,7 +43,7 @@ def _fusion_flash_attention(
     attention_probs_dropout_prob,
     use_sparse_flash_attn,
     attention_mask=None,
-    attn_mask_start_row_indices=None,
+    attn_mask_startend_row_indices=None,
     rr_flash_attn=None,
 ):
     """
@@ -57,7 +57,7 @@ def _fusion_flash_attention(
         attention_probs_dropout_prob (float): Dropout probability for attention weights
         use_sparse_flash_attn (bool): Whether to use sparse flash attention optimization
         attention_mask (Optional[paddle.Tensor]): Dense attention mask (default: None)
-        attn_mask_start_row_indices (Optional[paddle.Tensor]): Sparse mask indices (default: None)
+        attn_mask_startend_row_indices (Optional[paddle.Tensor]): Sparse mask indices (default: None)
         rr_flash_attn (Optional[Callable]): Recomputation wrapper for flash attention (default: None)
 
     Returns:
@@ -70,15 +70,18 @@ def _fusion_flash_attention(
         ValueError: If invalid combination of mask inputs is provided
     """
 
-    version = paddle.version.full_version
-    if attn_mask_start_row_indices is not None:
+    if attn_mask_startend_row_indices is not None:
+        if attn_mask_startend_row_indices.ndim == 3:
+            attn_mask_startend_row_indices = attn_mask_startend_row_indices.unsqueeze(
+                -1
+            )
         if use_sparse_flash_attn:
             if rr_flash_attn is None:
                 out = flashmask_attention(
                     q,
                     k,
                     v,
-                    startend_row_indices=attn_mask_start_row_indices.unsqueeze(-1),
+                    startend_row_indices=attn_mask_startend_row_indices,
                     causal=True,
                 )
             else:
@@ -87,11 +90,13 @@ def _fusion_flash_attention(
                     q,
                     k,
                     v,
-                    startend_row_indices=attn_mask_start_row_indices.unsqueeze(-1),
+                    startend_row_indices=attn_mask_startend_row_indices,
                     causal=True,
                 )
         else:
-            attention_mask = _gen_from_sparse_attn_mask_indices(attn_mask_start_row_indices, q.dtype)
+            attention_mask = _gen_from_sparse_attn_mask_indices(
+                attn_mask_startend_row_indices, q.dtype
+            )
             if rr_flash_attn is None:
                 out = F.scaled_dot_product_attention(
                     q,
@@ -135,23 +140,30 @@ def _fusion_flash_attention(
     return out, weights
 
 
-def _gen_from_sparse_attn_mask_indices(attn_mask_start_row_indices, dtype):
+def _gen_from_sparse_attn_mask_indices(attn_mask_startend_row_indices, dtype):
     """
-    Recover 4-D attention_mask from attn_mask_start_row_indices.
+    Recover 4-D attention_mask from attn_mask_startend_row_indices.
 
     Args:
-        attn_mask_start_row_indices (paddle.Tensor): The start row indices for the attention mask.
+        attn_mask_startend_row_indices (paddle.Tensor): The start row indices for the attention mask.
         dtype (str): The data type of the tensor.
 
     Returns:
-        paddle.Tensor: The dense attention mask recovered from attn_mask_start_row_indices.
+        paddle.Tensor: The dense attention mask recovered from attn_mask_startend_row_indices.
     """
-    batch_size, _, max_seq_len = attn_mask_start_row_indices.shape
-    base = paddle.arange(max_seq_len, dtype="int32").unsqueeze(1).expand([batch_size, -1, max_seq_len]).unsqueeze(1)
-    mask_indices = attn_mask_start_row_indices.unsqueeze(1)
+    batch_size, _, max_seq_len = attn_mask_startend_row_indices.shape
+    base = (
+        paddle.arange(max_seq_len, dtype="int32")
+        .unsqueeze(1)
+        .expand([batch_size, -1, max_seq_len])
+        .unsqueeze(1)
+    )
+    mask_indices = attn_mask_startend_row_indices.unsqueeze(1)
 
     tril = paddle.tril(
-        paddle.ones([max_seq_len, max_seq_len], dtype="bool").expand([batch_size, 1, max_seq_len, max_seq_len])
+        paddle.ones([max_seq_len, max_seq_len], dtype="bool").expand(
+            [batch_size, 1, max_seq_len, max_seq_len]
+        )
     )
     attention_mask = paddle.logical_and(base < mask_indices, tril)
     attention_mask = paddle.scale(

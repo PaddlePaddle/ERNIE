@@ -24,7 +24,7 @@ from paddleformers.utils.log import logger
 # isort: off
 # fmt: off
 # isort: on
-from ernie.dataset.dpo import create_dataset
+from paddleformers.datasets.dpo import create_dataset
 
 
 def calculate_acc_steps(num_samples, train_batch, dataset_world_size, per_device_train_batch_size):
@@ -85,6 +85,9 @@ def dpo_estimate_training(tokenizer, data_args, training_args, config, train_dat
             "greedy_intokens": data_args.greedy_intokens,
             "buffer_size": data_args.buffer_size,
             "mask_out_eos_token": data_args.mask_out_eos_token,
+            "packing": data_args.packing,
+            "mix_strategy": data_args.mix_strategy,
+            "encode_one_turn": data_args.encode_one_turn,
             }
         train_dataset = create_dataset(
                 task_group=data_args.train_dataset_path,
@@ -92,17 +95,7 @@ def dpo_estimate_training(tokenizer, data_args, training_args, config, train_dat
                 sub_dataset_type=data_args.train_dataset_type,
                 **dataset_config
             )
-    if len(train_dataset.example_dataset._task_group) > 1:
-        logger.warning("Suggest to use max_steps instead of num_train_epochs for multi source dataset")
-        logger.info(
-            "Multi source dataset detected, number of samples will be estimated by following rule. "
-            "num_samples= (source1_num_samples * prob1 + source2_num_samples * prob2 + ...)*epochs"
-            )
-        max_samples =  0
-        for task in train_dataset.example_dataset._task_group:
-            max_samples += np.ceil(task['num_examples'] * task["prob_origin"])
-    else:
-        max_samples = train_dataset.example_dataset._task_group[0]['num_examples']
+    max_samples = len(train_dataset.mix_datasets)
     if max_samples > 0 :
         if training_args.num_of_gpus > 0:
             dataset_world_size = (

@@ -20,7 +20,7 @@ import logging
 import re
 
 import numpy as np
-from ernie.dataset.data_utils import round_up_to_multiple_of_8
+from paddleformers.datasets.data_utils import round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
 

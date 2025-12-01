@@ -360,7 +360,7 @@ def mem_eff_attn(
     return out
 
 
-def inbatch_pack_offset_to_attn_mask_start_row_indices(inbatch_pack_offset):
+def inbatch_pack_offset_to_attn_mask_startend_row_indices(inbatch_pack_offset):
     inbatch_pack_offset = inbatch_pack_offset.numpy()
     attn_mask_row_start_indices = []
     min_start_row = np.inf

@@ -255,7 +255,7 @@ class TestLoRATrainingE2E:
                 "1",
                 "--use_sparse_head_and_loss_fn",
                 "0",
-                "--use_attn_mask_start_row_indices",
+                "--use_attn_mask_startend_row_indices",
                 "0",
                 "--tensor_parallel_output",
                 "1",

@@ -1,3 +1,28 @@
+# ERNIEKit Data Packing Strategy
+
+`Packing` is a technique used to optimize batch processing by combining multiple short input sequences into a single longer sequence before feeding them into the LLM. This reduces padding overhead and improves hardware utilization (e.g., GPU/TPU efficiency).
+
+`The greedy intokens strategy` is a token-level optimization that prioritizes filling the available token budget (e.g., max sequence length) in a greedy manner during batch processing. It ensures that the model generates as many tokens as possible within the constraints, minimizing wasted capacity.
+
+| packing      | greedy_intokens | Packing Strategy |
+|--------------|-----------------|------------------|
+| false | any   | No packing  |
+| true  | false | packing is enabled without greedy intokens strategy |
+| true  | true  | greedy intokens packing is enabled |
+
+# ERNIEKit Data Sampling Strategy
+
+Currently, four data sampling strategies are supported: `random`, `concat`, `interleave_under`, `interleave_over`
+
+| Data Sampling Strategy | Applicable Scenarios	| Limitations | Description |
+|------------------|-----------------|------------------|------------------|
+| `random`           | The dataset is extremely large and strict data proportioning is required | max_steps > 0 | In `random` mode, based on the input dataset probs, a fixed-size sample pool of `num_samples_each_epoch` is constructed, and the data loader randomly acquires data from this sample pool. |
+| `concat`           | Need to train all data in the datasets | None | In `concat` mode, the input dataset probs are not used. Instead, multiple datasets are directly concatenated. The size of the dataset is equal to the total size of the input multi-source datasets. When max_steps = -1, setting `num_train_epochs` allows for a complete traversal of the input datasets for `num_train_epochs` rounds. |
+| `interleave_under` | When small datasets are important but have limited samples | None | The `interleave` strategy involves cross-concatenating multiple datasets according to data proportioning. `interleave_under` indicates undersampling, meaning that sampling stops as soon as one of the datasets is exhausted. |
+| `interleave_over`  | When small datasets are important but have limited samples | None | The `interleave` strategy involves cross-concatenating multiple datasets according to data proportioning. `interleave_over` indicates oversampling, meaning that sampling stops only after all datasets have been exhausted. |
+
+- Note: `num_samples_each_epoch` only works in `random` data sampling strategy.
+
 # ERNIEKit Data Format Specification
 
 ERNIEKit currently supports reading local datasets and downloading specified Hugging Face datasets in two formats: erniekit and alpaca.
@@ -5,9 +30,9 @@ ERNIEKit currently supports reading local datasets and downloading specified Hug
 ## Local Datasets
 
 - **CLI**: Modify the following fields in the YAML config file:
-  - Set `train_dataset_path`/`eval_dataset_path` to the absolute or relative path of your local dataset file
-  - Set `train_dataset_type`/`eval_dataset_type` to the dataset format (erniekit/alpaca)
-  - Set `train_dataset_prob`/`eval_dataset_prob` for multi-source dataset mixing probabilities
+  - Set `train_dataset_path` / `eval_dataset_path` to the absolute or relative path of your local dataset file
+  - Set `train_dataset_type` / `eval_dataset_type` to the dataset format (erniekit/alpaca)
+  - Set `train_dataset_prob` / `eval_dataset_prob` for multi-source dataset mixing probabilities
 ```yaml
 # single-source
 train_dataset_type: "erniekit"
@@ -27,9 +52,9 @@ train_dataset_prob: "0.8,0.2"
 ## Hugging Face Datasets
 
 - **CLI**: Modify the following fields in the YAML config file:
-  - Set `train_dataset_path`/`eval_dataset_path` to the Hugging Face repo ID
-  - Set `train_dataset_type`/`eval_dataset_type` to alpaca
-  - Set `train_dataset_prob`/`eval_dataset_prob` for multi-source dataset mixing probabilities
+  - Set `train_dataset_path` / `eval_dataset_path` to the Hugging Face repo ID
+  - Set `train_dataset_type` / `eval_dataset_type` to alpaca
+  - Set `train_dataset_prob` / `eval_dataset_prob` for multi-source dataset mixing probabilities
 ```yaml
 # single-source
 train_dataset_type: "alpaca"
@@ -45,7 +70,7 @@ train_dataset_prob: "0.8,0.2"
   - Under `Set Built-in Dataset`, select the dataset name in `Dataset Selection`
   - The system will automatically configure the path and type, then download and read from Hugging Face
 
-Supported Hugging Face datasets are defined in `ernie.dataset.hf.data_info.json`:
+Supported Hugging Face datasets are defined:
 
 ### Supported Hugging Face Datasets
 | Dataset Name | Type |Format | File | File Format |
@@ -78,6 +103,13 @@ Supported Hugging Face datasets are defined in `ernie.dataset.hf.data_info.json`
 | [mayflowergmbh/airoboros-3.0_de](https://huggingface.co/datasets/mayflowergmbh/airoboros-3.0_de) | sft | alpaca | airoboros_3.json | json |
 | [mayflowergmbh/ultra-chat_de](https://huggingface.co/datasets/mayflowergmbh/ultra-chat_de) | sft | alpaca | ultra_chat_german.json | json |
 | [Intel/orca_dpo_pairs](https://huggingface.co/datasets/Intel/orca_dpo_pairs) | dpo | alpaca | orca_rlhf.jsonl | jsonl |
+| [shibing624/sharegpt_gpt4](https://huggingface.co/datasets/shibing624/sharegpt_gpt4) | sft | sharegpt | sharegpt_gpt4.jsonl | jsonl |
+| [llamafactory/lima](https://huggingface.co/datasets/llamafactory/lima) | sft | sharegpt | lima.json | json |
+| [Open-Orca/SlimOrca](https://huggingface.co/datasets/Open-Orca/SlimOrca) | sft | sharegpt | oo-labeled_correct.gpt4.sharegpt.jsonl | jsonl |
+| [totally-not-an-llm/sharegpt-hyperfiltered-3k](https://huggingface.co/datasets/totally-not-an-llm/sharegpt-hyperfiltered-3k) | sft | sharegpt | sharegptclean_final.json | json |
+| [m-a-p/neo_sft_phase2](https://huggingface.co/datasets/m-a-p/neo_sft_phase2) | sft | sharegpt | neo_sft_phase2.json | json |
+| [llamafactory/DPO-En-Zh-20k](https://huggingface.co/datasets/llamafactory/DPO-En-Zh-20k) | sft | sharegpt | dpo_zh.json | json |
+| [avemio/German-RAG-DPO-ShareGPT-HESSIAN-AI](https://huggingface.co/datasets/avemio/German-RAG-DPO-ShareGPT-HESSIAN-AI) | dpo | sharegpt | qa-with-multiple-references/DPO_equally-distributed-wikipedia-trainingdata-qa-with-multiple-references_id-over-800k-under-1000k_sharegpt.jsonl | jsonl |
 
 ## erniekit Data Format
 
@@ -310,22 +342,28 @@ Demo data for function call training:
 
 ### SFT Dataset
 
-Supports json and jsonl file formats:
+**Required fields for SFT**
+
+* `instruction`: A clear task directive (e.g., "Translate the following Chinese text to English").
+* `input`: Task-specific input content (may be empty for tasks like "Write a poem").
+* `output`: The expected model response.
+
+**Supports json and jsonl file formats**
 
 * **json**: Each line contains one JSON object:
-```json
-{"instruction":"instructionA", "input":"inputA", "output":"outputA"}
-{"instruction":"instructionB", "input":"inputB", "output":"outputB"}
-{"instruction":"instructionC", "input":"inputC", "output":"outputC"}
-```
-
-* **jsonl**: All data in a single JSON array:
 ```json
 [
     {"instruction":"instructionA", "input":"inputA", "output":"outputA"},
     {"instruction":"instructionB", "input":"inputB", "output":"outputB"},
     {"instruction":"instructionC", "input":"inputC", "output":"outputC"}
 ]
+```
+
+* **jsonl**: All data in a single JSON array:
+```json
+{"instruction":"instructionA", "input":"inputA", "output":"outputA"}
+{"instruction":"instructionB", "input":"inputB", "output":"outputB"}
+{"instruction":"instructionC", "input":"inputC", "output":"outputC"}
 ```
 
 **Field Mapping Between alpaca and erniekit**
@@ -339,4 +377,27 @@ Supports json and jsonl file formats:
 
 ### DPO Dataset
 
-(Coming soon)
+**Required fields for DPO**
+
+* `system(optional)`: System configuration
+* `question`: User question.
+* `chosen`: The higher-quality output selected by human annotators.
+* `rejected`: The lower-quality output for the same question.
+
+**Supports json and jsonl file formats**
+
+* **json**: Each line contains one JSON object:
+```json
+[
+    {"system": "你是一个AI小助理", "question": "哪一个富含蛋白质，床还是墙？", "chosen": "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。", "rejected": "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"},
+    {"system": "你是一个AI小助理", "question": "哪一个富含蛋白质，床还是墙？", "chosen": "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。", "rejected": "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"},
+    {"system": "你是一个AI小助理", "question": "哪一个富含蛋白质，床还是墙？", "chosen": "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。", "rejected": "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"}
+]
+```
+
+* **jsonl**: All data in a single JSON array:
+```json
+{"system": "你是一个AI小助理", "question": "哪一个富含蛋白质，床还是墙？", "chosen": "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。", "rejected": "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"}
+{"system": "你是一个AI小助理", "question": "哪一个富含蛋白质，床还是墙？", "chosen": "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。", "rejected": "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"}
+{"system": "你是一个AI小助理", "question": "哪一个富含蛋白质，床还是墙？", "chosen": "床和墙都不是蛋白质的来源，因为它们都是无生命的物体。蛋白质通常存在于肉类、奶制品、豆类和坚果等食物中。", "rejected": "对不起，我无法回答那个问题。请提供更具体的信息，让我知道你需要什么帮助。"}
+```

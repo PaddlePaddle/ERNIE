@@ -49,7 +49,7 @@ from paddleformers.transformers.model_outputs import (
     ModelOutput,
 )
 from .configuration_paddleocr_vl import PaddleOCRVLConfig
-from .modeling_moe_vl_pp import inbatch_pack_offset_to_attn_mask_start_row_indices
+from .modeling_moe_vl_pp import inbatch_pack_offset_to_attn_mask_startend_row_indices
 from .modeling_paddleocr_vl_ernie import Ernie4_5Model, Ernie4_5PretrainedModel
 
 from .siglip import SiglipVisionModel
@@ -607,11 +607,13 @@ class PaddleOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMix
                 inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
 
         if inbatch_pack_offset is not None:
-            attn_mask_start_row_indices = (
-                inbatch_pack_offset_to_attn_mask_start_row_indices(inbatch_pack_offset)
+            attn_mask_startend_row_indices = (
+                inbatch_pack_offset_to_attn_mask_startend_row_indices(
+                    inbatch_pack_offset
+                )
             )
         else:
-            attn_mask_start_row_indices = None
+            attn_mask_startend_row_indices = None
 
         if attention_mask is not None and attention_mask.dtype != paddle.bool:
             attention_mask = paddle.cast(attention_mask, paddle.bool)
@@ -654,7 +656,7 @@ class PaddleOCRVLForConditionalGeneration(Ernie4_5PretrainedModel, GenerationMix
             input_ids=None,
             position_ids=position_ids,
             attention_mask=attention_mask,
-            attn_mask_start_row_indices=attn_mask_start_row_indices,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
