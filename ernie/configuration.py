@@ -226,6 +226,7 @@ class Ernie4_5_Config(PretrainedConfig):
             * "attention_row_ln" - Attention row-wise layer normalization
             * "attention_column_ln" - Attention column-wise layer normalization
             * "mlp_column_ln" - MLP column-wise layer normalization
+            * "global" - Global configuration that applies to ALL operators
 
             - Value (`skip_num`): Controls how many times to skip recomputation:
             * 0: Never skip recomputation (minimum memory usage)
