@@ -95,6 +95,9 @@ class ModelArguments:
             "help": "Under use attn_mask_startend_row_indices=True, whether use sparse flash attention or not."
         },
     )
+    use_global_causal_attn: bool = field(
+        default=False, metadata={"help": "Whether to use global causal attention in packing data"}
+    )
     use_sparse_head_and_loss_fn: bool = field(
         default=False,
         metadata={"help": "Whether to use sparse LM Head and loss function."},

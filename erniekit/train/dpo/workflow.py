@@ -49,7 +49,8 @@ from paddleformers import __version__ as paddleformers_version
 
 from ernie.callbacks import LayerwiseDropoutCallback
 from ernie.configuration import Ernie4_5_MoeConfig
-from paddleformers.datasets.dpo import collate_fn, create_dataset
+from paddleformers.datasets.collate import dpo_collate_fn as collate_fn
+from paddleformers.datasets.loader import create_dataset
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
@@ -498,6 +499,8 @@ def run_dpo(
         "packing": data_args.packing,
         "mix_strategy": data_args.mix_strategy,
         "encode_one_turn": data_args.encode_one_turn,
+        "stage": model_args.stage,
+        "is_valid": False,
     }
 
     if finetuning_args.max_steps == -1:
@@ -549,11 +552,11 @@ def run_dpo(
         )
 
     if finetuning_args.do_eval and finetuning_args.should_load_dataset:
+        dataset_config["is_valid"] = True
         eval_dataset = create_dataset(
             task_group=data_args.eval_dataset_path,
             task_group_prob=data_args.eval_dataset_prob,
             sub_dataset_type=data_args.eval_dataset_type,
-            is_valid=True,
             **dataset_config,
         )
     logger.info("Creating dataset successfully ...")

@@ -33,7 +33,8 @@ from .data_utils import (
     sampling_pseudo_examples,
     sampling_pseudo_examples_fc,
 )
-from paddleformers.datasets.data_utils import pad_batch_data, round_up_to_multiple_of_8
+from paddleformers.datasets.collate import pad_batch_data
+from paddleformers.datasets.data_utils import round_up_to_multiple_of_8
 
 logger = logging.getLogger(__name__)
 

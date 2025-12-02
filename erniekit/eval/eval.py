@@ -418,15 +418,16 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         "encode_one_turn": data_args.encode_one_turn,
         "use_template": data_args.use_template,
         "is_pretraining": True if model_args.stage.lower() == "pt" else False,
+        "stage": model_args.stage,
     }
-    from paddleformers.datasets.finetuning import collate_fn
+    from paddleformers.datasets.collate import collate_fn
 
     if data_args.dataset_type == "map":
-        from paddleformers.datasets.finetuning import (
+        from paddleformers.datasets.SFTDataset import (
             create_indexed_dataset as create_dataset,
         )
     else:
-        from paddleformers.datasets.finetuning import create_dataset
+        from paddleformers.datasets.loader import create_dataset
     dataset_config.update(
         {
             "num_samples_each_epoch": data_args.num_samples_each_epoch,
