@@ -29,7 +29,22 @@ class DataArguments:
             )
         },
     )
-    dataset_name: str = field(default="KnowledgeBasedSFTReader", metadata={"help": "."})
+    mix_strategy: str = field(
+        default="random",
+        metadata={
+            "help": "Strategy to use in dataset mixing (random/concat/interleave) (undersampling/oversampling)."
+        },
+    )
+    input_dir: str = field(
+        default=None,
+        metadata={"help": "data path (only valid in offline pretrain dataset)"},
+    )
+    split: str = field(
+        default="950,50",
+        metadata={
+            "help": "Train/Eval data split ratio (only valid in offline pretrain dataset)"
+        },
+    )
     train_dataset_type: str = field(
         default=None,
         metadata={
@@ -77,6 +92,16 @@ class DataArguments:
         default=4096,
         metadata={"help": "Maximum sequence length."},
     )
+    encode_one_turn: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether encode each round independently in a multi-round dialogue."
+        },
+    )
+    use_template: bool = field(
+        default=True,
+        metadata={"help": "Whether to use template in data processing."},
+    )
     max_prompt_len: int = field(
         default=2048,
         metadata={"help": "Maximum prompt length."},
@@ -101,6 +126,10 @@ class DataArguments:
     )
 
     # strategy
+    packing: bool = field(
+        default=True,
+        metadata={"help": "Enable sequences packing in training."},
+    )
     greedy_intokens: bool = field(
         default=True,
         metadata={"help": "Whether to use greedy_intokens packing method."},

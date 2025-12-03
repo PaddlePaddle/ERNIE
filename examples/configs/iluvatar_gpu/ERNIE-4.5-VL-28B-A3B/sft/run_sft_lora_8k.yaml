@@ -8,7 +8,7 @@ fuse_linear: false
 fuse_rms_norm: false
 use_flash_attention: 1
 use_sparse_flash_attn: false
-use_attn_mask_start_row_indices: false
+use_attn_mask_startend_row_indices: false
 use_moe: true
 fine_tuning: LoRA
 lora_rank: 32

@@ -1655,7 +1655,11 @@ class PretrainingTrainer(Trainer):
 
         return self.optimizer
 
-    def save_model(self, output_dir=None):
+    def save_model(
+        self,
+        output_dir=None,
+        merge_tensor_parallel=False,
+    ):
         """
         Saves the model and associated configuration files to the specified directory.
 
@@ -1669,7 +1673,7 @@ class PretrainingTrainer(Trainer):
             None
 
         """
-        super().save_model(output_dir)
+        super().save_model(output_dir, merge_tensor_parallel)
         if self.args.should_save:
             with open(
                 os.path.join(output_dir, "static_name_to_dyg_name.json"), "w"

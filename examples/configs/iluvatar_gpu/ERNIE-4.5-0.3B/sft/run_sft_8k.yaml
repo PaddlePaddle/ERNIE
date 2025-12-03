@@ -83,7 +83,7 @@ unified_checkpoint_config: async_save
 
 use_flash_attention: true
 use_sparse_head_and_loss_fn: false
-use_attn_mask_start_row_indices: false
+use_attn_mask_startend_row_indices: false
 use_sparse_flash_attn: false
 tensor_parallel_output: false
 greedy_intokens: 1

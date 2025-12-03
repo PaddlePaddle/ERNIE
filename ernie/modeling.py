@@ -815,7 +815,7 @@ class Ernie4_5_Attention(nn.Layer):
         hidden_states,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         attention_mask: Optional[paddle.Tensor] = None,
-        attn_mask_start_row_indices: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         position_ids: Optional[Tuple[paddle.Tensor]] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
@@ -827,7 +827,7 @@ class Ernie4_5_Attention(nn.Layer):
             hidden_states (paddle.Tensor): Input tensor [bsz, seq_len, hidden_size]
             past_key_value (Optional[Tuple[paddle.Tensor, paddle.Tensor]]): Cached key/value states
             attention_mask (Optional[paddle.Tensor]): Attention mask tensor
-            attn_mask_start_row_indices (Optional[paddle.Tensor]): Variable length attention indices
+            attn_mask_startend_row_indices (Optional[paddle.Tensor]): Variable length attention indices
             position_ids (Optional[paddle.Tensor]): Position indices for RoPE
             output_attentions (bool): Return attention weights if True
             use_cache (bool): Cache key/value states if True
@@ -889,7 +889,7 @@ class Ernie4_5_Attention(nn.Layer):
                 output_attentions,
                 past_key_value,
                 use_cache,
-                attn_mask_start_row_indices,
+                attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -903,7 +903,7 @@ class Ernie4_5_Attention(nn.Layer):
                 output_attentions=output_attentions,
                 past_key_value=past_key_value,
                 use_cache=use_cache,
-                attn_mask_start_row_indices=attn_mask_start_row_indices,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
         if self.config.sequence_parallel:
             attn_output = attn_output.reshape([-1, attn_output.shape[-1]])
@@ -919,7 +919,7 @@ class Ernie4_5_Attention(nn.Layer):
         k,
         v,
         attention_mask=None,
-        attn_mask_start_row_indices=None,
+        attn_mask_startend_row_indices=None,
         seq_length=None,
     ):
         """Optimized flash attention implementation.
@@ -929,7 +929,7 @@ class Ernie4_5_Attention(nn.Layer):
             k (paddle.Tensor): Key tensor
             v (paddle.Tensor): Value tensor
             attention_mask (Optional[paddle.Tensor]): Attention mask
-            attn_mask_start_row_indices (Optional[paddle.Tensor]): Variable length indices
+            attn_mask_startend_row_indices (Optional[paddle.Tensor]): Variable length indices
             seq_length (Optional[int]): Sequence length
 
         Returns:
@@ -943,7 +943,7 @@ class Ernie4_5_Attention(nn.Layer):
             self.config.attention_probs_dropout_prob,
             self.config.use_sparse_flash_attn,
             attention_mask,
-            attn_mask_start_row_indices,
+            attn_mask_startend_row_indices,
             seq_length,
             self.config.use_var_len_flash_attn,
             self._rr_flash_attn if self.training else None,
@@ -955,7 +955,7 @@ class Ernie4_5_Attention(nn.Layer):
         k,
         v,
         attention_mask=None,
-        attn_mask_start_row_indices=None,
+        attn_mask_startend_row_indices=None,
         seq_length=None,
     ):
         """Standard self-attention implementation.
@@ -965,7 +965,7 @@ class Ernie4_5_Attention(nn.Layer):
             k (paddle.Tensor): Key tensor
             v (paddle.Tensor): Value tensor
             attention_mask (Optional[paddle.Tensor]): Attention mask
-            attn_mask_start_row_indices (Optional[paddle.Tensor]): Variable length indices
+            attn_mask_startend_row_indices (Optional[paddle.Tensor]): Variable length indices
             seq_length (Optional[int]): Sequence length
 
         Returns:
@@ -1041,7 +1041,7 @@ class Ernie4_5_Attention(nn.Layer):
         output_attentions=False,
         past_key_value=None,
         use_cache=False,
-        attn_mask_start_row_indices=None,
+        attn_mask_startend_row_indices=None,
     ):
         """Attention computation with rotary embeddings.
 
@@ -1055,7 +1055,7 @@ class Ernie4_5_Attention(nn.Layer):
             output_attentions (bool): Return attention weights
             past_key_value (Optional[Tuple[paddle.Tensor, paddle.Tensor]]): Cached states
             use_cache (bool): Cache new states
-            attn_mask_start_row_indices (Optional[paddle.Tensor]): Variable length indices
+            attn_mask_startend_row_indices (Optional[paddle.Tensor]): Variable length indices
 
         Returns:
             Tuple containing:
@@ -1143,7 +1143,7 @@ class Ernie4_5_Attention(nn.Layer):
             key_states,
             value_states,
             attention_mask,
-            attn_mask_start_row_indices,
+            attn_mask_startend_row_indices,
             seq_length,
         )
         return attn_output, attn_weights, past_key_value

@@ -49,7 +49,7 @@ from paddleformers import __version__ as paddleformers_version
 
 from ernie.callbacks import LayerwiseDropoutCallback
 from ernie.configuration import Ernie4_5_MoeConfig
-from ernie.dataset.dpo import collate_fn, create_dataset
+from paddleformers.datasets.dpo import collate_fn, create_dataset
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
 from ernie.modeling_moe_pp import Ernie4_5_MoeForCausalLMPipe
 from ernie.tokenizer import Ernie4_5_Tokenizer
@@ -352,7 +352,7 @@ def run_dpo(
 
     if finetuning_args.use_huggingface_model:
         if (
-            model_args.use_attn_mask_start_row_indices
+            model_args.use_attn_mask_startend_row_indices
             and model_args.use_sparse_flash_attn
         ):
             _attn_implementation = "flashmask"
@@ -493,11 +493,19 @@ def run_dpo(
         "random_shuffle": data_args.random_shuffle,
         "greedy_intokens": data_args.greedy_intokens,
         "buffer_size": data_args.buffer_size,
-        "use_attn_mask_start_row_indices": model_args.use_attn_mask_start_row_indices,
+        "use_attn_mask_startend_row_indices": model_args.use_attn_mask_startend_row_indices,
         "mask_out_eos_token": data_args.mask_out_eos_token,
+        "packing": data_args.packing,
+        "mix_strategy": data_args.mix_strategy,
+        "encode_one_turn": data_args.encode_one_turn,
     }
 
     if finetuning_args.max_steps == -1:
+        if data_args.mix_strategy == "random":
+            raise ValueError(
+                "When using 'random' mix_strategy, max_steps must be explicitly set (cannot be -1). "
+                "Random mixing requires a fixed number of training steps to properly sample data."
+            )
         if finetuning_args.should_load_dataset and paddle.distributed.get_rank() == 0:
             # NOTE(gongenlei): not to feed train_dataset, or the data will be wrong in next training.
             finetuning_args, _ = dpo_estimate_training(
@@ -565,6 +573,12 @@ def run_dpo(
         lora=model_args.lora,
     )
 
+    # padding to the maximum seq length in batch data when max_seq_len is None
+    max_seq_len = (
+        data_args.max_seq_len
+        if (data_args.packing or finetuning_args.sequence_parallel)
+        else None
+    )
     trainer = ErnieMoEDPOTrainer(
         model=model,
         ref_model=ref_model,
@@ -584,7 +598,7 @@ def run_dpo(
         data_collator=partial(
             collate_fn,
             tokenizer=tokenizer,
-            max_seq_len=data_args.max_seq_len,
+            max_seq_len=max_seq_len,
             use_sparse_head_and_loss_fn=model_args.use_sparse_head_and_loss_fn,
             use_fused_head_and_loss_fn=model_args.use_fused_head_and_loss_fn,
             use_response_score_delta=finetuning_args.offset_alpha > 0.0,

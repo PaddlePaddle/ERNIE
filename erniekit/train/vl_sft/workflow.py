@@ -459,9 +459,12 @@ def run_vl_sft(
 
     cfg.use_flash_attention = model_args.use_flash_attention
     cfg.use_sparse_flash_attn = model_args.use_sparse_flash_attn
-    cfg.use_attn_mask_start_row_indices = model_args.use_attn_mask_start_row_indices
+    cfg.use_attn_mask_startend_row_indices = (
+        model_args.use_attn_mask_startend_row_indices
+    )
     cfg.use_recompute_moe = model_args.use_recompute_moe
     cfg.recompute = finetuning_args.recompute
+    cfg.refined_recompute = finetuning_args.refined_recompute
     cfg.recompute_granularity = model_args.recompute_granularity
     cfg.use_recompute_loss_fn = model_args.use_recompute_loss_fn
     cfg.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
@@ -684,7 +687,7 @@ def run_vl_sft(
                 "worker_index": paddle.distributed.get_rank(),
                 "prefetch_factor": finetuning_args.prefetch_factor,
                 "task_group": train_task_group_text,
-                "in_tokens": finetuning_args.packing,  # Text SFT packing option
+                "in_tokens": data_args.packing,  # Text SFT packing option
                 "batch_size": finetuning_args.per_device_train_batch_size,
                 "tokenizer": tokenizer,
                 "number_of_samples_each_epoch": data_args.num_samples_each_epoch,
@@ -702,6 +705,7 @@ def run_vl_sft(
                 "use_train_part_sharding": finetuning_args.text_use_train_part_sharding,
                 "rope_3d": model_args.rope_3d,
                 "chat_template": preprocess_args.chat_template,
+                "device": finetuning_args.device,
             }
 
             text_sft_train_reader = create_pyreader(config_dataset_text)
@@ -737,7 +741,7 @@ def run_vl_sft(
         im_prefix_length=256,
         rng=random.Random(2024),
         combine_batch=1,
-        packing=finetuning_args.packing,
+        packing=data_args.packing,
     )
 
     if model_args.lora:
@@ -803,7 +807,7 @@ def run_vl_sft(
         modality_ratio=modality_ratio,
         processing_class=image_preprocess_save,
         batch_size=finetuning_args.per_device_train_batch_size,
-        packing=finetuning_args.packing,
+        packing=data_args.packing,
     )
     if vit_trainable_callback is not None:
         vit_trainable_callback.auto_cast_func = trainer.autocast_smart_context_manager

@@ -45,7 +45,7 @@ def calculate_effective_tokens(training_args, train_dataset, max_seq_len):
     total_effective_tokens = 0
     try:
         data_parallel_degree = training_args.data_parallel_degree
-    except:
+    except Exception:
         data_parallel_degree = 1
     if training_args.sharding_parallel_degree > 1:
         sharding_parallel_degree = training_args.sharding_parallel_degree
@@ -85,9 +85,13 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
     train_dataset.estimate = True
     logger.info("Start to estimate max training steps...")
 
-    train_dataset_path_list = [path for path in str(data_args.train_dataset_path).replace(" ", "").split(',')]
+    train_dataset_path_list = [
+        path for path in str(data_args.train_dataset_path).replace(" ", "").split(",")
+    ]
     if len(train_dataset_path_list) > 1:
-        logger.warning("Suggest to use max_steps instead of num_train_epochs for multi source dataset.")
+        logger.warning(
+            "Suggest to use max_steps instead of num_train_epochs for multi source dataset."
+        )
         logger.info(
             "Multi source dataset detected, number of samples will be estimated by following rule. "
             "num_samples = (source1_num_samples * prob1 + source2_num_samples * prob2 + ...) * epochs"
@@ -97,7 +101,9 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
 
     if training_args.max_estimate_samples != -1:
         # Set estimate samples to max_estimate_samples
-        logger.warning("The results between sampling and non-sampling methods may differ.")
+        logger.warning(
+            "The results between sampling and non-sampling methods may differ."
+        )
         train_dataset.max_estimate_samples = min(
             training_args.max_estimate_samples, train_dataset.max_estimate_samples
         )
@@ -125,8 +131,12 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
         if max_samples != train_dataset.max_estimate_samples:
             max_steps *= max_samples / train_dataset.max_estimate_samples
             train_tokens *= max_samples / train_dataset.max_estimate_samples
-            train_dataset.used_samples *= max_samples / train_dataset.max_estimate_samples
-            train_dataset.unused_samples *= max_samples / train_dataset.max_estimate_samples
+            train_dataset.used_samples *= (
+                max_samples / train_dataset.max_estimate_samples
+            )
+            train_dataset.unused_samples *= (
+                max_samples / train_dataset.max_estimate_samples
+            )
 
         max_steps = int(np.ceil(max_steps))
 
@@ -137,7 +147,9 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
             "global_batch_size": int(global_batch_size),
             "gradient_accumulation_steps": training_args.gradient_accumulation_steps,
             "warmup_steps": int(np.ceil(0.1 * max_steps)),
-            "per_device_train_batch_size": int(training_args.per_device_train_batch_size),
+            "per_device_train_batch_size": int(
+                training_args.per_device_train_batch_size
+            ),
             "tensor_parallel_degree": int(training_args.tensor_parallel_degree),
             "pipeline_parallel_degree": int(training_args.pipeline_parallel_degree),
             "sharding_parallel_degree": int(training_args.sharding_parallel_degree),
@@ -147,14 +159,20 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
             "valid": True,
             "train_samples": int(max_samples * training_args.num_train_epochs),
             "estimate_samples": int(train_dataset.max_estimate_samples),
-            "actual_train_samples": int(train_dataset.used_samples * training_args.num_train_epochs),
-            "skip_samples": int(train_dataset.unused_samples * training_args.num_train_epochs),
+            "actual_train_samples": int(
+                train_dataset.used_samples * training_args.num_train_epochs
+            ),
+            "skip_samples": int(
+                train_dataset.unused_samples * training_args.num_train_epochs
+            ),
         }
         if hasattr(training_args, "num_of_gpus"):
             res["num_of_gpus"] = training_args.num_of_gpus
 
         if train_batches / training_args.num_train_epochs / global_batch_size < 1:
-            logger.warning("This dataset is too small, you'd better enlarge your dataset.")
+            logger.warning(
+                "This dataset is too small, you'd better enlarge your dataset."
+            )
             res["valid"] = False
 
         if getattr(training_args, "estimation_output_file", None):
@@ -168,13 +186,15 @@ def estimate_training(train_dataset, data_args, training_args, model_args):
             "max_steps": 0,
             "gradient_accumulation_steps": training_args.gradient_accumulation_steps,
             "train_tokens": 0,
-            "per_device_train_batch_size": int(training_args.per_device_train_batch_size),
+            "per_device_train_batch_size": int(
+                training_args.per_device_train_batch_size
+            ),
             "tensor_parallel_degree": int(training_args.tensor_parallel_degree),
             "pipeline_parallel_degree": int(training_args.pipeline_parallel_degree),
             "sharding_parallel_degree": int(training_args.sharding_parallel_degree),
             "num_samples_each_epoch": data_args.num_samples_each_epoch,
             "max_seq_len": int(data_args.max_seq_len),
-            "seed": data_args.seed,
+            "seed": training_args.seed,
             "valid": False,
             "train_samples": 0,
         }
@@ -206,7 +226,12 @@ def check_refined_recompute(rr, sequence_parallel, lora=False):
         logger.error("Currently do not support refine recompute; to be supported soon.")
 
     for op_name in rr.keys():
-        if op_name in ["mlp_row_ln", "attention_row_ln", "attention_column_ln", "mlp_column_ln"]:
+        if op_name in [
+            "mlp_row_ln",
+            "attention_row_ln",
+            "attention_column_ln",
+            "mlp_column_ln",
+        ]:
             if not sequence_parallel:
                 logger.warning(
                     f"Currently, the `{op_name}` op is only supported "
@@ -252,7 +277,7 @@ def save_stop_info(args, stop_step, outside_eval, outside_predict):
     }
     os.makedirs(output_path, exist_ok=True)
     file_path = os.path.join(output_path, "stop_step.json")
-    with open(file_path, 'w') as json_file:
+    with open(file_path, "w") as json_file:
         json.dump(data, json_file)
     logger.info(f"Saving stop info into {file_path}")
     return

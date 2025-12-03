@@ -723,7 +723,7 @@ def modality_detach(wrapped_class):
     return wrapped_class
 
 
-def inbatch_pack_offset_to_attn_mask_start_row_indices(inbatch_pack_offset):
+def inbatch_pack_offset_to_attn_mask_startend_row_indices(inbatch_pack_offset):
     inbatch_pack_offset = inbatch_pack_offset.numpy()
     attn_mask_row_start_indices = []
     min_start_row = np.inf
@@ -1017,16 +1017,19 @@ class ErnieDecoderLayerPipe(ErnieMoEDecoderLayer):
 
         token_type_ids = token_type_ids.clone()
         if inbatch_pack_offset is not None:
-            attn_mask_start_row_indices = (
-                inbatch_pack_offset_to_attn_mask_start_row_indices(inbatch_pack_offset)
+            attn_mask_startend_row_indices = (
+                inbatch_pack_offset_to_attn_mask_startend_row_indices(
+                    inbatch_pack_offset
+                )
             )
         else:
-            attn_mask_start_row_indices = None
+            attn_mask_startend_row_indices = None
 
         has_gradient = not hidden_states.stop_gradient
         if (
             self.config.recompute
             and self.config.recompute_granularity == "full"
+            and not self.config.skip_recompute_ops[self.layer_idx].get("global", False)
             and has_gradient
         ):
             decoderlayer_act_offload_settings = self.config.get(
@@ -1050,7 +1053,7 @@ class ErnieDecoderLayerPipe(ErnieMoEDecoderLayer):
                 super().forward,
                 hidden_states,
                 None,  # attention_mask,
-                attn_mask_start_row_indices,  # attn_mask_start_row_indices
+                attn_mask_startend_row_indices,  # attn_mask_startend_row_indices
                 position_ids,  # position_ids,
                 token_type_ids.clone(),  # token-type
                 False,  # output-attention
@@ -1062,7 +1065,7 @@ class ErnieDecoderLayerPipe(ErnieMoEDecoderLayer):
             hidden_states = super().forward(
                 hidden_states,
                 None,  # attention_mask,
-                attn_mask_start_row_indices,  # attn_mask_start_row_indices
+                attn_mask_startend_row_indices,  # attn_mask_startend_row_indices
                 position_ids,  # position_ids,
                 token_type_ids.clone(),  # token-type
                 False,  # output-attention
