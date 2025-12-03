@@ -22,11 +22,16 @@ from io import BytesIO
 
 import xxhash
 from PIL import Image
+from paddleformers.transformers.legacy.tokenizer_utils_base import BatchEncoding
 
 
 def get_text_token_num(tokenizer, text: str):
     """text tokenize and count"""
-    return len(tokenizer.encode(text)["input_ids"])
+    tokens = tokenizer.encode(text)
+    if isinstance(tokens, BatchEncoding):
+        return len(tokens["input_ids"])
+    else:
+        return len(tokens)
 
 
 def get_uniq_id(text):

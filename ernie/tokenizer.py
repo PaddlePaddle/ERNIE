@@ -24,7 +24,10 @@ import numpy as np
 import paddle
 import sentencepiece as spm
 from paddleformers.transformers import PretrainedTokenizer
-from paddleformers.transformers.tokenizer_utils_base import PaddingStrategy, TextInput
+from paddleformers.transformers.legacy.tokenizer_utils_base import (
+    PaddingStrategy,
+    TextInput,
+)
 from paddleformers.utils.log import logger
 
 
