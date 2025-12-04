@@ -2,7 +2,7 @@
 stage: VL-SFT
 
 # model
-model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Paddle/
+model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Thinking/
 multimodal: true
 fuse_linear: true
 fuse_rms_norm: false
@@ -20,10 +20,11 @@ moe_multimodal_dispatch_use_allgather: v2-alltoall-unpad-text
 pp_seg_method: layer:Ernie4_5_DecoderLayer|ErnieDecoderLayer|EmptyLayer
 
 # data
-train_dataset_path: "examples/data/sft_vl-train_demo1.jsonl"
-train_dataset_prob: "1.0"
-text_dataset_path: ""
-text_dataset_prob: ""
+dataset_name: "FunctionCallSFTReader"
+train_dataset_path: ""
+train_dataset_prob: ""
+text_dataset_path: "examples/data/function-call-train.jsonl"
+text_dataset_prob: "1.0"
 max_seq_len: 32768
 num_samples_each_epoch: 10000000
 modality_ratio: "[1,1]"
@@ -34,6 +35,7 @@ pad_to_max_seqlen: 32768
 render_timestamp: true
 serialize_output: false
 one_sample_in_one_seq: true
+chat_template: "ernie_vl_thinking"
 
 # dataloader
 dataloader_num_workers: 1
@@ -91,7 +93,7 @@ tensorwise_offload_optimizer: false
 unified_checkpoint_config: ignore_merge_optimizer
 recompute: true
 recompute_granularity: full
-refined_recompute: "global:3"
+refined_recompute: "global:2"
 pre_alloc_memory: 60
 
 # amp
@@ -101,3 +103,6 @@ amp_master_grad: 1
 
 # checkpoint
 unified_checkpoint: true
+
+# device flag
+FLAGS_use_stride_kernel: false
