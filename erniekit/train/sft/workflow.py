@@ -602,7 +602,6 @@ def run_sft(
                     task_group=data_args.eval_dataset_path,
                     task_group_prob=data_args.eval_dataset_prob,
                     sub_dataset_type=data_args.eval_dataset_type,
-                    is_valid=True,
                     **dataset_config,
                 )
 
