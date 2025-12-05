@@ -96,7 +96,8 @@ class ModelArguments:
         },
     )
     use_global_causal_attn: bool = field(
-        default=False, metadata={"help": "Whether to use global causal attention in packing data"}
+        default=False,
+        metadata={"help": "Whether to use global causal attention in packing data"},
     )
     use_sparse_head_and_loss_fn: bool = field(
         default=False,
