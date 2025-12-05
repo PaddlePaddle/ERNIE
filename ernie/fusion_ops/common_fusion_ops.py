@@ -94,6 +94,7 @@ def _fusion_flash_attention(
                     causal=True,
                 )
         else:
+            # attn_mask_startend_row_indices.ndim mush be 3
             if attn_mask_startend_row_indices.ndim == 4:
                 attn_mask_startend_row_indices = attn_mask_startend_row_indices.squeeze(
                     -1
