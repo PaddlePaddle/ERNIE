@@ -71,11 +71,11 @@ def _fusion_flash_attention(
     """
 
     if attn_mask_startend_row_indices is not None:
-        if attn_mask_startend_row_indices.ndim == 3:
-            attn_mask_startend_row_indices = attn_mask_startend_row_indices.unsqueeze(
-                -1
-            )
         if use_sparse_flash_attn:
+            if attn_mask_startend_row_indices.ndim == 3:
+                attn_mask_startend_row_indices = (
+                    attn_mask_startend_row_indices.unsqueeze(-1)
+                )
             if rr_flash_attn is None:
                 out = flashmask_attention(
                     q,
@@ -94,6 +94,10 @@ def _fusion_flash_attention(
                     causal=True,
                 )
         else:
+            if attn_mask_startend_row_indices.ndim == 4:
+                attn_mask_startend_row_indices = attn_mask_startend_row_indices.squeeze(
+                    -1
+                )
             attention_mask = _gen_from_sparse_attn_mask_indices(
                 attn_mask_startend_row_indices, q.dtype
             )
