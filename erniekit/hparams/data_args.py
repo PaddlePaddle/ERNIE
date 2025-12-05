@@ -146,19 +146,25 @@ class DataArguments:
         default=True,
         metadata={"help": "Whether to use cls to predict RM score."},
     )
-    eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
-    share_folder: bool = field(
-        default=False,
-        metadata={"help": "Use share folder for data dir and output dir on multi machine."},
-    )
-
-    data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
-    skip_warmup: bool = field(
-        default=True,
-        metadata={"help": "Whether to skip the warmup process of mmap files."},
-    )
-    data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
     truncate_packing: bool = field(
         default=True,
-        metadata={"help": "Whether to truncate data in packing (only valid in pretrain online dataflow)."},
+        metadata={
+            "help": "Whether to truncate data in packing (only valid in pretrain online dataflow)."
+        },
+    )
+    template: str = field(
+        default=None,
+        metadata={"help": "The chat template used in training."},
+    )
+    split_multi_turn: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to split multi-round dialogues into multiple pieces of data for training"
+        },
+    )
+    template_backend: str = field(
+        default="jinja",
+        metadata={
+            "help": "jinja means using apply_chat_template, custom means using a custom template"
+        },
     )

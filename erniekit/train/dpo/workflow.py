@@ -46,6 +46,7 @@ from paddleformers.transformers import (
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.utils.log import logger
 from paddleformers import __version__ as paddleformers_version
+from paddleformers.datasets.template.template import get_template_and_fix_tokenizer
 
 from ernie.callbacks import LayerwiseDropoutCallback
 from ernie.configuration import Ernie4_5_MoeConfig
@@ -501,7 +502,27 @@ def run_dpo(
         "encode_one_turn": data_args.encode_one_turn,
         "stage": model_args.stage,
         "is_valid": False,
+        "template_backend": data_args.template_backend,
     }
+    dataset_config.update(
+        {
+            "template": data_args.template,
+            "train_on_prompt": False,
+            "tool_format": None,
+            "default_system": None,
+            "enable_thinking": True,
+        }
+    )
+
+    if dataset_config["template_backend"] == "custom":
+        template_instance = get_template_and_fix_tokenizer(dataset_config)
+    else:
+        template_instance = None
+    dataset_config.update(
+        {
+            "template_instance": template_instance,
+        }
+    )
 
     if finetuning_args.max_steps == -1:
         if data_args.mix_strategy == "random":

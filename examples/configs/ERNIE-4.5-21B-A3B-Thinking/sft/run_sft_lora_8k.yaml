@@ -1,12 +1,13 @@
 ### data
-train_dataset_type: "chatml"
-eval_dataset_type: "chatml"
+train_dataset_type: "messages"
+eval_dataset_type: "messages"
 train_dataset_path: "./examples/data/sft_think-train.jsonl"
 train_dataset_prob: "1.0"
 eval_dataset_path: "./examples/data/sft_think-eval.jsonl"
 eval_dataset_prob: "1.0"
 max_seq_len: 8192
 num_samples_each_epoch: 6000000
+split_multi_turn: True
 
 ### model
 model_name_or_path: baidu/ERNIE-4.5-21B-A3B-Thinking
