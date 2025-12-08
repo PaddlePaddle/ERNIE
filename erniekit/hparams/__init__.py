@@ -17,7 +17,14 @@ from .export_args import ExportArguments
 from .finetuning_args import FinetuningArguments
 from .generating_args import GeneratingArguments
 from .model_args import ModelArguments
-from .parser import get_eval_args, get_export_args, get_server_args, get_train_args, read_args
+from .parser import (
+    get_eval_args,
+    get_export_args,
+    get_server_args,
+    get_train_args,
+    get_env_args,
+    read_args,
+)
 from .server_args import ServerArguments
 
 __all__ = [
@@ -31,5 +38,6 @@ __all__ = [
     "get_eval_args",
     "get_server_args",
     "get_export_args",
+    "get_env_args",
     "read_args",
 ]

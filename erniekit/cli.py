@@ -25,7 +25,7 @@ from pathlib import Path
 from .version.env import VERSION
 from .version import commit
 from .utils.process import terminate_process_tree, detect_device, set_ascend_environment
-from .hparams import read_args
+from .hparams import get_env_args
 
 script_dir = Path(__file__).parent.resolve()
 parent_dir = script_dir.parent
@@ -140,9 +140,8 @@ def main():
     os.environ["FLAGS_dataloader_use_file_descriptor"] = "False"
 
     if current_device == "xpu":
-        args = read_args()
-        use_stride_kernel = args.get("FLAGS_use_stride_kernel", False)
-        os.environ["FLAGS_use_stride_kernel"] = "1" if use_stride_kernel else "0"
+        args = get_env_args()
+        os.environ["FLAGS_use_stride_kernel"] = args.FLAGS_use_stride_kernel
         os.environ["XPU_PADDLE_L3_SIZE"] = "0"
         os.environ["XPUAPI_DEFAULT_SIZE"] = "2205258752"
 
