@@ -146,3 +146,25 @@ class DataArguments:
         default=True,
         metadata={"help": "Whether to use cls to predict RM score."},
     )
+    truncate_packing: bool = field(
+        default=True,
+        metadata={
+            "help": "Whether to truncate data in packing (only valid in pretrain online dataflow)."
+        },
+    )
+    template: str = field(
+        default=None,
+        metadata={"help": "The chat template used in training."},
+    )
+    split_multi_turn: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to split multi-round dialogues into multiple pieces of data for training"
+        },
+    )
+    template_backend: str = field(
+        default="jinja",
+        metadata={
+            "help": "jinja means using apply_chat_template, custom means using a custom template"
+        },
+    )

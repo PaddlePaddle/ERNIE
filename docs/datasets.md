@@ -315,9 +315,9 @@ Here is a multi-image example of SFT VL dataset:
 }
 ```
 
-## chatml Format
+## messages Format
 
-The chatml Format is used for training thinking models and function call training:
+The messages Format is used for training thinking models and function call training:
 
 Demo data for thinking models:
 
