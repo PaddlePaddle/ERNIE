@@ -72,6 +72,7 @@ def _fusion_flash_attention(
 
     if attn_mask_startend_row_indices is not None:
         if use_sparse_flash_attn:
+            # attn_mask_startend_row_indices.ndim mush be 4
             if attn_mask_startend_row_indices.ndim == 3:
                 attn_mask_startend_row_indices = (
                     attn_mask_startend_row_indices.unsqueeze(-1)
