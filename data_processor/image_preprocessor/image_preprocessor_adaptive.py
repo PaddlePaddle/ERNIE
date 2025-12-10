@@ -241,7 +241,7 @@ class AdaptiveImageProcessor(BaseImageProcessor):
 
     def to_dict(self):
         encoder_dict = super().to_dict()
-        encoder_dict.pop("image_processor_type", None)
+        encoder_dict["image_processor_type"] = "Ernie4_5_VLImageProcessor"
         return encoder_dict
 
     def _preprocess(

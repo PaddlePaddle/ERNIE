@@ -33,6 +33,7 @@ from ernie.tokenizer_vl import (
     SFT_IMAGE_END_TOKEN,
     SFT_IMAGE_START_TOKEN,
 )
+from paddleformers.transformers.legacy.tokenizer_utils_base import BatchEncoding
 
 
 class VideoProcess(Process):
@@ -335,7 +336,11 @@ class VideoProcess(Process):
         # calculate the ratio of each video
         text_token_count = 0
         for item in meta["text_info"]:
-            text_token_count += len(self.tokenizer.encode(item["text"])["input_ids"])
+            tokens = self.tokenizer.encode(item["text"])
+            if isinstance(tokens, BatchEncoding):
+                text_token_count += len(tokens["input_ids"])
+            else:
+                text_token_count += len(tokens)
         text_token_count += 1  # for eos token
 
         if not self.is_training:
