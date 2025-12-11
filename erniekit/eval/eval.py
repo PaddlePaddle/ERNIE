@@ -36,6 +36,7 @@ from paddleformers.trainer import (
 from paddleformers.trainer.trainer_utils import ShardingOption
 from paddleformers.utils.log import logger
 from paddleformers import __version__ as paddleformers_version
+from paddleformers.datasets.template.template import get_template_and_fix_tokenizer
 
 from ernie.configuration import Ernie4_5_MoeConfig
 from ernie.modeling_moe import Ernie4_5_MoeForCausalLM
@@ -418,15 +419,39 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
         "encode_one_turn": data_args.encode_one_turn,
         "use_template": data_args.use_template,
         "is_pretraining": True if model_args.stage.lower() == "pt" else False,
+        "truncate_packing": data_args.truncate_packing,
+        "stage": model_args.stage,
+        "is_valid": False,
+        "template_backend": data_args.template_backend,
+        "split_multi_turn": data_args.split_multi_turn,
     }
-    from paddleformers.datasets.finetuning import collate_fn
+    dataset_config.update(
+        {
+            "template": data_args.template,
+            "train_on_prompt": False,
+            "tool_format": None,
+            "default_system": None,
+            "enable_thinking": True,
+        }
+    )
+
+    if dataset_config["template_backend"] == "custom":
+        template_instance = get_template_and_fix_tokenizer(dataset_config)
+    else:
+        template_instance = None
+    dataset_config.update(
+        {
+            "template_instance": template_instance,
+        }
+    )
+    from paddleformers.datasets.collate import collate_fn
 
     if data_args.dataset_type == "map":
-        from paddleformers.datasets.finetuning import (
+        from paddleformers.datasets.loader import (
             create_indexed_dataset as create_dataset,
         )
     else:
-        from paddleformers.datasets.finetuning import create_dataset
+        from paddleformers.datasets.loader import create_dataset
     dataset_config.update(
         {
             "num_samples_each_epoch": data_args.num_samples_each_epoch,
@@ -440,11 +465,11 @@ def run_eval(args: Optional[dict[str, Any]] = None) -> None:
             eval_file_path = os.path.join(data_args.offline_dataset_path, "eval")
             eval_dataset = create_dataset(data_file_prefix=eval_file_path)
         else:
+            dataset_config["is_valid"] = True
             eval_dataset = create_dataset(
                 task_group=data_args.eval_dataset_path,
                 task_group_prob=data_args.eval_dataset_prob,
                 sub_dataset_type=data_args.eval_dataset_type,
-                is_valid=True,
                 **dataset_config,
             )
 

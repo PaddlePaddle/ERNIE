@@ -51,6 +51,7 @@ from ernie.tokenizer_vl import (
     SFT_VIDEO_END_TOKEN,
     SFT_VIDEO_START_TOKEN,
 )
+from paddleformers.transformers.legacy.tokenizer_utils_base import BatchEncoding
 
 
 class SlidingWindowsContextManager:
@@ -539,7 +540,9 @@ class ExampleToFeature(ProcessorBase):
             else:
                 cur_tokens = self.tokenizer.encode(
                     item["text"], add_special_tokens=False, return_attention_mask=False
-                )["input_ids"]
+                )
+                if isinstance(cur_tokens, BatchEncoding):
+                    cur_tokens = cur_tokens["input_ids"]
             input_ids.append(cur_tokens)
 
             mask_flag = item.get("tag", "no_mask")

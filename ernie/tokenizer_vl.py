@@ -29,7 +29,7 @@ import paddle
 
 from paddleformers.utils.log import logger
 from paddleformers.transformers import PretrainedTokenizer
-from paddleformers.transformers.tokenizer_utils_base import (
+from paddleformers.transformers.legacy.tokenizer_utils_base import (
     PaddingStrategy,
     TextInput,
 )

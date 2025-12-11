@@ -237,7 +237,7 @@ def test_sft():
     attach_log_file()
     assert_result(ret_code, err_log)
 
-    base_loss = 12.301529
+    base_loss = 12.301653
     assert_loss(base_loss)
 
 
@@ -275,7 +275,7 @@ def test_sft_lora():
     attach_log_file()
     assert_result(ret_code, err_log)
 
-    base_loss = 12.291286
+    base_loss = 12.29144
     assert_loss(base_loss)
 
 
