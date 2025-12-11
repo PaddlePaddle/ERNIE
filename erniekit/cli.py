@@ -141,7 +141,7 @@ def main():
 
     if current_device == "xpu":
         args = get_env_args()
-        os.environ["FLAGS_use_stride_kernel"] = args.FLAGS_use_stride_kernel
+        os.environ["FLAGS_use_stride_kernel"] = str(args.FLAGS_use_stride_kernel)
         os.environ["XPU_PADDLE_L3_SIZE"] = "0"
         os.environ["XPUAPI_DEFAULT_SIZE"] = "2205258752"
 
