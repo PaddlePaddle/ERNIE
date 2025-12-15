@@ -166,6 +166,15 @@ def run_dpo(
 
     set_seed(finetuning_args.seed)
 
+    if finetuning_args.pre_alloc_memory > 0:
+        logger.warning(
+            f"pre-allocating a tensor whose memory capacity is {finetuning_args.pre_alloc_memory} GB "
+            "and then release it."
+        )
+        memory_size = int(finetuning_args.pre_alloc_memory * 1024 * 1024 * 1024)
+        x = paddle.empty([memory_size], dtype=paddle.uint8)
+        del x
+
     logger.warning(
         f"Process rank: {finetuning_args.local_rank}, device: {finetuning_args.device}, world_size: "
         f"{finetuning_args.world_size}, distributed training: {bool(finetuning_args.local_rank != -1)}, "
