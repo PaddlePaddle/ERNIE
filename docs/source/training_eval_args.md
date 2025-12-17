@@ -41,7 +41,7 @@ Each parameter is documented with its type, default value and detailed descripti
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `per_device_eval_batch_size` | int | Required | Evaluation batch size (micro batch size) |
-| `eval_dataset_path` | str | Required | Path to evaluation dataset (see [sft-eval.jsonl](../examples/data/sft-eval.jsonl) |
+| `eval_dataset_path` | str | Required | Path to evaluation dataset (see [sft-eval.jsonl](https://github.com/PaddlePaddle/ERNIE/blob/develop/examples/data/sft-eval.jsonl) |
 | `eval_dataset_prob` | str | 1.0 | Evaluation dataset sampling probability. |
 | `eval_dataset_type` | str | erniekit | Evaluation dataset type. |
 | `eval_steps` | int | Required | Evaluation interval steps |
@@ -52,12 +52,12 @@ Each parameter is documented with its type, default value and detailed descripti
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `train_dataset_path` | str | Required | Training dataset path (see [sft-train.jsonl](../examples/data/sft-train.jsonl)) |
+| `train_dataset_path` | str | Required | Training dataset path (see [sft-train.jsonl](https://github.com/PaddlePaddle/ERNIE/blob/develop/examples/data/sft-train.jsonl)) |
 | `train_dataset_prob` | str | 1.0 | Training dataset sampling probability. |
 | `train_dataset_type` | str | erniekit | Training dataset type. |
 | `max_steps` | int | Required | Maximum training steps (overrides `num_train_epochs` if set) |
 | `num_train_epochs` | int | Required | Training epochs |
-| `per_device_train_batch_size` | int | Required | Training batch size (micro batch size). Global batch size = DP * sharding * micro_batch_size * gradient_accumulation_steps |
+| `per_device_train_batch_size` | int | Required | Training batch size (micro batch size). Global batch size = DP *sharding* micro_batch_size * gradient_accumulation_steps |
 | `gradient_accumulation_steps` | int | Required | Gradient accumulation steps |
 | `weight_decay` | float | 0.0 | AdamW optimizer weight decay |
 | `seed` | int | 42 | Random seed |
@@ -127,7 +127,7 @@ Each parameter is documented with its type, default value and detailed descripti
 | `use_sparse_flash_attn` | bool | True | Enable FlashMask (requires `use_attn_mask_startend_row_indices`) |
 | `fuse_rope` | bool | False | Fuse rotary position embedding |
 | `fuse_linear` | bool | False | F fuse linear operations |
-| `greedy_intokens` | bool | True | Enable greedy token-based packing. <br>Instead of sequential sampling, a global buffer of samples is maintained <br>and greedily packed into sequences to maximize token utilization and minimize padding. |
+| `greedy_intokens` | bool | True | Enable greedy token-based packing. Instead of sequential sampling, a global buffer of samples is maintained and greedily packed into sequences to maximize token utilization and minimize padding. |
 | `dataloader_num_workers` | int | 1 | Dataloader subprocess count (0 to disable) |
 | `distributed_dataloader` | int | 0 | Use distributed dataloader for large datasets |
 | `moe_multimodal_dispatch_use_allgather` | str | v2-alltoall-unpad | Optimize MoE layer with allgather+unpad |

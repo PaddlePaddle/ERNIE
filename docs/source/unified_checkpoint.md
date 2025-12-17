@@ -40,6 +40,7 @@ To address this, we implement an **Asynchronous Saving Mechanism**, allowing che
 **Important**: Asynchronous saving consumes additional CPU memory. Make sure the system has enough available memory before turning on this feature.
 
 To enable this feature, set:
+
 ```yaml
 unified_checkpoint_config: "async_save"
 ```
@@ -53,6 +54,7 @@ For example, a single checkpoint of a 72B model in BF16 training can take up nea
 Checkpoint compression addresses this by applying **Int8 (O1)** and **Int4 (O2)** compression to optimizer parameters, reducing storage usage by up to **78.5%** without affecting training quality.
 
 To enable this feature, set:
+
 ```yaml
 unified_checkpoint_config: "remove_master_weight"  # Toggle to skip saving the master weight. When enabled, the master weight will not be stored in the checkpoint; instead, it will be reconstructed from the model weight during loading.
 

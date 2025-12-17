@@ -1,5 +1,3 @@
-[English](./paddleocr_vl_sft.md) | 简体中文
-
 # PaddleOCR-VL-0.9B SFT
 
 ## 1. 引言
@@ -22,9 +20,7 @@ PaddleOCR-VL 是一款为文档解析任务量身打造的、性能顶尖 (SOTA)
     - 表格识别与结构化输出：将图像中的表格转换为 Excel、CSV 或 JSON 格式
     - 数学公式识别：识别教科书、论文中的数学公式，并输出为 LaTeX 等格式
 
-
 这时，就需要通过 SFT (Supervised Fine-Tuning) 来提升模型的准确性和鲁棒性。
-
 
 ## 2. 环境配置
 
@@ -86,9 +82,8 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 ```
 
 孟加拉语训练数据示例：
-<p align="center">
-  <img src="./assets/bengali_train_example.png" width="400px"></a>
-</p>
+
+![bengali_train_example](assets/bengali_train_example.png){ width="400" }
 
 ```json
 {
@@ -106,7 +101,7 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 
 ## 4. 训练配置
 
-我们针对孟加拉语示例数据集提供了[配置文件](../examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml)，其中的关键训练超参数如下：
+我们针对孟加拉语示例数据集提供了[配置文件](https://github.com/PaddlePaddle/ERNIE/blob/develop/examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml)，其中的关键训练超参数如下：
 
 - `max_steps=926`：训练总步数, 约等于 `(D × E) / (G × B × A)`。
     - `D=29605`：数据集中训练样本数目。
@@ -133,15 +128,16 @@ erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
         model_name_or_path=PaddlePaddle/PaddleOCR-VL \
         train_dataset_path=./ocr_vl_sft-train_Bengali.jsonl \
 ```
+
 在 1*A800-80 G 上训练时长约为 2 小时。
 
 ERNIEKit 默认使用机器上的全部 GPU，可以通过环境变量 `CUDA_VISIBLE_DEVICES` 设置 ERNIEKit 能够使用的 GPU。
 
 GPU 的数目 `GPU_num` 会影响训练超参数 `learning_rate & packing_size & gradient_accumulation_steps` 配置。理论上，每个更新步使用的样本数目 `sample_num = G*B*A`，近似与学习率 `learning_rate` 成正线形关系，因此，当 GPU 数目增加 `N` 倍变为 `N*GPU` 时，有两种调整方式：
 1. 保持 `sample_num` 不变
-    - 将 `packing_size` 减少 `x` 倍，变成 `packing_size/x`
-    - 将 `gradient_accumulation_steps` 减少 `y` 倍，变成 `gradient_accumulation_steps/y`
-    - 满足 `x*y = N` 即可
+   - 将 `packing_size` 减少 `x` 倍，变成 `packing_size/x`
+   - 将 `gradient_accumulation_steps` 减少 `y` 倍，变成 `gradient_accumulation_steps/y`
+   - 满足 `x*y = N` 即可
 2. 将 `learning_rate` 增加 `N` 倍，变成 `N*learning_rate`
 
 可以通过 `tensorboard` 对训练过程可视化，使用以下命令行即可启动（下方命令将端口 port 设置为 `8084`，需要根据实际情况设置可用端口）：
@@ -154,7 +150,7 @@ tensorboard --logdir ./PaddleOCR-VL-SFT-Bengali/tensorboard_logs/ --port 8084
 
 损失曲线如下：
 
-![SFT-loss](./assets/PaddleOCR-Bengali-SFT-Loss.png)
+![SFT-loss](assets/PaddleOCR-Bengali-SFT-Loss.png)
 
 ## 6. 模型结构说明
 
@@ -205,11 +201,11 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
 ### 7.4. 单样本推理
 
 孟加拉语测试图像：
-<p align="center">
-  <img src="./assets/bengali_test_example.png" width="400px"></a>
-</p>
+
+![bengali_test_example](assets/bengali_test_example.png){ width="400" }
 
 使用以下命令进行单样本推理：
+
 ```bash
 paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/dataset/bengali_sft/5b/7a/5b7a5c1c-207a-4924-b5f3-82890dc7b94a.png \
     --vl_rec_model_name "PaddleOCR-VL-0.9B" \
@@ -224,15 +220,13 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 
 ## 8. 注意事项
 
-### 8.1. 表格/公式/图表数据格式
+### 8.1. 表格/公式/图表数据格式 {: #81-表格公式图表数据格式 }
 
 特别地，表格/公式/图表数据使用特殊的识别格式：
 
 表格数据：OTSL 格式
 
-<p align="center">
-  <img src="./assets/table_example.png" width="400px"></a>
-</p>
+![table_example](assets/table_example.png){ width="400" }
 
 ```json
 {
@@ -248,9 +242,7 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 
 公式数据: Latex格式
 
-<p align="center">
-  <img src="./assets/formula_example.jpg" width="200px"></a>
-</p>
+![formula_example](assets/formula_example.jpg){ width="200" }
 
 ```json
 {
@@ -266,9 +258,7 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 
 图表数据：Markdown格式
 
-<p align="center">
-  <img src="./assets/chart_example.png" width="400px"></a>
-</p>
+![chart_example](assets/chart_example.png){ width="400" }
 
 ```json
 {
@@ -288,7 +278,7 @@ paddleocr doc_parser -i https://paddle-model-ecology.bj.bcebos.com/PPOCRVL/datas
 
 **问题表现**
 
-```
+```python
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
   File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 181, in <module>
@@ -302,7 +292,7 @@ ImportError: libGL.so.1: cannot open shared object file: No such file or directo
 
 **解决方案**
 
-```
+```bash
 python -m pip install --force-reinstall opencv-python-headless
 python -m pip install numpy==1.26.4
 ```

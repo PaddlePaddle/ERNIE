@@ -1,5 +1,3 @@
-English | [简体中文](./paddleocr_vl_sft_zh.md)
-
 # PaddleOCR-VL-0.9B SFT
 
 ## 1. Introduction
@@ -21,7 +19,6 @@ While PaddleOCR-VL-0.9B excels in common scenarios, its performance often faces 
     - Mathematical Formula Recognition: Identifying mathematical equations in textbooks or research papers and exporting them into formats like LaTeX.
 
 This is where SFT (Supervised Fine-Tuning) becomes necessary to enhance the model’s accuracy and robustness for these specialized tasks.
-
 
 ## 2. Environment Setup
 
@@ -49,7 +46,7 @@ python -m pip install opencv-python-headless
 python -m pip install numpy==1.26.4
 ```
 
-For more installation methods, please refer to the [ERNIEKit Installation Guide]((./erniekit.md#2-installation)).
+For more installation methods, please refer to the [ERNIEKit Installation Guide](./erniekit.md#2-installation).
 
 ## 3. Model and Dataset Preparation
 
@@ -62,20 +59,20 @@ huggingface-cli download PaddlePaddle/PaddleOCR-VL --local-dir PaddlePaddle/Padd
 
 ### 3.2. Dataset Preparation
 
-For the training dataset format, please refer to [SFT VL Dataset Format]((./datasets.md#sft-vl-dataset)). Required fields are as follows:
-* `text_info`: The list of text data, each element contains a `text` and a `tag`
-  * `text`: The text content from User question or System response
-  * `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
-* `image_info`: The list of image data, each element contains a `image_url` and a `matched_text_index`
-  * `image_url`: The url to download image online or the path to access image locally
-  * `matched_text_index`: The index of matched text in `text_info`
-    * Default: `matched_text_index=0` means the image is matched with the first text, and will be palced before the first text
+For the training dataset format, please refer to [SFT VL Dataset Format](./datasets.md#sft-vl-dataset). Required fields are as follows:
+- `text_info`: The list of text data, each element contains a `text` and a `tag`
+  - `text`: The text content from User question or System response
+  - `tag`: The mask tag (`no_mask`=include in training, `mask`=exclude)
+- `image_info`: The list of image data, each element contains a `image_url` and a `matched_text_index`
+  - `image_url`: The url to download image online or the path to access image locally
+  - `matched_text_index`: The index of matched text in `text_info`
+    - Default: `matched_text_index=0` means the image is matched with the first text, and will be palced before the first text
 
 Notes:
-* Each training sample is in JSON format, with multiple samples separated by newlines
-* Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
+- Each training sample is in JSON format, with multiple samples separated by newlines
+- Please ensure that `mask` items and `no_mask` items alternate in the `text_info`
 
-For your convenience, we also provide a quick-start [Bengali training dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl)) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:
+For your convenience, we also provide a quick-start [Bengali training dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl) for fine-tuning PaddleOCR-VL-0.9B on Bengali recognition. Download it using the following command:
 
 ```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
@@ -83,10 +80,7 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-train_Bengali.jsonl
 
 Bengali training example:
 
-<p align="center">
-  <img src="./assets/bengali_train_example.png" width="400px"></a>
-</p>
-
+![Bengali training example](./assets/bengali_train_example.png){ width="400" }
 
 ```json
 {
@@ -104,7 +98,7 @@ Tables, formulas, and charts use a special data format. For details, please refe
 
 ## 4. Training Configuration
 
-We provide a [configuration](../examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml) file for the Bengali sample dataset. The key training hyperparameters are as follows:
+We provide a [configuration](https://github.com/PaddlePaddle/ERNIE/blob/develop/examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml) file for the Bengali sample dataset. The key training hyperparameters are as follows:
 
 - `max_steps=926`: Total number of training steps, approximately `(D × E) / (G × B × A)`.
     - `D`: Number of training samples in the dataset.
@@ -171,7 +165,6 @@ After training, the model will be saved in the path specified by `output_dir=./P
 - generation.json: Generation configuration file.
 - checkpoint-[save_steps\*n]: Checkpoint folders. Saves the training state at multiples of `save_steps`. In addition to the files above, it also saves master-weight, optimizer-state, scheduler-state, etc., which can be used to resume training after an interruption.
 
-
 ## 7. Inference
 
 ### 7.1. Inference Environment Setup
@@ -188,13 +181,13 @@ python -m pip install numpy==1.26.4
 ### 7.2. Inference Model Preparation
 Copy the necessary inference configuration files from the original PaddleOCR-VL model to the directory where the SFT-trained model is saved:
 
-```
+```bash
 cp PaddlePaddle/PaddleOCR-VL/chat_template.jinja PaddleOCR-VL-SFT-Bengali
 cp PaddlePaddle/PaddleOCR-VL/inference.yml PaddleOCR-VL-SFT-Bengali
 ```
 
 ### 7.3. Inference Dataset Preparation
-We provide a [Bengali test dataset]((https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl)) that can be used for inference to observe the fine-tuning results. Download it using the following command:
+We provide a [Bengali test dataset](https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl) that can be used for inference to observe the fine-tuning results. Download it using the following command:
 
 ```bash
 wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
@@ -203,9 +196,8 @@ wget https://paddleformers.bj.bcebos.com/datasets/ocr_vl_sft-test_Bengali.jsonl
 ### 7.4. Single-Sample Inference
 
 Bengali test image：
-<p align="center">
-  <img src="./assets/bengali_test_example.png" width="400px"></a>
-</p>
+
+![Bengali test example](./assets/bengali_test_example.png){ width="400" }
 
 Use the following command for single-sample inference:
 
@@ -229,9 +221,7 @@ In particular, the following formats are used for specific data types:
 
 Table Data: OTSL format
 
-<p align="center">
-  <img src="./assets/table_example.png" width="400px"></a>
-</p>
+![Table example](./assets/table_example.png){ width="400" }
 
 ```json
 {
@@ -247,9 +237,7 @@ Table Data: OTSL format
 
 Formula Data: LaTeX format
 
-<p align="center">
-  <img src="./assets/formula_example.jpg" width="200px"></a>
-</p>
+![Formula example](./assets/formula_example.jpg){ width="200" }
 
 ```json
 {
@@ -265,9 +253,7 @@ Formula Data: LaTeX format
 
 Chart Data: Markdown format
 
-<p align="center">
-  <img src="./assets/chart_example.png" width="400px"></a>
-</p>
+![Chart example](./assets/chart_example.png){ width="400" }
 
 ```json
 {
@@ -287,7 +273,7 @@ If you encounter the following problem while using the above command, it is gene
 
 **Error message**
 
-```
+```python
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
   File "/usr/local/lib/python3.10/dist-packages/cv2/__init__.py", line 181, in <module>
