@@ -2,7 +2,7 @@ site_name: ERNIE Docs
 site_url: !ENV READTHEDOCS_CANONICAL_URL
 repo_url: https://github.com/PaddlePaddle/ERNIE
 repo_name: PaddlePaddle/ERNIE
-edit_uri: edit/main/docs/source/
+edit_uri: edit/develop/docs/source/
 docs_dir: source
 site_dir: site
 strict: false
