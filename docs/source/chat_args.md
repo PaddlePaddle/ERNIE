@@ -28,7 +28,7 @@ Each parameter is documented with its type, default value and detailed descripti
 | `block_size` | int | 64 | Number of tokens per cache management block |
 | `kv_cache_ratio` | float | 0.75 | Ratio of KV Cache allocated to input. Recommended value = average input length/(average input length + average output length) |
 
-* Note: The optimal configuration for model deployment can be referred: https://github.com/PaddlePaddle/FastDeploy/tree/develop/docs/zh/optimal_deployment
+- Note: The optimal configuration for model deployment can be referred: https://github.com/PaddlePaddle/FastDeploy/tree/develop/docs/zh/optimal_deployment
 
 ## 2. Chat Request Configuration
 
