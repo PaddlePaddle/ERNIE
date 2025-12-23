@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - release/v1.0
+      - release/v1.4
       - ernie-4.5-vl
 
 concurrency:
