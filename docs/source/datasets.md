@@ -14,7 +14,7 @@
 
 Currently, four data sampling strategies are supported: `random`, `concat`, `interleave_under`, `interleave_over`
 
-| Data Sampling Strategy | Applicable Scenarios	| Limitations | Description |
+| Data Sampling Strategy | Applicable Scenarios | Limitations | Description |
 |------------------|-----------------|------------------|------------------|
 | `random`           | The dataset is extremely large and strict data proportioning is required | max_steps > 0 | In `random` mode, based on the input dataset probs, a fixed-size sample pool of `num_samples_each_epoch` is constructed, and the data loader randomly acquires data from this sample pool. |
 | `concat`           | Need to train all data in the datasets | None | In `concat` mode, the input dataset probs are not used. Instead, multiple datasets are directly concatenated. The size of the dataset is equal to the total size of the input multi-source datasets. When max_steps = -1, setting `num_train_epochs` allows for a complete traversal of the input datasets for `num_train_epochs` rounds. |
@@ -115,7 +115,7 @@ Supported Hugging Face datasets are defined:
 
 ### SFT Dataset
 
-We provide [demo](../examples/data/) data for quick testing. You can either use these samples or train with your own data.
+We provide [demo](https://github.com/PaddlePaddle/ERNIE/blob/develop/examples/data/) data for quick testing. You can either use these samples or train with your own data.
 
 Required fields for SFT:
 
@@ -144,7 +144,7 @@ Notes:
 
 ### DPO Dataset
 
-We provide [demo](../examples/data/) data for quick testing. You can either use these samples or train with your own data.
+We provide [demo](https://github.com/PaddlePaddle/ERNIE/blob/develop/examples/data/) data for quick testing. You can either use these samples or train with your own data.
 
 Required fields for DPO:
 
@@ -180,10 +180,9 @@ Required fields for DPO:
 ### SFT VL Dataset
 
 We provide demo data for quick training, please download the [image](https://paddleformers.bj.bcebos.com/datasets/DoclingMatix.tar.gz) or [video](
-https://paddleformers.bj.bcebos.com/datasets/NExTVideo.tar.gz) data according to your needs and unzip it to the [demo](../examples/data/)  data directory. You can either use these samples or train with your own data.
+https://paddleformers.bj.bcebos.com/datasets/NExTVideo.tar.gz) data according to your needs and unzip it to the [demo](https://github.com/PaddlePaddle/ERNIE/blob/develop/examples/data/)  data directory. You can either use these samples or train with your own data.
 
 Required fields for SFT VL:
-
 
 * `text_info`: The list of text data, each element contains a `text` and a `tag`
   * `text`: The text content from User question or System response
@@ -337,7 +336,6 @@ Demo data for function call training:
 ]
 ```
 
-
 ## alpaca Format
 
 ### SFT Dataset
@@ -370,9 +368,9 @@ Demo data for function call training:
 
 | alpaca | erniekit | Mapping |
 |--------|----------|---------|
-| instruction <br> input | src | src[-1] = instruction + input |
+| instruction, input | src | src[-1] = instruction + input |
 | output | tgt | tgt[-1] = output |
-| history | src <br> tgt | history = zip(src[:-1], tgt[:-1]) |
+| history | src, tgt | history = zip(src[:-1], tgt[:-1]) |
 | system | system | system=system |
 
 ### DPO Dataset

@@ -1,0 +1,42 @@
+[project]
+name = "ernie-docs"
+version = "0.1.0"
+description = "Documentation for ERNIE"
+requires-python = ">=3.10"
+dependencies = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-api-autonav",
+    "mkdocs-awesome-nav",
+    "mkdocs-glightbox",
+    "python-markdown-math",
+    "mkdocs-same-dir",
+    "mkdocs-static-i18n",
+]
+
+[project.optional-dependencies]
+lint = [
+    "pymarkdownlnt",
+]
+
+[tool.pymarkdown.plugins]
+# Disable line length check (too strict for documentation)
+md013.enabled = false
+# Allow multiple top-level headings (common in docs)
+md025.enabled = false
+# Allow duplicate headings (common in multi-section docs)
+md024.enabled = false
+# Allow emphasis as headers (stylistic choice)
+md036.enabled = false
+# Set list indent to 4 spaces (Python style)
+md007.indent = 4
+# Allow both dash and asterisk for unordered lists
+md004.enabled = false
+# Allow code blocks without blank lines around them
+md031.enabled = false
+# Allow lists without blank lines around them
+md032.enabled = false
+# Allow headings without blank lines around them
+md022.enabled = false
+# Allow bare URLs
+md034.enabled = false

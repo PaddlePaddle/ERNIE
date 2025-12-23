@@ -1,5 +1,8 @@
 # Unified Checkpoint User Guide
 
+!!! note "Recommended: FlexCheckpoint"
+    We recommend using **FlexCheckpoint** for checkpoint management. FlexCheckpoint is fully compatible with the Safetensors model format and provides automatic parameter re-sharding across distributed strategies and model structures. This significantly reduces the cost of weight conversion and enhances the end-to-end training and inference development efficiency of large models.
+
 ## 1. Overview
 
 **Unified Checkpoint** is a storage solution designed by PaddlePaddle for large model scenarios. Its core idea is to store model weights, optimizer weights, and other parameters in a unified `safetensors` format, without distinguishing between different distributed strategies during saving. This improves the generality of checkpoint storage for large models.
@@ -40,6 +43,7 @@ To address this, we implement an **Asynchronous Saving Mechanism**, allowing che
 **Important**: Asynchronous saving consumes additional CPU memory. Make sure the system has enough available memory before turning on this feature.
 
 To enable this feature, set:
+
 ```yaml
 unified_checkpoint_config: "async_save"
 ```
@@ -53,6 +57,7 @@ For example, a single checkpoint of a 72B model in BF16 training can take up nea
 Checkpoint compression addresses this by applying **Int8 (O1)** and **Int4 (O2)** compression to optimizer parameters, reducing storage usage by up to **78.5%** without affecting training quality.
 
 To enable this feature, set:
+
 ```yaml
 unified_checkpoint_config: "remove_master_weight"  # Toggle to skip saving the master weight. When enabled, the master weight will not be stored in the checkpoint; instead, it will be reconstructed from the model weight during loading.
 

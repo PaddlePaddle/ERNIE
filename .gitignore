@@ -7,3 +7,5 @@ __pycache__/
 output
 demo_data/index-cache
 log
+docs/site/
+uv.lock

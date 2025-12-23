@@ -6,7 +6,7 @@
 
 [ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview)
 
-📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)  | 🛠️ [Training](./docs/erniekit.md)  | ⚡️ [Deploy](https://github.com/PaddlePaddle/FastDeploy)
+📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)  | 🛠️ [Training](./docs/source/erniekit.md)  | ⚡️ [Deploy](https://github.com/PaddlePaddle/FastDeploy)
 
 <a href="https://trendshift.io/repositories/14169" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14169" alt="PaddlePaddle%2FERNIE | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
@@ -22,7 +22,7 @@
 **[2025-10] 🔥 Released ERNIEKit v1.4:**
 
 - **New Features**
-    - VL Model Training: Support SFT for [PaddleOCR-VL-0.9B]((https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B)) model. More details in [PaddleOCR-VL-0.9B SFT](./docs/paddleocr_vl_sft.md).
+    - VL Model Training: Support SFT for [PaddleOCR-VL-0.9B]((https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B)) model. More details in [PaddleOCR-VL-0.9B SFT](./docs/source/paddleocr_vl_sft.md).
     - Dataflow : Support padding-free startegy.
         - Packing data within a batch into a sequence to avoid padding, thereby reducing GPU memory usage and accelerating training.
 
@@ -178,7 +178,7 @@ In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visua
 
 ## Model Development
 
-ERNIE 4.5 models are trained and deployed for inference using the [PaddlePaddle]((https://github.com/PaddlePaddle/Paddle)) framework. The full workflow of training, compression, and inference for ERNIE 4.5 is supported through the [ERNIEKit](./docs/erniekit.md) and [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) toolkit. The table below details the feature matrix of the ERNIE 4.5 model family for training and inference.
+ERNIE 4.5 models are trained and deployed for inference using the [PaddlePaddle]((https://github.com/PaddlePaddle/Paddle)) framework. The full workflow of training, compression, and inference for ERNIE 4.5 is supported through the [ERNIEKit](./docs/source/erniekit.md) and [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) toolkit. The table below details the feature matrix of the ERNIE 4.5 model family for training and inference.
 <div align="center">
 
 | Model             |  Training      |  Inference              |
@@ -209,7 +209,7 @@ _Note: For different ERNIE 4.5 model, we provide diverse quantization schemes us
 * Quantization-Aware Training (QAT)
 * Post-Training Quantization (PTQ) [WIP]
 
-Minimum hardware requirements for training each model are documented [here](./docs/erniekit.md).
+Minimum hardware requirements for training each model are documented [here](./docs/source/erniekit.md).
 
 
 #### Quick Start
@@ -223,7 +223,7 @@ huggingface-cli download baidu/ERNIE-4.5-0.3B-Paddle --local-dir baidu/ERNIE-4.5
 erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
 ```
 
-For detailed guides on installation, CLI usage, WebUI, multi-node training, and advanced features, please refer to [ERNIEKit Training Document](./docs/erniekit.md).
+For detailed guides on installation, CLI usage, WebUI, multi-node training, and advanced features, please refer to [ERNIEKit Training Document](./docs/source/erniekit.md).
 
 For detailed guides on High-performance pre-training, please refer to [Pre-Training Document](./examples/pre-training/README.md).
 

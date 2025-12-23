@@ -12,6 +12,4 @@ To enable developers to efficiently train ERNIE 4.5 models, particularly the 300
 
 The Weight Only Quantization (WINT) approach uses **channelwise quantization** and specialized **acceleration operators** to boost training speed with no accuracy degradation.
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/918f0029-48f1-4743-9ec0-e4b542108a84" width="600px"></a>
-</p>
+![WINT8MIX LoRA](https://github.com/user-attachments/assets/918f0029-48f1-4743-9ec0-e4b542108a84)

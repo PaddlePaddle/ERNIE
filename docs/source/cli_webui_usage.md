@@ -21,17 +21,20 @@ Whether you're a developer seeking script-based customization or prefer graphica
 **Installation**
 
 Run in the erniekit root directory:
+
 ```bash
 python -m pip install -e .
 ```
 
 Verify installation:
+
 ```bash
 erniekit help
 ```
 
 Expected output:
-```
+
+```text
 ------------------------------------------------------------
 | Usage:                                                     |
 |   erniekit train -h: model finetuning                      |
@@ -68,7 +71,7 @@ export ASCEND_RT_VISIBLE_DEVICES=0
 export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 ```
 
-* Note: In `Chat` module, the number of gpus configured by CUDA_VISIBLE_DEVICES should be equal to `tensor_parallel_degree` in the config.
+- Note: In `Chat` module, the number of gpus configured by CUDA_VISIBLE_DEVICES should be equal to `tensor_parallel_degree` in the config.
 Alternatively, you can also unset CUDA_VISIBLE_DEVICES.
 
 # 1. CLI Usage
@@ -76,6 +79,7 @@ Alternatively, you can also unset CUDA_VISIBLE_DEVICES.
 Examples using **ERNIE-4.5-0.3B** model:
 
 ## 1.1. Chat
+
 ```bash
 # download model from huggingface
 huggingface-cli download baidu/ERNIE-4.5-0.3B-Paddle --local-dir baidu/ERNIE-4.5-0.3B-Paddle
@@ -85,11 +89,12 @@ erniekit server examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 erniekit chat examples/configs/ERNIE-4.5-0.3B/run_chat.yaml
 ```
 
-* Note: the command-line dialogue for VL-model only supports pure text input.
+- Note: the command-line dialogue for VL-model only supports pure text input.
 
 ## 1.2. Model Fine-tuning
 
 ### 1.2.1. SFT & LoRA Fine-tuning
+
 ```bash
 # download model from huggingface
 huggingface-cli download baidu/ERNIE-4.5-0.3B-Paddle --local-dir baidu/ERNIE-4.5-0.3B-Paddle
@@ -104,6 +109,7 @@ erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_lora_32k.yaml
 ```
 
 ### 1.2.2. DPO & LoRA Fine-tuning
+
 ```bash
 # download model from huggingface
 huggingface-cli download baidu/ERNIE-4.5-0.3B-Paddle --local-dir baidu/ERNIE-4.5-0.3B-Paddle
@@ -118,16 +124,19 @@ erniekit train examples/configs/ERNIE-4.5-0.3B/dpo/run_dpo_lora_32k.yaml
 ```
 
 ## 1.3. Model Evaluation
+
 ```bash
 erniekit eval examples/configs/ERNIE-4.5-0.3B/run_eval.yaml
 ```
 
 ## 1.4. Model Export
+
 ```bash
 erniekit export examples/configs/ERNIE-4.5-0.3B/run_export.yaml
 ```
 
 ## 1.5. Multi-Node Training
+
 ```bash
 NNODES={num_nodes} MASTER_ADDR={your_master_addr} MASTER_PORT={your_master_port} CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 erniekit train examples/configs/ERNIE-4.5-300B-A47B/sft/run_sft_lora_8k.yaml
 ```
@@ -135,6 +144,7 @@ NNODES={num_nodes} MASTER_ADDR={your_master_addr} MASTER_PORT={your_master_port}
 # 2. WebUI Examples
 
 Launch WebUI:
+
 ```bash
 erniekit webui
 # Specify port: GRADIO_SERVER_PORT=8080 erniekit webui
@@ -181,9 +191,7 @@ Displays GPU count (read-only).
 | Use SP Callback | use_sp_callback | Skips redundant gradient calculations |
 | MoE Group | moe_group | MoE communication group ("mp" or "dummy") |
 
-<div align="center">
-<img src="https://github.com/user-attachments/assets/157ef9af-6741-4ce3-8c2e-2f8004dab170">
-</div>
+![Basic Info](https://github.com/user-attachments/assets/157ef9af-6741-4ce3-8c2e-2f8004dab170)
 
 ## 2.2. Training Module
 
@@ -260,9 +268,7 @@ Same options as training dataset:
 | Save Strategy | save_strategy | Checkpoint saving method |
 | Save Limit | save_total_limit | Max checkpoints to keep |
 
-<div align="center">
-<img src="https://github.com/user-attachments/assets/43964682-b5da-46d3-b065-8318ed8a66be">
-</div>
+![Training Module](https://github.com/user-attachments/assets/43964682-b5da-46d3-b065-8318ed8a66be)
 
 ## 2.3. Chat Module
 
@@ -288,9 +294,7 @@ After successful loading:
 | Top-p | top_p | Nucleus sampling (higher=more diverse) |
 | Temperature | temperature | Controls randomness (higher=more creative) |
 
-<div align="center">
-<img src="https://github.com/user-attachments/assets/008dd8be-5ac2-4a12-ba1e-16ce6a02f1c7">
-</div>
+![Chat Module](https://github.com/user-attachments/assets/008dd8be-5ac2-4a12-ba1e-16ce6a02f1c7)
 
 ## 2.4. Evaluation Module
 
@@ -306,9 +310,7 @@ Choose evaluation dataset (built-in/custom). Click "Preview Eval Dataset" for vi
 | Dataset Probability | eval_dataset_prob | Sampling probability |
 | Data Type | eval_dataset_type | Supported: erniekit, alpaca |
 
-<div align="center">
-<img src="https://github.com/user-attachments/assets/e7ae0388-4594-43d3-b2f1-75533a7951c8">
-</div>
+![Evaluation Module](https://github.com/user-attachments/assets/e7ae0388-4594-43d3-b2f1-75533a7951c8)
 
 ## 2.5. Export Module
 
@@ -326,6 +328,4 @@ For large safetensors files, click "Start Split Model" to split weights (saved i
 |--------|-------|-------|
 | Max Shard Size (GB) | max_shard_size | Split file size limit |
 
-<div align="center">
-<img src="https://github.com/user-attachments/assets/67353c8c-eca6-4aa8-b912-0064c9d41556">
-</div>
+![Export Module](https://github.com/user-attachments/assets/67353c8c-eca6-4aa8-b912-0064c9d41556)
