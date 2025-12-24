@@ -49,7 +49,7 @@ model.add_image_preprocess(processor)
 **Configure LoRA Adapter (PEFT)**
 > Train only about 1% of the parameters, significantly reducing memory usage while maintaining model expressiveness, suitable for training 28B-level VL models in a single-card environment.
 
-**[New Features]** 
+**[New Features]**
 
 You can choose to:
 - Fine-tune vision only
