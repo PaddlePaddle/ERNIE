@@ -1,6 +1,9 @@
 # Unsloth
 
-## Unsloth Fine-tuning Guide for ERNIE_4_5_VL_28B_A3B
+## **Unsloth Fine-tuning Guide for ERNIE_4_5_VL_28B_A3B**
+> **Reference:** This tutorial is adapted and extended based on the official Unsloth Colab notebook for ERNIE_4_5_VL_28B_A3B fine-tuning and inference.  
+> Please refer to the original notebook for interactive demonstrations and additional examples:  
+> [https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
 
 This tutorial provides a comprehensive, end-to-end guide on how to fine-tune the **ERNIE_4_5_VL_28B_A3B** vision-language model using Unsloth, covering the complete workflow from environment setup and dataset construction to LoRA training, inference, and model export.
 
@@ -13,7 +16,7 @@ By the end of this tutorial, you will understand how to perform:
 
 GitHub Repository: [Unsloth](https://github.com/unslothai/unsloth)
 
-## Fine-tuning ERNIE_4_5_VL_28B_A3B with Unsloth
+## **Fine-tuning ERNIE_4_5_VL_28B_A3B with Unsloth**
 
 ### **Installation**
 **Local Installation (Linux Recommended)**
@@ -171,6 +174,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
 ### **Training Components (Collator & Trainer)**
 **Using Custom ErnieVisionDataCollator and Custom ErnieSFTTrainer**
 > ERNIE-4.5-VL uses 3D position_ids and image patch tokens, so the default collator of the standard SFTTrainer cannot be reused.
+
 ```
 # @title Setup Collator & Trainer
 
@@ -413,6 +417,7 @@ min_p = 0.1
 ```
 > This combination suppresses low-probability noise while preserving creativity — ideal for structured formula output.
 👉 For detailed reasoning, see this tweet: [https://x.com/menhguin/status/1826132708508213629](https://x.com/menhguin/status/1826132708508213629)
+
 ```
 FastVisionModel.for_inference(model) # Enable for inference!
 

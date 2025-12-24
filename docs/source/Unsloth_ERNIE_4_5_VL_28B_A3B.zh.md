@@ -1,6 +1,9 @@
 # Unsloth
 
-## Unsloth 微调 ERNIE_4_5_VL_28B_A3B 教程
+## **Unsloth 微调 ERNIE_4_5_VL_28B_A3B 教程**
+> **参考资料：** 本教程参考并改编自官方 Unsloth Colab Notebook，内容涉及 ERNIE_4_5_VL_28B_A3B 的微调与推理示例。  
+> 欢迎访问原始交互式 Notebook 以获取更多示例与实操演示：  
+> [https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
 
 本教程将系统性地介绍如何使用 Unsloth 对 ERNIE_4_5_VL_28B_A3B 视觉-语言模型进行高效微调，涵盖从环境安装、数据构造、LoRA 训练，到推理与模型导出的完整流程。
 
@@ -13,7 +16,7 @@
 
 GitHub 仓库： [Unsloth](https://github.com/unslothai/unsloth)
 
-## Unsloth 微调 ERNIE_4_5_VL_28B_A3B
+## **Unsloth 微调 ERNIE_4_5_VL_28B_A3B**
 
 ### **安装（Installation）**
 **本地安装（推荐 Linux）：**
@@ -170,6 +173,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
 ### **训练组件（Collator & Trainer）**
 **使用自定义 ErnieVisionDataCollator 和自定义 ErnieSFTTrainer**
 > ERNIE-4.5-VL 使用三维 position_ids 与图像 patch token，因此无法直接复用标准 SFTTrainer 的默认 collator。
+
 ```
 # @title Setup Collator & Trainer
 
@@ -412,6 +416,7 @@ min_p = 0.1
 ```
 > 该组合在高温采样下仍能抑制低概率噪声 token，适合公式类结构化输出。
 👉 原因详细说明见此推文：[https://x.com/menhguin/status/1826132708508213629](https://x.com/menhguin/status/1826132708508213629)
+
 ```
 FastVisionModel.for_inference(model) # Enable for inference!
 
