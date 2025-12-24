@@ -9,7 +9,6 @@
 
 ## 1. 模型服务部署配置
 
-
 | 参数名称 | 类型 | 默认值 | 描述 |
 | --- | --- | --- | --- |
 | `model_name_or_path` | str | None | Model name or path |
