@@ -2,12 +2,11 @@
 
 ## **Unsloth Fine-tuning Guide for ERNIE_4_5_VL_28B_A3B**
 > **Reference:** This tutorial is adapted and extended based on the official Unsloth Colab notebook for ERNIE_4_5_VL_28B_A3B fine-tuning and inference.  
-> Please refer to the original notebook for interactive demonstrations and additional examples:  
-> there's google colab (you need to pay for it)
-> or AMD for free
-> [https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
-> And more (replace the url after 'nb' with the page on github)
-> Free on amd:  [https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
+> You can run this notebook on Google Colab (paid) or for free using AMD resources:
+> - Google Colab: [https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)  
+> - Free on AMD: [https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)  
+> More notebooks are available by replacing the path after `nb/` with the corresponding notebook name in the GitHub repository.
+
 
 This tutorial provides a comprehensive, end-to-end guide on how to fine-tune the **ERNIE_4_5_VL_28B_A3B** vision-language model using Unsloth, covering the complete workflow from environment setup and dataset construction to LoRA training, inference, and model export.
 
@@ -480,5 +479,6 @@ model.save_pretrained_merged("finetune", tokenizer)
 ```
 ### Conclusion
 
-You now have a complete production-grade pipeline for fine-tuning ERNIE_4.5-VL-28B using Unsloth — from dataset design to training, inference, and deployment.
-This workflow enables efficient VL training on limited hardware while preserving the model’s full multimodal reasoning capabilities.
+You now have a complete, production-grade pipeline for fine-tuning ERNIE-4.5-VL-28B using Unsloth, covering dataset design, training, inference, and deployment. 
+
+This workflow enables efficient multimodal training on limited hardware while preserving the model’s full reasoning capabilities.
