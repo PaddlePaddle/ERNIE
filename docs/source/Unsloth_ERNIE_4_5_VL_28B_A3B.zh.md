@@ -3,7 +3,11 @@
 ## **Unsloth 微调 ERNIE_4_5_VL_28B_A3B 教程**
 > **参考资料：** 本教程参考并改编自官方 Unsloth Colab Notebook，内容涉及 ERNIE_4_5_VL_28B_A3B 的微调与推理示例。  
 > 欢迎访问原始交互式 Notebook 以获取更多示例与实操演示：  
+> there's google colab (you need to pay for it)
+> or AMD for free
 > [https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
+> And more (replace the url after 'nb' with the page on github)
+> Free on amd:  [https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
 
 本教程将系统性地介绍如何使用 Unsloth 对 ERNIE_4_5_VL_28B_A3B 视觉-语言模型进行高效微调，涵盖从环境安装、数据构造、LoRA 训练，到推理与模型导出的完整流程。
 

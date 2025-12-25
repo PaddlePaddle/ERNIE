@@ -3,7 +3,11 @@
 ## **Unsloth Fine-tuning Guide for ERNIE_4_5_VL_28B_A3B**
 > **Reference:** This tutorial is adapted and extended based on the official Unsloth Colab notebook for ERNIE_4_5_VL_28B_A3B fine-tuning and inference.  
 > Please refer to the original notebook for interactive demonstrations and additional examples:  
+> there's google colab (you need to pay for it)
+> or AMD for free
 > [https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
+> And more (replace the url after 'nb' with the page on github)
+> Free on amd:  [https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)
 
 This tutorial provides a comprehensive, end-to-end guide on how to fine-tune the **ERNIE_4_5_VL_28B_A3B** vision-language model using Unsloth, covering the complete workflow from environment setup and dataset construction to LoRA training, inference, and model export.
 
