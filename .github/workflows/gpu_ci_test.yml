@@ -6,13 +6,6 @@ on:
       - develop
       - release/v1.0
       - ernie-4.5-vl
-    paths:
-      - 'data_processor/**'
-      - 'ernie/**'
-      - 'erniekit/**'
-      - 'examples/**'
-      - 'requirements/**'
-      - 'tests/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -42,11 +35,24 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Check Changes
+        id: check_changes
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
+          if echo "$changed_files" | grep -qE "^(data_processor|ernie|erniekit|examples|requirements|tests)/"; then
+            echo "run_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_tests=false" >> $GITHUB_OUTPUT
+          fi
       - name: Prepare Model
+        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c ' cp -r /home/models/* /workspace '
       - name: Install erniekit
+        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           pip install -e.'
       - name: Runing case
+        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           make gpu_ci_test'
