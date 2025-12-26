@@ -17,15 +17,17 @@ jobs:
     runs-on: [self-hosted, ernie-8gpu]
     steps:
       - name: Get Repo for Diff
+        env:
+          ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
+          ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+          ACTIONS_ALLOW_UNSECURE_NODE_VERSION: true
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          path: check_diff_repo
 
       - name: Check Changes
         id: check_changes
         run: |
-          cd check_diff_repo
           git fetch origin ${{ github.base_ref }}
           changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
           if echo "$changed_files" | grep -qE "^(data_processor|ernie|erniekit|examples|requirements|tests)/"; then
