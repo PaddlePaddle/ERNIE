@@ -1,34 +1,37 @@
 # Unsloth
 
-## **Unsloth Fine-tuning Guide for ERNIE_4_5_VL_28B_A3B**
-> **Reference:** This tutorial is adapted and extended based on the official Unsloth Colab notebook for ERNIE_4_5_VL_28B_A3B fine-tuning and inference.  
-> You can run this notebook on Google Colab (paid) or for free using AMD resources:
-> - Google Colab: [https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)  
-> - Free on AMD: [https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)  
-> More notebooks are available by replacing the path after `nb/` with the corresponding notebook name in the GitHub repository.
+## Unsloth 微调 ERNIE_4_5_VL_28B_A3B 教程
 
-This tutorial provides a comprehensive, end-to-end guide on how to fine-tune the **ERNIE_4_5_VL_28B_A3B** vision-language model using Unsloth, covering the complete workflow from environment setup and dataset construction to LoRA training, inference, and model export.
+!!! note
+    本教程参考并改编自官方 Unsloth Colab Notebook，内容涉及 ERNIE_4_5_VL_28B_A3B 的微调与推理示例。原始教程在 [Google Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb), 你也可以在[AMD 的计算资源](https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)上免费运行本教程。
 
-By the end of this tutorial, you will understand how to perform:
+本教程将系统性地介绍如何使用 Unsloth 对 ERNIE_4_5_VL_28B_A3B 视觉-语言模型进行高效微调，涵盖从环境安装、数据构造、LoRA 训练，到推理与模型导出的完整流程。
 
-- Data Preparation
-- Model Training
-- Inference
-- Model Saving & Deployment
+在本教程中，你将学习如何进行：
 
-GitHub Repository: [Unsloth](https://github.com/unslothai/unsloth)
+- 数据准备（Data Prep）
+- 模型训练（Train）
+- 推理（Inference）
+- 模型保存（Save）
 
-## **Fine-tuning ERNIE_4_5_VL_28B_A3B with Unsloth**
+GitHub 仓库： [Unsloth](https://github.com/unslothai/unsloth)
 
-### **Installation**
-**Local Installation (Linux Recommended)**
+## **Unsloth 微调 ERNIE_4_5_VL_28B_A3B**
+
+### 安装（Installation）
+
+**本地安装（推荐 Linux）：**
+
 ```bash
 pip install unsloth
 ```
-For full installation instructions, refer to the official documentation:[installation instructions (English)](https://docs.unsloth.ai/get-started/installing-+-updating)
 
-### **Model Loading & LoRA Configuration**
-**Loading ERNIE-4.5-VL Model**
+您可以在此处查看 Unsloth 的完整[安装说明[英文]。](https://docs.unsloth.ai/get-started/installing-+-updating)
+
+### 模型加载与LoRA配置（Model Loading & LoRA Configuration）
+
+**加载 ERNIE-4.5-VL 模型**
+
 ```python
 from unsloth import FastVisionModel # 对应 LLM 使用 FastLanguageModel
 import torch
@@ -45,22 +48,28 @@ model, tokenizer = FastVisionModel.from_pretrained(
     attn_implementation="eager"
 )
 ```
-**Load Processor & Register Image Preprocessing**
+
+**加载 Processor 并注册图像预处理**
+
 ```python
 processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
 processor.eval()
 model.add_image_preprocess(processor)
 ```
-**Configure LoRA Adapter (PEFT)**
-> Train only about 1% of the parameters, significantly reducing memory usage while maintaining model expressiveness, suitable for training 28B-level VL models in a single-card environment.
 
-**[New Features]**
+**配置 LoRA 适配器 (PEFT)**
 
-You can choose to:
-- Fine-tune vision only
-- Fine-tune language only
-- Fine-tune both
-- Selectively fine-tune Attention and/or MLP layers
+!!! note
+    仅训练约 1% 参数量，在保持模型表达能力的同时显著降低显存占用，适合 28B 级 VL 模型在单卡环境下训练。
+
+**新增特性**
+
+你可以选择：
+
+- 只微调视觉模块
+- 只微调语言模块
+- 或两者同时微调
+- 还可以指定仅微调 Attention 或 MLP 层
 
 ```python
 model = FastVisionModel.get_peft_model(
@@ -78,9 +87,10 @@ model = FastVisionModel.get_peft_model(
     ]
 )
 ```
-### **Data Preparation**
 
-**Unified Vision Conversation Format**
+### **数据准备（Data Preparation）**
+
+**Vision 微调统一格式：**
 
 ```json
 [
@@ -100,18 +110,18 @@ model = FastVisionModel.get_peft_model(
 ]
 ```
 
-**We use a subset of a handwritten math formula dataset, aiming to convert images into structured LaTeX expressions.**
+**我们示例将使用一个手写数学公式数据集的子集，目标是将图片转换为可读的 LaTeX 表达式，从而实现公式渲染。**
 
-Subset: ```unsloth/LaTeX_OCR```
+子集：```unsloth/LaTeX_OCR```
 
-Full Dataset: ```linxy/LaTeX_OCR```
+完整数据集：```linxy/LaTeX_OCR```
 
 ```python
 from datasets import load_dataset
 dataset = load_dataset("unsloth/LaTeX_OCR", split="train")
 ```
 
-**The dataset must be converted into a multi-turn dialogue list, with each entry clearly distinguishing between text and image.**
+**数据集必须转化为多轮对话列表，每条内容明确区分 text 和 image。**
 
 ```python
 instruction = "为这张图片写出对应的 LaTeX 表达式。"
@@ -133,7 +143,7 @@ def convert_to_conversation(sample):
 converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 ```
 
-**Inference Check**
+**微调前的模型推理测试**
 
 ```python
 FastVisionModel.for_inference(model) # Enable for inference!
@@ -173,9 +183,11 @@ text_streamer = TextStreamer(tokenizer, skip_prompt = True)
 _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
                    use_cache=False, temperature=1.5, min_p=0.1)
 ```
-### **Training Components (Collator & Trainer)**
-**Using Custom ErnieVisionDataCollator and Custom ErnieSFTTrainer**
-> ERNIE-4.5-VL uses 3D position_ids and image patch tokens, so the default collator of the standard SFTTrainer cannot be reused.
+
+### **训练组件（Collator & Trainer）**
+
+**使用自定义 ErnieVisionDataCollator 和自定义 ErnieSFTTrainer**
+> ERNIE-4.5-VL 使用三维 position_ids 与图像 patch token，因此无法直接复用标准 SFTTrainer 的默认 collator。
 
 ```python
 # @title Setup Collator & Trainer
@@ -367,9 +379,11 @@ class ErnieSFTTrainer(SFTTrainer):
             return (loss, outputs)
         return loss
 ```
-### **Model Training (Train)**
-**For quick demonstration, we only train for 30 steps.**
-For formal training, set num_train_epochs=1 and turn off max_steps.
+
+### **模型训练（Train）**
+
+**为了快速演示，这里仅训练 30 步。**
+正式训练可设置 num_train_epochs=1 并关闭 max_steps。
 
 ```python
 from trl import  SFTConfig
@@ -412,16 +426,18 @@ trainer = ErnieSFTTrainer(
 )
 trainer_stats = trainer.train()
 ```
-### **Inference**
-**We use:**
+
+### **推理（Inference）**
+
+**我们使用：**
 
 ```python
 temperature = 1.5
 min_p = 0.1
 ```
 
-> This combination suppresses low-probability noise while preserving creativity — ideal for structured formula output.
-👉 For detailed reasoning, see this tweet: [https://x.com/menhguin/status/1826132708508213629](https://x.com/menhguin/status/1826132708508213629)
+> 该组合在高温采样下仍能抑制低概率噪声 token，适合公式类结构化输出。
+👉 原因详细说明见此推文：[https://x.com/menhguin/status/1826132708508213629](https://x.com/menhguin/status/1826132708508213629)
 
 ```python
 FastVisionModel.for_inference(model) # Enable for inference!
@@ -461,13 +477,18 @@ text_streamer = TextStreamer(tokenizer, skip_prompt = True)
 _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
                    use_cache=False, temperature=1.5, min_p=0.1)
 ```
-### **Saving & Loading **
-**Save LoRA adapters**
+
+### **模型保存与加载（Saving & Loading Fine-tuned Models）**
+
+**保存 LoRA 适配器（不包含完整模型）**
+
 ```python
 model.save_pretrained("lora_model")
 tokenizer.save_pretrained("lora_model")
 ```
-**Load for inference**
+
+**加载 LoRA 进行推理**
+
 ```python
 model, tokenizer = FastVisionModel.from_pretrained(
     model_name = "lora_model",
@@ -475,11 +496,14 @@ model, tokenizer = FastVisionModel.from_pretrained(
 )
 FastVisionModel.for_inference(model)
 ```
-**Merge & export (float16, for vLLM)**
+
+**保存为 float16（用于 vLLM）**
+
 ```python
 model.save_pretrained_merged("finetune", tokenizer)
 ```
-### Conclusion
 
-You now have a complete, production-grade pipeline for fine-tuning ERNIE-4.5-VL-28B using Unsloth, covering dataset design, training, inference, and deployment.
-This workflow enables efficient multimodal training on limited hardware while preserving the model’s full reasoning capabilities.
+### 结束语
+
+现在，您已经可以使用 Unsloth 构建一套完整的生产级微调流程，用于训练 ERNIE_4.5-VL-28B 模型，涵盖数据集设计、训练、推理与部署等关键环节。
+该流程在硬件资源受限的情况下依然能够高效完成 VL 训练，并保持模型完整的多模态推理能力。
