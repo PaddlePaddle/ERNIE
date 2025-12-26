@@ -23,14 +23,17 @@ GitHub 仓库： [Unsloth](https://github.com/unslothai/unsloth)
 
 ### **安装（Installation）**
 **本地安装（推荐 Linux）：**
-```
+
+```bash
 pip install unsloth
 ```
+
 您可以在此处查看 Unsloth 的完整[安装说明[英文]。](https://docs.unsloth.ai/get-started/installing-+-updating)
 
 ### **模型加载与LoRA配置（Model Loading & LoRA Configuration）**
 **加载 ERNIE-4.5-VL 模型**
-```
+
+```python
 from unsloth import FastVisionModel # 对应 LLM 使用 FastLanguageModel
 import torch
 from transformers import AutoModelForCausalLM ,AutoProcessor
@@ -47,11 +50,13 @@ model, tokenizer = FastVisionModel.from_pretrained(
 )
 ```
 **加载 Processor 并注册图像预处理**
-```
+
+```python
 processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
 processor.eval()
 model.add_image_preprocess(processor)
 ```
+
 **配置 LoRA 适配器 (PEFT)**
 > 仅训练约 1% 参数量，在保持模型表达能力的同时显著降低显存占用，适合 28B 级 VL 模型在单卡环境下训练。
 
@@ -62,7 +67,8 @@ model.add_image_preprocess(processor)
 - 只微调语言模块
 - 或两者同时微调
 - 还可以指定仅微调 Attention 或 MLP 层
-```
+
+```python   
 model = FastVisionModel.get_peft_model(
     model,
     r=8,
@@ -82,7 +88,7 @@ model = FastVisionModel.get_peft_model(
 
 **Vision 微调统一格式：**
 
-```
+```json
 [
   {
     "role": "user",
@@ -106,14 +112,14 @@ model = FastVisionModel.get_peft_model(
 
 完整数据集：```linxy/LaTeX_OCR```
 
-```
+```python
 from datasets import load_dataset
 dataset = load_dataset("unsloth/LaTeX_OCR", split="train")
 ```
 
 **数据集必须转化为多轮对话列表，每条内容明确区分 text 和 image。**
 
-```
+```python
 instruction = "为这张图片写出对应的 LaTeX 表达式。"
 
 def convert_to_conversation(sample):
@@ -135,7 +141,7 @@ converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 
 **微调前的模型推理测试**
 
-```
+```python
 FastVisionModel.for_inference(model) # Enable for inference!
 
 image = dataset[2]["image"]
@@ -177,7 +183,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
 **使用自定义 ErnieVisionDataCollator 和自定义 ErnieSFTTrainer**
 > ERNIE-4.5-VL 使用三维 position_ids 与图像 patch token，因此无法直接复用标准 SFTTrainer 的默认 collator。
 
-```
+```python
 # @title Setup Collator & Trainer
 
 from trl import SFTTrainer, SFTConfig
@@ -370,7 +376,8 @@ class ErnieSFTTrainer(SFTTrainer):
 ### **模型训练（Train）**
 **为了快速演示，这里仅训练 30 步。**
 正式训练可设置 num_train_epochs=1 并关闭 max_steps。
-```
+
+```python
 from trl import  SFTConfig
 
 FastVisionModel.for_training(model) # Enable for training!
@@ -420,7 +427,7 @@ min_p = 0.1
 > 该组合在高温采样下仍能抑制低概率噪声 token，适合公式类结构化输出。
 👉 原因详细说明见此推文：[https://x.com/menhguin/status/1826132708508213629](https://x.com/menhguin/status/1826132708508213629)
 
-```
+```python
 FastVisionModel.for_inference(model) # Enable for inference!
 
 image = dataset[2]["image"]
@@ -460,12 +467,12 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
 ```
 ### **模型保存与加载（Saving & Loading Fine-tuned Models）**
 **保存 LoRA 适配器（不包含完整模型）**
-```
+```python
 model.save_pretrained("lora_model")
 tokenizer.save_pretrained("lora_model")
 ```
 **加载 LoRA 进行推理**
-```
+```python
 model, tokenizer = FastVisionModel.from_pretrained(
     model_name = "lora_model",
     load_in_4bit = False,
@@ -473,7 +480,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
 FastVisionModel.for_inference(model)
 ```
 **保存为 float16（用于 vLLM）**
-```
+```python
 model.save_pretrained_merged("finetune", tokenizer)
 ```
 ### 结束语

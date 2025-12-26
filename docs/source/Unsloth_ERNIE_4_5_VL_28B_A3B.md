@@ -23,14 +23,14 @@ GitHub Repository: [Unsloth](https://github.com/unslothai/unsloth)
 
 ### **Installation**
 **Local Installation (Linux Recommended)**
-```
+```bash
 pip install unsloth
 ```
 For full installation instructions, refer to the official documentation:[installation instructions (English)](https://docs.unsloth.ai/get-started/installing-+-updating)
 
 ### **Model Loading & LoRA Configuration**
 **Loading ERNIE-4.5-VL Model**
-```
+```python
 from unsloth import FastVisionModel # 对应 LLM 使用 FastLanguageModel
 import torch
 from transformers import AutoModelForCausalLM ,AutoProcessor
@@ -47,7 +47,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
 )
 ```
 **Load Processor & Register Image Preprocessing**
-```
+```python
 processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
 processor.eval()
 model.add_image_preprocess(processor)
@@ -63,7 +63,7 @@ You can choose to:
 - Fine-tune both
 - Selectively fine-tune Attention and/or MLP layers
 
-```
+```python
 model = FastVisionModel.get_peft_model(
     model,
     r=8,
@@ -83,7 +83,7 @@ model = FastVisionModel.get_peft_model(
 
 **Unified Vision Conversation Format**
 
-```
+```json
 [
   {
     "role": "user",
@@ -107,14 +107,14 @@ Subset: ```unsloth/LaTeX_OCR```
 
 Full Dataset: ```linxy/LaTeX_OCR```
 
-```
+```python
 from datasets import load_dataset
 dataset = load_dataset("unsloth/LaTeX_OCR", split="train")
 ```
 
 **The dataset must be converted into a multi-turn dialogue list, with each entry clearly distinguishing between text and image.**
 
-```
+```python
 instruction = "为这张图片写出对应的 LaTeX 表达式。"
 
 def convert_to_conversation(sample):
@@ -136,7 +136,7 @@ converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 
 **Inference Check**
 
-```
+```python
 FastVisionModel.for_inference(model) # Enable for inference!
 
 image = dataset[2]["image"]
@@ -178,7 +178,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
 **Using Custom ErnieVisionDataCollator and Custom ErnieSFTTrainer**
 > ERNIE-4.5-VL uses 3D position_ids and image patch tokens, so the default collator of the standard SFTTrainer cannot be reused.
 
-```
+```python
 # @title Setup Collator & Trainer
 
 from trl import SFTTrainer, SFTConfig
@@ -371,7 +371,8 @@ class ErnieSFTTrainer(SFTTrainer):
 ### **Model Training (Train)**
 **For quick demonstration, we only train for 30 steps.**
 For formal training, set num_train_epochs=1 and turn off max_steps.
-```
+
+```python
 from trl import  SFTConfig
 
 FastVisionModel.for_training(model) # Enable for training!
@@ -414,14 +415,16 @@ trainer_stats = trainer.train()
 ```
 ### **Inference**
 **We use:**
-```
+
+```python
 temperature = 1.5
 min_p = 0.1
 ```
+
 > This combination suppresses low-probability noise while preserving creativity — ideal for structured formula output.
 👉 For detailed reasoning, see this tweet: [https://x.com/menhguin/status/1826132708508213629](https://x.com/menhguin/status/1826132708508213629)
 
-```
+```python
 FastVisionModel.for_inference(model) # Enable for inference!
 
 image = dataset[2]["image"]
@@ -461,12 +464,12 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
 ```
 ### **Saving & Loading **
 **Save LoRA adapters**
-```
+```python
 model.save_pretrained("lora_model")
 tokenizer.save_pretrained("lora_model")
 ```
 **Load for inference**
-```
+```python
 model, tokenizer = FastVisionModel.from_pretrained(
     model_name = "lora_model",
     load_in_4bit = False,
@@ -474,7 +477,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
 FastVisionModel.for_inference(model)
 ```
 **Merge & export (float16, for vLLM)**
-```
+```python
 model.save_pretrained_merged("finetune", tokenizer)
 ```
 ### Conclusion
