@@ -16,7 +16,26 @@ jobs:
     name: Test
     runs-on: [self-hosted, ernie-8gpu]
     steps:
+      - name: Get Repo for Diff
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: check_diff_repo
+
+      - name: Check Changes
+        id: check_changes
+        run: |
+          cd check_diff_repo
+          git fetch origin ${{ github.base_ref }}
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
+          if echo "$changed_files" | grep -qE "^(data_processor|ernie|erniekit|examples|requirements|tests)/"; then
+            echo "run_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_tests=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Start Docker 
+        if: steps.check_changes.outputs.run_tests == 'true'
         run: |
           if [ ! "$(docker ps -q -f name=ERNIE_CI_Test)" ]; then
             echo "Starting Test ERNIE_CI_Test"
@@ -25,9 +44,11 @@ jobs:
             echo "ERNIE_CI_Test already running"
           fi
       - name: Cleanup Environment Cache
+        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           rm -rf /workspace/* /workspace/.[!.]* /workspace/..?*'
       - name: Get Repo
+        if: steps.check_changes.outputs.run_tests == 'true'
         env:
           ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
           ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
@@ -35,16 +56,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Check Changes
-        id: check_changes
-        run: |
-          git fetch origin ${{ github.base_ref }}
-          changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
-          if echo "$changed_files" | grep -qE "^(data_processor|ernie|erniekit|examples|requirements|tests)/"; then
-            echo "run_tests=true" >> $GITHUB_OUTPUT
-          else
-            echo "run_tests=false" >> $GITHUB_OUTPUT
-          fi
       - name: Prepare Model
         if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c ' cp -r /home/models/* /workspace '

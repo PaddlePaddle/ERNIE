@@ -19,7 +19,26 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Get Repo for Diff
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: check_diff_repo
+
+      - name: Check Changes
+        id: check_changes
+        run: |
+          cd check_diff_repo
+          git fetch origin ${{ github.base_ref }}
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
+          if echo "$changed_files" | grep -qE "^(cookbook|data_processor|ernie|erniekit|examples|requirements|tests|tools)/"; then
+            echo "run_lint=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_lint=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Container
+        if: steps.check_changes.outputs.run_lint == 'true'
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -36,12 +55,14 @@ jobs:
             -w /workspace ${docker_image}
 
       - name: Install Dependencies
+        if: steps.check_changes.outputs.run_lint == 'true'
         run: |
           docker exec -t ${container_name} /bin/bash -c '
           python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
           '
 
       - name: Get Diff
+        if: steps.check_changes.outputs.run_lint == 'true'
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -63,7 +84,7 @@ jobs:
           '
 
       - name: Terminate And Delete the Container
-        if: always()
+        if: always() && steps.check_changes.outputs.run_lint == 'true'
         run: |
           docker stop $container_name 2>/dev/null || true
           docker rm -f $container_name 2>/dev/null || true
