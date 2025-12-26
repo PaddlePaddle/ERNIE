@@ -7,7 +7,6 @@
 > - AMD 免费算力平台：https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb  
 > 你还可以将上述链接中 `nb/` 之后的路径替换为 GitHub 仓库中的其他 Notebook 文件名，以访问更多示例。
 
-
 本教程将系统性地介绍如何使用 Unsloth 对 ERNIE_4_5_VL_28B_A3B 视觉-语言模型进行高效微调，涵盖从环境安装、数据构造、LoRA 训练，到推理与模型导出的完整流程。
 
 在本教程中，你将学习如何进行：
@@ -67,8 +66,7 @@ model.add_image_preprocess(processor)
 - 只微调语言模块
 - 或两者同时微调
 - 还可以指定仅微调 Attention 或 MLP 层
-
-```python   
+```python
 model = FastVisionModel.get_peft_model(
     model,
     r=8,
@@ -420,7 +418,7 @@ trainer_stats = trainer.train()
 ```
 ### **推理（Inference）**
 **我们使用：**
-```
+```python
 temperature = 1.5
 min_p = 0.1
 ```
@@ -486,5 +484,4 @@ model.save_pretrained_merged("finetune", tokenizer)
 ### 结束语
 
 现在，您已经可以使用 Unsloth 构建一套完整的生产级微调流程，用于训练 ERNIE_4.5-VL-28B 模型，涵盖数据集设计、训练、推理与部署等关键环节。
-
 该流程在硬件资源受限的情况下依然能够高效完成 VL 训练，并保持模型完整的多模态推理能力。

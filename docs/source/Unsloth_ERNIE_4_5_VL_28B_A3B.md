@@ -7,7 +7,6 @@
 > - Free on AMD: [https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb](https://oneclickamd.ai/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb)  
 > More notebooks are available by replacing the path after `nb/` with the corresponding notebook name in the GitHub repository.
 
-
 This tutorial provides a comprehensive, end-to-end guide on how to fine-tune the **ERNIE_4_5_VL_28B_A3B** vision-language model using Unsloth, covering the complete workflow from environment setup and dataset construction to LoRA training, inference, and model export.
 
 By the end of this tutorial, you will understand how to perform:
@@ -482,6 +481,5 @@ model.save_pretrained_merged("finetune", tokenizer)
 ```
 ### Conclusion
 
-You now have a complete, production-grade pipeline for fine-tuning ERNIE-4.5-VL-28B using Unsloth, covering dataset design, training, inference, and deployment. 
-
+You now have a complete, production-grade pipeline for fine-tuning ERNIE-4.5-VL-28B using Unsloth, covering dataset design, training, inference, and deployment.
 This workflow enables efficient multimodal training on limited hardware while preserving the model’s full reasoning capabilities.
