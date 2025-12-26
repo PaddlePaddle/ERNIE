@@ -6,6 +6,13 @@ on:
       - develop
       - release/v1.0
       - ernie-4.5-vl
+    paths:
+      - 'data_processor/**'
+      - 'ernie/**'
+      - 'erniekit/**'
+      - 'examples/**'
+      - 'requirements/**'
+      - 'tests/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
