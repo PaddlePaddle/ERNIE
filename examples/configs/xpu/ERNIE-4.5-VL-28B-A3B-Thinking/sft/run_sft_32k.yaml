@@ -2,7 +2,7 @@
 stage: VL-SFT
 
 # model
-model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Paddle/
+model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Thinking/
 multimodal: true
 fuse_linear: true
 fuse_rms_norm: false
@@ -34,6 +34,7 @@ pad_to_max_seqlen: 32768
 render_timestamp: true
 serialize_output: false
 one_sample_in_one_seq: true
+chat_template: "ernie_vl_thinking"
 
 # dataloader
 dataloader_num_workers: 1
@@ -91,7 +92,7 @@ tensorwise_offload_optimizer: false
 unified_checkpoint_config: ignore_merge_optimizer
 recompute: true
 recompute_granularity: full
-refined_recompute: "global:3"
+refined_recompute: "global:2"
 pre_alloc_memory: 60
 
 # amp

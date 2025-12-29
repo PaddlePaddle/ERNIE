@@ -38,6 +38,7 @@ from .generating_args import GeneratingArguments
 from .model_args import ModelArguments
 from .server_args import ServerArguments
 from .preprocess_args import End2EndProcessorArguments
+from .env_args import EnvConfigArguments
 
 _TRAIN_ARGS = [
     ModelArguments,
@@ -291,3 +292,12 @@ def get_export_args(
         _parse_export_args(args)
     )
     return model_args, data_args, generating_args, finetuning_args, export_args
+
+
+def get_env_args(
+    args: Optional[Union[dict[str, Any], list[str]]] = None
+) -> EnvConfigArguments:
+    parser = PdArgumentParser(EnvConfigArguments)
+    allow_extra_keys = is_env_enabled("ALLOW_EXTRA_ARGS")
+    (env_args,) = _parse_args(parser, args=args, allow_extra_keys=allow_extra_keys)
+    return env_args

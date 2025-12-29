@@ -2,15 +2,15 @@
 stage: VL-SFT
 
 # model
-model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Paddle/
+model_name_or_path: baidu/ERNIE-4.5-VL-28B-A3B-Thinking/
 multimodal: true
 fuse_linear: true
 fuse_rms_norm: false
 use_flash_attention: 1
 use_moe: true
 fine_tuning: Full
-use_sparse_head_and_loss_fn: true
-use_recompute_loss_fn: true
+use_sparse_head_and_loss_fn: false
+use_recompute_loss_fn: false
 moe_group: "mp"
 moe_use_aux_free_update_coef: 0.0
 moe_aux_loss_lambda: 0.0
@@ -20,20 +20,22 @@ moe_multimodal_dispatch_use_allgather: v2-alltoall-unpad-text
 pp_seg_method: layer:Ernie4_5_DecoderLayer|ErnieDecoderLayer|EmptyLayer
 
 # data
-train_dataset_path: "examples/data/sft_vl-train_demo1.jsonl"
-train_dataset_prob: "1.0"
-text_dataset_path: ""
-text_dataset_prob: ""
-max_seq_len: 32768
+dataset_name: "FunctionCallSFTReader"
+train_dataset_path: ""
+train_dataset_prob: ""
+text_dataset_path: "examples/data/function-call-train.jsonl"
+text_dataset_prob: "1.0"
+max_seq_len: 8192
 num_samples_each_epoch: 10000000
 modality_ratio: "[1,1]"
 
 # preprocess
 variable_resolution: 1
-pad_to_max_seqlen: 32768
+pad_to_max_seqlen: 8192
 render_timestamp: true
 serialize_output: false
 one_sample_in_one_seq: true
+chat_template: "ernie_vl_thinking"
 
 # dataloader
 dataloader_num_workers: 1
@@ -89,9 +91,9 @@ save_sharding_stage1_model_include_freeze_params: true
 offload_optim: false
 tensorwise_offload_optimizer: false
 unified_checkpoint_config: ignore_merge_optimizer
+use_recompute_moe: false
 recompute: true
-recompute_granularity: full
-refined_recompute: "global:3"
+recompute_granularity: core_attn
 pre_alloc_memory: 60
 
 # amp
