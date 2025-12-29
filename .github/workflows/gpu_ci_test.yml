@@ -42,4 +42,4 @@ jobs:
           pip install -e.'
       - name: Runing case
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
-          make gpu_ci_test'
+          export FLAGS_tcp_store_using_libuv=0 && make gpu_ci_test'

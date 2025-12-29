@@ -1,0 +1,28 @@
+llama3
+================================================================================== short test summary info ===================================================================================
+FAILED scripts/regression/test_model.py::TestTrain::test_full[llama-sft] - AssertionError: Training Failed
+FAILED scripts/regression/test_model.py::TestTrain::test_full[llama-dpo] - AssertionError: [AssertionError('Resume-Training loss: 0.692937, base_loss: 0.693068, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_full[llama-pt] - AssertionError: [AssertionError('Fisrt-Training loss: 11.86996, base_loss: 11.975817, exist diff!'), AssertionError('Resume-Training loss: 11.867313, base_loss: 11.974206, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_lora[llama-sft] - AssertionError: [AssertionError('Fisrt-Training loss: 11.848728, base_loss: 11.944797, exist diff!'), AssertionError('Resume-Training loss: 11.847164, base_loss: 11.946123, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_lora[llama-dpo] - AssertionError: [AssertionError('Resume-Training loss: 0.693752, base_loss: 0.693138, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_lora[llama-pt] - AssertionError: [AssertionError('Fisrt-Training loss: 11.86996, base_loss: 11.975819, exist diff!'), AssertionError('Resume-Training loss: 11.867338, base_loss: 11.97421, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_full_tp_pp[llama-sft] - AssertionError: [AssertionError('Fisrt-Training loss: 11.850949, base_loss: 11.956945, exist diff!'), AssertionError('Resume-Training loss: 11.850901, base_loss: 11.956932, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_full_tp_pp[llama-dpo] - AssertionError: [AssertionError('Resume-Training loss: 0.693465, base_loss: 0.693116, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_full_tp_pp[llama-pt] - AssertionError: Training Failed
+FAILED scripts/regression/test_model.py::TestTrain::test_lora_tp_pp[llama-sft] - AssertionError: [AssertionError('Fisrt-Training loss: 11.850949, base_loss: 11.956937, exist diff!'), AssertionError('Resume-Training loss: 11.850845, base_loss: 11.956906, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_lora_tp_pp[llama-pt] - AssertionError: [AssertionError('Fisrt-Training loss: 11.874638, base_loss: 11.980649, exist diff!'), AssertionError('Resume-Training loss: 11.882799, base_loss: 11.983072, exist diff!')]
+FAILED scripts/regression/test_model.py::TestTrain::test_full_function_call[llama-sft] - AssertionError: [AssertionError('Fisrt-Training loss: 11.928186, base_loss: 11.955276, exist diff!'), AssertionError('Resume-Training loss: 11.941845, base_loss: 11.950663, exist diff!')]
+
+
+
+FAILED scripts/regression/test_model.py::TestTrain::test_full[qwen3_next-sft] - AssertionError: Training Failed
+FAILED scripts/regression/test_model.py::TestTrain::test_full[qwen3_next-pt] - AssertionError: [AssertionError('Fisrt-Training loss: 12.905554, base_loss: 11.975817, exist diff!'), AssertionError(...
+FAILED scripts/regression/test_model.py::TestTrain::test_lora[qwen3_next-sft] - AssertionError: [AssertionError('Fisrt-Training loss: 12.733016, base_loss: 11.944797, exist diff!'), AssertionError(...
+FAILED scripts/regression/test_model.py::TestTrain::test_lora[qwen3_next-pt] - AssertionError: [AssertionError('Fisrt-Training loss: 12.905554, base_loss: 11.975819, exist diff!'), AssertionError(...
+FAILED scripts/regression/test_model.py::TestTrain::test_full_tp_pp[qwen3_next-sft] - AssertionError: [AssertionError('Fisrt-Training loss: 12.800236, base_loss: 11.956945, exist diff!'), AssertionError(...
+FAILED scripts/regression/test_model.py::TestTrain::test_full_tp_pp[qwen3_next-pt] - AssertionError: Training Failed
+FAILED scripts/regression/test_model.py::TestTrain::test_lora_tp_pp[qwen3_next-sft] - AssertionError: [AssertionError('Fisrt-Training loss: 12.800236, base_loss: 11.956937, exist diff!'), AssertionError(...
+FAILED scripts/regression/test_model.py::TestTrain::test_lora_tp_pp[qwen3_next-pt] - AssertionError: [AssertionError('Fisrt-Training loss: 12.905737, base_loss: 11.980649, exist diff!'), AssertionError(...
+FAILED scripts/regression/test_model.py::TestTrain::test_full_function_call[qwen3_next-sft] - AssertionError: Training Failed
+======================================== 9 failed, 3 passed in 2545.74s (0:42:25) ========================================
+root@bddwd-inf-k8s-a100-a12ni6-0516.bddwd.baidu.com PaddleFormers $ export PF_HOME="/root/paddlejob/workspace/env_run/zhangjunjun/pfs-tooklits/pfs" && python -m pytest -s -v --models=qwen3_next scripts/regression/test_model.py
