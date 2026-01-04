@@ -11,24 +11,17 @@ env:
   BRANCH: ${{ github.event.pull_request.base.ref }}
   TASK: ERNIE-Codestyle-${{ github.event.pull_request.number }}
 jobs:
-  Lint:
-    name: Lint
-    runs-on: [self-hosted, ernie-cpu]
-    permissions:
-      pull-requests: write
-      contents: read
-      id-token: write
+  Check-Changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_lint: ${{ steps.check_changes.outputs.run_lint }}
     steps:
-      - name: Get Repo for Diff
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          path: diff_check
-
       - name: Check Changes
         id: check_changes
         run: |
-          cd diff_check
           git fetch origin ${{ github.base_ref }}
           changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
           if echo "$changed_files" | grep -qE "^(cookbook|data_processor|ernie|erniekit|examples|requirements|tests|tools)/"; then
@@ -37,8 +30,17 @@ jobs:
             echo "run_lint=false" >> $GITHUB_OUTPUT
           fi
 
+  Lint:
+    needs: Check-Changes
+    if: needs.Check-Changes.outputs.run_lint == 'true'
+    name: Lint
+    runs-on: [self-hosted, ernie-cpu]
+    permissions:
+      pull-requests: write
+      contents: read
+      id-token: write
+    steps:
       - name: Run Container
-        if: steps.check_changes.outputs.run_lint == 'true'
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -55,14 +57,12 @@ jobs:
             -w /workspace ${docker_image}
 
       - name: Install Dependencies
-        if: steps.check_changes.outputs.run_lint == 'true'
         run: |
           docker exec -t ${container_name} /bin/bash -c '
           python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
           '
 
       - name: Get Diff
-        if: steps.check_changes.outputs.run_lint == 'true'
         env:
           work_dir: ${{ github.workspace }}
         run: |
@@ -84,7 +84,7 @@ jobs:
           '
 
       - name: Terminate And Delete the Container
-        if: always() && steps.check_changes.outputs.run_lint == 'true'
+        if: always()
         run: |
           docker stop $container_name 2>/dev/null || true
           docker rm -f $container_name 2>/dev/null || true

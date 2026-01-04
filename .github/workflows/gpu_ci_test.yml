@@ -12,24 +12,17 @@ concurrency:
   cancel-in-progress: true
   
 jobs:
-  Test:
-    name: Test
-    runs-on: [self-hosted, ernie-8gpu]
+  Check-Changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.check_changes.outputs.run_tests }}
     steps:
-      - name: Get Repo for Diff
-        env:
-          ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
-          ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-          ACTIONS_ALLOW_UNSECURE_NODE_VERSION: true
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          path: diff_check
-
       - name: Check Changes
         id: check_changes
         run: |
-          cd diff_check
           git fetch origin ${{ github.base_ref }}
           changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
           if echo "$changed_files" | grep -qE "^(data_processor|ernie|erniekit|examples|requirements|tests)/"; then
@@ -38,8 +31,13 @@ jobs:
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
 
+  Test:
+    needs: Check-Changes
+    if: needs.Check-Changes.outputs.run_tests == 'true'
+    name: Test
+    runs-on: [self-hosted, ernie-8gpu]
+    steps:
       - name: Start Docker 
-        if: steps.check_changes.outputs.run_tests == 'true'
         run: |
           if [ ! "$(docker ps -q -f name=ERNIE_CI_Test)" ]; then
             echo "Starting Test ERNIE_CI_Test"
@@ -48,11 +46,9 @@ jobs:
             echo "ERNIE_CI_Test already running"
           fi
       - name: Cleanup Environment Cache
-        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           rm -rf /workspace/* /workspace/.[!.]* /workspace/..?*'
       - name: Get Repo
-        if: steps.check_changes.outputs.run_tests == 'true'
         env:
           ACTIONS_RUNNER_FORCED_INTERNAL_NODE_VERSION: node16
           ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
@@ -61,13 +57,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Prepare Model
-        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c ' cp -r /home/models/* /workspace '
       - name: Install erniekit
-        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           pip install -e.'
       - name: Runing case
-        if: steps.check_changes.outputs.run_tests == 'true'
         run: docker exec -t ERNIE_CI_Test /bin/bash -c '
           make gpu_ci_test'
