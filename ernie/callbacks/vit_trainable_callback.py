@@ -131,23 +131,13 @@ class VitTrainableCallback(TrainerCallback):
                 not model.balanced_image_preprocess
             ), "不支持balanced_image_preprocess"
 
-            def limao_huan_taizi_hook(
-                p,
-            ):
-                def hook(g):
-                    logger.info(f"limao hook called -- {p.name}")
-                    p._clear_dataptr()
-
-                return hook
-
             def _prepare_pipeline_inputs_func_wrapper(inner_self, data):
                 def wrap(micro_data):
                     inputs, labels = micro_data
-                    if args.pipeline_parallel_rank == 0 and inputs[2] is not None:
-                        fea = inputs[2]
+                    if args.pipeline_parallel_rank == 0 and inputs[3] is not None:
+                        fea = inputs[3]
                         self.images_features.append(fea)
                         fea.stop_gradient = False
-                        # fea.register_hook(limao_huan_taizi_hook(fea))
                     return (inputs, labels)
 
                 return (wrap(i) for i in ori_prepare_pipeline_inputs_func(data))
