@@ -48,7 +48,7 @@ python -m pip install opencv-python-headless
 python -m pip install numpy==1.26.4
 ```
 
-更多安装方式请参考 [ERNIEKit-安装文档](./erniekit.md#2-installation)。
+更多安装方式请参考 [ERNIEKit-安装文档](./erniekit.zh.md#2)。
 
 ## 3. 模型和数据集准备
 

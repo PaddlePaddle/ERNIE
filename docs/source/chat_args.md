@@ -9,7 +9,6 @@ Each parameter is documented with its type, default value and detailed descripti
 
 ## 1. Model Serving Deployment Configuration
 
-
 | Parameter Name | Type | Default Value | Description |
 | --- | --- | --- | --- |
 | `model_name_or_path` | str | None | Model name or path |
