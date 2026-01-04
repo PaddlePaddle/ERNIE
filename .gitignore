@@ -9,3 +9,4 @@ demo_data/index-cache
 log
 docs/site/
 uv.lock
+.DS_Store

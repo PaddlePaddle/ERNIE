@@ -11,7 +11,28 @@ env:
   BRANCH: ${{ github.event.pull_request.base.ref }}
   TASK: ERNIE-Codestyle-${{ github.event.pull_request.number }}
 jobs:
+  Check-Changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_lint: ${{ steps.check_changes.outputs.run_lint }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check Changes
+        id: check_changes
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
+          if echo "$changed_files" | grep -qE "^(cookbook|data_processor|ernie|erniekit|examples|requirements|tests|tools)/"; then
+            echo "run_lint=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_lint=false" >> $GITHUB_OUTPUT
+          fi
+
   Lint:
+    needs: Check-Changes
+    if: needs.Check-Changes.outputs.run_lint == 'true'
     name: Lint
     runs-on: [self-hosted, ernie-cpu-01]
     permissions:

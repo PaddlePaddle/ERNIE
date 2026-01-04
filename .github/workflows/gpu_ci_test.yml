@@ -12,7 +12,28 @@ concurrency:
   cancel-in-progress: true
   
 jobs:
+  Check-Changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.check_changes.outputs.run_tests }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check Changes
+        id: check_changes
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
+          if echo "$changed_files" | grep -qE "^(data_processor|ernie|erniekit|examples|requirements|tests)/"; then
+            echo "run_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_tests=false" >> $GITHUB_OUTPUT
+          fi
+
   Test:
+    needs: Check-Changes
+    if: needs.Check-Changes.outputs.run_tests == 'true'
     name: Test
     runs-on: [self-hosted, ernie-8gpu]
     steps:
