@@ -41,7 +41,7 @@ from paddle.io import DataLoader
 
 from setuptools._distutils.util import strtobool
 
-from paddleformers.peft import LoRAModel, PrefixModelForCausalLM
+from paddleformers.peft import LoRAModel
 from paddleformers.trainer import (
     speed_metrics,
 )
@@ -829,9 +829,7 @@ class SFTTrainer(PretrainingTrainer):
             logger.info(
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
-            if isinstance(self.model, LoRAModel) or isinstance(
-                self.model, PrefixModelForCausalLM
-            ):
+            if isinstance(self.model, LoRAModel):
                 self._load_best_model_from_peft_checkpoint()
             else:
                 weight_name = PADDLE_WEIGHTS_NAME

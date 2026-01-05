@@ -35,7 +35,7 @@ jobs:
     needs: Check-Changes
     if: needs.Check-Changes.outputs.run_tests == 'true'
     name: Test
-    runs-on: [self-hosted, ernie-8gpu]
+    runs-on: [self-hosted, ernie-8gpu-1]
     steps:
       - name: Start Docker 
         run: |
