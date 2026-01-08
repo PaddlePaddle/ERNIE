@@ -28,7 +28,11 @@ from bot_requests import BotClient
 
 os.environ["NO_PROXY"] = "localhost,127.0.0.1"  # Disable proxy
 
-logging.root.setLevel(logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 MULTI_MODEL_PREFIX = "ERNIE-4.5-VL"
 
