@@ -5,7 +5,7 @@ moviepy
 GPUtil
 openai
 gradio
-opencv-python==4.5.5.64
+opencv-python==4.8.1.78
 imgaug==0.4.0
 triton==3.3
 use-triton-in-paddle
