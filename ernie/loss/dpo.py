@@ -312,6 +312,8 @@ class ErnieDPOCriterion(DPOCriterion):
             policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps, score_deltas
         )
         loss = dpo_loss + sft_loss
+        if "iluvatar" in paddle.get_device():
+            paddle.device.empty_cache()
         if self.use_infohub:
             infohub.policy_chosen_logps.append(policy_chosen_logps.detach())
             infohub.policy_rejected_logps.append(policy_rejected_logps.detach())
