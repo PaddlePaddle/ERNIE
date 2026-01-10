@@ -43,6 +43,7 @@ from paddleformers.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions as _CausalLMOutput,
 )
 from paddleformers.transformers.model_utils import PretrainedModel, register_base_model
+from paddleformers.transformers.utils import get_scale_by_dtype
 from paddleformers.utils.log import logger
 
 from .configuration import Ernie4_5_MoeConfig
@@ -1828,9 +1829,22 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
         """Avoid using attention_mask with flash_attn on generation."""
         if self.config.use_flash_attention:
             return None
-        return super().prepare_attention_mask_for_generation(
-            input_ids, pad_token_id, eos_token_id
-        )
+        else:
+            is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
+                input_ids == pad_token_id
+            ).item()
+            is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+                (eos_token_id is not None) and (pad_token_id != eos_token_id)
+            )
+            if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+                attention_mask = (input_ids == pad_token_id).astype(
+                    paddle.get_default_dtype()
+                ) * get_scale_by_dtype(return_positive=False)
+            else:
+                attention_mask = paddle.zeros_like(
+                    input_ids, dtype=paddle.get_default_dtype()
+                )
+            return attention_mask
 
     def prepare_inputs_for_generation(
         self,
@@ -1943,7 +1957,9 @@ class Ernie4_5_MoeForCausalLM(Ernie4_5_PretrainedModel):
             model_kwargs["attention_mask"] = paddle.concat(
                 [
                     attention_mask,
-                    paddle.ones([attention_mask.shape[0], 1], dtype="int64"),
+                    paddle.ones(
+                        [attention_mask.shape[0], 1], dtype=attention_mask.dtype
+                    ),
                 ],
                 axis=-1,
             )

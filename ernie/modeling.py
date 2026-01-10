@@ -987,24 +987,47 @@ class Ernie4_5_Attention(nn.Layer):
         k = paddle.repeat_interleave(k, replicate, axis=1)
         v = paddle.repeat_interleave(v, replicate, axis=1)
 
-        scale_qk_coeff = self.config.scale_qk_coeff * self.head_dim**0.5
-        attention_mask = paddle.where(
-            attention_mask,
-            paddle.to_tensor(0.0, dtype=q.dtype),
-            paddle.finfo(q.dtype).min,
-        )
-        product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
+        scale_qk_coeff = self.config.get("scale_qk_coeff", 1.0) * self.head_dim**0.5
+        if attention_mask.ndim == 2:
+            bsz, seq_len = attention_mask.shape
+            if q.shape[-2] > 1:
+                padding_mask = paddle.ones([bsz, 1, seq_len, seq_len])
 
-        product = product.cast(paddle.float32)
-        if self.config.scale_qk_coeff != 1.0:
-            product = product.scale(self.config.scale_qk_coeff)
+                for i in range(seq_len):
+                    if int(~attention_mask[..., i]) == 0:
+                        padding_mask[..., i, :] = 0
 
-        if attention_mask is not None:
-            attention_mask = attention_mask.cast(paddle.float32)
-            if self.config.fuse_softmax_mask:
-                weights = incubate.softmax_mask_fuse(product, attention_mask)
+                expaned_attn_mask = (
+                    paddle.ones([attention_mask.shape[0], 1, seq_len, seq_len])
+                    * padding_mask
+                )
+                causal_attention_mask = paddle.tril(expaned_attn_mask).astype(q.dtype)
+                causal_attention_mask = paddle.where(
+                    causal_attention_mask > 0,
+                    paddle.to_tensor(0, dtype=q.dtype),
+                    paddle.finfo(q.dtype).min,
+                )
             else:
-                product = product + attention_mask
+                causal_attention_mask = paddle.zeros(
+                    [attention_mask.shape[0], 1, 1, seq_len]
+                )
+        elif attention_mask.ndim == 4 and attention_mask.dtype == bool:
+            causal_attention_mask = paddle.where(
+                attention_mask,
+                paddle.to_tensor(0.0, dtype=q.dtype),
+                paddle.finfo(q.dtype).min,
+            )
+        else:
+            causal_attention_mask = None
+        product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
+        product = product.cast(paddle.float32)
+
+        if causal_attention_mask is not None:
+            causal_attention_mask = causal_attention_mask.cast(paddle.float32)
+            if self.config.fuse_softmax_mask:
+                weights = incubate.softmax_mask_fuse(product, causal_attention_mask)
+            else:
+                product = product + causal_attention_mask
                 weights = F.softmax(product)
         else:
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
