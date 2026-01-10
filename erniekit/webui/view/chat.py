@@ -39,7 +39,7 @@ def build(manager):
     default_system_prompt = config.get_default_user_dict("chat", "system_prompt")
     default_thought_checkbox = config.get_default_user_dict("chat", "thought_checkbox")
 
-    with gr.Tab() as chat_tab:
+    with gr.Tab("chat_tab") as chat_tab:
         chat_info = gr.HTML()
 
         with gr.Row():

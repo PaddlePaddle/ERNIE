@@ -16,6 +16,7 @@
 The startup interface of ErnieKit WebUI
 """
 
+import os
 import resource
 import sys
 from pathlib import Path
@@ -34,6 +35,21 @@ from view import basic, chat, eval, export, train  # noqa: E402
 from view.style import CSS, html_log  # noqa: E402
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def is_env_enabled(env_name: str) -> bool:
+    """Check if environment variables are enabled"""
+    return os.getenv(env_name, "").lower() in ["true", "1", "yes"]
+
+
+def fix_proxy(ipv6_enabled: bool = False) -> None:
+    """Fix Gradio UI proxy settings to prevent local connections from being disrupted by proxies"""
+    os.environ["no_proxy"] = "localhost,127.0.0.1,0.0.0.0"
+    if ipv6_enabled:
+        os.environ.pop("http_proxy", None)
+        os.environ.pop("HTTP_PROXY", None)
+        os.environ.pop("https_proxy", None)
+        os.environ.pop("HTTPS_PROXY", None)
 
 
 def create_ui():
@@ -55,14 +71,22 @@ def create_ui():
             manager.setup_language_switching(language, demo, alert)
 
         manager.setup_component_tracking(demo)
-
     return demo
 
 
 def run_webui():
+    # Read environment variable configuration
+    gradio_ipv6 = is_env_enabled("GRADIO_IPV6")
+    gradio_share = is_env_enabled("GRADIO_SHARE")
+    server_name = os.getenv("GRADIO_SERVER_NAME", "[::]" if gradio_ipv6 else "0.0.0.0")
+
+    # Fix proxy settings to avoid network interference
+    fix_proxy(ipv6_enabled=gradio_ipv6)
+
     print("Starting ErnieKit WebUI")
+
     demo = create_ui()
-    demo.queue().launch(server_name="0.0.0.0", share=False)
+    demo.queue().launch(server_name=server_name, share=gradio_share, inbrowser=True)
 
 
 if __name__ == "__main__":

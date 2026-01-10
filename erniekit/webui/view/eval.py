@@ -45,7 +45,7 @@ def build(manager):
     )
     default_eval_logging_dir = config.get_default_user_dict("eval", "logging_dir")
 
-    with gr.Tab() as eval_tab:
+    with gr.Tab("eval_tab") as eval_tab:
         with gr.Row():
             eval_dataset_path = gr.Textbox(
                 value=default_eval_dataset_path,

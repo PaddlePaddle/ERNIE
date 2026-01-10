@@ -124,7 +124,7 @@ def build(manager):
     )
     default_train_text_dataset = config.get_default_user_dict("train", "text_dataset")
 
-    with gr.Tab() as train_tab:
+    with gr.Tab("train_tab") as train_tab:
         with gr.Row():
             best_config = gr.Dropdown(
                 choices=config.get_choices_kwargs("best_config"),

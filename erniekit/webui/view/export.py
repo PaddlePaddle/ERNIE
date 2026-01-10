@@ -32,7 +32,7 @@ def build(manager):
 
     default_max_shard_size = config.get_default_user_dict("export", "max_shard_size")
 
-    with gr.Tab() as export_tab:
+    with gr.Tab("export_tab") as export_tab:
         with gr.Row():
             max_shard_size = gr.Slider(
                 minimum=1,

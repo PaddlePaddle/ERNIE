@@ -4,7 +4,7 @@ decord
 moviepy
 GPUtil
 openai
-gradio
+gradio==5.42.0
 opencv-python==4.5.5.64
 imgaug==0.4.0
 triton==3.3

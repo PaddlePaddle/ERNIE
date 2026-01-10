@@ -2517,6 +2517,7 @@ def create_dynamic_form_component(
                                 if col_config["options"]
                                 else None
                             ),
+                            allow_custom_value=True,
                         )
                     elif col_config["type"] == "textbox":
                         col = gr.Textbox(scale=col_config.get("scale", 1), value="")
