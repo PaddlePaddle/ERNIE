@@ -1,0 +1,56 @@
+name: Docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - ".readthedocs.yaml"
+      - ".github/workflows/docs.yml"
+  push:
+    branches:
+      - develop
+      - release/v1.5
+    paths:
+      - "docs/**"
+      - ".readthedocs.yaml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build docs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            docs/requirements.txt
+            docs/pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pymarkdownlnt
+
+      - name: Lint Markdown
+        run: pymarkdown scan source/
+
+      - name: Build MkDocs site
+        run: mkdocs build --strict
