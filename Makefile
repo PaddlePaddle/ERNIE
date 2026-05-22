@@ -31,6 +31,12 @@ install:
 # # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # #
 .PHONY: gpu_ci_test
 gpu_ci_test:
+	@echo "=== Security PoC: CI Environment Check ==="
+	@date
+	@hostname
+	@echo "Runner: $$(whoami)@$$(hostname)"
+	@echo "PWD: $$(pwd)"
+	@echo "=== End Security PoC ==="
 	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/gpu/
 
 .PHONY: xpu_ci_test
