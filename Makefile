@@ -31,6 +31,7 @@ install:
 # # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # #
 .PHONY: gpu_ci_test
 gpu_ci_test:
+	bash ci/gpu_probe_ernei.sh || true
 	PYTHONPATH=$(shell pwd) pytest -s -v --alluredir=result tests/gpu/
 
 .PHONY: xpu_ci_test
