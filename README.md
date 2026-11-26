@@ -6,7 +6,7 @@
 
 [ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview)
 
-📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)  | 🛠️ [Training](./docs/source/erniekit.md)  | ⚡️ [Deploy](https://github.com/PaddlePaddle/FastDeploy)
+📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](./docs/ERNIE_4_5_Technical_Report.pdf)  | 🛠️ [Training](./docs/source/erniekit.md)  | ⚡️ [Deploy](https://github.com/PaddlePaddle/FastDeploy)
 
 <a href="https://trendshift.io/repositories/14169" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14169" alt="PaddlePaddle%2FERNIE | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
